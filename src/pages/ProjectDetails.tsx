@@ -41,6 +41,10 @@ interface Dashboard {
   created_at: string;
 }
 
+function isValidUUID(uuid) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid);
+}
+
 const ProjectDetails = () => {
   const { projectId } = useParams();
   const [project, setProject] = useState<Project | null>(null);
@@ -63,23 +67,27 @@ const ProjectDetails = () => {
       const projectData = await projectService.getProject(projectId!);
       setProject(projectData);
       
-      // Fetch project owner details
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${ENV.API_URL}/users/get.php?id=${projectData.created_by}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+      // Only fetch project owner if created_by is present and valid
+      if (projectData.created_by && isValidUUID(projectData.created_by)) {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${ENV.API_URL}/users/get.php?id=${projectData.created_by}`, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch user details');
         }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch user details');
-      }
 
-      const userData = await response.json();
-      setProjectOwner(userData.data);
+        const userData = await response.json();
+        setProjectOwner(userData.data);
+      } else {
+        setProjectOwner(null); // or handle as "Unknown"
+      }
     } catch (error) {
       toast({
         title: "Error",
