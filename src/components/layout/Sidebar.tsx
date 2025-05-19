@@ -73,11 +73,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 icon={<Bug className="h-5 w-5" />} 
                 label="Bugs" 
               />
-              {/* <NavLink 
+              <NavLink 
                 to="/fixes" 
                 icon={<CheckCircle className="h-5 w-5" />} 
                 label="Fixes" 
-              /> */}
+              />
               <NavLink 
                 to="/activity" 
                 icon={<ActivitySquare className="h-5 w-5" />} 

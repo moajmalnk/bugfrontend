@@ -469,9 +469,6 @@ const NewBug = () => {
                 </div>
               </div>
               
-              <p className="text-xs text-muted-foreground">
-                Note: In this demo, files are stored temporarily in the browser and will be lost on page refresh.
-              </p>
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">

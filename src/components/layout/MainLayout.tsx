@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Sidebar } from './Sidebar';
 import { UserNav } from './UserNav';
-import { BellIcon, MenuIcon, Sun, Moon } from 'lucide-react';
+import { BellIcon, MenuIcon, Sun, Moon, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Sheet,
@@ -25,12 +25,21 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [privacyMode, setPrivacyMode] = useState(() => localStorage.getItem('privacyMode') === 'true');
 
   useEffect(() => {
     if (!isLoading && !currentUser) {
       navigate('/login', { replace: true });
     }
   }, [currentUser, isLoading, navigate]);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setPrivacyMode(localStorage.getItem('privacyMode') === 'true');
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   if (isLoading) {
     return (
