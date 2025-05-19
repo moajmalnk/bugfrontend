@@ -57,12 +57,12 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
         <ScrollArea className="flex-1">
           <div className="space-y-4 px-1">
             <div>
-              <h3 className="text-xs font-medium px-2 mb-2 text-muted-foreground">NAVIGATION</h3>
+              {/* <h3 className="text-xs font-medium px-2 mb-2 text-muted-foreground">NAVIGATION</h3>
               <NavLink 
                 to="/dashboard" 
                 icon={<LayoutDashboard className="h-5 w-5" />} 
                 label="Dashboard" 
-              />
+              /> */}
               <NavLink 
                 to="/projects" 
                 icon={<FolderKanban className="h-5 w-5" />} 

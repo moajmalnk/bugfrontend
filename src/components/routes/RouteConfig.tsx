@@ -174,7 +174,7 @@ const RouteConfig = () => {
         element={
           <ProtectedRoute>
             <Suspense fallback={<LoadingFallback />}>
-              <Dashboard />
+              <Projects />
             </Suspense>
           </ProtectedRoute>
         }
