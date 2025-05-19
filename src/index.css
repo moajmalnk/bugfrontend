@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -103,4 +102,12 @@
 
 .status-declined {
   @apply text-bugstatus-declined;
+}
+
+.dialog-close {
+  display: none !important;
+}
+
+.absolute.right-4.top-4 {
+  display: none !important;
 }
