@@ -10,6 +10,10 @@ export function KeyboardShortcuts() {
         e.preventDefault();
         navigate("/bugs/new", { state: { from: window.location.pathname } });
       }
+      if (e.ctrlKey && e.shiftKey && (e.key === "f" || e.key === "F")) {
+        e.preventDefault();
+        navigate("/fixes", { state: { from: window.location.pathname } });
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
