@@ -13,6 +13,8 @@ import { LastUpdatedSection } from './LastUpdatedSection';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
+import { useState } from "react";
+import { bugService } from "@/services/bugService";
 
 interface BugDetailsCardProps {
   bug: Bug;
@@ -44,6 +46,31 @@ export const BugDetailsCard = ({
     rejected: 'text-bugstatus-declined',
   };
   
+  const [updating, setUpdating] = useState(false);
+  const [bugState, setBugState] = useState(bug); // local state for bug
+
+  const handleUpdate = async (field: "status" | "priority", value: string) => {
+    setUpdating(true);
+    try {
+      const updatedBug = { ...bugState, [field]: value };
+      // Call your update API (make sure it matches your backend)
+      await bugService.updateBug(updatedBug);
+      setBugState(updatedBug);
+      toast({
+        title: "Success",
+        description: `Bug ${field} updated successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to update bug ${field}.`,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+  
   const handleStatusChange = (status: BugStatus) => {
     return updateBugStatus(bug.id, status);
   };
@@ -58,14 +85,9 @@ export const BugDetailsCard = ({
           <Label className="text-xs sm:text-sm">Status</Label>
           {canUpdateStatus ? (
             <Select
-              value={bug.status}
-              onValueChange={() => {
-                toast({
-                  title: "Coming Soon",
-                  description: "Bug status update functionality will be available soon.",
-                  variant: "default"
-                });
-              }}
+              value={bugState.status}
+              onValueChange={(value) => handleUpdate("status", value)}
+              disabled={updating}
             >
               <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm">
                 <SelectValue />
@@ -75,6 +97,7 @@ export const BugDetailsCard = ({
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="fixed">Fixed</SelectItem>
                 <SelectItem value="declined">Declined</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
             </Select>
           ) : (
@@ -86,9 +109,26 @@ export const BugDetailsCard = ({
 
         <div className="space-y-1.5">
           <Label className="text-xs sm:text-sm">Priority</Label>
-          <div className="p-2 border rounded-md text-xs sm:text-sm">
-            <span className="capitalize">{bug.priority}</span>
-          </div>
+          {canUpdateStatus ? (
+            <Select
+              value={bugState.priority}
+              onValueChange={(value) => handleUpdate("priority", value)}
+              disabled={updating}
+            >
+              <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="p-2 border rounded-md text-xs sm:text-sm">
+              <span className="capitalize">{bug.priority}</span>
+            </div>
+          )}
         </div>
 
         <div className="space-y-1.5">

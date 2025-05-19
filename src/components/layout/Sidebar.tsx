@@ -12,9 +12,11 @@ import {
   ActivitySquare,
   FileBarChart,
   CheckCircle,
-  MessageCircle
+  MessageCircle,
+  Menu
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState } from "react";
 
 interface SidebarProps {
   className?: string;
@@ -71,11 +73,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 icon={<Bug className="h-5 w-5" />} 
                 label="Bugs" 
               />
-              <NavLink 
+              {/* <NavLink 
                 to="/fixes" 
                 icon={<CheckCircle className="h-5 w-5" />} 
                 label="Fixes" 
-              />
+              /> */}
               <NavLink 
                 to="/activity" 
                 icon={<ActivitySquare className="h-5 w-5" />} 
@@ -135,3 +137,41 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     </div>
   );
 };
+
+export default function MainLayout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  return (
+    <div className="flex h-screen">
+      {/* Sidebar for desktop */}
+      <div className="hidden md:block w-64">
+        <Sidebar />
+      </div>
+
+      {/* Sidebar drawer for mobile */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 md:hidden ${sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        onClick={() => setSidebarOpen(false)}
+      >
+        <div
+          className={`absolute left-0 top-0 h-full w-64 bg-card shadow-lg transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+          onClick={e => e.stopPropagation()}
+        >
+          <Sidebar closeSidebar={() => setSidebarOpen(false)} />
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col">
+        {/* Top bar with menu button on mobile */}
+        <div className="md:hidden flex items-center p-2 border-b bg-background">
+          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+            <Menu className="h-6 w-6" />
+          </Button>
+          <span className="ml-2 font-bold text-lg">BugRacer</span>
+        </div>
+        <main className="flex-1 overflow-y-auto">{children}</main>
+      </div>
+    </div>
+  );
+}

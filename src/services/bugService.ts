@@ -24,7 +24,7 @@ export const bugService = {
       }
 
       const data = await response.json();
-      return data.data || [];
+      return Array.isArray(data.data?.bugs) ? data.data.bugs : [];
     } catch (error) {
       console.error('Error fetching bugs:', error);
       throw error;
@@ -84,8 +84,8 @@ export const bugService = {
   async updateBug(bug: Bug): Promise<Bug> {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/update.php?id=${bug.id}`, {
-        method: 'PUT',
+      const response = await fetch(`${API_URL}/update.php`, {
+        method: 'POST',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',

@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
-import axios from 'axios';
+import { apiClient } from '@/lib/axios';
 import { useQueryClient } from '@tanstack/react-query';
 
 const formSchema = z.object({
@@ -83,9 +83,10 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.put<ApiResponse<Bug>>(
-        `/Bugricer/backend/api/bugs/update.php?id=${bug.id}`, 
+      const response = await apiClient.post<ApiResponse<Bug>>(
+        '/bugs/update.php',
         {
+          id: bug.id,
           title: values.title,
           description: values.description,
           priority: values.priority,

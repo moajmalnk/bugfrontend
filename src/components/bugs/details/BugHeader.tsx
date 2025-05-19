@@ -1,8 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
 import { Bug } from '@/types';
+import EditBugDialog from '@/components/bugs/EditBugDialog';
 
 interface BugHeaderProps {
   bug: Bug;
@@ -41,20 +41,15 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug }: BugHeaderPr
         </div>
         
         {canEditBug && (
-          <Button 
-            variant="outline"
-            size="sm"
-            className="w-full sm:w-auto h-8 sm:h-9 text-xs sm:text-sm"
-            onClick={() => {
-              toast({
-                title: "Coming Soon",
-                description: "Bug editing functionality will be available soon.",
-                variant: "default"
-              });
-            }}
-          >
-            Edit Bug
-          </Button>
+          <EditBugDialog bug={bug}>
+            <Button 
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto h-8 sm:h-9 text-xs sm:text-sm"
+            >
+              Edit Bug
+            </Button>
+          </EditBugDialog>
         )}
       </div>
     </div>
