@@ -21,7 +21,7 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated && !isAuthLoading) {
-      navigate('/dashboard');
+      navigate('/projects');
     }
   }, [isAuthenticated, isAuthLoading, navigate]);
 
@@ -47,7 +47,7 @@ const Login = () => {
     try {
       const success = await login(username, password);
       if (success) {
-        navigate('/dashboard');
+        navigate('/projects');
       } else {
         toast({
           title: "Login failed",

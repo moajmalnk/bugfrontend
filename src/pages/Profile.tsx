@@ -18,7 +18,7 @@ export default function Profile() {
       <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-8">
         <div className="w-32 h-32 rounded-full overflow-hidden">
           <img
-            src={currentUser.avatar}
+            src="https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png"
             alt={currentUser.name}
             className="w-full h-full object-cover"
           />
@@ -33,7 +33,7 @@ export default function Profile() {
             </Button>
             <Button variant="outline" size="sm">
               <MapPin className="w-4 h-4 mr-2" />
-              San Francisco, CA
+              CODO AI Innovations
             </Button>
           </div>
         </div>
