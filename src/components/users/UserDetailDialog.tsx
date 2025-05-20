@@ -11,9 +11,9 @@ import { User } from "@/types";
 import { format, formatDistanceToNow } from "date-fns";
 import { AtSign, Bug, Calendar, Code2, Mail, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
-import { EditUserDialog } from "./EditUserDialog";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
+import { EditUserDialog } from "./EditUserDialog";
 
 interface UserStats {
   total_projects: number;
@@ -184,10 +184,7 @@ export function UserDetailDialog({
               user={user}
               onPasswordChange={onPasswordChange}
             />
-            <DeleteUserDialog
-              user={user}
-              onUserDelete={onUserDelete}
-            />
+            <DeleteUserDialog user={user} onUserDelete={onUserDelete} />
           </div>
 
           {/* Stats and Recent Activity */}
