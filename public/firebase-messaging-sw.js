@@ -16,6 +16,6 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function(payload) {
   self.registration.showNotification(payload.notification.title, {
     body: payload.notification.body,
-    icon: 'frontend/public/favicon.ico'
+    icon: '/favicon.ico'
   });
 });
