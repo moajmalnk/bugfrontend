@@ -1,33 +1,19 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Shield, 
-  Code2, 
-  Bug,
-  MoreHorizontal,
-  UserPlus,
-  Pencil,
-  Key,
-  Trash2
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
-import { AddUserDialog } from '@/components/users/AddUserDialog';
-import { EditUserDialog } from '@/components/users/EditUserDialog';
-import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
-import { ChangePasswordDialog } from '@/components/users/ChangePasswordDialog';
-import { User, UserRole } from '@/types';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { UserDetailDialog } from '@/components/users/UserDetailDialog';
-import { ENV } from '@/lib/env';
+import { toast } from "@/components/ui/use-toast";
+import { AddUserDialog } from "@/components/users/AddUserDialog";
+import { UserDetailDialog } from "@/components/users/UserDetailDialog";
+import { useAuth } from "@/context/AuthContext";
+import { ENV } from "@/lib/env";
+import { User, UserRole } from "@/types";
+import { Bug, Code2, Shield } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface NewUser {
   name: string;
@@ -47,25 +33,29 @@ const Users = () => {
     try {
       const response = await fetch(`${ENV.API_URL}/users/get.php`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to fetch users');
+        throw new Error("Failed to fetch users");
       }
 
       const data = await response.json();
       if (data.success) {
-        setUsers(data.data.map((user: any) => ({
-          ...user,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username)}&background=3b82f6&color=fff`
-        })));
+        setUsers(
+          data.data.map((user: any) => ({
+            ...user,
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              user.username
+            )}&background=3b82f6&color=fff`,
+          }))
+        );
       } else {
-        throw new Error(data.message || 'Failed to fetch users');
+        throw new Error(data.message || "Failed to fetch users");
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
       toast({
         title: "Error",
         description: "Failed to load users. Please try again.",
@@ -82,11 +72,11 @@ const Users = () => {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'admin':
+      case "admin":
         return <Shield className="h-5 w-5 text-blue-500" />;
-      case 'developer':
+      case "developer":
         return <Code2 className="h-5 w-5 text-green-500" />;
-      case 'tester':
+      case "tester":
         return <Bug className="h-5 w-5 text-yellow-500" />;
       default:
         return null;
@@ -96,23 +86,25 @@ const Users = () => {
   const handleAddUser = async (userData: NewUser) => {
     try {
       const response = await fetch(`${ENV.API_URL}/users/create.php`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify(userData)
+        body: JSON.stringify(userData),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add user');
+        throw new Error("Failed to add user");
       }
 
       const data = await response.json();
       if (data.success) {
         const newUser = {
           ...data.data,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=3b82f6&color=fff`
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+            userData.username
+          )}&background=3b82f6&color=fff`,
         };
         setUsers([...users, newUser]);
         toast({
@@ -121,10 +113,10 @@ const Users = () => {
         });
         return true;
       } else {
-        throw new Error(data.message || 'Failed to add user');
+        throw new Error(data.message || "Failed to add user");
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
       toast({
         title: "Error",
         description: "Failed to add user. Please try again.",
@@ -137,30 +129,32 @@ const Users = () => {
   const handleUpdateUser = async (updatedUser: User) => {
     try {
       const response = await fetch(`${ENV.API_URL}/users/update.php`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify(updatedUser)
+        body: JSON.stringify(updatedUser),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update user');
+        throw new Error("Failed to update user");
       }
 
       const data = await response.json();
       if (data.success) {
-        setUsers(users.map(user => user.id === updatedUser.id ? updatedUser : user));
+        setUsers(
+          users.map((user) => (user.id === updatedUser.id ? updatedUser : user))
+        );
         toast({
           title: "Success",
           description: "User has been updated successfully.",
         });
       } else {
-        throw new Error(data.message || 'Failed to update user');
+        throw new Error(data.message || "Failed to update user");
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
       toast({
         title: "Error",
         description: "Failed to update user. Please try again.",
@@ -171,29 +165,32 @@ const Users = () => {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      const response = await fetch(`${ENV.API_URL}/users/delete.php?id=${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      const response = await fetch(
+        `${ENV.API_URL}/users/delete.php?id=${userId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
-      });
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to delete user');
+        throw new Error("Failed to delete user");
       }
 
       const data = await response.json();
       if (data.success) {
-        setUsers(users.filter(user => user.id !== userId));
+        setUsers(users.filter((user) => user.id !== userId));
         toast({
           title: "Success",
           description: "User has been deleted successfully.",
         });
       } else {
-        throw new Error(data.message || 'Failed to delete user');
+        throw new Error(data.message || "Failed to delete user");
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
       toast({
         title: "Error",
         description: "Failed to delete user. Please try again.",
@@ -203,11 +200,13 @@ const Users = () => {
   };
 
   // Only admin should access this page
-  if (currentUser?.role !== 'admin') {
+  if (currentUser?.role !== "admin") {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
-        <p className="text-muted-foreground">Only administrators can access the user management page.</p>
+        <p className="text-muted-foreground">
+          Only administrators can access the user management page.
+        </p>
       </div>
     );
   }
@@ -224,7 +223,9 @@ const Users = () => {
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight break-words">User Management</h1>
+          <h1 className="text-2xl font-bold tracking-tight break-words">
+            User Management
+          </h1>
           <p className="text-muted-foreground mt-1 break-words max-w-xl">
             Manage your team members and their access levels
           </p>
@@ -233,20 +234,18 @@ const Users = () => {
           <AddUserDialog onUserAdd={handleAddUser} />
         </div>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle className="break-words">BugRacer Users</CardTitle>
-          <CardDescription>
-            Total users: {users.length}
-          </CardDescription>
+          <CardDescription>Total users: {users.length}</CardDescription>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[calc(100vh-20rem)]">
             <div className="space-y-4">
               {users.map((user) => (
-                <div 
-                  key={user.id} 
+                <div
+                  key={user.id}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors gap-4 cursor-pointer"
                   onClick={() => setSelectedUser(user)}
                 >
@@ -269,10 +268,12 @@ const Users = () => {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
                     <div className="flex items-center bg-accent/50 px-3 py-1 rounded-full shrink-0">
                       {getRoleIcon(user.role)}
-                      <span className="ml-2 text-sm capitalize">{user.role}</span>
+                      <span className="ml-2 text-sm capitalize">
+                        {user.role}
+                      </span>
                     </div>
-                    
-                    <DropdownMenu>
+
+                    {/* <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           <MoreHorizontal className="h-4 w-4" />
@@ -294,7 +295,7 @@ const Users = () => {
                           <span>Delete User</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                    </DropdownMenu> */}
                   </div>
                 </div>
               ))}
@@ -308,6 +309,17 @@ const Users = () => {
           user={selectedUser}
           open={!!selectedUser}
           onOpenChange={(open) => !open && setSelectedUser(null)}
+          onUserUpdate={handleUpdateUser}
+          onUserDelete={handleDeleteUser}
+          onPasswordChange={async (userId: string, newPassword: string) => {
+            // You may want to implement this or pass a real handler
+            // For now, just show a toast or do nothing
+            toast({
+              title: "Password Change",
+              description: "Password change handler not implemented.",
+              variant: "destructive",
+            });
+          }}
         />
       )}
     </div>
