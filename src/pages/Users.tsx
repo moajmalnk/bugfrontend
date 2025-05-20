@@ -221,18 +221,22 @@ const Users = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6 max-w-7xl">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
-          <p className="text-muted-foreground mt-1">Manage your team members and their access levels</p>
+          <h1 className="text-2xl font-bold tracking-tight break-words">User Management</h1>
+          <p className="text-muted-foreground mt-1 break-words max-w-xl">
+            Manage your team members and their access levels
+          </p>
         </div>
-        <AddUserDialog onUserAdd={handleAddUser} />
+        <div className="w-full sm:w-auto">
+          <AddUserDialog onUserAdd={handleAddUser} />
+        </div>
       </div>
       
       <Card>
         <CardHeader>
-          <CardTitle>BugRacer Users</CardTitle>
+          <CardTitle className="break-words">BugRacer Users</CardTitle>
           <CardDescription>
             Total users: {users.length}
           </CardDescription>
@@ -246,7 +250,7 @@ const Users = () => {
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors gap-4 cursor-pointer"
                   onClick={() => setSelectedUser(user)}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
                     <img
                       src={user.avatar}
                       alt={`${user.name}'s avatar`}
@@ -262,7 +266,7 @@ const Users = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
                     <div className="flex items-center bg-accent/50 px-3 py-1 rounded-full shrink-0">
                       {getRoleIcon(user.role)}
                       <span className="ml-2 text-sm capitalize">{user.role}</span>

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Bug, FolderKanban, Search, Plus, Trash2 } from 'lucide-react';
 import { NewProjectDialog } from '@/components/projects/NewProjectDialog';
 import { projectService, Project } from '@/services/projectService';
+import { bugService } from '@/services/bugService';
 import { toast } from '@/components/ui/use-toast';
 import {
   AlertDialog,
@@ -30,9 +31,11 @@ const Projects = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const { toast: useToastToast } = useToast();
+  const [projectBugsCount, setProjectBugsCount] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchProjects();
+    fetchAndCountBugs();
   }, []);
 
   const fetchProjects = async () => {
@@ -47,6 +50,21 @@ const Projects = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchAndCountBugs = async () => {
+    try {
+      const bugs = await bugService.getBugs();
+      const counts: Record<string, number> = {};
+      bugs.forEach((bug: any) => {
+        if (bug.project_id) {
+          counts[bug.project_id] = (counts[bug.project_id] || 0) + 1;
+        }
+      });
+      setProjectBugsCount(counts);
+    } catch (error) {
+      // Fallback: do nothing
     }
   };
 
@@ -175,12 +193,15 @@ const Projects = () => {
                 <CardDescription>{project.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-2 mb-4">
+                <div className="flex flex-wrap items-center gap-2 mb-4">
                   {project.status === 'active' ? (
                     <Badge variant="default">Active</Badge>
                   ) : (
                     <Badge variant="outline">{project.status}</Badge>
                   )}
+                  <Badge variant="secondary" className="ml-auto">
+                    🐞 {projectBugsCount[project.id] ?? 0} Bugs
+                  </Badge>
                 </div>
               </CardContent>
               <CardFooter className="flex gap-2">

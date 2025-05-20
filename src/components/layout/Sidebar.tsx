@@ -1,29 +1,26 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAuth } from '@/context/AuthContext';
-import { 
-  LayoutDashboard, 
-  FolderKanban,
-  Bug, 
-  Settings, 
-  Users,
-  ActivitySquare,
-  FileBarChart,
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/context/AuthContext";
+import { cn } from "@/lib/utils";
+import {
+  Bug,
   CheckCircle,
-  MessageCircle,
-  Menu
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+  FolderKanban,
+  Menu,
+  Settings,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps {
   className?: string;
   closeSidebar?: () => void;
 }
 
-const defaultAvatar = "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png";
+const defaultAvatar =
+  "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png";
 
 export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
@@ -31,7 +28,15 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const NavLink = ({ to, icon, label }: { to: string; icon: JSX.Element; label: string }) => (
+  const NavLink = ({
+    to,
+    icon,
+    label,
+  }: {
+    to: string;
+    icon: JSX.Element;
+    label: string;
+  }) => (
     <Link to={to} onClick={closeSidebar}>
       <Button
         variant="ghost"
@@ -47,7 +52,9 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   );
 
   return (
-    <nav className={cn("h-full flex flex-col border-r bg-card min-w-0", className)}>
+    <nav
+      className={cn("h-full flex flex-col border-r bg-card min-w-0", className)}
+    >
       <div className="p-4 pb-2">
         <div className="flex items-center mb-8 px-2">
           <Bug className="h-6 w-6 text-primary mr-2" />
@@ -56,41 +63,43 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
         <ScrollArea className="flex-1 min-w-0">
           <div className="space-y-4 px-1">
             <div>
-              <NavLink 
-                to="/projects" 
-                icon={<FolderKanban className="h-5 w-5" />} 
-                label="Projects" 
+              <NavLink
+                to="/projects"
+                icon={<FolderKanban className="h-5 w-5" />}
+                label="Projects"
               />
-              <NavLink 
-                to="/bugs" 
-                icon={<Bug className="h-5 w-5" />} 
-                label="Bugs" 
+              <NavLink
+                to="/bugs"
+                icon={<Bug className="h-5 w-5" />}
+                label="Bugs"
               />
-              <NavLink 
-                to="/fixes" 
-                icon={<CheckCircle className="h-5 w-5" />} 
-                label="Fixes" 
+              <NavLink
+                to="/fixes"
+                icon={<CheckCircle className="h-5 w-5" />}
+                label="Fixes"
               />
             </div>
-            {currentUser?.role === 'admin' && (
+            {currentUser?.role === "admin" && (
               <>
                 <Separator />
                 <div>
-                  <h3 className="text-xs font-medium px-2 mb-2 text-muted-foreground">ADMIN</h3>
-                  <NavLink 
-                    to="/users" 
-                    icon={<Users className="h-5 w-5" />} 
-                    label="Users" 
+                  <h3 className="text-xs font-medium px-2 mb-2 text-muted-foreground">
+                    ADMIN
+                  </h3>
+                  <NavLink
+                    to="/users"
+                    icon={<Users className="h-5 w-5" />}
+                    label="Users"
                   />
-                  <NavLink 
+                  {/* <NavLink 
                     to="/reports" 
                     icon={<FileBarChart className="h-5 w-5" />} 
                     label="Reports" 
-                  />
-                  <NavLink 
-                    to="/settings" 
-                    icon={<Settings className="h-5 w-5" />} 
-                    label="Settings" 
+                  /> */}
+                  <NavLink
+                    to="/settings"
+                    icon={<Settings className="h-5 w-5" />}
+                    label="Settings"
                   />
                 </div>
               </>
@@ -99,8 +108,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
         </ScrollArea>
       </div>
       <div className="mt-auto p-4 border-t">
-        <Link 
-          to="/profile" 
+        <Link
+          to="/profile"
           className="flex items-center hover:bg-accent rounded-lg p-2 transition-colors"
           onClick={closeSidebar}
         >
@@ -111,7 +120,9 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
           />
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{currentUser?.name}</p>
-            <p className="text-xs text-muted-foreground capitalize truncate">{currentUser?.role}</p>
+            <p className="text-xs text-muted-foreground capitalize truncate">
+              {currentUser?.role}
+            </p>
           </div>
         </Link>
       </div>
@@ -131,13 +142,19 @@ export default function MainLayout({ children }) {
 
       {/* Sidebar drawer for mobile */}
       <div
-        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 md:hidden ${sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 md:hidden ${
+          sidebarOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
         onClick={() => setSidebarOpen(false)}
         aria-label="Sidebar overlay"
       >
         <div
-          className={`absolute left-0 top-0 h-full w-64 bg-card shadow-lg transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
-          onClick={e => e.stopPropagation()}
+          className={`absolute left-0 top-0 h-full w-64 bg-card shadow-lg transition-transform duration-200 ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+          onClick={(e) => e.stopPropagation()}
         >
           <Sidebar closeSidebar={() => setSidebarOpen(false)} />
         </div>
@@ -147,7 +164,12 @@ export default function MainLayout({ children }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar with menu button on mobile */}
         <div className="md:hidden flex items-center p-2 border-b bg-background">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} aria-label="Open sidebar">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
+          >
             <Menu className="h-6 w-6" />
           </Button>
           <span className="ml-2 font-bold text-lg truncate">BugRacer</span>
