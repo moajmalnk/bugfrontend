@@ -7,8 +7,8 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Redirect to dashboard or login
-    navigate('/dashboard');
+    // Redirect to projects or login
+    navigate('/projects');
   }, [navigate]);
 
   return (
