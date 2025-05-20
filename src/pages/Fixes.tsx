@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -18,13 +17,14 @@ import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/components/ui/use-toast';
+import { Bug as BugType } from '@/services/bugService';
 
 const Fixes = () => {
   const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch all bugs
-  const { data: bugs, isLoading, error } = useQuery({
+  const { data: bugs, isLoading, error } = useQuery<BugType[]>({
     queryKey: ['bugs'],
     queryFn: () => bugService.getBugs(),
   });
