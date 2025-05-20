@@ -41,8 +41,8 @@ const BugDetails = () => {
   
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+      <div className="flex items-center justify-center min-h-[60vh] bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
       </div>
     );
   }
@@ -89,7 +89,7 @@ const BugDetails = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:p-6">
+    <div className="min-h-[60vh] bg-background px-2 py-4 sm:px-4 md:px-8 lg:px-12 xl:px-0">
       <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
         <BugHeader 
           bug={bug} 
@@ -97,21 +97,21 @@ const BugDetails = () => {
           canEditBug={canEditBug} 
         />
         
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Main Content - Description and Screenshots */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             <BugContentCards bug={bug} />
           </div>
           
           {/* Sidebar - Bug Details */}
-          <div className="space-y-4 sm:space-y-6">
+          <aside className="space-y-4 sm:space-y-6">
             <BugDetailsCard 
               bug={bug}
               canUpdateStatus={canUpdateStatus}
               updateBugStatus={handleStatusUpdate}
               formattedUpdatedDate={formattedUpdatedDate}
             />
-          </div>
+          </aside>
         </div>
       </div>
     </div>

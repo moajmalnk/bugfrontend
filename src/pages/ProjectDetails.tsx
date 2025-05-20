@@ -113,20 +113,20 @@ const ProjectDetails = () => {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center min-h-[60vh] bg-background"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div></div>;
   }
   
   if (!project) {
-    return <div>Project not found</div>;
+    return <div className="flex items-center justify-center min-h-[60vh] text-lg font-semibold text-muted-foreground">Project not found</div>;
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-          <div>
-              <h1 className="text-2xl font-bold tracking-tight">{project.name}</h1>
-            <p className="text-muted-foreground">{project.description}</p>
-          </div>
+    <div className="space-y-6 p-2 sm:p-4 md:p-6 lg:p-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">{project.name}</h1>
+          <p className="text-muted-foreground text-sm md:text-base break-words max-w-xl">{project.description}</p>
+        </div>
         {currentUser?.role === 'admin' && (
           <Button 
             onClick={() => {
@@ -136,6 +136,7 @@ const ProjectDetails = () => {
                 variant: "default"
               });
             }}
+            className="mt-4 md:mt-0"
           >
             <Pencil className="mr-2 h-4 w-4" /> Edit Project
           </Button>
@@ -143,14 +144,14 @@ const ProjectDetails = () => {
       </div>
 
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList className="flex flex-wrap gap-2 md:gap-4 mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="bugs">Bugs</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Bugs</CardTitle>
@@ -185,7 +186,7 @@ const ProjectDetails = () => {
               </CardContent>
             </Card>
           </div>
-            
+          
           <div className="mt-6">
             <Card>
               <CardHeader>
@@ -205,17 +206,17 @@ const ProjectDetails = () => {
             </Card>
           </div>
         </TabsContent>
-          
+        
         <TabsContent value="bugs">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
               <div>
                 <CardTitle>Project Bugs</CardTitle>
-              <CardDescription>
+                <CardDescription>
                   All bugs reported in this project
-              </CardDescription>
+                </CardDescription>
               </div>
-              <Button asChild>
+              <Button asChild className="w-full sm:w-auto mt-2 sm:mt-0">
                 <Link to={`/bugs/new?projectId=${projectId}`}>
                   <Plus className="mr-2 h-4 w-4" /> Report Bug
                 </Link>
@@ -247,7 +248,7 @@ const ProjectDetails = () => {
         
         <TabsContent value="members">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
               <div>
                 <CardTitle>Project Members</CardTitle>
                 <CardDescription>
@@ -262,6 +263,7 @@ const ProjectDetails = () => {
                     variant: "default"
                   });
                 }}
+                className="w-full sm:w-auto mt-2 sm:mt-0"
               >
                 <Plus className="mr-2 h-4 w-4" /> Add Member
               </Button>

@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Sidebar } from './Sidebar';
 import { UserNav } from './UserNav';
-import { BellIcon, MenuIcon, Sun, Moon, Eye, EyeOff } from 'lucide-react';
+import { BellIcon, MenuIcon, Sun, Moon, Eye, EyeOff, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Sheet,
@@ -58,51 +58,35 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
   return (
     <NotificationProvider>
-      <div className="flex h-screen overflow-hidden bg-background">
-        {/* Mobile sidebar */}
-        {isMobile ? (
-          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-            <SheetContent side="left" className="p-0 w-[300px]">
-              <Sidebar closeSidebar={() => setSidebarOpen(false)} />
-            </SheetContent>
-          </Sheet>
-        ) : (
-          /* Desktop sidebar */
-          <div className="hidden md:flex md:w-64 md:flex-col">
-            <Sidebar />
+      <div className="flex h-screen">
+        {/* Sidebar for desktop */}
+        <div className="hidden md:block w-64">
+          <Sidebar />
+        </div>
+
+        {/* Sidebar drawer for mobile */}
+        <div
+          className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 md:hidden ${sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+          onClick={() => setSidebarOpen(false)}
+        >
+          <div
+            className={`absolute left-0 top-0 h-full w-64 bg-card shadow-lg transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <Sidebar closeSidebar={() => setSidebarOpen(false)} />
           </div>
-        )}
+        </div>
 
         {/* Main content */}
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="border-b bg-card">
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-2">
-                {isMobile && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setSidebarOpen(true)} 
-                    className="block md:hidden"
-                  >
-                    <MenuIcon className="h-5 w-5" />
-                  </Button>
-                )}
-                <h1 className="text-lg font-semibold">BugRacer</h1>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={toggleTheme}>
-                  {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                </Button>
-                <NotificationPopover />
-                <UserNav />
-              </div>
-            </div>
-          </header>
-
-          {/* Page content */}
-          <main className="flex-1 overflow-auto p-6">{children}</main>
+        <div className="flex-1 flex flex-col">
+          {/* Top bar with menu button on mobile */}
+          <div className="md:hidden flex items-center p-2 border-b bg-background">
+            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+              <Menu className="h-6 w-6" />
+            </Button>
+            <span className="ml-2 font-bold text-lg">BugRacer</span>
+          </div>
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">{children}</main>
         </div>
       </div>
     </NotificationProvider>
