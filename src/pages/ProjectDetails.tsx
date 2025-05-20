@@ -123,8 +123,8 @@ const ProjectDetails = () => {
   return (
     <div className="space-y-6 p-2 sm:p-4 md:p-6 lg:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">{project.name}</h1>
+        <div className="w-full md:w-auto">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words max-w-full">{project.name}</h1>
           <p className="text-muted-foreground text-sm md:text-base break-words max-w-xl">{project.description}</p>
         </div>
         {currentUser?.role === 'admin' && (
@@ -136,7 +136,7 @@ const ProjectDetails = () => {
                 variant: "default"
               });
             }}
-            className="mt-4 md:mt-0"
+            className="w-full md:w-auto mt-4 md:mt-0"
           >
             <Pencil className="mr-2 h-4 w-4" /> Edit Project
           </Button>
@@ -144,10 +144,10 @@ const ProjectDetails = () => {
       </div>
 
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex flex-wrap gap-2 md:gap-4 mb-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="bugs">Bugs</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
+        <TabsList className="flex flex-nowrap overflow-x-auto gap-2 md:gap-4 mb-4">
+          <TabsTrigger value="overview" className="flex-1 min-w-[120px]">Overview</TabsTrigger>
+          <TabsTrigger value="bugs" className="flex-1 min-w-[120px]">Bugs</TabsTrigger>
+          <TabsTrigger value="members" className="flex-1 min-w-[120px]">Members</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview">
@@ -238,7 +238,9 @@ const ProjectDetails = () => {
               ) : (
                 <div className="space-y-4">
                   {bugs.map((bug) => (
-                    <BugCard key={bug.id} bug={bug} onDelete={() => {}} />
+                    <div key={bug.id} className="w-full max-w-full">
+                      <BugCard bug={bug} onDelete={() => fetchProjectBugs()} />
+                    </div>
                   ))}
                 </div>
               )}

@@ -243,6 +243,22 @@ const NewBug = () => {
     newFiles.splice(index, 1);
     setFiles(newFiles);
   };
+
+  const handlePasteScreenshot = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          const fileWithPreview = Object.assign(file, {
+            preview: URL.createObjectURL(file)
+          });
+          setScreenshots(prev => [...prev, fileWithPreview]);
+        }
+      }
+    }
+  };
   
   // Clean up object URLs when component unmounts
   useEffect(() => {
@@ -373,7 +389,11 @@ const NewBug = () => {
               
               <div className="grid gap-4 md:grid-cols-2">
                 {/* Screenshots section */}
-                <div className="space-y-3">
+                <div
+                  className="space-y-3"
+                  tabIndex={0}
+                  onPaste={handlePasteScreenshot}
+                >
                   <Button 
                     type="button" 
                     variant="outline" 
@@ -382,6 +402,7 @@ const NewBug = () => {
                   >
                     <ImagePlus className="h-8 w-8 mb-2 text-muted-foreground" />
                     <span>Add Screenshots</span>
+                    <span className="text-xs text-muted-foreground mt-1">(Paste or Upload)</span>
                   </Button>
                   
                   {/* Preview of screenshots */}

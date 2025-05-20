@@ -83,7 +83,9 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
       <Card className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 hover:shadow-md transition-shadow">
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-medium text-base sm:text-lg break-words">{bug.title || 'Untitled Bug'}</h4>
+            <h4 className="font-medium text-base sm:text-lg break-words whitespace-pre-line w-full">
+              {bug.title || 'Untitled Bug'}
+            </h4>
             <Badge 
               variant="outline" 
               className={`text-xs ${priorityColors[bug.priority] || priorityColors.medium}`}
