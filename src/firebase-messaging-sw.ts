@@ -21,7 +21,7 @@ export async function requestNotificationPermission() {
     console.log("FCM Token:", token); // <-- This will print the token in the browser console
 
     // Send token to backend
-    await fetch("/api/save-fcm-token", {
+    await fetch("/api/save-fcm-token.php", { // <-- .php if using PHP
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
