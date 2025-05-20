@@ -6,7 +6,6 @@ import { initOfflineDetector } from "@/lib/offline";
 import { QueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router } from "react-router-dom";
-import { requestNotificationPermission } from "./firebase-messaging-sw";
 
 // Initialize the query client outside of the component
 const queryClient = new QueryClient();
@@ -38,9 +37,10 @@ function App() {
     localStorage.setItem("privacyMode", privacy ? "true" : "false");
   }, [privacy]);
 
-  useEffect(() => {
-    requestNotificationPermission();
-  }, []);
+  // Comment out notification permission for testing
+  // useEffect(() => {
+  //   requestNotificationPermission();
+  // }, []);
 
   return (
     <Router>
