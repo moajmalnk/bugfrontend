@@ -22,7 +22,7 @@ const BugDetails = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
-  
+
   const { data: bug, isLoading, error } = useQuery({
     queryKey: ['bug', bugId],
     queryFn: async () => {
@@ -38,42 +38,45 @@ const BugDetails = () => {
       throw new Error(response.data.message || 'Failed to fetch bug details');
     }
   });
-  
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-      </div>
+      <main className="flex items-center justify-center min-h-[60vh] bg-background" aria-busy="true" aria-live="polite">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent" aria-label="Loading"></div>
+      </main>
     );
   }
 
   if (error || !bug) {
-    return <BugNotFound />;
+    return (
+      <main>
+        <BugNotFound />
+      </main>
+    );
   }
-  
+
   const formattedCreatedDate = format(new Date(bug.created_at), 'MMMM d, yyyy HH:mm');
   const formattedUpdatedDate = format(new Date(bug.updated_at), 'MMMM d, yyyy HH:mm');
-  
+
   const canUpdateStatus = currentUser?.role === 'admin' || currentUser?.role === 'developer';
   const canEditBug = currentUser?.role === 'admin';
-  
+
   const handleStatusUpdate = async (newStatus: BugStatus) => {
     try {
       const token = localStorage.getItem('token');
       await axios.put<ApiResponse<Bug>>(
         `/Bugricer/backend/api/bugs/update.php?id=${bug.id}`,
         { status: newStatus },
-        { 
-          headers: { 
+        {
+          headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          } 
+          }
         }
       );
 
-      // Invalidate and refetch the bug data
       queryClient.invalidateQueries({ queryKey: ['bug', bug.id] });
-      
+
       toast({
         title: "Success",
         description: "Bug status updated successfully",
@@ -89,23 +92,25 @@ const BugDetails = () => {
   };
 
   return (
-    <div className="min-h-[60vh] bg-background px-2 py-4 sm:px-4 md:px-8 lg:px-12 xl:px-0">
-      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
-        <BugHeader 
-          bug={bug} 
-          formattedCreatedDate={formattedCreatedDate} 
-          canEditBug={canEditBug} 
-        />
-        
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <main className="min-h-[60vh] bg-background px-2 py-4 sm:px-4 md:px-8 lg:px-12 xl:px-0">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        <header>
+          <BugHeader
+            bug={bug}
+            formattedCreatedDate={formattedCreatedDate}
+            canEditBug={canEditBug}
+          />
+        </header>
+
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
           {/* Main Content - Description and Screenshots */}
-          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <section className="w-full lg:w-2/3 space-y-6 sm:space-y-8" aria-label="Bug Content">
             <BugContentCards bug={bug} />
-          </div>
-          
+          </section>
+
           {/* Sidebar - Bug Details */}
-          <aside className="space-y-4 sm:space-y-6">
-            <BugDetailsCard 
+          <aside className="w-full lg:w-1/3 space-y-6 sm:space-y-8" aria-label="Bug Details">
+            <BugDetailsCard
               bug={bug}
               canUpdateStatus={canUpdateStatus}
               updateBugStatus={handleStatusUpdate}
@@ -113,8 +118,8 @@ const BugDetails = () => {
             />
           </aside>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
 

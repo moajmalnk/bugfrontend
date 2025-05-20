@@ -25,19 +25,19 @@ export const BugCard = ({ bug, onDelete }: BugCardProps) => {
   const isFromProject = location.pathname.startsWith('/projects/');
 
   return (
-    <div className="flex items-center justify-between p-4 rounded-lg border">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <h4 className="font-medium">{bug.title}</h4>
-          <Badge variant="outline">{bug.priority}</Badge>
-          <Badge variant="outline">{bug.status.replace('_', ' ')}</Badge>
+    <div className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 rounded-lg border bg-background transition-shadow hover:shadow-md">
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="font-medium text-base sm:text-lg break-words">{bug.title}</h4>
+          <Badge variant="outline" className="text-xs sm:text-sm">{bug.priority}</Badge>
+          <Badge variant="outline" className="text-xs sm:text-sm">{bug.status.replace('_', ' ')}</Badge>
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs sm:text-sm text-muted-foreground truncate">
           Created {new Date(bug.created_at).toLocaleDateString()}
         </p>
       </div>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" asChild>
+      <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
+        <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm px-3 py-1">
           <Link 
             to={`/bugs/${bug.id}`}
             state={{ from: isFromProject ? 'project' : 'bugs' }}
@@ -49,6 +49,7 @@ export const BugCard = ({ bug, onDelete }: BugCardProps) => {
           <Button 
             variant="destructive" 
             size="sm"
+            className="text-xs sm:text-sm px-3 py-1"
             onClick={async () => {
               try {
                 await bugService.deleteBug(bug.id);
@@ -72,4 +73,4 @@ export const BugCard = ({ bug, onDelete }: BugCardProps) => {
       </div>
     </div>
   );
-}; 
+};

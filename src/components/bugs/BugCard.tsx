@@ -80,10 +80,10 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
 
   return (
     <>
-      <Card className="flex items-center justify-between p-4 hover:shadow-md transition-shadow">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h4 className="font-medium">{bug.title || 'Untitled Bug'}</h4>
+      <Card className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 hover:shadow-md transition-shadow">
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="font-medium text-base sm:text-lg break-words">{bug.title || 'Untitled Bug'}</h4>
             <Badge 
               variant="outline" 
               className={`text-xs ${priorityColors[bug.priority] || priorityColors.medium}`}
@@ -97,13 +97,13 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
               {(bug.status || 'pending').replace('_', ' ')}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground truncate">
             Created {formatDistanceToNow(parseISO(bug.created_at), { addSuffix: true })}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
+        <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
+          <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm px-3 py-1">
             <Link 
               to={`/bugs/${bug.id}`}
               state={{ from: isFromProject ? 'project' : 'bugs' }}
@@ -114,6 +114,7 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
           <Button 
             variant="destructive" 
             size="sm"
+            className="text-xs sm:text-sm px-3 py-1"
             onClick={() => setShowDeleteDialog(true)}
             disabled={isDeleting}
           >
