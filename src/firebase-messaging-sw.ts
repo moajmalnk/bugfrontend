@@ -19,8 +19,12 @@ export async function requestNotificationPermission() {
   if (permission === "granted") {
     const token = await getToken(messaging, { vapidKey: "BBXSfgYVLTeG4EnmK8fYtatHbkxa_cRW0p_aOplUppKKrH6rHi5uUyDcurLEUjJj0DoV7yx2PfmChIUzL5qf3hk" });
     console.log("FCM Token:", token); // <-- This will print the token in the browser console
-    // Send this token to your backend to save for the user
-    // Example:
-    // await fetch("/api/save-fcm-token", { method: "POST", body: JSON.stringify({ token }) });
+
+    // Send token to backend
+    await fetch("/api/save-fcm-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
   }
 }
