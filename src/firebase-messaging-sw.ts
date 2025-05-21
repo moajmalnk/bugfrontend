@@ -1,3 +1,4 @@
+import { ENV } from "@/lib/env";
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken } from "firebase/messaging";
 
@@ -18,12 +19,17 @@ export async function requestNotificationPermission() {
   const permission = await Notification.requestPermission();
   if (permission === "granted") {
     const token = await getToken(messaging, { vapidKey: "BBXSfgYVLTeG4EnmK8fYtatHbkxa_cRW0p_aOplUppKKrH6rHi5uUyDcurLEUjJj0DoV7yx2PfmChIUzL5qf3hk" });
-    console.log("FCM Token:", token); // <-- This will print the token in the browser console
+    console.log("FCM Token:", token);
 
-    // Send token to backend
-    await fetch("/api/save-fcm-token.php", { 
+    // Get user token from localStorage
+    const userToken = localStorage.getItem("token");
+
+    await fetch(`${ENV.API_URL}/save-fcm-token.php`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userToken}`,
+      },
       body: JSON.stringify({ token }),
     });
   }
