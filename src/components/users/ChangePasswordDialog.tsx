@@ -1,26 +1,31 @@
-import { useState } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger,
-  DialogFooter 
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
-import { User } from '@/types';
+import { User } from "@/types";
 import { KeyRound } from "lucide-react";
+import { useState } from "react";
 
-interface ChangePasswordDialogProps {
+export interface ChangePasswordDialogProps {
   user: User;
   onPasswordChange: (userId: string, newPassword: string) => Promise<void>;
+  trigger?: React.ReactElement;
 }
 
-export function ChangePasswordDialog({ user, onPasswordChange }: ChangePasswordDialogProps) {
+export function ChangePasswordDialog({
+  user,
+  onPasswordChange,
+  trigger,
+}: ChangePasswordDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [password, setPassword] = useState("");
@@ -53,7 +58,7 @@ export function ChangePasswordDialog({ user, onPasswordChange }: ChangePasswordD
       setPassword("");
       setConfirmPassword("");
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
       toast({
         title: "Error",
         description: "Failed to update password. Please try again.",
@@ -67,10 +72,12 @@ export function ChangePasswordDialog({ user, onPasswordChange }: ChangePasswordD
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <KeyRound className="h-4 w-4" />
-          <span className="sr-only">Change Password</span>
-        </Button>
+        {trigger ? trigger : (
+          <Button variant="ghost" size="sm">
+            <KeyRound className="h-4 w-4" />
+            <span className="sr-only">Change Password</span>
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -113,4 +120,4 @@ export function ChangePasswordDialog({ user, onPasswordChange }: ChangePasswordD
       </DialogContent>
     </Dialog>
   );
-} 
+}

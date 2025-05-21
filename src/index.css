@@ -111,3 +111,24 @@
 .absolute.right-4.top-4 {
   display: none !important;
 }
+
+/* Custom scrollbar for BugRacer theme */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #23293a; /* dark card bg or your theme color */
+  border-radius: 8px;
+  border: 2px solid #151a23; /* matches dialog bg */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #3b4252;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #23293a #151a23;
+}
