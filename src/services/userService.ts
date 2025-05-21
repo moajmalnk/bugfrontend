@@ -57,20 +57,20 @@ class UserService {
   }
 
   async addUser(userData: NewUserData): Promise<User> {
-    const response = await this.fetchWithAuth(`${this.baseUrl}/create.php`, {
-      method: 'POST',
-      body: JSON.stringify(userData)
+    const response = await fetch(`${this.baseUrl}/create.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify(userData),
     });
 
-    if (!response.success) {
-      throw new Error(response.message);
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || "Failed to add user.");
     }
-
-    const newUser = response.data;
-    return {
-      ...newUser,
-      avatar: this.generateAvatar(newUser.username, newUser.role)
-    };
+    return data.data;
   }
 
   async updateUser(userId: string, userData: UpdateUserData): Promise<User> {

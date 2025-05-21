@@ -184,7 +184,13 @@ export function UserDetailDialog({
               user={user}
               onPasswordChange={onPasswordChange}
             />
-            <DeleteUserDialog user={user} onUserDelete={onUserDelete} />
+            <DeleteUserDialog
+              user={user}
+              onUserDelete={async (userId) => {
+                await onUserDelete(userId);
+                onOpenChange(false); // Close the dialog after delete
+              }}
+            />
           </div>
 
           {/* Stats and Recent Activity */}

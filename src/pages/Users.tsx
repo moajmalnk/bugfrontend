@@ -86,7 +86,6 @@ const Users = () => {
 
   const handleAddUser = async (userData: NewUser): Promise<boolean> => {
     try {
-      // Only send the required fields
       const payload = {
         username: userData.username,
         email: userData.email,
@@ -94,10 +93,18 @@ const Users = () => {
         role: userData.role,
       };
       await userService.addUser(payload);
-      // Success logic...
+      toast({
+        title: "Success",
+        description: "User added successfully.",
+      });
+      fetchUsers(); // Refresh user list after adding
       return true;
-    } catch (error) {
-      // Error logic...
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add user.",
+        variant: "destructive",
+      });
       return false;
     }
   };

@@ -28,7 +28,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { UserPlus } from "lucide-react";
+import { Eye, EyeOff, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -66,6 +66,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
     password: "",
     role: "tester" as UserRole,
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   // Initialize the form
   const form = useForm<UserFormValues>({
@@ -189,9 +190,25 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} className="w-full" />
-                    </FormControl>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        {...field}
+                        className="w-full pr-10"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+                        onClick={() => setShowPassword((v) => !v)}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
                     <FormDescription>
                       Password must be at least 6 characters
                     </FormDescription>
