@@ -9,12 +9,14 @@ import {
 } from "@/components/ui/dialog";
 import { ENV } from "@/lib/env";
 import { User } from "@/types";
+import axios from "axios";
 import { format, formatDistanceToNow } from "date-fns";
 import { AtSign, Bug, Calendar, Code2, Mail, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
+
 export interface DeleteUserDialogProps {
   user: User;
   onUserDelete: (userId: string) => Promise<void>;
@@ -35,6 +37,22 @@ interface UserDetailDialogProps {
   user: User;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+async function handlePasswordChange(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+) {
+  try {
+    await axios.post("/api/users/change-password.php", {
+      userId,
+      currentPassword,
+      newPassword,
+    });
+  } catch (error: any) {
+    throw error.response?.data?.message || "Failed to update password";
+  }
 }
 
 export function UserDetailDialog({
@@ -191,7 +209,7 @@ export function UserDetailDialog({
             <div className="flex-1 min-w-0">
               <ChangePasswordDialog
                 user={user}
-                onPasswordChange={onPasswordChange}
+                onPasswordChange={handlePasswordChange}
                 trigger={
                   <DialogTrigger asChild>
                     <Button

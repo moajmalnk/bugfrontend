@@ -12,12 +12,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { User } from "@/types";
+import axios from "axios";
 import { KeyRound } from "lucide-react";
 import { useState } from "react";
 
 export interface ChangePasswordDialogProps {
   user: User;
-  onPasswordChange: (userId: string, newPassword: string) => Promise<void>;
+  onPasswordChange: (
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<void>;
   trigger?: React.ReactElement;
 }
 
@@ -30,6 +35,7 @@ export function ChangePasswordDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,10 +59,11 @@ export function ChangePasswordDialog({
 
     setIsLoading(true);
     try {
-      await onPasswordChange(user.id, password);
+      await onPasswordChange(user.id, currentPassword, password);
       setOpen(false);
       setPassword("");
       setConfirmPassword("");
+      setCurrentPassword("");
     } catch (error) {
       console.error("Error:", error);
       toast({
@@ -72,7 +79,9 @@ export function ChangePasswordDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger ? trigger : (
+        {trigger ? (
+          trigger
+        ) : (
           <Button variant="ghost" size="sm">
             <KeyRound className="h-4 w-4" />
             <span className="sr-only">Change Password</span>
@@ -88,6 +97,17 @@ export function ChangePasswordDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Current Password</Label>
+              <Input
+                id="current-password"
+                type="password"
+                placeholder="Enter current password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
               <Input
@@ -120,4 +140,21 @@ export function ChangePasswordDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+async function handlePasswordChange(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+) {
+  try {
+    await axios.post("/api/users/change-password.php", {
+      userId,
+      currentPassword,
+      newPassword,
+    });
+    // No return value
+  } catch (error: any) {
+    throw error.response?.data?.message || "Failed to update password";
+  }
 }
