@@ -153,7 +153,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                     <FormLabel>Username</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="johndoe"
+                        placeholder="Username"
                         {...field}
                         className="w-full"
                       />
@@ -175,7 +175,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="john.doe@example.com"
+                        placeholder="Enter your email"
                         {...field}
                         className="w-full"
                       />
