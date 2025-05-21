@@ -1,47 +1,49 @@
-import React, { useState, useEffect } from 'react';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { 
+import { Button } from "@/components/ui/button";
+import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
   DialogTrigger,
-  DialogDescription
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { 
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { Pencil } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
-import { User, UserRole } from '@/types';
-import { userService } from '@/services/userService';
-import { Label } from "@/components/ui/label";
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/components/ui/use-toast";
+import { userService } from "@/services/userService";
+import { User } from "@/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Pencil } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 // Define the form schema
 const userFormSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-  username: z.string().min(3, { message: 'Username must be at least 3 characters' })
-    .regex(/^[a-zA-Z0-9_]+$/, { message: 'Username can only contain letters, numbers, and underscores' }),
-  email: z.string().email({ message: 'Invalid email address' }),
-  role: z.enum(['admin', 'developer', 'tester'], { 
-    required_error: 'Please select a role',
+  username: z
+    .string()
+    .min(3, { message: "Username must be at least 3 characters" })
+    .regex(/^[a-zA-Z0-9_]+$/, {
+      message: "Username can only contain letters, numbers, and underscores",
+    }),
+  email: z.string().email({ message: "Invalid email address" }),
+  role: z.enum(["admin", "developer", "tester"], {
+    required_error: "Please select a role",
   }),
 });
 
@@ -53,19 +55,22 @@ type EditUserDialogProps = {
   trigger?: React.ReactNode;
 };
 
-export function EditUserDialog({ user, onUserUpdate, trigger }: EditUserDialogProps) {
+export function EditUserDialog({
+  user,
+  onUserUpdate,
+  trigger,
+}: EditUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    ...user
+    ...user,
   });
 
   // Initialize the form
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
-      name: user.name,
-      username: user.username || '',
+      username: user.username || "",
       email: user.email,
       role: user.role,
     },
@@ -74,8 +79,7 @@ export function EditUserDialog({ user, onUserUpdate, trigger }: EditUserDialogPr
   // Update form values when user prop changes
   useEffect(() => {
     form.reset({
-      name: user.name,
-      username: user.username || '',
+      username: user.username || "",
       email: user.email,
       role: user.role,
     });
@@ -85,21 +89,21 @@ export function EditUserDialog({ user, onUserUpdate, trigger }: EditUserDialogPr
     setIsSubmitting(true);
     try {
       const updatedUser = await userService.updateUser(user.id, {
-        name: data.name,
         username: data.username,
         email: data.email,
         role: data.role,
       });
-      
+
       onUserUpdate(updatedUser);
-      
+
       toast({
         title: "Success",
         description: "User has been updated successfully.",
       });
       setOpen(false);
+      window.location.reload(); // Reload after saving changes
     } catch (error) {
-      console.error('Error updating user:', error);
+      console.error("Error updating user:", error);
       toast({
         title: "Error",
         description: "Failed to update the user. Please try again.",
@@ -131,25 +135,12 @@ export function EditUserDialog({ user, onUserUpdate, trigger }: EditUserDialogPr
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="username"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <Input placeholder="johndoe" {...field} />
+                    <Input placeholder="Enter username" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -162,7 +153,7 @@ export function EditUserDialog({ user, onUserUpdate, trigger }: EditUserDialogPr
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="john.doe@example.com" {...field} />
+                    <Input type="email" placeholder="Enter email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -174,8 +165,8 @@ export function EditUserDialog({ user, onUserUpdate, trigger }: EditUserDialogPr
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Role</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
+                  <Select
+                    onValueChange={field.onChange}
                     defaultValue={field.value}
                   >
                     <FormControl>
@@ -194,18 +185,15 @@ export function EditUserDialog({ user, onUserUpdate, trigger }: EditUserDialogPr
               )}
             />
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => setOpen(false)}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Saving...' : 'Save Changes'}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>

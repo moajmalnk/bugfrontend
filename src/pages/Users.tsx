@@ -111,36 +111,18 @@ const Users = () => {
 
   const handleUpdateUser = async (updatedUser: User) => {
     try {
-      const response = await fetch(`${ENV.API_URL}/users/update.php`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(updatedUser),
+      await userService.updateUser(updatedUser.id, updatedUser);
+      setUsers(
+        users.map((user) => (user.id === updatedUser.id ? updatedUser : user))
+      );
+      toast({
+        title: "Success",
+        description: "User has been updated successfully.",
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to update user");
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        setUsers(
-          users.map((user) => (user.id === updatedUser.id ? updatedUser : user))
-        );
-        toast({
-          title: "Success",
-          description: "User has been updated successfully.",
-        });
-      } else {
-        throw new Error(data.message || "Failed to update user");
-      }
-    } catch (error) {
-      console.error("Error:", error);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to update user. Please try again.",
+        description: error.message || "Failed to update user.",
         variant: "destructive",
       });
     }

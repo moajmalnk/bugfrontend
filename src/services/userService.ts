@@ -74,20 +74,19 @@ class UserService {
   }
 
   async updateUser(userId: string, userData: UpdateUserData): Promise<User> {
-    const response = await this.fetchWithAuth(`${this.baseUrl}/update.php`, {
-      method: 'PUT',
-      body: JSON.stringify({ id: userId, ...userData })
+    const response = await fetch(`${ENV.API_URL}/users/update.php`, {
+      method: "POST", // Use POST, since your API expects POST
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ id: userId, ...userData }),
     });
-
-    if (!response.success) {
-      throw new Error(response.message);
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || "Failed to update user");
     }
-
-    const updatedUser = response.data;
-    return {
-      ...updatedUser,
-      avatar: this.generateAvatar(updatedUser.name, updatedUser.role) // <-- use name
-    };
+    return result.data; // Ensure your API returns the full updated user object including 'name'
   }
 
   async deleteUser(userId: string): Promise<boolean> {
