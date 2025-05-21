@@ -47,28 +47,24 @@ export function ChangePasswordDialog({
       });
       return;
     }
-
-    if (password.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
     try {
       await onPasswordChange(user.id, currentPassword, password);
+      toast({
+        title: "Success",
+        description: "Password changed successfully",
+      });
       setOpen(false);
+      setCurrentPassword("");
       setPassword("");
       setConfirmPassword("");
-      setCurrentPassword("");
-    } catch (error) {
-      console.error("Error:", error);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to update password. Please try again.",
+        description:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Failed to update password. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -147,14 +143,17 @@ async function handlePasswordChange(
   currentPassword: string,
   newPassword: string
 ) {
+  const API_BASE =
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost/Bugricer/backend/api";
   try {
-    await axios.post("/api/users/change-password.php", {
+    await axios.post(`${API_BASE}/users/change-password.php`, {
       userId,
       currentPassword,
       newPassword,
     });
     // No return value
   } catch (error: any) {
-    throw error.response?.data?.message || "Failed to update password";
+    throw error;
   }
 }
