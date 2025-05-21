@@ -195,7 +195,7 @@ export function UserDetailDialog({
 
           {/* Stats and Recent Activity */}
           <div className="space-y-6">
-            {/* <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
               <div className="bg-primary/10 rounded-lg p-3 space-y-1">
                 <p className="text-sm text-muted-foreground">Total Projects</p>
                 <p className="text-2xl font-semibold">
@@ -216,7 +216,7 @@ export function UserDetailDialog({
                   )}
                 </p>
               </div>
-            </div> */}
+            </div>
 
             {/* Recent Activity */}
             {!isLoading && stats.recent_activity.length > 0 && (
