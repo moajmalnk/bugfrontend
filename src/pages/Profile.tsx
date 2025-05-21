@@ -1,12 +1,31 @@
-
-import { useAuth } from '@/context/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Mail, MapPin, Link as LinkIcon, Github, Linkedin } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/context/AuthContext";
+import {
+  Github,
+  Linkedin,
+  Link as LinkIcon,
+  LogOut,
+  Mail,
+  MapPin,
+} from "lucide-react";
+import { useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Profile() {
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
+  const navigate = useNavigate();
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleLogout = useCallback(async () => {
+    setShowConfirm(false);
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  }, [logout, navigate]);
 
   if (!currentUser) {
     return null;
@@ -14,6 +33,52 @@ export default function Profile() {
 
   return (
     <div className="container max-w-4xl mx-auto py-8">
+      {/* Top Bar with Logout Button */}
+      <div className="flex justify-end mb-6">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowConfirm(true)}
+          className="flex items-center gap-2"
+          aria-label="Logout"
+        >
+          <LogOut className="w-4 h-4" />
+          Logout
+        </Button>
+      </div>
+
+      {/* Logout Confirmation Modal */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 transition-colors">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 w-[90vw] max-w-md mx-4 animate-fadeIn">
+            <h2 className="text-xl font-semibold mb-3 text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <LogOut className="w-5 h-5 text-red-500" />
+              Confirm Logout
+            </h2>
+            <p className="mb-6 text-gray-600 dark:text-gray-300">
+              Are you sure you want to log out? You will need to sign in again
+              to access your account.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setShowConfirm(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleLogout}
+                className="w-full sm:w-auto"
+              >
+                Yes, Logout
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Profile Header */}
       <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-8">
         <div className="w-32 h-32 rounded-full overflow-hidden">
@@ -47,8 +112,9 @@ export default function Profile() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Experienced {currentUser.role} specializing in bug tracking and project management.
-              Passionate about creating efficient and user-friendly solutions.
+              Experienced {currentUser.role} specializing in bug tracking and
+              project management. Passionate about creating efficient and
+              user-friendly solutions.
             </p>
           </CardContent>
         </Card>
@@ -59,15 +125,24 @@ export default function Profile() {
             <CardTitle>Links</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <a href="#" className="flex items-center text-muted-foreground hover:text-primary">
+            <a
+              href="#"
+              className="flex items-center text-muted-foreground hover:text-primary"
+            >
               <Github className="w-4 h-4 mr-2" />
               Github
             </a>
-            <a href="#" className="flex items-center text-muted-foreground hover:text-primary">
+            <a
+              href="#"
+              className="flex items-center text-muted-foreground hover:text-primary"
+            >
               <Linkedin className="w-4 h-4 mr-2" />
               LinkedIn
             </a>
-            <a href="#" className="flex items-center text-muted-foreground hover:text-primary">
+            <a
+              href="#"
+              className="flex items-center text-muted-foreground hover:text-primary"
+            >
               <LinkIcon className="w-4 h-4 mr-2" />
               Portfolio
             </a>
