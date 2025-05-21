@@ -1,48 +1,52 @@
-import React, { useState } from 'react';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { 
+import { Button } from "@/components/ui/button";
+import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
   DialogTrigger,
-  DialogDescription
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { 
-  Form, 
-  FormControl, 
-  FormDescription, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { 
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { UserPlus } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
-import { UserRole } from '@/types';
-import { Label } from "@/components/ui/label";
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/components/ui/use-toast";
+import { UserRole } from "@/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { UserPlus } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 // Define the form schema
 const userFormSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-  username: z.string().min(3, { message: 'Username must be at least 3 characters' })
-    .regex(/^[a-zA-Z0-9_]+$/, { message: 'Username can only contain letters, numbers, and underscores' }),
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  role: z.enum(['admin', 'developer', 'tester'], { 
-    required_error: 'Please select a role',
+  username: z
+    .string()
+    .min(3, { message: "Username must be at least 3 characters" })
+    .regex(/^[a-zA-Z0-9_]+$/, {
+      message: "Username can only contain letters, numbers, and underscores",
+    }),
+  email: z.string().email({ message: "Invalid email address" }),
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters" }),
+  role: z.enum(["admin", "developer", "tester"], {
+    required_error: "Please select a role",
   }),
 });
 
@@ -56,29 +60,45 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    username: '',
-    email: '',
-    password: '',
-    role: 'tester' as UserRole,
+    name: "",
+    username: "",
+    email: "",
+    password: "",
+    role: "tester" as UserRole,
   });
 
   // Initialize the form
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
-      name: '',
-      username: '',
-      email: '',
-      password: '',
-      role: 'tester',
+      username: "",
+      email: "",
+      password: "",
+      role: "tester",
     },
   });
+
+  const handleAddUser = async (userData: UserFormValues): Promise<boolean> => {
+    try {
+      // Only send the required fields
+      const payload = {
+        username: userData.username,
+        email: userData.email,
+        password: userData.password,
+        role: userData.role,
+      };
+      const success = await onUserAdd(payload);
+      return success;
+    } catch (error) {
+      // Error logic...
+      return false;
+    }
+  };
 
   const onSubmit = async (data: UserFormValues) => {
     setIsSubmitting(true);
     try {
-      const result = await onUserAdd(data);
+      const result = await handleAddUser(data);
       if (result) {
         toast({
           title: "Success",
@@ -94,7 +114,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         });
       }
     } catch (error) {
-      console.error('Error adding user:', error);
+      console.error("Error adding user:", error);
       toast({
         title: "Error",
         description: "An unexpected error occurred.",
@@ -117,7 +137,8 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         <DialogHeader>
           <DialogTitle className="break-words">Add New User</DialogTitle>
           <DialogDescription className="break-words">
-            Create a new user account. Fill in all the required information below.
+            Create a new user account. Fill in all the required information
+            below.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -125,28 +146,20 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
             <div className="grid grid-cols-1 gap-4">
               <FormField
                 control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="John Doe" {...field} className="w-full" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
                 name="username"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Username</FormLabel>
                     <FormControl>
-                      <Input placeholder="johndoe" {...field} className="w-full" />
+                      <Input
+                        placeholder="johndoe"
+                        {...field}
+                        className="w-full"
+                      />
                     </FormControl>
                     <FormDescription>
-                      Username can only contain letters, numbers, and underscores
+                      Username can only contain letters, numbers, and
+                      underscores
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -159,7 +172,12 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="john.doe@example.com" {...field} className="w-full" />
+                      <Input
+                        type="email"
+                        placeholder="john.doe@example.com"
+                        {...field}
+                        className="w-full"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -187,34 +205,28 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Role</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full" />
-                      </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="admin">Admin</SelectItem>
                         <SelectItem value="developer">Developer</SelectItem>
                         <SelectItem value="tester">Tester</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormDescription>
-                      Choose the user's permission level
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
             <DialogFooter>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isSubmitting}
                 className="w-full sm:w-auto"
               >
-                {isSubmitting ? 'Adding...' : 'Add User'}
+                {isSubmitting ? "Adding..." : "Add User"}
               </Button>
             </DialogFooter>
           </form>

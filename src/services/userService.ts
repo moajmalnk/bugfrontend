@@ -1,8 +1,7 @@
-import { User, UserRole } from '@/types';
 import { ENV } from '@/lib/env';
+import { User, UserRole } from '@/types';
 
 interface NewUserData {
-  name: string;
   username: string;
   email: string;
   password: string;
@@ -10,7 +9,6 @@ interface NewUserData {
 }
 
 interface UpdateUserData {
-  name?: string;
   username?: string;
   email?: string;
   role?: UserRole;
@@ -19,15 +17,14 @@ interface UpdateUserData {
 class UserService {
   private baseUrl = `${ENV.API_URL}/users`;
 
-  private generateAvatar(name: string, role: UserRole): string {
+  private generateAvatar(username: string, role: UserRole): string {
     const backgroundColors = {
-      admin: '3b82f6', // blue
-      developer: '10b981', // green
-      tester: 'f59e0b', // yellow
+      admin: '3b82f6',
+      developer: '10b981',
+      tester: 'f59e0b',
     };
-    
-    const bgColor = backgroundColors[role] || '6b7280'; // gray default
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgColor}&color=fff`;
+    const bgColor = backgroundColors[role] || '6b7280';
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=${bgColor}&color=fff`;
   }
 
   private async fetchWithAuth(url: string, options: RequestInit = {}) {
@@ -55,7 +52,7 @@ class UserService {
     }
     return response.data.map((user: any) => ({
       ...user,
-      avatar: this.generateAvatar(user.username, user.role)
+      avatar: this.generateAvatar(user.name, user.role) // <-- use name
     }));
   }
 
@@ -89,7 +86,7 @@ class UserService {
     const updatedUser = response.data;
     return {
       ...updatedUser,
-      avatar: this.generateAvatar(updatedUser.username, updatedUser.role)
+      avatar: this.generateAvatar(updatedUser.name, updatedUser.role) // <-- use name
     };
   }
 

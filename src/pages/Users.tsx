@@ -11,6 +11,7 @@ import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { UserDetailDialog } from "@/components/users/UserDetailDialog";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
+import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
 import { Bug, Code2, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -83,45 +84,20 @@ const Users = () => {
     }
   };
 
-  const handleAddUser = async (userData: NewUser) => {
+  const handleAddUser = async (userData: NewUser): Promise<boolean> => {
     try {
-      const response = await fetch(`${ENV.API_URL}/users/create.php`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to add user");
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        const newUser = {
-          ...data.data,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            userData.username
-          )}&background=3b82f6&color=fff`,
-        };
-        setUsers([...users, newUser]);
-        toast({
-          title: "Success",
-          description: "New user has been added successfully.",
-        });
-        return true;
-      } else {
-        throw new Error(data.message || "Failed to add user");
-      }
+      // Only send the required fields
+      const payload = {
+        username: userData.username,
+        email: userData.email,
+        password: userData.password,
+        role: userData.role,
+      };
+      await userService.addUser(payload);
+      // Success logic...
+      return true;
     } catch (error) {
-      console.error("Error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add user. Please try again.",
-        variant: "destructive",
-      });
+      // Error logic...
       return false;
     }
   };
@@ -252,11 +228,11 @@ const Users = () => {
                   <div className="flex items-center gap-4 min-w-0">
                     <img
                       src={user.avatar}
-                      alt={`${user.name}'s avatar`}
+                      alt={`${user.username}'s avatar`}
                       className="h-10 w-10 rounded-full shrink-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{user.name}</p>
+                      <p className="font-medium truncate">{user.username}</p>
                       <div className="flex flex-col sm:flex-row text-sm text-muted-foreground sm:space-x-2">
                         <p className="font-medium truncate">@{user.username}</p>
                         <span className="hidden sm:inline">•</span>
