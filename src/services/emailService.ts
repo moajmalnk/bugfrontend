@@ -13,3 +13,22 @@ export async function sendEmailNotification(
   });
   return response.json();
 }
+
+// Fetch tester emails from the backend
+const res = await fetch(`${ENV.API_URL}/get_all_testers.php`);
+const data = await res.json();
+const testerEmails = data.emails; // This should be an array of emails
+
+// Define 'description' and 'name' before using them
+const name = data.name || "Unknown Bug";
+const description = data.description || "No description provided.";
+
+// Define currentUser or get it from your authentication/user context
+const currentUser = { name: "Bug Ricer" }; // Replace this with actual user fetching logic
+
+await sendEmailNotification(
+  testerEmails,
+  `New Bug Reported: ${name}`,
+  `<b>${name}</b><br/>${description}<br/><br/>Reported by: ${currentUser?.name || "Bug Ricer"}`,
+  data.attachments || []
+);
