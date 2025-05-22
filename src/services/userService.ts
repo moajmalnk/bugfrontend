@@ -56,6 +56,15 @@ class UserService {
     }));
   }
 
+  async getAllTesterEmails(): Promise<string[]> {
+    const response = await fetch(`${ENV.API_URL}/get_all_testers.php`);
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to fetch tester emails');
+    }
+    return data.emails;
+  }
+
   async addUser(userData: NewUserData): Promise<User> {
     const response = await fetch(`${this.baseUrl}/create.php`, {
       method: "POST",
