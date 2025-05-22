@@ -1,10 +1,14 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, UserRole } from '@/types';
 import { toast } from "@/components/ui/use-toast";
-import { mockDataStore } from '@/lib/mockData';
-import { api } from '@/lib/api';
-import { useNavigate } from 'react-router-dom';
-import { ENV } from '@/lib/env';
+import { ENV } from "@/lib/env";
+import { User } from "@/types";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { useNavigate } from "react-router-dom";
 
 interface AuthContextType {
   currentUser: User | null;
@@ -28,7 +32,7 @@ const API_URL = `${ENV.API_URL}/auth`;
 const AUTH_ENDPOINTS = {
   login: `${API_URL}/login.php`,
   register: `${API_URL}/register.php`,
-  me: `${API_URL}/me.php`
+  me: `${API_URL}/me.php`,
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -37,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
   const checkAuthStatus = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (!token) {
       setIsLoading(false);
       return;
@@ -45,27 +49,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await fetch(AUTH_ENDPOINTS.me, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       const data = await response.json();
-      console.log('Auth check response:', data);
-      
+      // console.log("Auth check response:", data);
+
       if (data.success && data.data) {
         setCurrentUser(data.data);
       } else {
-        console.error('Auth check failed:', data);
-        localStorage.removeItem('token');
+        console.error("Auth check failed:", data);
+        localStorage.removeItem("token");
         setCurrentUser(null);
       }
     } catch (error) {
-      console.error('Auth check error:', error);
-      localStorage.removeItem('token');
+      console.error("Auth check error:", error);
+      localStorage.removeItem("token");
       setCurrentUser(null);
     } finally {
       setIsLoading(false);
@@ -77,27 +81,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuthStatus();
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (
+    username: string,
+    password: string
+  ): Promise<boolean> => {
     try {
       const response = await fetch(AUTH_ENDPOINTS.login, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
+          Accept: "application/json",
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username,
-          password
-        })
+          password,
+        }),
       });
 
       const data = await response.json();
-      console.log('Login response:', data);
+      // console.log('Login response:', data);
 
       if (data.success && data.data?.token) {
-        localStorage.setItem('token', data.data.token);
+        localStorage.setItem("token", data.data.token);
         setCurrentUser(data.data.user);
-        navigate('/dashboard', { replace: true });
+        navigate("/dashboard", { replace: true });
         return true;
       }
 
@@ -109,10 +116,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           variant: "destructive",
         });
       }
-      
+
       return false;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       toast({
         title: "Error",
         description: "Failed to connect to the server",
@@ -125,20 +132,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (data: RegisterData): Promise<boolean> => {
     try {
       const response = await fetch(AUTH_ENDPOINTS.register, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
+          Accept: "application/json",
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       });
 
       const result = await response.json();
 
       if (result.success && result.data?.token) {
-        localStorage.setItem('token', result.data.token);
+        localStorage.setItem("token", result.data.token);
         setCurrentUser(result.data.user);
-        navigate('/dashboard', { replace: true });
+        navigate("/dashboard", { replace: true });
         return true;
       }
 
@@ -153,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return false;
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error("Registration error:", error);
       toast({
         title: "Error",
         description: "Failed to connect to the server",
@@ -164,9 +171,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     setCurrentUser(null);
-    navigate('/login', { replace: true });
+    navigate("/login", { replace: true });
   };
 
   const value = {
@@ -175,20 +182,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     login,
     logout,
-    register
+    register,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
