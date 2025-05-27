@@ -121,7 +121,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{currentUser?.name}</p>
             <p className="text-xs text-muted-foreground capitalize truncate">
-              {currentUser?.role}
+              {currentUser?.role} {currentUser?.email && `(${currentUser.email})`}
             </p>
           </div>
         </Link>
