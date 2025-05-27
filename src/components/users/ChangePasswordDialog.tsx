@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
+import { ENV } from "@/lib/env";
 import { User } from "@/types";
 import axios from "axios";
 import { KeyRound } from "lucide-react";
@@ -143,11 +144,9 @@ async function handlePasswordChange(
   currentPassword: string,
   newPassword: string
 ) {
-  const API_BASE =
-    import.meta.env.VITE_API_BASE_URL ||
-    "http://localhost/Bugricer/backend/api";
   try {
-    await axios.post(`${API_BASE}/users/change-password.php`, {
+    // Use the ENV configuration that's already set up in your application
+    await axios.post(`${ENV.API_URL}/users/change-password.php`, {
       userId,
       currentPassword,
       newPassword,
@@ -157,3 +156,5 @@ async function handlePasswordChange(
     throw error;
   }
 }
+
+export default handlePasswordChange;

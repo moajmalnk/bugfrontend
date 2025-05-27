@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import {
   Github,
@@ -12,8 +13,68 @@ import {
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+// Profile skeleton components
+const ProfileHeaderSkeleton = () => (
+  <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-8">
+    <Skeleton className="w-32 h-32 rounded-full" />
+    <div className="flex-1 text-center md:text-left">
+      <Skeleton className="h-9 w-64 mb-2 mx-auto md:mx-0" />
+      <Skeleton className="h-5 w-32 mb-4 mx-auto md:mx-0" />
+      <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+        <Skeleton className="h-9 w-44" />
+        <Skeleton className="h-9 w-44" />
+      </div>
+    </div>
+  </div>
+);
+
+const AboutCardSkeleton = () => (
+  <Card className="md:col-span-2">
+    <CardHeader>
+      <Skeleton className="h-7 w-24" />
+    </CardHeader>
+    <CardContent>
+      <Skeleton className="h-20 w-full" />
+    </CardContent>
+  </Card>
+);
+
+const LinksCardSkeleton = () => (
+  <Card>
+    <CardHeader>
+      <Skeleton className="h-7 w-24" />
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <Skeleton className="h-6 w-32" />
+      <Skeleton className="h-6 w-32" />
+      <Skeleton className="h-6 w-32" />
+    </CardContent>
+  </Card>
+);
+
+const ActivityCardSkeleton = () => (
+  <Card className="md:col-span-3">
+    <CardHeader>
+      <Skeleton className="h-7 w-40" />
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-4">
+        {[1, 2, 3].map((_, i) => (
+          <div key={i} className="flex items-start gap-4">
+            <Skeleton className="w-2 h-2 mt-2 rounded-full" />
+            <div className="w-full">
+              <Skeleton className="h-5 w-44 mb-2" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </CardContent>
+  </Card>
+);
+
 export default function Profile() {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, isLoading } = useAuth();
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -26,6 +87,31 @@ export default function Profile() {
       console.error("Logout failed:", error);
     }
   }, [logout, navigate]);
+
+  if (isLoading) {
+    return (
+      <div
+        className="container max-w-4xl mx-auto py-8"
+        aria-busy="true"
+        aria-label="Loading profile"
+      >
+        {/* Top Bar with Skeleton Logout Button */}
+        <div className="flex justify-end mb-6">
+          <Skeleton className="h-9 w-24" />
+        </div>
+
+        {/* Profile Header Skeleton */}
+        <ProfileHeaderSkeleton />
+
+        {/* Content Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <AboutCardSkeleton />
+          <LinksCardSkeleton />
+          <ActivityCardSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return null;
@@ -83,14 +169,20 @@ export default function Profile() {
       <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-8">
         <div className="w-32 h-32 rounded-full overflow-hidden">
           <img
-            src="https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png"
-            alt={currentUser.name}
+            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+              currentUser.name || currentUser.username
+            )}&background=3b82f6&color=fff&size=128`}
+            alt={currentUser.name || currentUser.username}
             className="w-full h-full object-cover"
           />
         </div>
         <div className="flex-1 text-center md:text-left">
-          <h1 className="text-3xl font-bold mb-2">{currentUser.name}</h1>
-          <p className="text-muted-foreground mb-4">{currentUser.role}</p>
+          <h1 className="text-3xl font-bold mb-2">
+            {currentUser.name || currentUser.username}
+          </h1>
+          <p className="text-muted-foreground mb-4 capitalize">
+            {currentUser.role}
+          </p>
           <div className="flex flex-wrap gap-4 justify-center md:justify-start">
             <Button variant="outline" size="sm">
               <Mail className="w-4 h-4 mr-2" />
@@ -98,7 +190,7 @@ export default function Profile() {
             </Button>
             <Button variant="outline" size="sm">
               <MapPin className="w-4 h-4 mr-2" />
-              CODO AI Innovations
+              BugRacer Team
             </Button>
           </div>
         </div>

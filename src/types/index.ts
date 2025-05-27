@@ -11,6 +11,9 @@ export type Bug = {
   description: string;
   project_id: string;
   reported_by: string;
+  reporter_name?: string;
+  updated_by?: string;
+  updated_by_name?: string;  // Add this field
   priority: 'high' | 'medium' | 'low';
   status: 'pending' | 'in_progress' | 'fixed' | 'declined' | 'rejected';
   created_at: string;

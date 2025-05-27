@@ -45,14 +45,11 @@ async function handlePasswordChange(
   newPassword: string
 ) {
   try {
-    await axios.post(
-      "http://localhost/Bugricer/backend/api/users/change-password.php",
-      {
-        userId,
-        currentPassword,
-        newPassword,
-      }
-    );
+    await axios.post(`${ENV.API_URL}/users/change-password.php`, {
+      userId,
+      currentPassword,
+      newPassword,
+    });
   } catch (error: any) {
     throw error.response?.data?.message || "Failed to update password";
   }

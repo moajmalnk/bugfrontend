@@ -1,19 +1,14 @@
-import { Bug } from '@/types';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Maximize2, ZoomIn, ZoomOut, X, RotateCw } from 'lucide-react';
-import { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
+import { Bug } from "@/types";
+import { RotateCw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { useState } from "react";
 
 interface BugContentCardsProps {
   bug: Bug;
@@ -24,9 +19,9 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
 
-  const handleZoomIn = () => setScale(prev => Math.min(prev + 0.25, 3));
-  const handleZoomOut = () => setScale(prev => Math.max(prev - 0.25, 0.5));
-  const handleRotate = () => setRotation(prev => (prev + 90) % 360);
+  const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));
+  const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
   const handleReset = () => {
     setScale(1);
     setRotation(0);
@@ -34,15 +29,19 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader className="pb-3">
           <CardTitle className="text-base sm:text-lg">Description</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="whitespace-pre-line text-sm sm:text-base">{bug.description}</p>
+          <div className="max-w-full overflow-x-auto">
+            <p className="whitespace-pre-wrap text-sm sm:text-base break-words">
+              {bug.description}
+            </p>
+          </div>
         </CardContent>
       </Card>
-      
+
       {bug.screenshots && bug.screenshots.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
@@ -51,13 +50,13 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           <CardContent>
             <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {bug.screenshots.map((screenshot, index) => (
-                <div 
-                  key={index} 
+                <div
+                  key={index}
                   className="relative group rounded-md border overflow-hidden aspect-[16/10]"
                 >
-                  <img 
-                    src={screenshot.path} 
-                    alt={screenshot.name} 
+                  <img
+                    src={screenshot.path}
+                    alt={screenshot.name}
                     className="object-cover w-full h-full transition-transform group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -80,20 +79,22 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           </CardContent>
         </Card>
       )}
-      
+
       {bug.files?.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base sm:text-lg">Attached Files</CardTitle>
+            <CardTitle className="text-base sm:text-lg">
+              Attached Files
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
               {bug.files.map((file, index) => (
                 <li key={index} className="flex items-center gap-2">
-                  <a 
-                    href={file.path} 
-                    className="text-sm sm:text-base text-primary hover:underline" 
-                    target="_blank" 
+                  <a
+                    href={file.path}
+                    className="text-sm sm:text-base text-primary hover:underline"
+                    target="_blank"
                     rel="noopener noreferrer"
                   >
                     {file.name}
@@ -106,20 +107,20 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       )}
 
       {/* Image Full View Dialog */}
-      <Dialog 
-        open={!!selectedImage} 
+      <Dialog
+        open={!!selectedImage}
         onOpenChange={() => {
           setSelectedImage(null);
           setScale(1);
           setRotation(0);
         }}
       >
-        <DialogContent 
-          className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col p-0 gap-0"
-        >
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col p-0 gap-0">
           <DialogHeader className="p-3 sm:p-4 flex-shrink-0 border-b">
             <div className="flex items-center justify-between gap-4">
-              <DialogTitle className="text-sm sm:text-base">Screenshot Preview</DialogTitle>
+              <DialogTitle className="text-sm sm:text-base">
+                Screenshot Preview
+              </DialogTitle>
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <Button
                   variant="outline"
@@ -165,13 +166,13 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           {selectedImage && (
             <div className="relative flex-1 overflow-auto p-3 sm:p-4">
               <div className="min-h-full flex items-center justify-center">
-                <img 
-                  src={selectedImage} 
-                  alt="Full size screenshot" 
+                <img
+                  src={selectedImage}
+                  alt="Full size screenshot"
                   className="max-w-full max-h-full object-contain transition-transform duration-200"
                   style={{
                     transform: `scale(${scale}) rotate(${rotation}deg)`,
-                    transformOrigin: 'center center'
+                    transformOrigin: "center center",
                   }}
                 />
               </div>

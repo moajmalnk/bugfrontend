@@ -1,14 +1,16 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/components/ui/use-toast";
 import { bugService } from "@/services/bugService";
-import { Bug, BugStatus, Project } from '@/types';
+import { sendBugStatusUpdateNotification } from "@/services/emailService";
+import { Bug, BugStatus, Project } from "@/types";
 import { useState } from "react";
 
 interface BugDetailsCardProps {
@@ -19,12 +21,12 @@ interface BugDetailsCardProps {
   formattedUpdatedDate: string;
 }
 
-export const BugDetailsCard = ({ 
-  bug, 
-  project, 
-  canUpdateStatus, 
+export const BugDetailsCard = ({
+  bug,
+  project,
+  canUpdateStatus,
   updateBugStatus,
-  formattedUpdatedDate 
+  formattedUpdatedDate,
 }: BugDetailsCardProps) => {
   const [updating, setUpdating] = useState(false);
   const [bugState, setBugState] = useState(bug);
@@ -35,10 +37,30 @@ export const BugDetailsCard = ({
       const updatedBug = { ...bugState, [field]: value };
       await bugService.updateBug(updatedBug);
       setBugState(updatedBug);
-      toast({
-        title: "Success",
-        description: `Bug ${field} updated successfully.`,
-      });
+
+      // Send notification when status is changed to "fixed"
+      if (field === "status" && value === "fixed") {
+        const notificationResult = await sendBugStatusUpdateNotification(
+          updatedBug
+        );
+        if (notificationResult.success) {
+          toast({
+            title: "Success",
+            description: `Bug ${field} updated and notifications sent.`,
+          });
+        } else {
+          toast({
+            title: "Warning",
+            description: `Bug ${field} updated but failed to send notifications.`,
+            variant: "default",
+          });
+        }
+      } else {
+        toast({
+          title: "Success",
+          description: `Bug ${field} updated successfully.`,
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -54,7 +76,9 @@ export const BugDetailsCard = ({
     <div className="w-full max-w-full sm:max-w-sm mx-auto">
       <Card className="w-full h-full">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base sm:text-lg break-words">Bug Details</CardTitle>
+          <CardTitle className="text-base sm:text-lg break-words">
+            Bug Details
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
@@ -78,7 +102,9 @@ export const BugDetailsCard = ({
               </Select>
             ) : (
               <div className="p-2 border rounded-md text-xs sm:text-sm bg-muted/30 w-full">
-                <span className="capitalize break-words">{bug.status.replace('_', ' ')}</span>
+                <span className="capitalize break-words">
+                  {bug.status.replace("_", " ")}
+                </span>
               </div>
             )}
           </div>
@@ -107,10 +133,21 @@ export const BugDetailsCard = ({
             )}
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs sm:text-sm">Last Updated</Label>
-            <div className="p-2 border rounded-md text-xs sm:text-sm bg-muted/30 w-full">
-              {formattedUpdatedDate}
+          {/* Last Updated and Updated By Section */}
+          <div className="space-y-2 py-3 border-t border-border">
+            <div className="flex flex-col space-y-1">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Last Updated:</span>
+                <span className="font-medium">{formattedUpdatedDate}</span>
+              </div>
+
+              {/* Add the Updated By information with null check */}
+              {bug.updated_by_name && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Updated By:</span>
+                  <span className="font-medium">{bug.updated_by_name}</span>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

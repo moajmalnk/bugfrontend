@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +25,75 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+
+// Skeleton components for loading state
+const ProjectHeaderSkeleton = () => (
+  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
+    <div className="w-full md:w-auto">
+      <Skeleton className="h-8 w-64 md:w-80 mb-2" />
+      <Skeleton className="h-5 w-full md:w-96 max-w-xl" />
+    </div>
+    <Skeleton className="h-10 w-full md:w-32 mt-4 md:mt-0" />
+  </div>
+);
+
+const StatsCardSkeleton = () => (
+  <Card className="flex-1 min-w-[150px]">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <Skeleton className="h-5 w-24" />
+      <Skeleton className="h-4 w-4 rounded-full" />
+    </CardHeader>
+    <CardContent>
+      <Skeleton className="h-8 w-12" />
+    </CardContent>
+  </Card>
+);
+
+const RecentActivitySkeleton = () => (
+  <Card>
+    <CardHeader>
+      <Skeleton className="h-6 w-40 mb-2" />
+      <Skeleton className="h-4 w-60" />
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-4">
+        {Array(3)
+          .fill(0)
+          .map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </div>
+          ))}
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const BugCardSkeleton = () => (
+  <div className="border border-border rounded-lg p-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <div className="space-y-2">
+        <Skeleton className="h-5 w-40 sm:w-60" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-16" />
+        </div>
+      </div>
+      <Skeleton className="h-8 w-24" />
+    </div>
+    <Skeleton className="h-16 w-full mb-3" />
+    <div className="flex justify-between items-center">
+      <div className="flex gap-2">
+        <Skeleton className="h-6 w-20" />
+      </div>
+      <Skeleton className="h-4 w-32" />
+    </div>
+  </div>
+);
 
 interface ProjectUser {
   id: string;
@@ -120,10 +190,31 @@ const ProjectDetails = () => {
     }
   };
 
+  // Render skeleton loading UI
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+      <div
+        className="space-y-6 p-3 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto"
+        aria-busy="true"
+        aria-label="Loading project details"
+      >
+        <ProjectHeaderSkeleton />
+
+        <div className="flex flex-nowrap overflow-x-auto gap-2 md:gap-4 pb-1 mb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+          <Skeleton className="h-10 w-28 flex-shrink-0" />
+          <Skeleton className="h-10 w-28 flex-shrink-0" />
+          <Skeleton className="h-10 w-28 flex-shrink-0" />
+        </div>
+
+        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+        </div>
+
+        <div className="mt-6">
+          <RecentActivitySkeleton />
+        </div>
       </div>
     );
   }
@@ -137,13 +228,14 @@ const ProjectDetails = () => {
   }
 
   return (
-    <div className="space-y-6 p-2 sm:p-4 md:p-6 lg:p-8">
+    <div className="space-y-6 p-3 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
+      {/* Project Header - Responsive Layout */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
         <div className="w-full md:w-auto">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words max-w-full">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words max-w-full">
             {project.name}
           </h1>
-          <p className="text-muted-foreground text-sm md:text-base break-words max-w-xl">
+          <p className="text-muted-foreground text-xs sm:text-sm md:text-base break-words max-w-xl">
             {project.description}
           </p>
         </div>
@@ -157,7 +249,8 @@ const ProjectDetails = () => {
                 variant: "default",
               });
             }}
-            className="w-full md:w-auto mt-4 md:mt-0"
+            className="w-full md:w-auto mt-2 md:mt-0 flex-shrink-0"
+            size="sm"
           >
             <Pencil className="mr-2 h-4 w-4" /> Edit Project
           </Button>
@@ -168,22 +261,24 @@ const ProjectDetails = () => {
         defaultValue="overview"
         value={activeTab}
         onValueChange={setActiveTab}
+        className="w-full"
       >
-        <TabsList className="flex flex-nowrap overflow-x-auto gap-2 md:gap-4 mb-4">
-          <TabsTrigger value="overview" className="flex-1 min-w-[120px]">
+        <TabsList className="flex flex-nowrap overflow-x-auto gap-2 md:gap-4 pb-1 mb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+          <TabsTrigger value="overview" className="flex-1 min-w-[100px]">
             Overview
           </TabsTrigger>
-          <TabsTrigger value="bugs" className="flex-1 min-w-[120px]">
+          <TabsTrigger value="bugs" className="flex-1 min-w-[100px]">
             Bugs
           </TabsTrigger>
-          <TabsTrigger value="members" className="flex-1 min-w-[120px]">
+          <TabsTrigger value="members" className="flex-1 min-w-[100px]">
             Members
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Card>
+          {/* Stats Cards - Responsive grid that works on all screen sizes */}
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card className="flex-1 min-w-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                   Total Bugs
@@ -195,7 +290,7 @@ const ProjectDetails = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="flex-1 min-w-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Open Bugs</CardTitle>
                 <AlertCircle className="h-4 w-4 text-yellow-500" />
@@ -212,7 +307,7 @@ const ProjectDetails = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="flex-1 min-w-0 xs:col-span-2 lg:col-span-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                   Fixed Bugs
@@ -236,12 +331,12 @@ const ProjectDetails = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <Clock className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-                  <h3 className="mt-4 text-lg font-medium">
+                <div className="text-center py-6 sm:py-8">
+                  <Clock className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground opacity-50" />
+                  <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-medium">
                     Feature Coming Soon
                   </h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
+                  <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-lg mx-auto">
                     We're working hard to bring you project activity tracking.
                     Check back soon!
                   </p>
@@ -260,7 +355,11 @@ const ProjectDetails = () => {
                   All bugs reported in this project
                 </CardDescription>
               </div>
-              <Button asChild className="w-full sm:w-auto mt-2 sm:mt-0">
+              <Button
+                asChild
+                className="w-full sm:w-auto mt-2 sm:mt-0"
+                size="sm"
+              >
                 <Link to={`/bugs/new?projectId=${projectId}`}>
                   <Plus className="mr-2 h-4 w-4" /> Report Bug
                 </Link>
@@ -272,7 +371,7 @@ const ProjectDetails = () => {
                   title="No bugs reported"
                   description="This project doesn't have any bugs reported yet."
                   action={
-                    <Button asChild>
+                    <Button asChild size="sm">
                       <Link to={`/bugs/new?projectId=${projectId}`}>
                         Report First Bug
                       </Link>
@@ -311,6 +410,7 @@ const ProjectDetails = () => {
                   });
                 }}
                 className="w-full sm:w-auto mt-2 sm:mt-0"
+                size="sm"
               >
                 <Plus className="mr-2 h-4 w-4" /> Add Member
               </Button>
@@ -329,6 +429,7 @@ const ProjectDetails = () => {
                         variant: "default",
                       });
                     }}
+                    size="sm"
                   >
                     Add Members
                   </Button>

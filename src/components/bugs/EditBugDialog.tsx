@@ -1,9 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Bug, BugPriority, BugStatus } from '@/types';
-import { 
+import { Button } from "@/components/ui/button";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -11,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -19,26 +15,37 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from '@/components/ui/use-toast';
-import { apiClient } from '@/lib/axios';
-import { useQueryClient } from '@tanstack/react-query';
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
+import { apiClient } from "@/lib/axios";
+import { sendBugStatusUpdateNotification } from "@/services/emailService";
+import { Bug, BugPriority, BugStatus } from "@/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const formSchema = z.object({
-  title: z.string().min(3, 'Bug title must be at least 3 characters'),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
-  priority: z.enum(['low', 'medium', 'high'] as const),
-  status: z.enum(['pending', 'in_progress', 'fixed', 'declined', 'rejected'] as const),
+  title: z.string().min(3, "Bug title must be at least 3 characters"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  priority: z.enum(["low", "medium", "high"] as const),
+  status: z.enum([
+    "pending",
+    "in_progress",
+    "fixed",
+    "declined",
+    "rejected",
+  ] as const),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -82,40 +89,57 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const response = await apiClient.post<ApiResponse<Bug>>(
-        '/bugs/update.php',
+        "/bugs/update.php",
         {
           id: bug.id,
           title: values.title,
           description: values.description,
           priority: values.priority,
-          status: values.status
+          status: values.status,
         },
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
       );
 
       if (!response.data.success) {
-        throw new Error(response.data.message || 'Failed to update bug');
+        throw new Error(response.data.message || "Failed to update bug");
       }
 
-      toast({
-        title: "Success",
-        description: "Bug updated successfully",
-      });
+      // Send notification if status changed to "fixed"
+      if (values.status === "fixed" && bug.status !== "fixed") {
+        const updatedBug = {
+          ...bug,
+          title: values.title,
+          description: values.description,
+          priority: values.priority,
+          status: values.status,
+        };
+
+        await sendBugStatusUpdateNotification(updatedBug);
+        toast({
+          title: "Success",
+          description: "Bug updated and notifications sent",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Bug updated successfully",
+        });
+      }
 
       // Invalidate and refetch queries
-      queryClient.invalidateQueries({ queryKey: ['bug', bug.id] });
-      queryClient.invalidateQueries({ queryKey: ['bugs'] });
-      
+      queryClient.invalidateQueries({ queryKey: ["bug", bug.id] });
+      queryClient.invalidateQueries({ queryKey: ["bugs"] });
+
       setOpen(false);
     } catch (error) {
-      console.error('Failed to update bug:', error);
+      console.error("Failed to update bug:", error);
       toast({
         title: "Error",
         description: "Failed to update bug. Please try again.",
@@ -225,7 +249,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : 'Save Changes'}
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>

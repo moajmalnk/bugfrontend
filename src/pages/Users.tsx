@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { UserDetailDialog } from "@/components/users/UserDetailDialog";
@@ -15,6 +16,27 @@ import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
 import { Bug, Code2, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
+
+// User Card Skeleton component for loading state
+const UserCardSkeleton = () => (
+  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+    <div className="flex items-center gap-4 min-w-0">
+      <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+      <div className="min-w-0 flex-1">
+        <Skeleton className="h-5 w-32 mb-2" />
+        <div className="flex flex-col sm:flex-row text-sm sm:space-x-2">
+          <Skeleton className="h-4 w-24 mb-1 sm:mb-0" />
+          <span className="hidden sm:inline text-transparent">•</span>
+          <Skeleton className="h-4 w-40" />
+        </div>
+      </div>
+    </div>
+
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
+      <Skeleton className="h-8 w-24 rounded-full" />
+    </div>
+  </div>
+);
 
 interface NewUser {
   name: string;
@@ -176,14 +198,6 @@ const Users = () => {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -203,67 +217,58 @@ const Users = () => {
       <Card>
         <CardHeader>
           <CardTitle className="break-words">BugRacer Users</CardTitle>
-          <CardDescription>Total users: {users.length}</CardDescription>
+          <CardDescription>
+            {isLoading ? (
+              <Skeleton className="h-5 w-24 inline-block" />
+            ) : (
+              `Total users: ${users.length}`
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[calc(100vh-20rem)]">
             <div className="space-y-4">
-              {users.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors gap-4 cursor-pointer"
-                  onClick={() => setSelectedUser(user)}
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <img
-                      src={user.avatar}
-                      alt={`${user.username}'s avatar`}
-                      className="h-10 w-10 rounded-full shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{user.username}</p>
-                      <div className="flex flex-col sm:flex-row text-sm text-muted-foreground sm:space-x-2">
-                        <p className="font-medium truncate">@{user.username}</p>
-                        <span className="hidden sm:inline">•</span>
-                        <p className="truncate">{user.email}</p>
+              {isLoading
+                ? // Show multiple skeleton cards while loading
+                  Array(5)
+                    .fill(0)
+                    .map((_, index) => <UserCardSkeleton key={index} />)
+                : users.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors gap-4 cursor-pointer"
+                      onClick={() => setSelectedUser(user)}
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <img
+                          src={user.avatar}
+                          alt={`${user.username}'s avatar`}
+                          className="h-10 w-10 rounded-full shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">
+                            {user.username}
+                          </p>
+                          <div className="flex flex-col sm:flex-row text-sm text-muted-foreground sm:space-x-2">
+                            <p className="font-medium truncate">
+                              @{user.username}
+                            </p>
+                            <span className="hidden sm:inline">•</span>
+                            <p className="truncate">{user.email}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
+                        <div className="flex items-center bg-accent/50 px-3 py-1 rounded-full shrink-0">
+                          {getRoleIcon(user.role)}
+                          <span className="ml-2 text-sm capitalize">
+                            {user.role}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
-                    <div className="flex items-center bg-accent/50 px-3 py-1 rounded-full shrink-0">
-                      {getRoleIcon(user.role)}
-                      <span className="ml-2 text-sm capitalize">
-                        {user.role}
-                      </span>
-                    </div>
-
-                    {/* <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          <span>Edit User</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Key className="h-4 w-4 mr-2" />
-                          <span>Change Password</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          <span>Delete User</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu> */}
-                  </div>
-                </div>
-              ))}
+                  ))}
             </div>
           </ScrollArea>
         </CardContent>

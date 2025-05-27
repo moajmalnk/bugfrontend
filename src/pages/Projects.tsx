@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast, useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
@@ -28,6 +29,30 @@ import { Project, projectService } from "@/services/projectService";
 import { AlertCircle, CheckCircle2, FolderKanban, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+
+// Project Card Skeleton component for loading state
+const ProjectCardSkeleton = () => (
+  <Card className="flex flex-col h-full rounded-xl shadow-sm border border-border bg-background/90">
+    <CardHeader className="pb-2">
+      <Skeleton className="h-6 w-3/4 mb-2" />
+      <Skeleton className="h-4 w-1/2" />
+    </CardHeader>
+    <CardContent className="flex-1 flex flex-col justify-end">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <Skeleton className="h-5 w-16" />
+        <div className="ml-auto flex flex-col items-start gap-1 min-w-[110px] rounded-md">
+          <Skeleton className="h-4 w-24 mb-1" />
+          <Skeleton className="h-3 w-20 mb-1" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      </div>
+    </CardContent>
+    <CardFooter className="flex flex-col gap-2 sm:flex-row mt-auto">
+      <Skeleton className="h-8 w-full sm:w-24" />
+      <Skeleton className="h-8 w-full sm:w-24" />
+    </CardFooter>
+  </Card>
+);
 
 const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -147,7 +172,7 @@ const Projects = () => {
         });
       } else {
         toast({
-          title: "Success",
+          title: "Error",
           description: data.message || "Failed to delete project",
           variant: "destructive",
         });
@@ -170,17 +195,6 @@ const Projects = () => {
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       project.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  if (isLoading) {
-    return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading projects...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 px-2 sm:px-4 md:px-8 py-4 sm:py-6 w-full max-w-[1800px] mx-auto">
@@ -214,8 +228,20 @@ const Projects = () => {
         </div>
       </div>
 
-      {/* Projects Grid */}
-      {filteredProjects.length === 0 ? (
+      {/* Projects Grid with Loading Skeletons */}
+      {isLoading ? (
+        <div
+          className="grid gap-4 grid-cols-1 md:grid-cols-2"
+          aria-busy="true"
+          aria-label="Loading projects"
+        >
+          {Array(4)
+            .fill(0)
+            .map((_, index) => (
+              <ProjectCardSkeleton key={index} />
+            ))}
+        </div>
+      ) : filteredProjects.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center bg-background/80">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <FolderKanban className="h-6 w-6 text-muted-foreground" />
@@ -241,11 +267,8 @@ const Projects = () => {
         </div>
       ) : (
         <div
-          className="
-            grid gap-4
-            grid-cols-1
-            md:grid-cols-2
-          "
+          className="grid gap-4 grid-cols-1 md:grid-cols-2"
+          aria-label="Project list"
         >
           {filteredProjects.map((project) => (
             <Card
