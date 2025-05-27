@@ -121,7 +121,7 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
           <!-- Header -->
           <div style="background-color: #65a30d; color: #ffffff; padding: 20px; text-align: center;">
              <h1 style="margin: 0; font-size: 24px; display: flex; align-items: center; justify-content: center;">
-              <img src="https://raw.githubusercontent.com/ajmalnk/Bugricer/main/frontend/public/favicon.png" alt="Bug Ricer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
+              <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f41e/32.png" alt="Bug Ricer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
               BugRacer Alert
             </h1>
             <p style="margin: 5px 0 0 0; font-size: 16px;">Bug Fixed</p>
