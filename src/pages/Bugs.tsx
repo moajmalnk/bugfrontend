@@ -150,8 +150,11 @@ const Bugs = () => {
 
           {/* Total Bugs Count */}
           {!loading && bugs.length > 0 && (
-            <div className="text-sm text-muted-foreground">
-              Total Bugs: <span className="font-semibold text-foreground">{bugs.length}</span>
+            <div className="flex items-center border rounded-md px-3 py-1 bg-blue-50">
+              <BugIcon className="h-4 w-4 text-blue-500 mr-2" />
+              <span className="text-sm font-medium text-blue-700">
+                {bugs.length} Total Bugs
+              </span>
             </div>
           )}
         </div>
