@@ -128,23 +128,33 @@ const Bugs = () => {
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
       <section className="max-w-6xl mx-auto space-y-4">
-        {/* Report Bug Button */}
-        {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
-          <Button
-            variant="default"
-            asChild
-            className="w-full sm:w-auto h-10 text-sm"
-            aria-label="Report a new bug"
-          >
-            <Link
-              to="/bugs/new"
-              state={{ from: "/bugs" }}
-              className="flex items-center justify-center"
+        {/* Header: Report Bug Button and Total Bugs Count */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          {/* Report Bug Button */}
+          {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
+            <Button
+              variant="default"
+              asChild
+              className="w-full sm:w-auto h-10 text-sm"
+              aria-label="Report a new bug"
             >
-              <Plus className="mr-2 h-4 w-4" /> Report Bug
-            </Link>
-          </Button>
-        )}
+              <Link
+                to="/bugs/new"
+                state={{ from: "/bugs" }}
+                className="flex items-center justify-center"
+              >
+                <Plus className="mr-2 h-4 w-4" /> Report Bug
+              </Link>
+            </Button>
+          )}
+
+          {/* Total Bugs Count */}
+          {!loading && bugs.length > 0 && (
+            <div className="text-sm text-muted-foreground">
+              Total Bugs: <span className="font-semibold text-foreground">{bugs.length}</span>
+            </div>
+          )}
+        </div>
 
         {/* Search and Filters Section */}
         <div className="space-y-3">
