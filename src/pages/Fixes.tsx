@@ -135,7 +135,9 @@ const Fixes = () => {
     <div className="space-y-6 p-2 sm:p-4 md:p-6 lg:p-8 w-full max-w-6xl mx-auto">
       {isLoading ? (
         <>
-          <HeaderSkeleton />
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+            <HeaderSkeleton />
+          </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <div className="relative flex-1 max-w-full sm:max-w-sm">
