@@ -41,7 +41,7 @@ export function UserNav() {
         
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/profile">
+          <Link to="/profile" className="flex items-center">
             <UserAvatar className="mr-2 h-4 w-4" />
             <span>Profile</span>
           </Link>
