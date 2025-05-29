@@ -90,21 +90,11 @@ const Fixes = () => {
     queryFn: () => bugService.getBugs(),
   });
 
-  // Filter bugs to show only the fixed ones
-  const fixedBugs = bugs?.filter((bug) => bug.status === "fixed") || [];
-
   // Calculate fixed bugs by priority
-  const fixedByPriority = fixedBugs.reduce((acc, bug) => {
+  const bugsByPriority = bugs?.reduce((acc, bug) => {
     acc[bug.priority] = (acc[bug.priority] || 0) + 1;
     return acc;
   }, { high: 0, medium: 0, low: 0 });
-
-  // Filter by search term
-  const filteredBugs = fixedBugs.filter(
-    (bug) =>
-      bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bug.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   // Determine priorities colors
   const getPriorityColor = (priority: string) => {
@@ -118,15 +108,6 @@ const Fixes = () => {
       default:
         return "";
     }
-  };
-
-  // Format date helper
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
   };
 
   if (error) {
@@ -188,146 +169,52 @@ const Fixes = () => {
         <>
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <h1 className="text-2xl font-bold tracking-tight break-words">
-              Fixed Bugs
+              Bugs by Priority
             </h1>
             <div className="flex items-center space-x-2 sm:space-x-0 sm:ml-auto">
-              <div className="flex items-center border rounded-md px-3 py-1 bg-green-50">
-                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                <span className="text-sm font-medium text-green-700">
-                  {fixedBugs.length} Issues Fixed
-                </span>
-              </div>
+              {/* Add + Fix Bugs button */}
+              {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
+                <Button asChild className="h-9 text-sm">
+                  <Link to="/bugs">+ Fix Bugs</Link>
+                </Button>
+              )}
 
-              {/* Fixed by Priority Counts */}
-              {fixedByPriority.high > 0 && (
-                <div className="flex items-center border rounded-md px-2 py-1 bg-red-50 border-red-200 text-red-700 text-xs font-medium">
-                  <AlertCircle className="h-3 w-3 mr-1" /> High: {fixedByPriority.high}
+              {/* Display priority counts */}
+              {!isLoading && bugs && (
+                <div className="flex items-center space-x-2">
+                  {bugsByPriority.high > 0 && (
+                    <div className="flex items-center border rounded-md px-2 py-1 bg-red-50 border-red-200 text-red-700 text-xs font-medium">
+                      <AlertCircle className="h-3 w-3 mr-1" /> High: {bugsByPriority.high}
+                    </div>
+                  )}
+                  {bugsByPriority.medium > 0 && (
+                    <div className="flex items-center border rounded-md px-2 py-1 bg-yellow-50 border-yellow-200 text-yellow-700 text-xs font-medium">
+                      <AlertCircle className="h-3 w-3 mr-1" /> Medium: {bugsByPriority.medium}
+                    </div>
+                  )}
+                  {bugsByPriority.low > 0 && (
+                    <div className="flex items-center border rounded-md px-2 py-1 bg-green-50 border-green-200 text-green-700 text-xs font-medium">
+                      <AlertCircle className="h-3 w-3 mr-1" /> Low: {bugsByPriority.low}
+                    </div>
+                  )}
                 </div>
-              )}
-              {fixedByPriority.medium > 0 && (
-                <div className="flex items-center border rounded-md px-2 py-1 bg-yellow-50 border-yellow-200 text-yellow-700 text-xs font-medium">
-                  <AlertCircle className="h-3 w-3 mr-1" /> Medium: {fixedByPriority.medium}
-                </div>
-              )}
-              {fixedByPriority.low > 0 && (
-                 <div className="flex items-center border rounded-md px-2 py-1 bg-green-50 border-green-200 text-green-700 text-xs font-medium">
-                   <AlertCircle className="h-3 w-3 mr-1" /> Low: {fixedByPriority.low}
-                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <div className="relative flex-1 max-w-full sm:max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search fixed bugs..."
-                className="pl-8 w-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {filteredBugs.length === 0 ? (
+          {/* Display summary or no bugs message */}
+          {!isLoading && bugs?.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <AlertCircle className="h-6 w-6 text-muted-foreground" />
+                <Bug className="h-6 w-6 text-muted-foreground" />
               </div>
-              <h3 className="mt-4 text-lg font-semibold">No Fixed Bugs</h3>
+              <h3 className="mt-4 text-lg font-semibold">No Bugs Found</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                No bugs have been fixed yet.
+                There are no bugs in the system yet.
               </p>
             </div>
           ) : (
-            <>
-              {/* Table for sm and up */}
-              <div className="hidden sm:block rounded-md border overflow-x-auto">
-                <Table className="min-w-[600px] w-full">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Bug ID</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Reported By</TableHead>
-                      <TableHead>Fixed Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredBugs.map((bug) => (
-                      <TableRow key={bug.id}>
-                        <TableCell className="font-medium max-w-[120px] break-all">
-                          <div className="flex items-center space-x-2">
-                            <Bug className="h-4 w-4 text-muted-foreground" />
-                            <span>{bug.id.substring(0, 8)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-[200px] break-words">
-                          {bug.title}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={getPriorityColor(bug.priority)}
-                          >
-                            {bug.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[120px] break-words">
-                          {bug.reported_by}
-                        </TableCell>
-                        <TableCell>{formatDate(bug.updated_at)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link to={`/bugs/${bug.id}`}>View Details</Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Card list for mobile */}
-              <div className="sm:hidden space-y-4">
-                {filteredBugs.map((bug) => (
-                  <div
-                    key={bug.id}
-                    className="rounded-lg border p-4 bg-background flex flex-col gap-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Bug className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-semibold text-sm break-all">
-                        {bug.id.substring(0, 8)}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={getPriorityColor(bug.priority)}
-                      >
-                        {bug.priority}
-                      </Badge>
-                    </div>
-                    <div className="font-bold text-base break-words">
-                      {bug.title}
-                    </div>
-                    <div className="text-xs text-muted-foreground break-words">
-                      Reported by:{" "}
-                      <span className="font-medium">{bug.reported_by}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Fixed: {formatDate(bug.updated_at)}
-                    </div>
-                    <div className="flex justify-end">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/bugs/${bug.id}`}>View Details</Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
+            null
           )}
         </>
       )}
