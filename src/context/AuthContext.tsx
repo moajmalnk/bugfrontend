@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.success && data.data?.token) {
         localStorage.setItem("token", data.data.token);
         setCurrentUser(data.data.user);
-        navigate("/dashboard", { replace: true });
+        navigate("/projects", { replace: true });
         return true;
       }
 
@@ -145,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success && result.data?.token) {
         localStorage.setItem("token", result.data.token);
         setCurrentUser(result.data.user);
-        navigate("/dashboard", { replace: true });
+        navigate("/projects", { replace: true });
         return true;
       }
 
