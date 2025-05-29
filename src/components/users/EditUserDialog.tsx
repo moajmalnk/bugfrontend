@@ -90,13 +90,28 @@ export function EditUserDialog({
   const onSubmit = async (data: UserFormValues) => {
     setIsSubmitting(true);
     try {
-      const updatedUser = await userService.updateUser(user.id, {
+      // Call the update service
+      await userService.updateUser(user.id, {
         username: data.username,
         email: data.email,
         role: data.role,
       });
 
-      onUserUpdate(updatedUser);
+      // Manually create updated user object from form data
+      const locallyUpdatedUser = {
+        ...user, // Start with current user data
+        username: data.username, // Apply updated values
+        email: data.email,
+        role: data.role,
+        // Note: The 'name' property is often derived from 'username' or handled server-side.
+        // Ensure your backend returns the updated 'name' in the response if necessary,
+        // or handle its derivation client-side if possible.
+        // For now, we assume username update is sufficient for avatar.
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.username || data.email)}&background=3b82f6&color=fff&size=128`
+      };
+
+      // Call the onUserUpdate callback with the locally constructed updated user object
+      onUserUpdate(locallyUpdatedUser);
 
       toast({
         title: "Success",

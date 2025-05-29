@@ -9,6 +9,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Instagram,
 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -91,6 +92,7 @@ export default function Profile() {
   }, [logout, navigate]);
 
   const handleUserUpdate = (updatedUser) => {
+    // console.log("Updated user data received in handleUserUpdate:", updatedUser);
     updateCurrentUser(updatedUser);
   };
 
@@ -245,25 +247,40 @@ export default function Profile() {
           </CardHeader>
           <CardContent className="space-y-4">
             <a
-              href="#"
+              href="https://github.com/codoacademy"
               className="flex items-center text-muted-foreground hover:text-primary"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <Github className="w-4 h-4 mr-2" />
               Github
             </a>
             <a
-              href="#"
+              href="https://www.linkedin.com/company/105054896/admin?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base%3BJ1VB4Lv3ROO10lMF0Q2WfA%3D%3D"
               className="flex items-center text-muted-foreground hover:text-primary"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <Linkedin className="w-4 h-4 mr-2" />
               LinkedIn
             </a>
             <a
-              href="#"
+              href="https://www.codoacademy.com/"
               className="flex items-center text-muted-foreground hover:text-primary"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <LinkIcon className="w-4 h-4 mr-2" />
-              Portfolio
+              Website
+            </a>
+            <a
+              href="https://www.instagram.com/codo.ai/"
+              className="flex items-center text-muted-foreground hover:text-primary"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Instagram className="w-4 h-4 mr-2" />
+              Instagram
             </a>
           </CardContent>
         </Card>
