@@ -101,12 +101,18 @@ export function EditUserDialog({
         description: "User has been updated successfully.",
       });
       setOpen(false);
-      window.location.reload(); // Reload after saving changes
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating user:", error);
+      let errorMessage = "Failed to update the user. Please try again.";
+      if (error.message && (error.message.includes("Username already taken") || error.message.includes("Email already in use"))) {
+        errorMessage = error.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "Error",
-        description: "Failed to update the user. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
