@@ -53,12 +53,14 @@ type EditUserDialogProps = {
   user: User;
   onUserUpdate: (user: User) => void;
   trigger?: React.ReactNode;
+  loggedInUserRole: string;
 };
 
 export function EditUserDialog({
   user,
   onUserUpdate,
   trigger,
+  loggedInUserRole,
 }: EditUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -174,6 +176,7 @@ export function EditUserDialog({
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
+                    disabled={loggedInUserRole !== 'admin'}
                   >
                     <FormControl>
                       <SelectTrigger>

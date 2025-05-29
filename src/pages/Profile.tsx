@@ -203,6 +203,7 @@ export default function Profile() {
             <EditUserDialog
               user={currentUser}
               onUserUpdate={handleUserUpdate}
+              loggedInUserRole={currentUser.role}
               trigger={
                 <Button variant="outline" size="sm">
                   Edit Profile
