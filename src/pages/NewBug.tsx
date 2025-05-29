@@ -166,135 +166,121 @@ const NewBug = () => {
           description: "Bug report submitted successfully",
         });
 
-        // Send email notification to testers
-        try {
-          console.log("Sending notification for bug:", name);
-
-          // Create a timeout to prevent the email request from blocking navigation
-          setTimeout(async () => {
-            try {
-              // Get the bug ID from the response
-              const bugId = data.bugId || data.data?.id || data.id;
-
-              // Safety check - don't proceed with undefined bugId
-              if (!bugId) {
-                console.error(
-                  "Bug ID is undefined, can't generate attachment URLs"
-                );
-                return;
-              }
-
-              // Use absolute URLs for attachments to work in emails across environments
-              const baseUrl = window.location.origin;
-              // const apiPath = ENV.API_URL.replace(/^https?:\/\/[^/]+/, ""); // This is not needed
-
-              let allAttachments: string[] = [];
-
-              // Directly generate attachment URLs from the state variables
-              const screenshotUrls =
-                screenshots.length > 0
-                  ? screenshots.map((file) => {
-                      return `${baseUrl}/Bugricer/backend/api/get_attachment.php?bug_id=${bugId}&type=screenshot&filename=${encodeURIComponent(
-                        file.name
-                      )}`;
-                    })
-                  : [];
-
-              const fileUrls =
-                files.length > 0
-                  ? files.map((file) => {
-                      return `${baseUrl}/Bugricer/backend/api/get_attachment.php?bug_id=${bugId}&type=file&filename=${encodeURIComponent(
-                        file.name
-                      )}`;
-                    })
-                  : [];
-
-              allAttachments = [...screenshotUrls, ...fileUrls];
-
-              const emailResponse = await sendEmailNotification(
-                await getNotificationRecipients(), // Get all admins and developers
-                `Bug Report: ${name}`,
-                `
-                <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f7f6; padding: 20px;">
-                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    
-                    <!-- Header -->
-                    <div style="background-color: #2563eb; color: #ffffff; padding: 20px; text-align: center;">
-                      <h1 style="margin: 0; font-size: 24px; display: flex; align-items: center; justify-content: center;">
-                         <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f41e/32.png" alt="Bug Ricer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
-                        BugRacer Alert
-                      </h1>
-                      <p style="margin: 5px 0 0 0; font-size: 16px;">New Bug Reported</p>
-                    </div>
-                    
-                    <!-- Body -->
-                    <div style="padding: 20px; border-bottom: 1px solid #e2e8f0;">
-                      <h3 style="margin-top: 0; color: #1e293b; font-size: 18px;">${name}</h3>
-                      <p style="white-space: pre-wrap; margin-bottom: 15px; font-size: 14px;">${description || "No description provided."}</p>
-                      
-                      <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize; ${priority === "high" ? "color: #dc2626;" : priority === "medium" ? "color: #ea580c;" : "color: #65a30d;"}">${priority}</span></p>
-                      <p style="font-size: 14px; margin-bottom: 5px;"><strong>Status:</strong> <span style="font-weight: normal;">Pending</span></p>
-                      <p style="font-size: 14px; margin-bottom: 5px;"><strong>Reported By:</strong> <span style="font-weight: normal;">${currentUser?.name || "Bug Ricer User"}</span></p>
-                      <p style="font-size: 14px; margin-bottom: 0;"><strong>Date:</strong> <span style="font-weight: normal;">${new Date().toLocaleString()}</span></p>
-                    </div>
-                    
-                    <!-- Attachments -->
-                    ${allAttachments.length > 0
-                      ? `
-                    <div style="padding: 20px; border-top: 1px solid #e2e8f0;">
-                      <p style="margin-top: 0; margin-bottom: 10px; font-size: 14px;"><strong>Attachments (${allAttachments.length}):</strong></p>
-                      <ul style="padding-left: 20px; margin: 0; font-size: 14px;">
-                        ${allAttachments
-                          .map(
-                            (url) =>
-                              `<li style="margin-bottom: 5px;"><a href="${url}" style="color: #2563eb; text-decoration: none;">${decodeURIComponent(
-                                url.split("/").pop() || ""
-                              )}</a></li>`
-                          )
-                          .join("")}
-                      </ul>
-                    </div>
-                    `
-                      : ""
-                  }
-                    
-                    <!-- Footer -->
-                    <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
-                      <p style="margin: 0;">This is an automated notification from Bug Ricer. Please do not reply to this email.</p>
-                      <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} Bug Ricer. All rights reserved.</p>
-                    </div>
-                    
-                  </div>
-                </div>
-                `,
-                allAttachments // Pass all attachment URLs
-              );
-              console.log("Email notification sent:", emailResponse);
-            } catch (emailError) {
-              console.error("Failed to send email notification:", emailError);
-            }
-          }, 100);
-
-          // Handle redirection immediately
-          if (preSelectedProjectId) {
-            navigate(`/projects/${preSelectedProjectId}`);
-          } else if (redirectPath === "/") {
-            navigate("/");
-          } else {
-            navigate("/bugs");
-          }
-        } catch (emailError) {
-          console.error("Failed to send email notification:", emailError);
-
-          // Still handle redirection even if email fails
-          if (preSelectedProjectId) {
-            navigate(`/projects/${preSelectedProjectId}`);
-          } else if (redirectPath === "/") {
-            navigate("/");
-          } else {
-            navigate("/bugs");
-          }
+        // Handle redirection immediately after successful submission and toast
+        if (preSelectedProjectId) {
+          navigate(`/projects/${preSelectedProjectId}`);
+        } else if (redirectPath === "/") {
+          navigate("/");
+        } else {
+          navigate("/bugs");
         }
+
+        // Send email notification asynchronously without blocking navigation
+        setTimeout(async () => {
+          try {
+            console.log("Sending notification for bug:", name);
+
+            // Get the bug ID from the response
+            const bugId = data.bugId || data.data?.id || data.id;
+
+            // Safety check - don't proceed with undefined bugId
+            if (!bugId) {
+              console.error(
+                "Bug ID is undefined, can't generate attachment URLs"
+              );
+              return;
+            }
+
+            // Use absolute URLs for attachments to work in emails across environments
+            const baseUrl = window.location.origin;
+            // const apiPath = ENV.API_URL.replace(/^https?:\/\/[^/]+/, ""); // This is not needed
+
+            let allAttachments: string[] = [];
+
+            // Directly generate attachment URLs from the state variables
+            const screenshotUrls =
+              screenshots.length > 0
+                ? screenshots.map((file) => {
+                    return `${baseUrl}/Bugricer/backend/api/get_attachment.php?bug_id=${bugId}&type=screenshot&filename=${encodeURIComponent(
+                      file.name
+                    )}`;
+                  })
+                : [];
+
+            const fileUrls =
+              files.length > 0
+                ? files.map((file) => {
+                    return `${baseUrl}/Bugricer/backend/api/get_attachment.php?bug_id=${bugId}&type=file&filename=${encodeURIComponent(
+                      file.name
+                    )}`;
+                  })
+                : [];
+
+            allAttachments = [...screenshotUrls, ...fileUrls];
+
+            const emailResponse = await sendEmailNotification(
+              await getNotificationRecipients(), // Get all admins and developers
+              `Bug Report: ${name}`,
+              `
+              <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f7f6; padding: 20px;">
+                <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  
+                  <!-- Header -->
+                  <div style="background-color: #2563eb; color: #ffffff; padding: 20px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 24px; display: flex; align-items: center; justify-content: center;">
+                       <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f41e/32.png" alt="Bug Ricer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
+                      BugRacer Alert
+                    </h1>
+                    <p style="margin: 5px 0 0 0; font-size: 16px;">New Bug Reported</p>
+                  </div>
+                  
+                  <!-- Body -->
+                  <div style="padding: 20px; border-bottom: 1px solid #e2e8f0;">
+                    <h3 style="margin-top: 0; color: #1e293b; font-size: 18px;">${name}</h3>
+                    <p style="white-space: pre-wrap; margin-bottom: 15px; font-size: 14px;">${description || "No description provided."}</p>
+                    
+                    <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize; ${priority === "high" ? "color: #dc2626;" : priority === "medium" ? "color: #ea580c;" : "color: #65a30d;"}">${priority}</span></p>
+                    <p style="font-size: 14px; margin-bottom: 5px;"><strong>Status:</strong> <span style="font-weight: normal;">Pending</span></p>
+                    <p style="font-size: 14px; margin-bottom: 5px;"><strong>Reported By:</strong> <span style="font-weight: normal;">${currentUser?.name || "Bug Ricer User"}</span></p>
+                    <p style="font-size: 14px; margin-bottom: 0;"><strong>Date:</strong> <span style="font-weight: normal;">${new Date().toLocaleString()}</span></p>
+                  </div>
+                  
+                  <!-- Attachments -->
+                  ${allAttachments.length > 0
+                    ? `
+                  <div style="padding: 20px; border-top: 1px solid #e2e8f0;">
+                    <p style="margin-top: 0; margin-bottom: 10px; font-size: 14px;"><strong>Attachments (${allAttachments.length}):</strong></p>
+                    <ul style="padding-left: 20px; margin: 0; font-size: 14px;">
+                      ${allAttachments
+                        .map(
+                          (url) =>
+                            `<li style="margin-bottom: 5px;"><a href="${url}" style="color: #2563eb; text-decoration: none;">${decodeURIComponent(
+                              url.split("/").pop() || ""
+                            )}</a></li>`
+                        )
+                        .join("")}
+                    </ul>
+                  </div>
+                  `
+                    : ""
+                }
+                  
+                  <!-- Footer -->
+                  <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
+                    <p style="margin: 0;">This is an automated notification from Bug Ricer. Please do not reply to this email.</p>
+                    <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} Bug Ricer. All rights reserved.</p>
+                  </div>
+                  
+                </div>
+              </div>
+              `,
+              allAttachments // Pass all attachment URLs
+            );
+            console.log("Email notification sent:", emailResponse);
+          } catch (emailError) {
+            console.error("Failed to send email notification:", emailError);
+          }
+        }, 100);
       } else {
         throw new Error(data.message || "Failed to submit bug report");
       }
