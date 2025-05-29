@@ -15,7 +15,7 @@
       "destination": "/$1"
     },
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ],
