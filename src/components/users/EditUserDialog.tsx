@@ -103,6 +103,7 @@ export function EditUserDialog({
         description: "User has been updated successfully.",
       });
       setOpen(false);
+      // window.location.reload(); // Commented out to prevent reload
     } catch (error: any) {
       console.error("Error updating user:", error);
       let errorMessage = "Failed to update the user. Please try again.";

@@ -210,7 +210,7 @@ export default function Profile() {
                 </Button>
               }
             />
-            <ChangePasswordDialog
+            {/* <ChangePasswordDialog
               user={currentUser}
               onPasswordChange={handlePasswordChangeFromDialog}
               trigger={
@@ -218,7 +218,7 @@ export default function Profile() {
                   Change Password
                 </Button>
               }
-            />
+            /> */}
           </div>
         </div>
       </div>
