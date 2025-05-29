@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { EditUserDialog } from "@/components/users/EditUserDialog";
+import handlePasswordChangeFromDialog, { ChangePasswordDialog } from "@/components/users/ChangePasswordDialog";
 
 // Profile skeleton components
 const ProfileHeaderSkeleton = () => (
@@ -74,7 +76,7 @@ const ActivityCardSkeleton = () => (
 );
 
 export default function Profile() {
-  const { currentUser, logout, isLoading } = useAuth();
+  const { currentUser, logout, isLoading, updateCurrentUser } = useAuth();
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -87,6 +89,10 @@ export default function Profile() {
       console.error("Logout failed:", error);
     }
   }, [logout, navigate]);
+
+  const handleUserUpdate = (updatedUser) => {
+    updateCurrentUser(updatedUser);
+  };
 
   if (isLoading) {
     return (
@@ -192,6 +198,26 @@ export default function Profile() {
               <MapPin className="w-4 h-4 mr-2" />
               BugRacer Team
             </Button>
+
+            {/* Edit Profile and Change Password Buttons */}
+            <EditUserDialog
+              user={currentUser}
+              onUserUpdate={handleUserUpdate}
+              trigger={
+                <Button variant="outline" size="sm">
+                  Edit Profile
+                </Button>
+              }
+            />
+            <ChangePasswordDialog
+              user={currentUser}
+              onPasswordChange={handlePasswordChangeFromDialog}
+              trigger={
+                <Button variant="outline" size="sm">
+                  Change Password
+                </Button>
+              }
+            />
           </div>
         </div>
       </div>

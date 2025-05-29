@@ -17,6 +17,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   register: (data: RegisterData) => Promise<boolean>;
+  updateCurrentUser: (user: User) => void;
 }
 
 interface RegisterData {
@@ -39,6 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  const updateCurrentUser = (user: User) => {
+    setCurrentUser(user);
+  };
 
   const checkAuthStatus = async () => {
     const token = localStorage.getItem("token");
@@ -183,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     register,
+    updateCurrentUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
