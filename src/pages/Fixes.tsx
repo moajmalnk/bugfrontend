@@ -14,9 +14,24 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Bug, CheckCircle, Search } from "lucide-react";
+import { AlertCircle, Bug, CheckCircle, Search, Plus, Filter } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -79,6 +94,8 @@ const HeaderSkeleton = () => (
 const Fixes = () => {
   const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   // Fetch all bugs
   const {
@@ -90,11 +107,16 @@ const Fixes = () => {
     queryFn: () => bugService.getBugs(),
   });
 
-  // Calculate fixed bugs by priority
-  const bugsByPriority = bugs?.reduce((acc, bug) => {
-    acc[bug.priority] = (acc[bug.priority] || 0) + 1;
-    return acc;
-  }, { high: 0, medium: 0, low: 0 });
+  // Filter bugs to show only the fixed ones
+  const fixedBugs = bugs?.filter((bug) => bug.status === "fixed") || [];
+
+  // Filter by search term and priority
+  const filteredBugs = fixedBugs.filter(
+    (bug) =>
+      (bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bug.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (priorityFilter === "all" || bug.priority === priorityFilter)
+  );
 
   // Determine priorities colors
   const getPriorityColor = (priority: string) => {
@@ -110,6 +132,31 @@ const Fixes = () => {
     }
   };
 
+  // Format date helper
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const FilterControls = () => (
+    <div className="flex flex-col sm:flex-row gap-3 w-full">
+      <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+        <SelectTrigger className="w-full min-w-[120px] max-w-[160px] bg-background/50 h-9 text-xs sm:text-sm">
+          <SelectValue placeholder="Priority" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Priorities</SelectItem>
+          <SelectItem value="high">High</SelectItem>
+          <SelectItem value="medium">Medium</SelectItem>
+          <SelectItem value="low">Low</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   if (error) {
     toast({
       title: "Error",
@@ -119,106 +166,217 @@ const Fixes = () => {
   }
 
   return (
-    <div className="space-y-6 p-2 sm:p-4 md:p-6 lg:p-8 w-full max-w-6xl mx-auto">
-      {isLoading ? (
-        <>
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-            <HeaderSkeleton />
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <div className="relative flex-1 max-w-full sm:max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </div>
-
-          {/* Table skeleton for desktop */}
-          <div className="hidden sm:block rounded-md border overflow-x-auto">
-            <Table className="min-w-[600px] w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Bug ID</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Reported By</TableHead>
-                  <TableHead>Fixed Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array(5)
-                  .fill(0)
-                  .map((_, index) => (
-                    <TableRowSkeleton key={index} />
-                  ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Card skeleton for mobile */}
-          <div className="sm:hidden space-y-4">
-            {Array(3)
-              .fill(0)
-              .map((_, index) => (
-                <CardSkeleton key={index} />
-              ))}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <h1 className="text-2xl font-bold tracking-tight break-words">
-              Bugs by Priority
-            </h1>
-            <div className="flex items-center space-x-2 sm:space-x-0 sm:ml-auto">
-              {/* Add + Fix Bugs button */}
-              {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
-                <Button asChild className="h-9 text-sm">
-                  <Link to="/bugs">+ Fix Bugs</Link>
-                </Button>
-              )}
-
-              {/* Display priority counts */}
-              {!isLoading && bugs && (
-                <div className="flex items-center space-x-2">
-                  {bugsByPriority.high > 0 && (
-                    <div className="flex items-center border rounded-md px-2 py-1 bg-red-50 border-red-200 text-red-700 text-xs font-medium">
-                      <AlertCircle className="h-3 w-3 mr-1" /> High: {bugsByPriority.high}
-                    </div>
-                  )}
-                  {bugsByPriority.medium > 0 && (
-                    <div className="flex items-center border rounded-md px-2 py-1 bg-yellow-50 border-yellow-200 text-yellow-700 text-xs font-medium">
-                      <AlertCircle className="h-3 w-3 mr-1" /> Medium: {bugsByPriority.medium}
-                    </div>
-                  )}
-                  {bugsByPriority.low > 0 && (
-                    <div className="flex items-center border rounded-md px-2 py-1 bg-green-50 border-green-200 text-green-700 text-xs font-medium">
-                      <AlertCircle className="h-3 w-3 mr-1" /> Low: {bugsByPriority.low}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Display summary or no bugs message */}
-          {!isLoading && bugs?.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <Bug className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold">No Bugs Found</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                There are no bugs in the system yet.
-              </p>
-            </div>
-          ) : (
-            null
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
+      <section className="max-w-6xl mx-auto space-y-4">
+        {/* Header: Fix Bugs Button and Fixed Bugs Count */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          {/* Fix Bugs Button */}
+          {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+            <Button
+              variant="default"
+              asChild
+              className="w-full sm:w-auto h-10 text-sm"
+              aria-label="Fix a bug"
+            >
+              <Link
+                to="/bugs"
+                className="flex items-center justify-center"
+              >
+                <Plus className="mr-2 h-4 w-4" /> Fix Bugs
+              </Link>
+            </Button>
           )}
-        </>
-      )}
-    </div>
+
+          {/* Fixed Bugs Count */}
+          {!isLoading && fixedBugs.length > 0 && (
+            <div className="flex items-center border rounded-md px-3 py-1 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+              <span className="text-sm font-medium text-green-700">
+                {fixedBugs.length} Issues Fixed
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Search and Filters Section */}
+        <div className="space-y-3">
+          <Input
+            placeholder="Search fixed bugs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-background/50 h-9 text-xs sm:text-sm"
+            aria-label="Search fixed bugs"
+          />
+
+          {/* Mobile Filter Button */}
+          <div className="block sm:hidden">
+            <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full h-9 text-xs bg-background/50"
+                  aria-label="Open filters"
+                >
+                  <Filter className="h-3.5 w-3.5 mr-2" />
+                  Filters
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-[45vh] px-4 py-6">
+                <SheetHeader className="mb-4">
+                  <SheetTitle className="text-base">Filters</SheetTitle>
+                  <SheetDescription className="text-xs">
+                    Apply filters to find specific fixed bugs
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="space-y-3">
+                  <FilterControls />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {/* Desktop Filters */}
+          <div className="hidden sm:flex gap-3">
+            <FilterControls />
+          </div>
+        </div>
+
+        {/* Content Section */}
+        {isLoading ? (
+          <>
+            {/* Table skeleton for desktop */}
+            <div className="hidden sm:block rounded-md border overflow-x-auto">
+              <Table className="min-w-[600px] w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bug ID</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Reported By</TableHead>
+                    <TableHead>Fixed Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array(5)
+                    .fill(0)
+                    .map((_, index) => (
+                      <TableRowSkeleton key={index} />
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Card skeleton for mobile */}
+            <div className="sm:hidden space-y-4">
+              {Array(3)
+                .fill(0)
+                .map((_, index) => (
+                  <CardSkeleton key={index} />
+                ))}
+            </div>
+          </>
+        ) : filteredBugs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <AlertCircle className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold">No Fixed Bugs</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              No bugs have been fixed yet.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Table for sm and up */}
+            <div className="hidden sm:block rounded-md border overflow-x-auto">
+              <Table className="min-w-[600px] w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bug ID</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Reported By</TableHead>
+                    <TableHead>Fixed Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredBugs.map((bug) => (
+                    <TableRow key={bug.id}>
+                      <TableCell className="font-medium max-w-[120px] break-all">
+                        <div className="flex items-center space-x-2">
+                          <Bug className="h-4 w-4 text-muted-foreground" />
+                          <span>{bug.id.substring(0, 8)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] break-words">
+                        {bug.title}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={getPriorityColor(bug.priority)}
+                        >
+                          {bug.priority}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[120px] break-words">
+                        {bug.reported_by}
+                      </TableCell>
+                      <TableCell>{formatDate(bug.updated_at)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/bugs/${bug.id}`}>View Details</Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Card list for mobile */}
+            <div className="sm:hidden space-y-4">
+              {filteredBugs.map((bug) => (
+                <div
+                  key={bug.id}
+                  className="rounded-lg border p-4 bg-background flex flex-col gap-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Bug className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm break-all">
+                      {bug.id.substring(0, 8)}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={getPriorityColor(bug.priority)}
+                    >
+                      {bug.priority}
+                    </Badge>
+                  </div>
+                  <div className="font-bold text-base break-words">
+                    {bug.title}
+                  </div>
+                  <div className="text-xs text-muted-foreground break-words">
+                    Reported by:{" "}
+                    <span className="font-medium">{bug.reported_by}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Fixed: {formatDate(bug.updated_at)}
+                  </div>
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/bugs/${bug.id}`}>View Details</Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+    </main>
   );
 };
 
