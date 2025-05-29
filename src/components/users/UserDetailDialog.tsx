@@ -37,6 +37,7 @@ interface UserDetailDialogProps {
   user: User;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  loggedInUserRole: string;
 }
 
 async function handlePasswordChange(
@@ -62,6 +63,7 @@ export function UserDetailDialog({
   onUserUpdate,
   onUserDelete,
   onPasswordChange,
+  loggedInUserRole,
 }: UserDetailDialogProps & {
   onUserUpdate: (user: User) => void;
   onUserDelete: (userId: string) => Promise<void>;
@@ -196,6 +198,7 @@ export function UserDetailDialog({
               <EditUserDialog
                 user={user}
                 onUserUpdate={onUserUpdate}
+                loggedInUserRole={loggedInUserRole}
                 trigger={
                   <Button
                     variant="outline"

@@ -217,13 +217,13 @@ const Users = () => {
       <Card>
         <CardHeader>
           <CardTitle className="break-words">BugRacer Users</CardTitle>
-          <CardDescription>
-            {isLoading ? (
-              <Skeleton className="h-5 w-24 inline-block" />
-            ) : (
-              `Total users: ${users.length}`
-            )}
-          </CardDescription>
+          {isLoading ? (
+            <Skeleton className="h-5 w-24 inline-block mt-1" />
+          ) : (
+            <p className="text-muted-foreground mt-1 text-sm">
+              Total users: {users.length}
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[calc(100vh-20rem)]">
@@ -290,6 +290,7 @@ const Users = () => {
               variant: "destructive",
             });
           }}
+          loggedInUserRole={currentUser.role}
         />
       )}
     </div>
