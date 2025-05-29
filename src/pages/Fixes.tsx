@@ -93,6 +93,12 @@ const Fixes = () => {
   // Filter bugs to show only the fixed ones
   const fixedBugs = bugs?.filter((bug) => bug.status === "fixed") || [];
 
+  // Calculate fixed bugs by priority
+  const fixedByPriority = fixedBugs.reduce((acc, bug) => {
+    acc[bug.priority] = (acc[bug.priority] || 0) + 1;
+    return acc;
+  }, { high: 0, medium: 0, low: 0 });
+
   // Filter by search term
   const filteredBugs = fixedBugs.filter(
     (bug) =>
@@ -191,6 +197,23 @@ const Fixes = () => {
                   {fixedBugs.length} Issues Fixed
                 </span>
               </div>
+
+              {/* Fixed by Priority Counts */}
+              {fixedByPriority.high > 0 && (
+                <div className="flex items-center border rounded-md px-2 py-1 bg-red-50 border-red-200 text-red-700 text-xs font-medium">
+                  <AlertCircle className="h-3 w-3 mr-1" /> High: {fixedByPriority.high}
+                </div>
+              )}
+              {fixedByPriority.medium > 0 && (
+                <div className="flex items-center border rounded-md px-2 py-1 bg-yellow-50 border-yellow-200 text-yellow-700 text-xs font-medium">
+                  <AlertCircle className="h-3 w-3 mr-1" /> Medium: {fixedByPriority.medium}
+                </div>
+              )}
+              {fixedByPriority.low > 0 && (
+                 <div className="flex items-center border rounded-md px-2 py-1 bg-green-50 border-green-200 text-green-700 text-xs font-medium">
+                   <AlertCircle className="h-3 w-3 mr-1" /> Low: {fixedByPriority.low}
+                 </div>
+              )}
             </div>
           </div>
 
