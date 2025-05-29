@@ -181,42 +181,45 @@ const NewBug = () => {
             console.log("Sending notification for bug:", name);
 
             // Get the bug ID from the response
-            const bugId = data.bugId || data.data?.id || data.id;
+            // const bugId = data.bugId || data.data?.id || data.id;
 
             // Safety check - don't proceed with undefined bugId
-            if (!bugId) {
-              console.error(
-                "Bug ID is undefined, can't generate attachment URLs"
-              );
-              return;
-            }
+            // if (!bugId) {
+            //   console.error(
+            //     "Bug ID is undefined, can't generate attachment URLs"
+            //   );
+            //   return;
+            // }
 
             // Use absolute URLs for attachments to work in emails across environments
-            const baseUrl = window.location.origin;
+            // const baseUrl = window.location.origin;
             // const apiPath = ENV.API_URL.replace(/^https?:\/\/[^/]+/, ""); // This is not needed
 
-            let allAttachments: string[] = [];
+            // let allAttachments: string[] = [];
 
             // Directly generate attachment URLs from the state variables
-            const screenshotUrls =
-              screenshots.length > 0
-                ? screenshots.map((file) => {
-                    return `${baseUrl}/Bugricer/backend/api/get_attachment.php?bug_id=${bugId}&type=screenshot&filename=${encodeURIComponent(
-                      file.name
-                    )}`;
-                  })
-                : [];
+            // const screenshotUrls =
+            //   screenshots.length > 0
+            //     ? screenshots.map((file) => {
+            //         return `${baseUrl}/Bugricer/backend/api/get_attachment.php?bug_id=${bugId}&type=screenshot&filename=${encodeURIComponent(
+            //           file.name
+            //         )}`;
+            //       })
+            //     : [];
 
-            const fileUrls =
-              files.length > 0
-                ? files.map((file) => {
-                    return `${baseUrl}/Bugricer/backend/api/get_attachment.php?bug_id=${bugId}&type=file&filename=${encodeURIComponent(
-                      file.name
-                    )}`;
-                  })
-                : [];
+            // const fileUrls =
+            //   files.length > 0
+            //     ? files.map((file) => {
+            //         return `${baseUrl}/Bugricer/backend/api/get_attachment.php?bug_id=${bugId}&type=file&filename=${encodeURIComponent(
+            //           file.name
+            //         )}`;
+            //       })
+            //     : [];
 
-            allAttachments = [...screenshotUrls, ...fileUrls];
+            // allAttachments = [...screenshotUrls, ...fileUrls];
+            
+            const uploadedAttachments = data.uploadedAttachments || [];
+            console.log("Uploaded attachment paths from backend:", uploadedAttachments);
 
             const emailResponse = await sendEmailNotification(
               await getNotificationRecipients(), // Get all admins and developers
@@ -246,12 +249,12 @@ const NewBug = () => {
                   </div>
                   
                   <!-- Attachments -->
-                  ${allAttachments.length > 0
+                  ${uploadedAttachments.length > 0
                     ? `
                   <div style="padding: 20px; border-top: 1px solid #e2e8f0;">
-                    <p style="margin-top: 0; margin-bottom: 10px; font-size: 14px;"><strong>Attachments (${allAttachments.length}):</strong></p>
+                    <p style="margin-top: 0; margin-bottom: 10px; font-size: 14px;"><strong>Attachments (${uploadedAttachments.length}):</strong></p>
                     <ul style="padding-left: 20px; margin: 0; font-size: 14px;">
-                      ${allAttachments
+                      ${uploadedAttachments
                         .map(
                           (url) =>
                             `<li style="margin-bottom: 5px;"><a href="${url}" style="color: #2563eb; text-decoration: none;">${decodeURIComponent(
@@ -274,7 +277,7 @@ const NewBug = () => {
                 </div>
               </div>
               `,
-              allAttachments // Pass all attachment URLs
+              uploadedAttachments // Pass the local file paths received from the backend
             );
             console.log("Email notification sent:", emailResponse);
           } catch (emailError) {
