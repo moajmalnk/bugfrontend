@@ -43,7 +43,6 @@ const SkeletonFallback = () => (
 );
 
 // Lazy loaded pages
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Projects = lazy(() => import("@/pages/Projects"));
 const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
 const Bugs = lazy(() => import("@/pages/Bugs"));
@@ -63,16 +62,6 @@ const RouteConfig = () => {
       <Route path="/login" element={<Login />} />
 
       {/* Protected Routes with Skeleton Loading */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Dashboard />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
       <Route
         path="/projects"
         element={
@@ -194,7 +183,7 @@ const RouteConfig = () => {
         }
       />
 
-      {/* Redirect root to dashboard */}
+      {/* Redirect root to projects */}
       <Route
         path="/"
         element={
