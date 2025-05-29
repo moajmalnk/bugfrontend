@@ -10,11 +10,16 @@ import {
   Mail,
   MapPin,
   Instagram,
+  Code2,
+  Bug,
 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
 import handlePasswordChangeFromDialog, { ChangePasswordDialog } from "@/components/users/ChangePasswordDialog";
+import { useQuery } from '@tanstack/react-query';
+import { userService } from '@/services/userService';
+import { formatDistanceToNow } from 'date-fns';
 
 // Profile skeleton components
 const ProfileHeaderSkeleton = () => (
@@ -76,10 +81,43 @@ const ActivityCardSkeleton = () => (
   </Card>
 );
 
+// Stats skeleton component
+const StatsSkeleton = () => (
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
+      <Skeleton className="h-4 w-24 mb-1" />
+      <Skeleton className="h-8 w-12" />
+    </div>
+    <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
+      <Skeleton className="h-4 w-24 mb-1" />
+      <Skeleton className="h-8 w-12" />
+    </div>
+  </div>
+);
+
+// Recent Activity skeleton component
+const RecentActivitySkeleton = () => (
+  <div className="bg-card rounded-lg p-4 shadow-sm min-h-[100px] overflow-x-auto">
+    <Skeleton className="h-5 w-32 mb-3" />
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-5/6" />
+      <Skeleton className="h-4 w-4/6" />
+    </div>
+  </div>
+);
+
 export default function Profile() {
   const { currentUser, logout, isLoading, updateCurrentUser } = useAuth();
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Fetch user statistics
+  const { data: userStats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['userStats', currentUser?.id],
+    queryFn: () => currentUser?.id ? userService.getUserStats(currentUser.id) : Promise.reject('User not logged in'),
+    enabled: !!currentUser?.id,
+  });
 
   const handleLogout = useCallback(async () => {
     setShowConfirm(false);
@@ -113,9 +151,23 @@ export default function Profile() {
 
         {/* Content Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <AboutCardSkeleton />
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <Skeleton className="h-7 w-24" />
+            </CardHeader>
+            <CardContent>
+              <StatsSkeleton />
+            </CardContent>
+          </Card>
           <LinksCardSkeleton />
-          <ActivityCardSkeleton />
+          <Card className="md:col-span-3">
+             <CardHeader>
+              <Skeleton className="h-7 w-40" />
+            </CardHeader>
+            <CardContent>
+              <RecentActivitySkeleton />
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -226,17 +278,32 @@ export default function Profile() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* About Section */}
+        {/* Stats Section (Replaces About) */}
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle>About</CardTitle>
+            <CardTitle>Statistics</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
-              Experienced {currentUser.role} specializing in bug tracking and
-              project management. Passionate about creating efficient and
-              user-friendly solutions.
-            </p>
+            {isLoadingStats ? (
+              <StatsSkeleton />
+            ) : userStats ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
+                  <p className="text-xs text-muted-foreground mb-1">Total Projects</p>
+                  <p className="text-2xl font-bold">
+                    {userStats.total_projects > 0 ? userStats.total_projects : <span className="text-muted-foreground text-base">No projects</span>}
+                  </p>
+                </div>
+                <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
+                  <p className="text-xs text-muted-foreground mb-1">Total Bugs</p>
+                  <p className="text-2xl font-bold">
+                    {userStats.total_bugs > 0 ? userStats.total_bugs : <span className="text-muted-foreground text-base">No bugs</span>}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-muted-foreground text-center">Could not load statistics.</div>
+            )}
           </CardContent>
         </Card>
 
@@ -285,25 +352,40 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Activity Section */}
+        {/* Recent Activity Section */}
         <Card className="md:col-span-3">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[1, 2, 3].map((_, i) => (
-                <div key={i} className="flex items-start gap-4">
-                  <div className="w-2 h-2 mt-2 rounded-full bg-primary" />
-                  <div>
-                    <p className="font-medium">Updated bug #{i + 1000}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Changed status to "In Progress"
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {isLoadingStats ? (
+              <RecentActivitySkeleton />
+            ) : userStats?.recent_activity && userStats.recent_activity.length > 0 ? (
+              <div className="space-y-2">
+                 {userStats.recent_activity.map((activity, index) => (
+                    <div
+                      key={index}
+                      className="flex items-start gap-2 text-sm break-words"
+                    >
+                      {activity.type === "bug" ? (
+                        <Bug className="h-4 w-4 mt-0.5 text-yellow-500" />
+                      ) : (
+                        <Code2 className="h-4 w-4 mt-0.5 text-green-500" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="break-words max-w-[180px] sm:max-w-[260px] md:max-w-[340px] lg:max-w-[400px]">
+                          {activity.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+               <div className="text-muted-foreground text-center">No recent activity to display.</div>
+            )}
           </CardContent>
         </Card>
       </div>

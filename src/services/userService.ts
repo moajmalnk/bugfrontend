@@ -14,6 +14,17 @@ interface UpdateUserData {
   role?: UserRole;
 }
 
+// Define the structure for user statistics
+interface UserStats {
+  total_projects: number;
+  total_bugs: number;
+  recent_activity: Array<{ // Define the structure for recent activity items
+    type: string; // e.g., 'bug', 'code'
+    title: string;
+    created_at: string; // ISO date string
+  }>;
+}
+
 class UserService {
   private baseUrl = `${ENV.API_URL}/users`;
 
@@ -96,6 +107,15 @@ class UserService {
       throw new Error(result.message || "Failed to update user");
     }
     return result.data; // Ensure your API returns the full updated user object including 'name'
+  }
+
+  async getUserStats(userId: string): Promise<UserStats> {
+    // Assuming an API endpoint like /users/stats.php that accepts a user ID
+    const response = await this.fetchWithAuth(`${this.baseUrl}/stats.php?id=${userId}`);
+    if (!response.success) {
+      throw new Error(response.message || "Failed to fetch user stats.");
+    }
+    return response.data; // Assuming response.data contains the UserStats object
   }
 
   async deleteUser(userId: string): Promise<boolean> {
