@@ -7,6 +7,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router } from "react-router-dom";
 import { requestNotificationPermission } from "./firebase-messaging-sw";
+import ContextMenu from "./components/ContextMenu";
 
 // Initialize the query client outside of the component
 const queryClient = new QueryClient();
@@ -43,12 +44,61 @@ function App() {
     requestNotificationPermission();
   }, []);
 
+  const [contextMenu, setContextMenu] = useState<{ mouseX: number | null; mouseY: number | null }>({ mouseX: null, mouseY: null });
+
+  // Native event handlers for document
+  const handleNativeContextMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({
+      mouseX: event.clientX,
+      mouseY: event.clientY,
+    });
+  };
+
+  const handleNativeClick = (event: MouseEvent) => {
+    // You might want to check if the click was outside the context menu before closing
+    // For simplicity, we'll close on any click for now
+    setContextMenu({ mouseX: null, mouseY: null });
+  };
+
+  useEffect(() => {
+    document.addEventListener('contextmenu', handleNativeContextMenu);
+    document.addEventListener('click', handleNativeClick);
+    return () => {
+      document.removeEventListener('contextmenu', handleNativeContextMenu);
+      document.removeEventListener('click', handleNativeClick);
+    };
+  }, []);
+
+  // Handler for React's onContextMenu prop
+  const handleReactContextMenu = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+      event.preventDefault();
+      setContextMenu({
+        mouseX: event.clientX,
+        mouseY: event.clientY,
+      });
+  };
+
+  // Handler for React's onClick prop
+  const handleReactClick = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+      // This will be handled by the native click listener for closing the menu
+      // Add any other click logic here if needed
+  };
+
   return (
     <Router>
       <AppProviders queryClient={queryClient}>
-        <KeyboardShortcuts />
-        <RouteConfig />
-        <PrivacyOverlay visible={privacy} />
+        {/* Attach React handlers to the div */}
+        <div onContextMenu={handleReactContextMenu} onClick={handleReactClick}>
+          <KeyboardShortcuts />
+          <RouteConfig />
+          <PrivacyOverlay visible={privacy} />
+          <ContextMenu
+            mouseX={contextMenu.mouseX}
+            mouseY={contextMenu.mouseY}
+            onClose={() => setContextMenu({ mouseX: null, mouseY: null })} // Pass a no-argument function
+          />
+        </div>
       </AppProviders>
     </Router>
   );

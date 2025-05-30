@@ -1,11 +1,14 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "@/context/ThemeContext";
 
 export function KeyboardShortcuts() {
   const navigate = useNavigate();
+  const { setTheme, theme } = useTheme();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // console.log('Key pressed:', e.key, 'Code:', e.code, 'Shift:', e.shiftKey, 'Ctrl:', e.ctrlKey);
       if (e.ctrlKey && (e.key === "b" || e.key === "B")) {
         e.preventDefault();
         navigate("/bugs/new", { state: { from: window.location.pathname } });
@@ -14,10 +17,17 @@ export function KeyboardShortcuts() {
         e.preventDefault();
         navigate("/fixes", { state: { from: window.location.pathname } });
       }
+      if (e.shiftKey && e.code === "Space") {
+        e.preventDefault();
+        // console.log('Shift+Space pressed. Toggling theme.');
+        // console.log('Current theme before toggle:', theme);
+        setTheme(theme === "dark" ? "light" : "dark");
+        // console.log('Theme toggled.');
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate]);
+  }, [navigate, theme]);
 
   return null;
 }
