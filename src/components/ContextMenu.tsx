@@ -9,11 +9,13 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from '@/context/ThemeContext';
+import { Laptop, Moon, Sun, Folder, Bug, CheckSquare, Users, Settings, User as UserIcon, RefreshCw, Lock } from 'lucide-react';
 
 interface ContextMenuItem {
   label: string;
   action: () => void;
   shortcut?: string;
+  icon?: React.ReactNode;
 }
 
 interface ContextMenuProps {
@@ -25,39 +27,48 @@ interface ContextMenuProps {
 const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const { toggleTheme } = useTheme();
+  const { toggleTheme, theme } = useTheme();
 
   // Define menu items based on user role
   const getMenuItems = (role: User['role'] | undefined) => {
     const commonItems = [
-      { label: 'Profile', action: () => { navigate('/profile'); onClose(); } },
-      { label: 'Dark or Light', action: () => { toggleTheme(); onClose(); }, shortcut: 'Shift+Space' },
-      { label: 'Privacy Mode', action: () => { /* TODO: Implement privacy mode toggle */ onClose(); }, shortcut: 'Ctrl+Space' },
-      { label: 'Refresh', action: () => { window.location.reload(); onClose(); } },
+      { label: 'Profile', action: () => { navigate('/profile'); onClose(); }, icon: <UserIcon className="h-4 w-4" /> },
+      { label: 'Dark or Light', action: () => { toggleTheme(); onClose(); }, shortcut: 'Shift+Space', icon: theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" /> },
+      { label: 'Privacy Mode', action: () => { /* TODO: Implement privacy mode toggle */ onClose(); }, shortcut: 'Ctrl+Space', icon: <Lock className="h-4 w-4" /> },
     ];
 
     if (role === 'admin') {
       return [
-        { label: 'Projects', action: () => { navigate('/projects'); onClose(); } },
-        { label: 'Bugs', action: () => { navigate('/bugs'); onClose(); } },
-        { label: 'Fixes', action: () => { navigate('/fixes'); onClose(); } },
-        { label: 'Users', action: () => { navigate('/users'); onClose(); } },
+        { label: 'Projects', action: () => { navigate('/projects'); onClose(); }, icon: <Folder className="h-4 w-4" /> },
+        { label: 'Bugs', action: () => { navigate('/bugs'); onClose(); }, icon: <Bug className="h-4 w-4" /> },
+        { label: 'Fixes', action: () => { navigate('/fixes'); onClose(); }, icon: <CheckSquare className="h-4 w-4" /> },
+        { label: 'Users', action: () => { navigate('/users'); onClose(); }, icon: <Users className="h-4 w-4" /> },
+        { label: 'New Bug', action: () => { navigate('/bugs/new'); onClose(); }, shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
+        { label: 'Fix Bugs', action: () => { navigate('/fixes'); onClose(); }, shortcut: 'Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
         ...commonItems,
-        { label: 'Settings', action: () => { navigate('/settings'); onClose(); } },
+        { label: 'Settings', action: () => { navigate('/settings'); onClose(); }, icon: <Settings className="h-4 w-4" /> },
+        { label: 'Refresh', action: () => { window.location.reload(); onClose(); }, shortcut: 'Ctrl+R', icon: <RefreshCw className="h-4 w-4" /> },
       ];
     } else if (role === 'developer') {
       return [
-        { label: 'Fixes', action: () => { navigate('/fixes'); onClose(); } },
+        { label: 'Fixes', action: () => { navigate('/fixes'); onClose(); }, icon: <CheckSquare className="h-4 w-4" /> },
+        { label: 'Fix Bugs', action: () => { navigate('/fixes'); onClose(); }, shortcut: 'Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
         ...commonItems,
+        { label: 'Refresh', action: () => { window.location.reload(); onClose(); }, shortcut: 'Ctrl+R', icon: <RefreshCw className="h-4 w-4" /> },
       ];
     } else if (role === 'tester') {
       return [
-        { label: 'Bugs', action: () => { navigate('/bugs'); onClose(); } },
+        { label: 'Bugs', action: () => { navigate('/bugs'); onClose(); }, icon: <Bug className="h-4 w-4" /> },
+        { label: 'New Bug', action: () => { navigate('/bugs/new'); onClose(); }, shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
         ...commonItems,
+        { label: 'Refresh', action: () => { window.location.reload(); onClose(); }, shortcut: 'Ctrl+R', icon: <RefreshCw className="h-4 w-4" /> },
       ];
     }
     // Default for unauthenticated or other roles
-    return commonItems;
+    return [
+      ...commonItems,
+      { label: 'Refresh', action: () => { window.location.reload(); onClose(); }, shortcut: 'Ctrl+R', icon: <RefreshCw className="h-4 w-4" /> },
+    ];
   };
 
   const menuItems = getMenuItems(currentUser?.role);
@@ -70,21 +81,56 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
     return null;
   }
 
+  // Calculate position to keep menu within viewport
+  const menuWidth = 200; // Approximate width, or measure dynamically if needed
+  const estimatedMenuHeight = menuItems.length * 30 + 20; // Estimate height (approx 30px per item + padding)
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  let finalX = mouseX || 0;
+  let finalY = mouseY || 0;
+
+  const buffer = 10; // px buffer from viewport edges
+
+  // Adjust if it goes off the right edge
+  if (finalX + menuWidth > viewportWidth - buffer) {
+    finalX = viewportWidth - menuWidth - buffer;
+  }
+
+  // Adjust if it goes off the bottom edge
+  if (finalY + estimatedMenuHeight > viewportHeight - buffer) {
+    finalY = viewportHeight - estimatedMenuHeight - buffer;
+  }
+
+  // Ensure it doesn't go off the left edge
+  if (finalX < buffer) {
+      finalX = buffer;
+  }
+
+  // Ensure it doesn't go off the top edge
+   if (finalY < buffer) {
+       finalY = buffer;
+   }
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={onClose}>
       <DropdownMenuContent
         style={{
           position: 'fixed',
-          top: mouseY || 0,
-          left: mouseX || 0,
-          marginTop: '5px',
-          marginLeft: '5px',
+          top: finalY,
+          left: finalX,
+          maxHeight: `calc(100vh - ${finalY}px - ${buffer}px)`, // Adjust max height based on final position and buffer
+          overflowY: 'auto',
+          minWidth: menuWidth, // Keep previous width control
+          maxWidth: 300, // Keep previous max width control
         }}
+        className="custom-scrollbar"
         onCloseAutoFocus={(e) => e.preventDefault()}
         onContextMenu={(e) => e.preventDefault()}
       >
         {menuItems.map((item, index) => (
           <DropdownMenuItem key={index} onClick={item.action}>
+            {item.icon && <span className="mr-2 flex h-4 w-4 items-center justify-center">{item.icon}</span>}
             {item.label}
             {item.shortcut && <span className="ml-auto text-xs text-muted-foreground">{item.shortcut}</span>}
           </DropdownMenuItem>
