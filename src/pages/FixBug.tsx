@@ -70,6 +70,9 @@ const FixBug = () => { // Changed component name
   // Refs for file inputs
   const fixAttachmentInputRef = useRef<HTMLInputElement>(null);
 
+  // State to control minimal loading time display
+  const [showSkeleton, setShowSkeleton] = useState(true);
+
   // Fetch bug details
   const {
     data: fetchedBug,
@@ -97,6 +100,8 @@ const FixBug = () => { // Changed component name
       throw new Error(response.data.message || "Failed to fetch bug details");
     },
     enabled: !!bugId, // Only run query if bugId is available
+    // Keep data in cache for a short time to avoid refetch on minor changes
+    staleTime: 1000 * 5, // 5 seconds
   });
 
   useEffect(() => {
@@ -104,6 +109,24 @@ const FixBug = () => { // Changed component name
       setBug(fetchedBug);
     }
   }, [fetchedBug]);
+
+  // Effect to manage minimal skeleton display time
+  useEffect(() => {
+    // Start the timer only if currently loading
+    if (isLoading) {
+      const timer = setTimeout(() => {
+        setShowSkeleton(false);
+      }, 1500); // Show skeleton for at least 1.5 seconds
+
+      // Cleanup function to clear the timer
+      return () => clearTimeout(timer);
+    } else {
+      // If not loading, hide skeleton immediately
+      setShowSkeleton(false);
+    }
+
+    // Re-run this effect if isLoading or bugId changes
+  }, [isLoading, bugId]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -122,7 +145,7 @@ const FixBug = () => { // Changed component name
       formData.append("fixed_by", currentUser.id); // Record who fixed it
 
       // Add fix attachments
-      fixAttachments.forEach((file, index) => {
+      fixAttachments.forEach((file) => {
         formData.append(`fix_attachments[]`, file);
       });
 
@@ -176,7 +199,7 @@ const FixBug = () => { // Changed component name
 
       // Create preview URLs for each file
       newFiles.forEach((file) => {
-        if (file.type.startsWith("image/")) {
+        if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
           file.preview = URL.createObjectURL(file);
         }
       });
@@ -209,9 +232,10 @@ const FixBug = () => { // Changed component name
     };
   }, [fixAttachments]);
 
-  if (isLoading) {
+  // Render logic based on loading and error states
+  if (isLoading && showSkeleton) {
     return (
-        <div className="space-y-6 max-w-4xl mx-auto px-2 py-4 sm:px-6">
+        <div className="space-y-6 max-w-4xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex items-center">
                 <Button variant="ghost" disabled>
                     <ArrowLeft className="mr-2 h-4 w-4" />
@@ -250,7 +274,7 @@ const FixBug = () => { // Changed component name
                 </CardFooter>
             </Card>
         </div>
-    ); // Basic loading skeleton
+    ); // Show skeleton only if still loading within the initial window
   }
 
   if (error || !bug) {
@@ -261,17 +285,18 @@ const FixBug = () => { // Changed component name
             <p className="text-muted-foreground mb-6">{error?.message || "Could not fetch bug details."}</p>
              <Button onClick={() => navigate(-1)}>Go Back</Button>
         </div>
-    ); // Basic error message
+    ); // Show error if there's an error or no bug data fetched
   }
 
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto px-2 py-4 sm:px-6">
+    <div className="space-y-6 max-w-4xl mx-auto px-4 py-4 sm:px-6 lg:px-8 overflow-x-hidden">
       <div className="flex items-center justify-between">
         <Button
           variant="ghost"
           className="flex items-center text-muted-foreground hover:text-foreground"
           onClick={() => navigate(-1)}
+          disabled={isSubmitting}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
@@ -280,16 +305,16 @@ const FixBug = () => { // Changed component name
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
              <BugIcon className="h-6 w-6 text-primary" />
              Fixing Bug: {bug.id.substring(0, 8)}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm sm:text-base">
             Update the status and provide details for the bug fix.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 p-4 sm:p-6">
             <div className="space-y-2">
               <Label htmlFor="name">Bug Name</Label>
               <Input
@@ -333,8 +358,8 @@ const FixBug = () => { // Changed component name
 
              <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={status} onValueChange={(value: Bug['status']) => setStatus(value)}>
-                <SelectTrigger id="status">
+              <Select value={status} onValueChange={(value: Bug['status']) => setStatus(value)} disabled={isSubmitting}>
+                <SelectTrigger id="status" className="text-sm sm:text-base">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -360,7 +385,7 @@ const FixBug = () => { // Changed component name
 
 
             <div className="space-y-4">
-              <Label>Fix Attachments (Screenshots, logs, etc.)</Label>
+              <Label className="text-sm sm:text-base">Fix Attachments (Screenshots, logs, etc.)</Label>
 
               {/* Hidden file input */}
               <input
@@ -391,7 +416,7 @@ const FixBug = () => { // Changed component name
                       <Label className="text-sm">
                         Attachments ({fixAttachments.length})
                       </Label>
-                      <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                         {fixAttachments.map((file, index) => (
                           <div
                             key={index}
@@ -401,17 +426,17 @@ const FixBug = () => { // Changed component name
                               <img
                                 src={file.preview}
                                 alt={`Fix attachment ${index + 1}`}
-                                className="h-32 w-full object-cover rounded flex-shrink-0"
+                                className="h-24 w-full object-cover rounded flex-shrink-0"
                               />
                             ) : file.type.startsWith("video/") ? (
                               <video
                                 src={file.preview}
                                 controls
-                                className="h-32 w-full object-cover rounded flex-shrink-0"
+                                className="h-24 w-full object-cover rounded flex-shrink-0"
                                 id={`video-preview-${index}`}
                               />
                             ) : (
-                              <div className="h-32 w-full flex items-center justify-center bg-muted rounded flex-shrink-0">
+                              <div className="h-24 w-full flex items-center justify-center bg-muted rounded flex-shrink-0">
                                 <File className="h-8 w-8 text-muted-foreground" />
                               </div>
                             )}
@@ -460,6 +485,7 @@ const FixBug = () => { // Changed component name
               type="button"
               variant="outline"
               onClick={() => navigate(-1)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
