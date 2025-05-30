@@ -170,7 +170,7 @@ const Fixes = () => {
       <section className="max-w-6xl mx-auto space-y-4">
         {/* Header: Fix Bugs Button and Fixed Bugs Count */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          {/* Fix Bugs Button */}
+          {/* Fix Bugs Button */}          
           {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
             <Button
               variant="default"
@@ -179,13 +179,14 @@ const Fixes = () => {
               aria-label="Fix a bug"
             >
               <Link
-                to="/bugs"
+                to="/bugs/"
                 className="flex items-center justify-center"
               >
                 <Plus className="mr-2 h-4 w-4" /> Fix Bugs
               </Link>
             </Button>
           )}
+         
 
           {/* Fixed Bugs Count */}
           {!isLoading && fixedBugs.length > 0 && (

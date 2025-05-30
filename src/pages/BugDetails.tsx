@@ -238,6 +238,7 @@ const BugDetails = () => {
             bug={bug}
             formattedCreatedDate={formattedCreatedDate}
             canEditBug={canEditBug}
+            currentUser={currentUser}
           />
         </header>
 

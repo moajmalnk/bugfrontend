@@ -55,6 +55,7 @@ const Profile = lazy(() => import("@/pages/Profile"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const Fixes = lazy(() => import("@/pages/Fixes"));
 const Messages = lazy(() => import("@/pages/Messages"));
+const FixBug = lazy(() => import("@/pages/FixBug"));
 
 const RouteConfig = () => {
   return (
@@ -178,6 +179,16 @@ const RouteConfig = () => {
           <ProtectedRoute>
             <Suspense fallback={<SkeletonFallback />}>
               <Messages />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bugs/:bugId/fix"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={<SkeletonFallback />}>
+              <FixBug />
             </Suspense>
           </ProtectedRoute>
         }
