@@ -121,11 +121,49 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     }
   };
 
+  const handleCopyDescription = async () => {
+    if (!bug?.description || !navigator.clipboard || !navigator.clipboard.writeText) {
+      toast({
+        title: "Error",
+        description: "Copying description is not supported or description is empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(bug.description);
+      toast({
+        title: "Success",
+        description: "Description copied to clipboard.",
+      });
+    } catch (error) {
+      console.error("Failed to copy description:", error);
+      toast({
+        title: "Error",
+        description: "Failed to copy description.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card className="overflow-hidden">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base sm:text-lg">Description</CardTitle>
+          {/* Add Copy Description Button */}
+          {bug?.description && navigator.clipboard && navigator.clipboard.writeText && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0.5"
+              onClick={handleCopyDescription}
+              aria-label="Copy description to clipboard"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="max-w-full overflow-x-auto">
