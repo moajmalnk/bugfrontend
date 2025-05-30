@@ -7,8 +7,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Bug } from "@/types";
-import { RotateCw, X, ZoomIn, ZoomOut, ArrowLeft, ArrowRight, Download } from "lucide-react";
+import { RotateCw, X, ZoomIn, ZoomOut, ArrowLeft, ArrowRight, Download, Copy, Share2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "@/components/ui/use-toast";
 
 interface BugContentCardsProps {
   bug: Bug;
@@ -45,6 +46,79 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     setCurrentImageIndex((prevIndex) => Math.min(bug.screenshots.length - 1, prevIndex + 1));
     setScale(1);
     setRotation(0);
+  };
+
+  const handleCopyImage = async () => {
+    if (!selectedImage || !navigator.clipboard || !navigator.clipboard.write) {
+      toast({
+        title: "Error",
+        description: "Copying image is not supported in your browser.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(selectedImage);
+      const blob = await response.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [blob.type]: blob,
+        }),
+      ]);
+      toast({
+        title: "Success",
+        description: "Image copied to clipboard.",
+      });
+    } catch (error) {
+      console.error("Failed to copy image:", error);
+      toast({
+        title: "Error",
+        description: "Failed to copy image.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleShareImage = async () => {
+    if (!selectedImage || !navigator.share) {
+      toast({
+        title: "Error",
+        description: "Web Share API is not supported in your browser or context.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(selectedImage);
+      const blob = await response.blob();
+      // Assuming the image name can be derived from the path or stored elsewhere
+      const imageName = bug.screenshots[currentImageIndex]?.name || 'screenshot.png';
+      const file = new File([blob], imageName, { type: blob.type });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: bug.title || 'Bug Screenshot',
+          text: bug.description ? bug.description.substring(0, 100) + '...' : 'Screenshot related to a bug.', // Share a snippet of description
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Sharing this type of file is not supported in your browser.",
+          variant: "destructive",
+        });
+      }
+
+    } catch (error) {
+      console.error("Failed to share image:", error);
+      toast({
+        title: "Error",
+        description: "Failed to share image.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -217,19 +291,48 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                     </a>
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 hover:bg-destructive hover:text-destructive-foreground"
-                  onClick={() => {
-                    setSelectedImage(null);
-                    setScale(1);
-                    setRotation(0);
-                  }}
-                  aria-label="Close dialog"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
+
+                {/* Add Copy Image Button */}
+                {navigator.clipboard && navigator.clipboard.write && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8"
+                    onClick={handleCopyImage}
+                    aria-label="Copy image to clipboard"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+
+                {/* Add Share Button */}
+                {navigator.share && navigator.canShare && bug.screenshots && bug.screenshots.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8"
+                    onClick={handleShareImage}
+                    aria-label="Share image"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+
+                {selectedImage && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => {
+                      setSelectedImage(null);
+                      setScale(1);
+                      setRotation(0);
+                    }}
+                    aria-label="Close dialog"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
             </div>
           </DialogHeader>
