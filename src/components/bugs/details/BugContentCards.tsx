@@ -49,7 +49,9 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
   };
 
   const handleCopyImage = async () => {
+    console.log("Attempting to copy image...");
     if (!selectedImage || !navigator.clipboard || !navigator.clipboard.write) {
+      console.error("Copying image not supported.", { selectedImage, clipboard: navigator.clipboard });
       toast({
         title: "Error",
         description: "Copying image is not supported in your browser.",
@@ -59,13 +61,20 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     }
 
     try {
+      console.log("Fetching image for copy:", selectedImage);
       const response = await fetch(selectedImage);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const blob = await response.blob();
+      console.log("Image blob fetched successfully for copy:", blob);
+
       await navigator.clipboard.write([
         new ClipboardItem({
           [blob.type]: blob,
         }),
       ]);
+      console.log("Image successfully copied to clipboard.");
       toast({
         title: "Success",
         description: "Image copied to clipboard.",
@@ -81,7 +90,9 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
   };
 
   const handleShareImage = async () => {
+    console.log("Attempting to share image...");
     if (!selectedImage || !navigator.share) {
+      console.error("Web Share API not supported.", { selectedImage, share: navigator.share });
       toast({
         title: "Error",
         description: "Web Share API is not supported in your browser or context.",
@@ -91,19 +102,28 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     }
 
     try {
+      console.log("Fetching image for share:", selectedImage);
       const response = await fetch(selectedImage);
+       if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const blob = await response.blob();
-      // Assuming the image name can be derived from the path or stored elsewhere
+      console.log("Image blob fetched successfully for share:", blob);
+
       const imageName = bug.screenshots[currentImageIndex]?.name || 'screenshot.png';
       const file = new File([blob], imageName, { type: blob.type });
+      console.log("File object created for share:", file);
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        console.log("Browser can share this file type.");
         await navigator.share({
           files: [file],
           title: bug.title || 'Bug Screenshot',
           text: bug.description ? bug.description.substring(0, 100) + '...' : 'Screenshot related to a bug.', // Share a snippet of description
         });
+        console.log("Share dialog opened/shared successfully.");
       } else {
+        console.warn("Browser cannot share this file type.", file.type);
         toast({
           title: "Error",
           description: "Sharing this type of file is not supported in your browser.",
