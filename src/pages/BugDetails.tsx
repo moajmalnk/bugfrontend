@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { format } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
+import { useEffect } from 'react';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -113,6 +114,7 @@ const BugDetails = () => {
     data: bug,
     isLoading,
     error,
+    refetch
   } = useQuery({
     queryKey: ["bug", bugId],
     queryFn: async () => {
@@ -131,6 +133,10 @@ const BugDetails = () => {
       throw new Error(response.data.message || "Failed to fetch bug details");
     },
   });
+
+  useEffect(() => {
+    refetch();
+  }, [bugId, refetch]);
 
   if (isLoading) {
     return (

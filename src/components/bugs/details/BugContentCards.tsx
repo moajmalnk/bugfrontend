@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Bug } from "@/types";
-import { RotateCw, X, ZoomIn, ZoomOut, ArrowLeft, ArrowRight } from "lucide-react";
+import { RotateCw, X, ZoomIn, ZoomOut, ArrowLeft, ArrowRight, Download } from "lucide-react";
 import { useState } from "react";
 
 interface BugContentCardsProps {
@@ -115,6 +115,17 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                   >
                     {file.name}
                   </a>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    aria-label={`Download file ${file.name}`}
+                    className="h-auto p-1"
+                  >
+                    <a href={file.path} target="_blank" rel="noopener noreferrer">
+                      <Download className="h-3.5 w-3.5" />
+                    </a>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -193,6 +204,19 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                 >
                   <RotateCw className="h-3.5 w-3.5" />
                 </Button>
+                {selectedImage && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8"
+                    asChild
+                    aria-label="Download image"
+                  >
+                    <a href={selectedImage} target="_blank" rel="noopener noreferrer">
+                      <Download className="h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"

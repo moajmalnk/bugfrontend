@@ -21,7 +21,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { BugPriority, Bug, Project } from "@/types"; // Added Bug import
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import {
   ArrowLeft,
@@ -57,6 +57,7 @@ const FixBug = () => { // Changed component name
   const navigate = useNavigate();
   const { bugId } = useParams<{ bugId: string }>(); // Get bugId from URL
   const { currentUser } = useAuth();
+  const queryClient = useQueryClient(); // Get query client
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bug, setBug] = useState<Bug | null>(null); // State to hold bug details
@@ -141,6 +142,10 @@ const FixBug = () => { // Changed component name
           title: "Success",
           description: "Bug status updated successfully",
         });
+        
+        // Invalidate the bug details query to force refetch on the details page
+        queryClient.invalidateQueries({ queryKey: ["bug", bugId] });
+        
         // Redirect back to the bug details page or bugs list
         navigate(`/bugs/${bugId}`);
       } else {
