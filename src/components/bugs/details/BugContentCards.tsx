@@ -62,8 +62,32 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       const response = await fetch(selectedImage, { mode: "cors" });
       if (!response.ok) throw new Error("Image fetch failed");
       const blob = await response.blob();
-      await navigator.clipboard.write([new window.ClipboardItem({ [blob.type]: blob })]);
-      toast({ title: "Success", description: "Image copied to clipboard." });
+
+      // Convert to PNG if not already PNG
+      let pngBlob = blob;
+      if (blob.type !== "image/png") {
+        // Draw image to canvas and export as PNG
+        const img = document.createElement("img");
+        img.crossOrigin = "anonymous";
+        const imgLoad = new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        img.src = URL.createObjectURL(blob);
+        await imgLoad;
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const pngDataUrl = canvas.toDataURL("image/png");
+        const res = await fetch(pngDataUrl);
+        pngBlob = await res.blob();
+        URL.revokeObjectURL(img.src);
+      }
+
+      await navigator.clipboard.write([new window.ClipboardItem({ "image/png": pngBlob })]);
+      toast({ title: "Success", description: "Image copied to clipboard as PNG." });
     } catch (error) {
       console.error("Copy image error:", error);
       toast({
