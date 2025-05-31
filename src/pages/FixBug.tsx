@@ -42,6 +42,7 @@ import React, {
   useState,
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom"; // Added useParams
+import { sendBugStatusUpdateNotification } from "@/services/emailService";
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -161,6 +162,15 @@ const FixBug = () => { // Changed component name
       const data = await response.json();
 
       if (data.success) {
+        // Send notification if status is fixed
+        if (status === "fixed") {
+          await sendBugStatusUpdateNotification({
+            ...bug,
+            status: "fixed",
+            updated_by_name: currentUser?.name || "Bug Ricer"
+          });
+        }
+
         toast({
           title: "Success",
           description: "Bug status updated successfully",
