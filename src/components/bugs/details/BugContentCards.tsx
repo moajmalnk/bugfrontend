@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Bug } from "@/types";
-import { RotateCw, X, ZoomIn, ZoomOut, ArrowLeft, ArrowRight, Download, Copy, Share2 } from "lucide-react";
+import { RotateCw, X, ZoomIn, ZoomOut, ArrowLeft, ArrowRight, Download, Copy, Share2, Printer } from "lucide-react";
 import { useState } from "react";
 import { toast } from "@/components/ui/use-toast";
 
@@ -89,7 +89,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       }
 
       await navigator.clipboard.write([new window.ClipboardItem({ "image/png": pngBlob })]);
-      toast({ title: "Success", description: `Image copied to clipboard as PNG).` });
+      toast({ title: "Success", description: `Image copied to clipboard as PNG.` });
     } catch (error) {
       console.error("Copy image error:", error);
       toast({
@@ -160,6 +160,27 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         variant: "destructive",
       });
     }
+  };
+
+  const handlePrintImage = () => {
+    if (!selectedImage) return;
+    // Open a new window with just the image and print it
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Image</title>
+          <style>
+            body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
+            img { max-width: 100vw; max-height: 100vh; }
+          </style>
+        </head>
+        <body>
+          <img src="${selectedImage}" onload="window.print();window.close()" />
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   return (
@@ -368,6 +389,18 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                     aria-label="Share image"
                   >
                     <Share2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+
+                {selectedImage && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8"
+                    onClick={handlePrintImage}
+                    aria-label="Print image"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
                   </Button>
                 )}
 
