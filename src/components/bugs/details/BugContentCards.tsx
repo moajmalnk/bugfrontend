@@ -48,7 +48,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     setRotation(0);
   };
 
-  const handleCopyImage = async () => {
+  const handleCopyImage = async (scaleFactor = 0.5) => {
     if (!selectedImage) return;
     if (!navigator.clipboard || !navigator.clipboard.write) {
       toast({
@@ -63,10 +63,9 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       if (!response.ok) throw new Error("Image fetch failed");
       const blob = await response.blob();
 
-      // Convert to PNG if not already PNG
+      // Convert to PNG if not already PNG, and downscale for speed
       let pngBlob = blob;
-      if (blob.type !== "image/png") {
-        // Draw image to canvas and export as PNG
+      if (blob.type !== "image/png" || scaleFactor !== 1) {
         const img = document.createElement("img");
         img.crossOrigin = "anonymous";
         const imgLoad = new Promise((resolve, reject) => {
@@ -75,11 +74,14 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         });
         img.src = URL.createObjectURL(blob);
         await imgLoad;
+
+        // Downscale
         const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
+        canvas.width = Math.max(1, Math.floor(img.width * scaleFactor));
+        canvas.height = Math.max(1, Math.floor(img.height * scaleFactor));
         const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
         const pngDataUrl = canvas.toDataURL("image/png");
         const res = await fetch(pngDataUrl);
         pngBlob = await res.blob();
@@ -87,7 +89,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       }
 
       await navigator.clipboard.write([new window.ClipboardItem({ "image/png": pngBlob })]);
-      toast({ title: "Success", description: "Image copied to clipboard as PNG." });
+      toast({ title: "Success", description: `Image copied to clipboard as PNG (${Math.round(scaleFactor * 100)}% size).` });
     } catch (error) {
       console.error("Copy image error:", error);
       toast({
@@ -349,8 +351,8 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                     variant="outline"
                     size="sm"
                     className="h-8 w-8"
-                    onClick={handleCopyImage}
-                    aria-label="Copy image to clipboard"
+                    onClick={() => handleCopyImage(0.25)}
+                    aria-label="Copy image to clipboard (2x faster)"
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
