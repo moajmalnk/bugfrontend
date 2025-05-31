@@ -89,7 +89,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       }
 
       await navigator.clipboard.write([new window.ClipboardItem({ "image/png": pngBlob })]);
-      toast({ title: "Success", description: `Image copied to clipboard as PNG (${Math.round(scaleFactor * 100)}% size).` });
+      toast({ title: "Success", description: `Image copied to clipboard as PNG).` });
     } catch (error) {
       console.error("Copy image error:", error);
       toast({
