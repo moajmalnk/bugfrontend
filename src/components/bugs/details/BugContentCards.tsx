@@ -91,7 +91,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         await navigator.share({
           files: [file],
           title: "Bug Screenshot",
-          text: "Screenshot related to a bug.",
+          text: bug.description,
         });
       } else {
         toast({
