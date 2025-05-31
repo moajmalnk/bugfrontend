@@ -24,13 +24,13 @@ export function KeyboardShortcuts() {
         setTheme(theme === "dark" ? "light" : "dark");
         // console.log('Theme toggled.');
       }
-      // Shortcut for Settings: Shift + S
-      if (e.shiftKey && (e.key === "s" || e.key === "S")) {
+      // Shortcut for Settings: Ctrl + Shift + S
+      if (e.ctrlKey && e.shiftKey && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
         navigate('/settings', { state: { from: window.location.pathname } });
       }
-      // Shortcut for Profile: Shift + P
-      if (e.shiftKey && (e.key === "p" || e.key === "P")) {
+      // Shortcut for Profile: Ctrl + Shift + P
+      if (e.ctrlKey && e.shiftKey && (e.key === "p" || e.key === "P")) {
         e.preventDefault();
         navigate('/profile', { state: { from: window.location.pathname } });
       }

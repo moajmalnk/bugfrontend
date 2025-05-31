@@ -32,7 +32,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
     // Define menu items based on user role
     const getMenuItems = (role: User['role'] | undefined): ContextMenuItem[] => {
         const commonItems: ContextMenuItem[] = [
-            { label: 'Profile', action: () => { navigate('/profile'); onClose(); }, icon: <UserIcon className="h-4 w-4" />, shortcut: 'Shift+P' },
+            { label: 'Profile', action: () => { navigate('/profile'); onClose(); }, icon: <UserIcon className="h-4 w-4" />, shortcut: 'Ctrl+Shift+P' },
             { label: 'Refresh', action: () => { window.location.reload(); onClose(); }, icon: <RefreshCw className="h-4 w-4" />, shortcut: 'Ctrl+R' },
             { label: 'Dark or Light', action: () => { toggleTheme(); onClose(); }, shortcut: 'Shift+Space', icon: theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" /> },
             { label: 'Privacy Mode', action: () => { /* TODO: Implement privacy mode toggle */ onClose(); }, shortcut: 'Ctrl+Space', icon: <Lock className="h-4 w-4" /> },
@@ -41,18 +41,18 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
         if (role === 'admin') {
             return [
                 { label: 'New Bug', action: () => { navigate('/bugs/new'); onClose(); }, shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
-                { label: 'Fix Bugs', action: () => { navigate('/bugs'); onClose(); }, shortcut: 'Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'Fix Bugs', action: () => { navigate('/bugs'); onClose(); }, shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
                 { label: 'Projects', action: () => { navigate('/projects'); onClose(); }, icon: <Folder className="h-4 w-4" /> },
                 { label: 'Bugs', action: () => { navigate('/bugs'); onClose(); }, icon: <Bug className="h-4 w-4" /> },
                 { label: 'Fixes', action: () => { navigate('/fixes'); onClose(); }, icon: <CheckSquare className="h-4 w-4" /> },
                 { label: 'Users', action: () => { navigate('/users'); onClose(); }, icon: <Users className="h-4 w-4" /> },
-                { label: 'Settings', action: () => { navigate('/settings'); onClose(); }, icon: <Settings className="h-4 w-4" />, shortcut: 'Shift+S' },
+                { label: 'Settings', action: () => { navigate('/settings'); onClose(); }, icon: <Settings className="h-4 w-4" />, shortcut: 'Ctrl+Shift+S' },
                 ...commonItems,
             ];
         } else if (role === 'developer') {
             return [
                 { label: 'Fixes', action: () => { navigate('/fixes'); onClose(); }, icon: <CheckSquare className="h-4 w-4" /> },
-                { label: 'Fix Bugs', action: () => { navigate('/bugs'); onClose(); }, shortcut: 'Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'Fix Bugs', action: () => { navigate('/bugs'); onClose(); }, shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
                 ...commonItems,
             ];
         } else if (role === 'tester') {
