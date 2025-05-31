@@ -65,6 +65,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       await navigator.clipboard.write([new window.ClipboardItem({ [blob.type]: blob })]);
       toast({ title: "Success", description: "Image copied to clipboard." });
     } catch (error) {
+      console.error("Copy image error:", error);
       toast({
         title: "Error",
         description: "Failed to copy image. Check browser support and CORS.",
