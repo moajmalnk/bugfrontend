@@ -28,7 +28,23 @@ export function useChunkLoadErrorRefresh() {
       }
     };
     window.addEventListener("error", handler);
-    return () => window.removeEventListener("error", handler);
+
+    // Also handle unhandledrejection for dynamic import errors
+    const rejectionHandler = (event) => {
+      if (
+        event?.reason?.message?.includes("Failed to fetch dynamically imported module") ||
+        event?.reason?.message?.includes("Loading chunk") ||
+        event?.reason?.message?.includes("expected a JavaScript module script")
+      ) {
+        setShowModal(true);
+      }
+    };
+    window.addEventListener("unhandledrejection", rejectionHandler);
+
+    return () => {
+      window.removeEventListener("error", handler);
+      window.removeEventListener("unhandledrejection", rejectionHandler);
+    };
   }, []);
 
   // Render the modal if needed
