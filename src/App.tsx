@@ -5,9 +5,11 @@ import RouteConfig from "@/components/routes/RouteConfig";
 import { initOfflineDetector } from "@/lib/offline";
 import { QueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { BrowserRouter as Router } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { requestNotificationPermission } from "./firebase-messaging-sw";
 import ContextMenu from "./components/ContextMenu";
+import { MainLayout } from "@/components/layout/MainLayout";
+import Fixes from "@/pages/Fixes";
 
 // Initialize the query client outside of the component
 const queryClient = new QueryClient();

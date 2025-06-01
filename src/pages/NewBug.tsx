@@ -400,7 +400,7 @@ const NewBug = () => {
   }, [screenshots, files]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-4xl mx-auto px-2 sm:px-4 py-4">
       <div className="flex items-center justify-between">
         <Button
           variant="ghost"
