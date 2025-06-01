@@ -12,24 +12,68 @@ import ContextMenu from "./components/ContextMenu";
 // Initialize the query client outside of the component
 const queryClient = new QueryClient();
 
-function useChunkLoadErrorRefresh() {
+export function useChunkLoadErrorRefresh() {
+  const [showModal, setShowModal] = useState(false);
+
   useEffect(() => {
     const handler = (event) => {
-      // Vite/React chunk load error pattern
       if (
         event?.message?.includes("Failed to fetch dynamically imported module") ||
         event?.message?.includes("Loading chunk") ||
         event?.message?.includes("expected a JavaScript module script")
       ) {
-        // Show a popup or toast
-        if (window.confirm("A new version of this site is available or a network error occurred. Click OK to refresh.")) {
-          window.location.reload();
-        }
+        setShowModal(true);
       }
     };
     window.addEventListener("error", handler);
     return () => window.removeEventListener("error", handler);
   }, []);
+
+  // Render the modal if needed
+  return showModal ? (
+    <div
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0,0,0,0.5)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 8,
+          padding: "2rem",
+          maxWidth: 400,
+          boxShadow: "0 4px 32px rgba(0,0,0,0.2)",
+          textAlign: "center"
+        }}
+      >
+        <h2 style={{ marginBottom: 16 }}>Update Available</h2>
+        <p style={{ marginBottom: 24 }}>
+          A new version of this site is available or a network error occurred.<br />
+          Please refresh to continue.
+        </p>
+        <button
+          style={{
+            background: "#2563eb",
+            color: "#fff",
+            border: "none",
+            borderRadius: 4,
+            padding: "0.75rem 1.5rem",
+            fontWeight: 600,
+            cursor: "pointer"
+          }}
+          onClick={() => window.location.reload()}
+        >
+          Refresh Now
+        </button>
+      </div>
+    </div>
+  ) : null;
 }
 
 function App() {
@@ -105,13 +149,13 @@ function App() {
       // Add any other click logic here if needed
   };
 
-  useChunkLoadErrorRefresh();
+  const chunkErrorModal = useChunkLoadErrorRefresh();
 
   return (
     <Router>
       <AppProviders queryClient={queryClient}>
-        {/* Attach React handlers to the div */}
-        <div onContextMenu={handleReactContextMenu} onClick={handleReactClick}>
+        <div>
+          {chunkErrorModal}
           <KeyboardShortcuts />
           <RouteConfig />
           <PrivacyOverlay visible={privacy} />
