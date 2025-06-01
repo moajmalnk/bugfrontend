@@ -12,6 +12,26 @@ import ContextMenu from "./components/ContextMenu";
 // Initialize the query client outside of the component
 const queryClient = new QueryClient();
 
+function useChunkLoadErrorRefresh() {
+  useEffect(() => {
+    const handler = (event) => {
+      // Vite/React chunk load error pattern
+      if (
+        event?.message?.includes("Failed to fetch dynamically imported module") ||
+        event?.message?.includes("Loading chunk") ||
+        event?.message?.includes("expected a JavaScript module script")
+      ) {
+        // Show a popup or toast
+        if (window.confirm("A new version of this site is available or a network error occurred. Click OK to refresh.")) {
+          window.location.reload();
+        }
+      }
+    };
+    window.addEventListener("error", handler);
+    return () => window.removeEventListener("error", handler);
+  }, []);
+}
+
 function App() {
   const [privacy, setPrivacy] = useState(() => {
     return localStorage.getItem("privacyMode") === "true";
@@ -84,6 +104,8 @@ function App() {
       // This will be handled by the native click listener for closing the menu
       // Add any other click logic here if needed
   };
+
+  useChunkLoadErrorRefresh();
 
   return (
     <Router>
