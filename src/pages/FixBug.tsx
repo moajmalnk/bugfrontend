@@ -316,7 +316,7 @@ const FixBug = () => { // Changed component name
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
                         <BugIcon className="h-6 w-6 text-primary" />
-                        Fixing Bug: {bug.id.substring(0, 8)}
+                        Fixing Bug: {bug.title} ({bug.id})
                     </CardTitle>
                     <CardDescription className="text-sm sm:text-base">
                         Update the status and provide details for the bug fix.

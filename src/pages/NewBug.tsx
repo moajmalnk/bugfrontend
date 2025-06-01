@@ -217,7 +217,7 @@ const NewBug = () => {
             //     : [];
 
             // allAttachments = [...screenshotUrls, ...fileUrls];
-            
+
             const uploadedAttachments = data.uploadedAttachments || [];
             console.log("Uploaded attachment paths from backend:", uploadedAttachments);
 
@@ -250,23 +250,23 @@ const NewBug = () => {
                   
                   <!-- Attachments -->
                   ${uploadedAttachments.length > 0
-                    ? `
+                ? `
                   <div style="padding: 20px; border-top: 1px solid #e2e8f0;">
                     <p style="margin-top: 0; margin-bottom: 10px; font-size: 14px;"><strong>Attachments (${uploadedAttachments.length}):</strong></p>
                     <ul style="padding-left: 20px; margin: 0; font-size: 14px;">
                       ${uploadedAttachments
-                        .map(
-                          (url) =>
-                            `<li style="margin-bottom: 5px;"><a href="${url}" style="color: #2563eb; text-decoration: none;">${decodeURIComponent(
-                              url.split("/").pop() || ""
-                            )}</a></li>`
-                        )
-                        .join("")}
+                  .map(
+                    (url) =>
+                      `<li style="margin-bottom: 5px;"><a href="${url}" style="color: #2563eb; text-decoration: none;">${decodeURIComponent(
+                        url.split("/").pop() || ""
+                      )}</a></li>`
+                  )
+                  .join("")}
                     </ul>
                   </div>
                   `
-                    : ""
-                }
+                : ""
+              }
                   
                   <!-- Footer -->
                   <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
