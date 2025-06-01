@@ -86,7 +86,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             </Button>
             <span className="ml-2 font-bold text-lg">BugRacer</span>
           </div>
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">{children}</main>
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 custom-scrollbar">{children}</main>
         </div>
       </div>
     </NotificationProvider>
