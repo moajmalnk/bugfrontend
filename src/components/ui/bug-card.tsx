@@ -5,6 +5,16 @@ import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { bugService } from '@/services/bugService';
 import { useState } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const priorityColors = {
   high: 'bg-red-100 text-red-800',
@@ -39,6 +49,7 @@ export const BugCard = ({ bug, onDelete }: BugCardProps) => {
   const { currentUser } = useAuth();
   const isFromProject = location.pathname.startsWith('/projects/');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   return (
     <div className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 rounded-lg border bg-background transition-shadow hover:shadow-md">
@@ -78,31 +89,51 @@ export const BugCard = ({ bug, onDelete }: BugCardProps) => {
             variant="destructive" 
             size="sm"
             className="text-xs sm:text-sm px-3 py-1"
-            onClick={async () => {
-              setIsDeleting(true);
-              try {
-                await bugService.deleteBug(bug.id);
-                toast({
-                  title: "Success",
-                  description: "Bug has been deleted successfully",
-                });
-                onDelete();
-              } catch (error) {
-                toast({
-                  title: "Error",
-                  description: "Failed to delete bug",
-                  variant: "destructive",
-                });
-              } finally {
-                setIsDeleting(false);
-              }
-            }}
+            onClick={() => setShowDeleteDialog(true)}
             disabled={isDeleting}
           >
             Delete
           </Button>
         )}
       </div>
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the bug and all its associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setIsDeleting(true);
+                try {
+                  await bugService.deleteBug(bug.id);
+                  toast({
+                    title: "Success",
+                    description: "Bug has been deleted successfully",
+                  });
+                  onDelete();
+                } catch (error) {
+                  toast({
+                    title: "Error",
+                    description: "Failed to delete bug",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsDeleting(false);
+                  setShowDeleteDialog(false);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
