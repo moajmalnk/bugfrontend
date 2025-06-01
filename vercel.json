@@ -11,10 +11,6 @@
   ],
   "rewrites": [
     {
-      "source": "/assets/(.*)",
-      "destination": "/$1"
-    },
-    {
       "source": "/:path*",
       "destination": "/index.html"
     }
