@@ -287,7 +287,7 @@ export default function Profile() {
             {isLoadingStats ? (
               <StatsSkeleton />
             ) : userStats ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={`grid gap-4 ${currentUser?.role === "admin" ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"}`}>
                 <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
                   <p className="text-xs text-muted-foreground mb-1">Total Projects</p>
                   <p className="text-2xl font-bold">
@@ -296,23 +296,39 @@ export default function Profile() {
                 </div>
                 
                 {/* Role-based statistics */}
-                <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
-                  {(currentUser?.role === "tester" || currentUser?.role === "admin") ? (
-                    <>
+                {currentUser?.role === "admin" ? (
+                  // Admin sees both Total Bugs and Total Fixes
+                  <>
+                    <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
                       <p className="text-xs text-muted-foreground mb-1">Total Bugs</p>
                       <p className="text-2xl font-bold">
                         {userStats.total_bugs > 0 ? userStats.total_bugs : <span className="text-muted-foreground text-base">No bugs</span>}
                       </p>
-                    </>
-                  ) : (
-                    <>
+                    </div>
+                    <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
                       <p className="text-xs text-muted-foreground mb-1">Total Fixes</p>
                       <p className="text-2xl font-bold">
                         {userStats.total_fixes > 0 ? userStats.total_fixes : <span className="text-muted-foreground text-base">No fixes</span>}
                       </p>
-                    </>
-                  )}
-                </div>
+                    </div>
+                  </>
+                ) : currentUser?.role === "tester" ? (
+                  // Tester sees only Total Bugs
+                  <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
+                    <p className="text-xs text-muted-foreground mb-1">Total Bugs</p>
+                    <p className="text-2xl font-bold">
+                      {userStats.total_bugs > 0 ? userStats.total_bugs : <span className="text-muted-foreground text-base">No bugs</span>}
+                    </p>
+                  </div>
+                ) : (
+                  // Developer sees only Total Fixes
+                  <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
+                    <p className="text-xs text-muted-foreground mb-1">Total Fixes</p>
+                    <p className="text-2xl font-bold">
+                      {userStats.total_fixes > 0 ? userStats.total_fixes : <span className="text-muted-foreground text-base">No fixes</span>}
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-muted-foreground text-center">Could not load statistics.</div>
@@ -369,9 +385,9 @@ export default function Profile() {
         <Card className="md:col-span-3">
           <CardHeader>
             <CardTitle>
-              {(currentUser?.role === "tester" || currentUser?.role === "admin") 
-                ? "Bugs Recent Activity" 
-                : "Fixes Recent Activity"
+              {currentUser?.role === "admin" 
+                ? "Recent Activity" 
+                : (currentUser?.role === "tester" ? "Bugs Recent Activity" : "Fixes Recent Activity")
               }
             </CardTitle>
           </CardHeader>
@@ -383,10 +399,12 @@ export default function Profile() {
                  {userStats.recent_activity
                    .filter((activity) => {
                      // Filter activities based on user role
-                     if (currentUser?.role === "tester" || currentUser?.role === "admin") {
-                       return activity.type === "bug"; // Show only bug activities
+                     if (currentUser?.role === "admin") {
+                       return true; // Admin sees all activities (bug, fix, project)
+                     } else if (currentUser?.role === "tester") {
+                       return activity.type === "bug" || activity.type === "project"; // Testers see bugs and projects
                      } else {
-                       return activity.type === "fix"; // Show only fix activities
+                       return activity.type === "fix" || activity.type === "project"; // Developers see fixes and projects
                      }
                    })
                    .map((activity, index) => (
@@ -396,8 +414,10 @@ export default function Profile() {
                     >
                       {activity.type === "bug" ? (
                         <Bug className="h-4 w-4 mt-0.5 text-yellow-500" />
-                      ) : (
+                      ) : activity.type === "fix" ? (
                         <Code2 className="h-4 w-4 mt-0.5 text-green-500" />
+                      ) : (
+                        <MapPin className="h-4 w-4 mt-0.5 text-blue-500" />
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="break-words max-w-[180px] sm:max-w-[260px] md:max-w-[340px] lg:max-w-[400px]">
@@ -412,10 +432,7 @@ export default function Profile() {
               </div>
             ) : (
                <div className="text-muted-foreground text-center">
-                 {(currentUser?.role === "tester" || currentUser?.role === "admin") 
-                   ? "No recent bug activity to display." 
-                   : "No recent fix activity to display."
-                 }
+                 No recent activity to display.
                </div>
             )}
           </CardContent>

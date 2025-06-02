@@ -10,6 +10,8 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { bugService } from "@/services/bugService";
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
+import { useAuth } from "@/context/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bug, BugStatus, Project } from "@/types";
 import { useState } from "react";
 
@@ -28,15 +30,37 @@ export const BugDetailsCard = ({
   updateBugStatus,
   formattedUpdatedDate,
 }: BugDetailsCardProps) => {
+  const { currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
   const [bugState, setBugState] = useState(bug);
 
   const handleUpdate = async (field: "status" | "priority", value: string) => {
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to update bugs.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUpdating(true);
     try {
-      const updatedBug = { ...bugState, [field]: value };
+      const updatedBug = { 
+        ...bugState, 
+        [field]: value,
+        updated_by: currentUser.id, // Ensure the current user is set as the updater
+        updated_by_name: currentUser.name || currentUser.username // Include the updater name
+      };
+      
       await bugService.updateBug(updatedBug);
       setBugState(updatedBug);
+
+      // Invalidate queries to refresh the bugs list and user stats
+      queryClient.invalidateQueries({ queryKey: ["bugs"] });
+      queryClient.invalidateQueries({ queryKey: ["bug", bug.id] });
+      queryClient.invalidateQueries({ queryKey: ["userStats", currentUser.id] });
 
       // Send notification when status is changed to "fixed"
       if (field === "status" && value === "fixed") {
@@ -142,10 +166,10 @@ export const BugDetailsCard = ({
               </div>
 
               {/* Add the Updated By information with null check */}
-              {bug.updated_by_name && (
+              {(bugState.updated_by_name || bug.updated_by_name) && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">Updated By:</span>
-                  <span className="font-medium">{bug.updated_by_name}</span>
+                  <span className="font-medium">{bugState.updated_by_name || bug.updated_by_name}</span>
                 </div>
               )}
             </div>
