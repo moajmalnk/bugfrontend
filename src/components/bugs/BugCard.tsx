@@ -53,7 +53,7 @@ const statusColors = {
 };
 
 export function BugCard({ bug, onDelete }: BugCardProps) {
-  const { currentUser } = useAuth();
+  const { currentUser, isLoading } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);

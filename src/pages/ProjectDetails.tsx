@@ -468,7 +468,7 @@ const ProjectDetails = () => {
         onValueChange={setActiveTab}
         className="w-full"
       >
-        <TabsList className="flex flex-nowrap overflow-x-auto gap-2 md:gap-4 pb-1 mb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+        <TabsList className="flex flex-nowrap overflow-x-auto gap-2 md:gap-4 pb-1 mb-4 custom-scrollbar">
           <TabsTrigger value="overview" className="flex-1 min-w-[100px]">
             Overview
           </TabsTrigger>
@@ -672,85 +672,81 @@ const ProjectDetails = () => {
               )}
             </CardHeader>
             
-            <CardContent>
-              <div className="mb-6">
-                <div className="relative w-full max-w-sm mb-6">
-                  <input
-                    type="text"
-                    placeholder="Search members..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-10 border border-border rounded-md pl-10 pr-12 py-2 
-                    focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none 
-                    shadow-sm hover:border-primary/50 transition-all duration-200 
-                    bg-background/50 backdrop-blur-sm"
-                  />
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">
-                    <Search className="h-4 w-4" />
-                  </div>
-                  {searchQuery && (
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  <Button
-                    size="sm"
-                        variant="ghost" 
-                        className="h-6 w-6 p-0 rounded-full opacity-70 hover:opacity-100"
-                        onClick={() => setSearchQuery("")}
-                  >
-                        <X className="h-3 w-3" />
-                        <span className="sr-only">Clear search</span>
-                  </Button>
-                    </div>
-                  )}
+            <CardContent className="space-y-6">
+              <div className="relative w-full max-w-sm">
+                <input
+                  type="text"
+                  placeholder="Search members..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-10 border border-border rounded-md pl-10 pr-12 py-2 
+                  focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none 
+                  shadow-sm hover:border-primary/50 transition-all duration-200 
+                  bg-background/50 backdrop-blur-sm"
+                />
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">
+                  <Search className="h-4 w-4" />
                 </div>
+                {searchQuery && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                <Button
+                  size="sm"
+                      variant="ghost" 
+                      className="h-6 w-6 p-0 rounded-full opacity-70 hover:opacity-100"
+                      onClick={() => setSearchQuery("")}
+                >
+                      <X className="h-3 w-3" />
+                      <span className="sr-only">Clear search</span>
+                </Button>
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center">
+                  <Shield className="h-5 w-5 mr-2 text-blue-600" /> 
+                  Administrators
+                </h3>
                 
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3 flex items-center">
-                      <Shield className="h-5 w-5 mr-2 text-blue-600" /> 
-                      Administrators
-                    </h3>
-                    
-                    {filteredAdmins.length === 0 && (
-                      <p className="text-muted-foreground text-sm italic">
-                        {searchQuery ? "No administrators match your search." : "No administrators assigned."}
-                      </p>
-                    )}
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
-                      {filteredAdmins.map(admin => (
-                        <MemberCard 
-                          key={admin.id} 
-                          member={admin} 
-                          isAdmin={true} 
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3 flex items-center">
-                      <UserRound className="h-5 w-5 mr-2 text-purple-600" /> 
-                      Project Members
-                    </h3>
-                    
-                    {filteredMembers.length === 0 && (
-                      <p className="text-muted-foreground text-sm italic">
-                        {searchQuery 
-                          ? "No members match your search." 
-                          : "No members assigned to this project yet."}
-                      </p>
-                    )}
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
-                      {filteredMembers.map(member => (
-                        <MemberCard 
-                          key={member.id} 
-                          member={member} 
-                          onRemove={handleRemoveMember} 
-                        />
-                      ))}
-                    </div>
-                  </div>
+                {filteredAdmins.length === 0 && (
+                  <p className="text-muted-foreground text-sm italic">
+                    {searchQuery ? "No administrators match your search." : "No administrators assigned."}
+                  </p>
+                )}
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+                  {filteredAdmins.map(admin => (
+                    <MemberCard 
+                      key={admin.id} 
+                      member={admin} 
+                      isAdmin={true} 
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center">
+                  <UserRound className="h-5 w-5 mr-2 text-purple-600" /> 
+                  Project Members
+                </h3>
+                
+                {filteredMembers.length === 0 && (
+                  <p className="text-muted-foreground text-sm italic">
+                    {searchQuery 
+                      ? "No members match your search." 
+                      : "No members assigned to this project yet."}
+                  </p>
+                )}
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+                  {filteredMembers.map(member => (
+                    <MemberCard 
+                      key={member.id} 
+                      member={member} 
+                      onRemove={handleRemoveMember} 
+                    />
+                  ))}
                 </div>
               </div>
             </CardContent>

@@ -73,8 +73,11 @@
 
   body {
     @apply bg-background text-foreground;
+    overflow: hidden; /* Prevent body scrolling */
   }
 }
+
+/* Remove body scrollbar styles since we're using main element scrolling */
 
 .bug-card {
   @apply rounded-lg border p-4 shadow-sm transition-all hover:shadow-md;
@@ -112,7 +115,7 @@
   display: none !important;
 }
 
-/* Custom scrollbar for BugRacer theme */
+/* Custom scrollbar for BugRacer theme - for individual elements */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
   background: transparent;
