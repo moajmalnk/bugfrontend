@@ -62,19 +62,19 @@ const TableRowSkeleton = () => (
 
 // Card skeleton for mobile view
 const CardSkeleton = () => (
-  <div className="rounded-lg border p-4 bg-background flex flex-col gap-2">
+  <div className="rounded-lg border p-3 sm:p-4 bg-background flex flex-col gap-2 sm:gap-3">
     <div className="flex items-center gap-2">
-      <Skeleton className="h-4 w-4 rounded-full" />
-      <Skeleton className="h-4 w-16" />
-      <Skeleton className="h-[22px] w-16 rounded-full" />
+      <Skeleton className="h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full" />
+      <Skeleton className="h-4 w-12 sm:w-16" />
+      <Skeleton className="h-[20px] sm:h-[22px] w-12 sm:w-16 rounded-full" />
     </div>
-    <Skeleton className="h-5 w-4/5" />
+    <Skeleton className="h-4 sm:h-5 w-4/5" />
     <div className="flex flex-col gap-1">
-      <Skeleton className="h-3 w-32" />
-      <Skeleton className="h-3 w-28" />
+      <Skeleton className="h-3 w-28 sm:w-32" />
+      <Skeleton className="h-3 w-24 sm:w-28" />
     </div>
     <div className="flex justify-end">
-      <Skeleton className="h-8 w-[90px]" />
+      <Skeleton className="h-7 sm:h-8 w-[80px] sm:w-[90px]" />
     </div>
   </div>
 );
@@ -176,9 +176,9 @@ const Fixes = () => {
   };
 
   const FilterControls = () => (
-    <div className="flex flex-col sm:flex-row gap-3 w-full">
+    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
       <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-        <SelectTrigger className="w-full min-w-[120px] max-w-[160px] bg-background/50 h-9 text-xs sm:text-sm">
+        <SelectTrigger className="w-full sm:min-w-[120px] sm:max-w-[160px] bg-background/50 h-9 text-xs sm:text-sm">
           <SelectValue placeholder="Priority" />
         </SelectTrigger>
         <SelectContent position="popper">
@@ -194,12 +194,12 @@ const Fixes = () => {
   const renderEmptyState = () => {
     if (hasAccessError) {
       return (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            <Lock className="h-6 w-6 text-muted-foreground" />
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 sm:p-8 text-center">
+          <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-muted">
+            <Lock className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
           </div>
-          <h3 className="mt-4 text-lg font-semibold">No Access</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-semibold">No Access</h3>
+          <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-md">
             You don't have access to any projects. You need to be a member of a project to view fixed bugs.
           </p>
         </div>
@@ -207,12 +207,12 @@ const Fixes = () => {
     }
 
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <AlertCircle className="h-6 w-6 text-muted-foreground" />
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 sm:p-8 text-center">
+        <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-muted">
+          <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
         </div>
-        <h3 className="mt-4 text-lg font-semibold">No Fixed Bugs</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-semibold">No Fixed Bugs</h3>
+        <p className="mt-2 text-xs sm:text-sm text-muted-foreground">
           No bugs have been fixed yet.
         </p>
       </div>
@@ -228,46 +228,46 @@ const Fixes = () => {
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-4 py-6 sm:px-6 md:px-8 lg:px-10">
-      <section className="max-w-7xl mx-auto space-y-6 md:space-y-8">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 md:gap-6">
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
+      <section className="max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 md:gap-6">
           {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
             <Button
               variant="default"
               asChild
-              className="w-full sm:w-auto h-10 text-base"
+              className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
               aria-label="Fix a bug"
             >
               <Link to="/bugs/" className="flex items-center justify-center">
-                <Plus className="mr-2 h-4 w-4" /> Fix Bugs
+                <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Fix Bugs
               </Link>
             </Button>
           )}
 
           {!skeletonLoading && !isLoading && fixedBugs.length > 0 && (
-            <div className="flex items-center border rounded-md px-4 py-2 bg-green-50">
-              <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-              <span className="text-sm font-medium text-green-700">
+            <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-green-50">
+              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 mr-2" />
+              <span className="text-xs sm:text-sm font-medium text-green-700">
                 {fixedBugs.length} Issues Fixed
               </span>
             </div>
           )}
         </div>
 
-        <div className="space-y-4 md:space-y-6">
+        <div className="space-y-3 sm:space-y-4 md:space-y-6">
           <div className="relative">
             <Input
               placeholder="Search fixed bugs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-background/50 h-10 text-sm pl-10"
+              className="w-full bg-background/50 h-9 sm:h-10 text-sm pl-9 sm:pl-10"
               aria-label="Search fixed bugs"
               disabled={skeletonLoading || hasAccessError || (fixedBugs.length === 0 && !isLoading)}
             />
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </div>
 
-          <div className="block md:hidden">
+          <div className="block lg:hidden">
             <Sheet
               open={isFilterSheetOpen}
               onOpenChange={setIsFilterSheetOpen}
@@ -275,11 +275,11 @@ const Fixes = () => {
               <SheetTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full h-10 text-sm bg-background/50"
+                  className="w-full h-9 sm:h-10 text-sm bg-background/50"
                   aria-label="Open filters"
                   disabled={skeletonLoading || hasAccessError || (fixedBugs.length === 0 && !isLoading)}
                 >
-                  <Filter className="h-4 w-4 mr-2" />
+                  <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
                   Filters
                 </Button>
               </SheetTrigger>
@@ -297,15 +297,15 @@ const Fixes = () => {
             </Sheet>
           </div>
 
-          <div className="hidden md:flex gap-4">
+          <div className="hidden lg:flex gap-4">
             <FilterControls />
           </div>
         </div>
 
         {skeletonLoading ? (
           <>
-            {/* Table skeleton for desktop */}
-            <div className="hidden md:block rounded-md border overflow-x-auto">
+            {/* Table skeleton for desktop and large tablets */}
+            <div className="hidden lg:block rounded-md border overflow-x-auto">
               <Table className="min-w-[800px] w-full">
                 <TableHeader>
                   <TableRow>
@@ -327,8 +327,8 @@ const Fixes = () => {
               </Table>
             </div>
 
-            {/* Card skeleton for mobile and tablet */}
-            <div className="md:hidden space-y-4">
+            {/* Card skeleton for mobile and tablets */}
+            <div className="lg:hidden space-y-3 sm:space-y-4">
               {Array(3)
                 .fill(0)
                 .map((_, index) => (
@@ -338,8 +338,8 @@ const Fixes = () => {
           </>
         ) : isLoading ? (
           <>
-            {/* Table skeleton for desktop */}
-            <div className="hidden md:block rounded-md border overflow-x-auto">
+            {/* Table skeleton for desktop and large tablets */}
+            <div className="hidden lg:block rounded-md border overflow-x-auto">
               <Table className="min-w-[800px] w-full">
                 <TableHeader>
                   <TableRow>
@@ -361,8 +361,8 @@ const Fixes = () => {
               </Table>
             </div>
 
-            {/* Card skeleton for mobile and tablet */}
-            <div className="md:hidden space-y-4">
+            {/* Card skeleton for mobile and tablets */}
+            <div className="lg:hidden space-y-3 sm:space-y-4">
               {Array(2)
                 .fill(0)
                 .map((_, index) => (
@@ -374,7 +374,7 @@ const Fixes = () => {
           renderEmptyState()
         ) : (
           <>
-            <div className="hidden md:block rounded-md border overflow-x-auto">
+            <div className="hidden lg:block rounded-md border overflow-x-auto">
               <Table className="min-w-[800px] w-full">
                 <TableHeader>
                   <TableRow>
@@ -421,28 +421,28 @@ const Fixes = () => {
               </Table>
             </div>
 
-            <div className="md:hidden space-y-4">
+            <div className="lg:hidden space-y-3 sm:space-y-4">
               {filteredBugs.map((bug) => (
                 <div
                   key={bug.id}
-                  className="rounded-lg border p-4 bg-background flex flex-col gap-3"
+                  className="rounded-lg border p-3 sm:p-4 bg-background flex flex-col gap-2 sm:gap-3"
                 >
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Bug className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold text-sm break-all">
+                    <Bug className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                    <span className="font-semibold text-xs sm:text-sm break-all">
                       {bug.id.substring(0, 8)}
                     </span>
                     <Badge
                       variant="outline"
-                      className={getPriorityColor(bug.priority)}
+                      className={`text-xs ${getPriorityColor(bug.priority)}`}
                     >
                       {bug.priority}
                     </Badge>
                   </div>
-                  <div className="font-bold text-base break-words">
+                  <div className="font-bold text-sm sm:text-base break-words">
                     {bug.title}
                   </div>
-                  <div className="flex flex-col gap-1 text-sm">
+                  <div className="flex flex-col gap-1 text-xs sm:text-sm">
                     <div className="text-muted-foreground break-words">
                       Reported by:{" "}
                       <span className="font-medium">{bug.reported_by}</span>
@@ -452,7 +452,7 @@ const Fixes = () => {
                     </div>
                   </div>
                   <div className="flex justify-end mt-1">
-                    <Button variant="outline" size="sm" asChild>
+                    <Button variant="outline" size="sm" asChild className="text-xs">
                       <Link to={`/bugs/${bug.id}`}>View Details</Link>
                     </Button>
                   </div>
