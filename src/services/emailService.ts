@@ -9,24 +9,31 @@ export const sendEmailNotification = async (
   try {
     // Ensure correct API URL path
     const apiUrl = `${ENV.API_URL}/send-bug-notification.php`;
-    console.log("Sending request to:", apiUrl);
+    console.log("Sending email notification:");
+    console.log("- API URL:", apiUrl);
+    console.log("- Recipients:", to);
+    console.log("- Subject:", subject);
     
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({ to, subject, body, attachments }),
-      credentials: 'include',
     });
+    
+    console.log("Response status:", response.status);
+    console.log("Response headers:", response.headers);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Email API error:", errorText);
-      throw new Error(`HTTP error: ${response.status}`);
+      console.error("Email API error response:", errorText);
+      throw new Error(`HTTP error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
+    console.log("Email API success response:", data);
     return data;
   } catch (error) {
     console.error("Email notification error:", error);
@@ -57,12 +64,22 @@ export const sendEmailNotification = async (
 export const getNotificationRecipients = async (): Promise<string[]> => {
   try {
     // Fetch admin emails
-    const adminResponse = await fetch(`${ENV.API_URL}/get_all_admins.php`);
+    const adminResponse = await fetch(`${ENV.API_URL}/get_all_admins.php`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
     const adminData = await adminResponse.json();
     const adminEmails = adminData.success ? adminData.emails : [];
     
     // Fetch developer emails
-    const devResponse = await fetch(`${ENV.API_URL}/get_all_developers.php`);
+    const devResponse = await fetch(`${ENV.API_URL}/get_all_developers.php`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
     const devData = await devResponse.json();
     const devEmails = devData.success ? devData.emails : [];
     
@@ -81,12 +98,22 @@ export const getNotificationRecipients = async (): Promise<string[]> => {
 export const getBugStatusUpdateRecipients = async (): Promise<string[]> => {
   try {
     // Fetch admin emails
-    const adminResponse = await fetch(`${ENV.API_URL}/get_all_admins.php`);
+    const adminResponse = await fetch(`${ENV.API_URL}/get_all_admins.php`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
     const adminData = await adminResponse.json();
     const adminEmails = adminData.success ? adminData.emails : [];
     
     // Fetch tester emails
-    const testerResponse = await fetch(`${ENV.API_URL}/get_all_testers.php`);
+    const testerResponse = await fetch(`${ENV.API_URL}/get_all_testers.php`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
     const testerData = await testerResponse.json();
     const testerEmails = testerData.success ? testerData.emails : [];
     
