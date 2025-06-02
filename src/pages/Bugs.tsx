@@ -356,22 +356,43 @@ const Bugs = () => {
     <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
       <section className="max-w-6xl mx-auto space-y-4">
         {/* Header: Report Bug Button */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
-            <Button
-              variant="default"
-              asChild
-              className="w-full sm:w-auto h-10 text-sm"
-              aria-label="Report a new bug"
-            >
-              <Link
-                to="/bugs/new"
-                state={{ from: "/bugs" }}
-                className="flex items-center justify-center"
-              >
-                <Plus className="mr-2 h-4 w-4" /> Report Bug
-              </Link>
-            </Button>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
+          {skeletonLoading ? (
+            <>
+              <Skeleton className="h-9 sm:h-10 w-full sm:w-32 rounded-md" />
+              <Skeleton className="h-7 sm:h-8 w-full sm:w-36 rounded-md" />
+            </>
+          ) : (
+            <>
+              {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
+                <Button
+                  variant="default"
+                  asChild
+                  className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
+                  aria-label="Report a new bug"
+                >
+                  <Link
+                    to="/bugs/new"
+                    state={{ from: "/bugs" }}
+                    className="flex items-center justify-center"
+                  >
+                    <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Report Bug
+                  </Link>
+                </Button>
+              )}
+              
+              {!loading && bugs.length > 0 && (() => {
+                const pendingBugs = bugs.filter(bug => bug.status === "pending" || bug.status === "in_progress");
+                return pendingBugs.length > 0 && (
+                  <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-orange-50">
+                    <BugIcon className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 mr-2" />
+                    <span className="text-xs sm:text-sm font-medium text-orange-700">
+                      {pendingBugs.length} Bugs Pending
+                    </span>
+                  </div>
+                );
+              })()}
+            </>
           )}
         </div>
 
