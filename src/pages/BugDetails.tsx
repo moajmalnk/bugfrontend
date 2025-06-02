@@ -259,7 +259,7 @@ const BugDetails = () => {
             updated_by_name: currentUser?.name || "Bug Ricer", // Include updater name in notification
           });
         } catch (notificationError) {
-          console.error("Failed to send notification:", notificationError);
+          // // console.error("Failed to send notification:", notificationError);
         }
       }
 
@@ -271,7 +271,7 @@ const BugDetails = () => {
         description: "Bug status updated successfully",
       });
     } catch (error) {
-      console.error("Failed to update bug status:", error);
+      // // console.error("Failed to update bug status:", error);
       toast({
         title: "Error",
         description: "Failed to update bug status",

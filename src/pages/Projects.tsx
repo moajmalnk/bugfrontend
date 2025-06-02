@@ -355,7 +355,7 @@ const Projects = () => {
       const baseUrl = `${ENV.API_URL}/projects/delete.php?id=${projectId}`;
       const url = force ? `${baseUrl}&force_delete=true` : baseUrl;
       
-      console.log(`Sending DELETE request to: ${url} (Force: ${force ? "true" : "false"})`);
+      // console.log(`Sending DELETE request to: ${url} (Force: ${force ? "true" : "false"})`);
       
       const token = localStorage.getItem("token");
       if (!token) {
@@ -376,10 +376,10 @@ const Projects = () => {
         }
       });
       
-      console.log(`Delete response status: ${response.status}`);
+      // console.log(`Delete response status: ${response.status}`);
       
       const data = await response.json();
-      console.log("Delete response data:", data);
+      // console.log("Delete response data:", data);
 
       if (data.success) {
         // Update both project arrays
@@ -402,8 +402,8 @@ const Projects = () => {
             data.message?.includes('constraint')) {
           
           // Add debug info
-          console.error(`Force delete failed with URL: ${url}`);
-          console.error(`Force parameter was: ${force}`);
+          // console.error(`Force delete failed with URL: ${url}`);
+          // console.error(`Force parameter was: ${force}`);
           
           setDeleteErrorMessage(data.message);
           setIsErrorDialogOpen(true);
@@ -416,7 +416,7 @@ const Projects = () => {
         }
       }
     } catch (error) {
-      console.error("Project deletion error:", error);
+      // console.error("Project deletion error:", error);
       toast({
         title: "Error",
         description: "Failed to delete project. Please try again.",
@@ -710,7 +710,7 @@ const Projects = () => {
             <AlertDialogAction
               onClick={() => {
                 if (projectToDelete) {
-                  console.log("Initiating force delete for project:", projectToDelete);
+                  // console.log("Initiating force delete for project:", projectToDelete);
                   handleDelete(projectToDelete, true);
                 }
               }}

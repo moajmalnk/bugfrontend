@@ -78,7 +78,7 @@ const Users = () => {
         throw new Error(data.message || "Failed to fetch users");
       }
     } catch (error) {
-      console.error("Error:", error);
+      // console.error("Error:", error);
       toast({
         title: "Error",
         description: "Failed to load users. Please try again.",
@@ -177,7 +177,7 @@ const Users = () => {
         throw new Error(data.message || "Failed to delete user");
       }
     } catch (error) {
-      console.error("Error:", error);
+      // console.error("Error:", error);
       toast({
         title: "Error",
         description: "Failed to delete user. Please try again.",

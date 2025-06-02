@@ -185,7 +185,7 @@ const FixBug = () => { // Changed component name
                 throw new Error(data.message || "Failed to update bug status");
             }
         } catch (error) {
-            console.error("Error updating bug:", error);
+            // // console.error("Error updating bug:", error);
             toast({
                 title: "Error",
                 description:

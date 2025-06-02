@@ -139,7 +139,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
 
       setOpen(false);
     } catch (error) {
-      console.error("Failed to update bug:", error);
+      // console.error("Failed to update bug:", error);
       toast({
         title: "Error",
         description: "Failed to update bug. Please try again.",

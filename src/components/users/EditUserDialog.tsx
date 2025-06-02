@@ -120,7 +120,7 @@ export function EditUserDialog({
       setOpen(false);
       // window.location.reload(); // Commented out to prevent reload
     } catch (error: any) {
-      console.error("Error updating user:", error);
+      // console.error("Error updating user:", error);
       let errorMessage = "Failed to update the user. Please try again.";
       if (error.message && (error.message.includes("Username already taken") || error.message.includes("Email already in use"))) {
         errorMessage = error.message;

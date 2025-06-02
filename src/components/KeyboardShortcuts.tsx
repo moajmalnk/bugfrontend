@@ -8,7 +8,7 @@ export function KeyboardShortcuts() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // console.log('Key pressed:', e.key, 'Code:', e.code, 'Shift:', e.shiftKey, 'Ctrl:', e.ctrlKey);
+      // // console.log('Key pressed:', e.key, 'Code:', e.code, 'Shift:', e.shiftKey, 'Ctrl:', e.ctrlKey);
       if (e.ctrlKey && (e.key === "b" || e.key === "B")) {
         e.preventDefault();
         navigate("/bugs/new", { state: { from: window.location.pathname } });
@@ -19,10 +19,10 @@ export function KeyboardShortcuts() {
       }
       if (e.shiftKey && e.code === "Space") {
         e.preventDefault();
-        // console.log('Shift+Space pressed. Toggling theme.');
-        // console.log('Current theme before toggle:', theme);
+        // // console.log('Shift+Space pressed. Toggling theme.');
+        // // console.log('Current theme before toggle:', theme);
         setTheme(theme === "dark" ? "light" : "dark");
-        // console.log('Theme toggled.');
+        // // console.log('Theme toggled.');
       }
       // Shortcut for Settings: Ctrl + Shift + S
       if (e.ctrlKey && e.shiftKey && (e.key === "s" || e.key === "S")) {

@@ -80,7 +80,7 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
       });
       onDelete?.();
     } catch (error) {
-      console.error('Error deleting bug:', error);
+      // console.error('Error deleting bug:', error);
       toast({
         title: "Error",
         description: "Failed to delete bug",
