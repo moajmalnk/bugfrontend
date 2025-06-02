@@ -1,7 +1,33 @@
 // Environment configuration
-export const ENV = {
-  API_URL: import.meta.env.VITE_API_URL || 'https://bugbackend.moajmalnk.in/api',
+const isLocalhost = typeof window !== 'undefined' && 
+  (window.location.hostname === 'localhost' || 
+   window.location.hostname === '127.0.0.1' ||
+   window.location.hostname.includes('localhost'));
+
+const getApiUrl = () => {
+  // Check for environment variable first
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // Auto-detect based on current URL
+  if (isLocalhost) {
+    return 'http://localhost/Bugricer/backend/api';
+  }
+  
+  // Production fallback
+  return 'https://bugbackend.moajmalnk.in/api';
 };
+
+export const ENV = {
+  API_URL: getApiUrl(),
+};
+
+// Log the current environment for debugging
+if (typeof window !== 'undefined') {
+  console.log('Environment detected:', isLocalhost ? 'Local' : 'Production');
+  console.log('API URL:', ENV.API_URL);
+}
 
 // Validate required environment variables
 export const validateEnv = () => {

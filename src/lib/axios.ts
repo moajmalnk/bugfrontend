@@ -1,11 +1,10 @@
 import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:80/api';
+import { ENV } from './env';
 
 export const apiClient = axios.create({
-  baseURL: API_URL,
+  baseURL: ENV.API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true
+  withCredentials: false // Changed to false to avoid CORS issues
 }); 
