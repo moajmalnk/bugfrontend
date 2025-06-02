@@ -18,8 +18,9 @@ interface UpdateUserData {
 interface UserStats {
   total_projects: number;
   total_bugs: number;
+  total_fixes?: number; // Optional for developers/admins
   recent_activity: Array<{ // Define the structure for recent activity items
-    type: string; // e.g., 'bug', 'code'
+    type: string; // e.g., 'bug', 'fix'
     title: string;
     created_at: string; // ISO date string
   }>;

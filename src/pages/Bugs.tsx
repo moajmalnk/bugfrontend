@@ -21,7 +21,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { bugService } from "@/services/bugService";
 import { Bug } from "@/types";
-import { Bug as BugIcon, Filter, Plus } from "lucide-react";
+import { Bug as BugIcon, Filter, Lock, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -56,27 +56,44 @@ const Bugs = () => {
   const { currentUser } = useAuth();
   const [bugs, setBugs] = useState<Bug[]>([]);
   const [loading, setLoading] = useState(true);
+  const [skeletonLoading, setSkeletonLoading] = useState(true); // Added for skeleton loading effect
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Fetch bugs when component mounts
     fetchBugs();
   }, []);
 
   const fetchBugs = async () => {
     try {
       setLoading(true);
+      setSkeletonLoading(true); // Ensure skeleton is showing while fetching
+      setAccessError(null);
+      
       const data = await bugService.getBugs();
       setBugs(data);
-    } catch (error) {
+      
+      // Turn off skeleton loading when we have data
+      setSkeletonLoading(false);
+    } catch (error: any) {
       console.error("Error fetching bugs:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load bugs. Please try again.",
-        variant: "destructive",
-      });
+      if (error.message?.includes("access")) {
+        setAccessError("You don't have access to any projects");
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to load bugs. Please try again.",
+          variant: "destructive",
+        });
+      }
+      setBugs([]);
+      
+      // Turn off skeleton loading even on error
+      setSkeletonLoading(false);
     } finally {
       setLoading(false);
     }
@@ -125,6 +142,51 @@ const Bugs = () => {
     </div>
   );
 
+  // Content to display when no bugs are found
+  const renderEmptyState = () => {
+    if (accessError) {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-background/50 p-6 sm:p-8 text-center mt-8">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
+            <Lock className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="mt-4 text-base sm:text-lg font-semibold">
+            No Access
+          </h3>
+          <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-[300px]">
+            {accessError}. You need to be a member of a project to view its bugs.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-background/50 p-6 sm:p-8 text-center mt-8">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
+          <BugIcon className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <h3 className="mt-4 text-base sm:text-lg font-semibold">
+          No bugs found
+        </h3>
+        <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-[300px]">
+          No bugs match your current filter criteria.
+        </p>
+        {(currentUser?.role === "admin" ||
+          currentUser?.role === "tester") && (
+          <Button
+            className="mt-5 h-9 text-xs sm:text-sm"
+            asChild
+            aria-label="Report a new bug"
+          >
+            <Link to="/bugs/new" state={{ from: "/bugs" }}>
+              Report Bug
+            </Link>
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
       <section className="max-w-6xl mx-auto space-y-4">
@@ -149,7 +211,7 @@ const Bugs = () => {
           )}
 
           {/* Total Bugs Count */}
-          {!loading && bugs.length > 0 && (
+          {!skeletonLoading && !loading && bugs.length > 0 && (
             <div className="flex items-center border rounded-md px-3 py-1 bg-blue-50">
               <BugIcon className="h-4 w-4 text-blue-500 mr-2" />
               <span className="text-sm font-medium text-blue-700">
@@ -167,6 +229,7 @@ const Bugs = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-background/50 h-9 text-xs sm:text-sm"
             aria-label="Search bugs"
+            disabled={(bugs.length === 0 && !loading) || skeletonLoading}
           />
 
           {/* Mobile Filter Button */}
@@ -177,6 +240,7 @@ const Bugs = () => {
                   variant="outline"
                   className="w-full h-9 text-xs bg-background/50"
                   aria-label="Open filters"
+                  disabled={(bugs.length === 0 && !loading) || skeletonLoading}
                 >
                   <Filter className="h-3.5 w-3.5 mr-2" />
                   Filters
@@ -203,7 +267,7 @@ const Bugs = () => {
         </div>
 
         {/* Bugs List with Loading Skeletons */}
-        {loading ? (
+        {skeletonLoading ? (
           <div
             className="grid gap-4 mt-4 grid-cols-1"
             aria-busy="true"
@@ -216,30 +280,21 @@ const Bugs = () => {
                 <BugCardSkeleton key={index} />
               ))}
           </div>
-        ) : filteredBugs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-background/50 p-6 sm:p-8 text-center mt-8">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
-              <BugIcon className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <h3 className="mt-4 text-base sm:text-lg font-semibold">
-              No bugs found
-            </h3>
-            <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-[300px]">
-              No bugs match your current filter criteria.
-            </p>
-            {(currentUser?.role === "admin" ||
-              currentUser?.role === "tester") && (
-              <Button
-                className="mt-5 h-9 text-xs sm:text-sm"
-                asChild
-                aria-label="Report a new bug"
-              >
-                <Link to="/bugs/new" state={{ from: "/bugs" }}>
-                  Report Bug
-                </Link>
-              </Button>
-            )}
+        ) : loading ? (
+          <div
+            className="grid gap-4 mt-4 grid-cols-1"
+            aria-busy="true"
+            aria-label="Loading bug list"
+          >
+            {/* Display multiple skeleton cards while loading */}
+            {Array(2)
+              .fill(0)
+              .map((_, index) => (
+                <BugCardSkeleton key={index} />
+              ))}
           </div>
+        ) : filteredBugs.length === 0 ? (
+          renderEmptyState()
         ) : (
           <div
             className="grid gap-4 mt-4 grid-cols-1"

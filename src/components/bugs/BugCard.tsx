@@ -9,6 +9,7 @@ import { projectService } from '@/services/projectService';
 import { userService } from '@/services/userService';
 import { bugService } from '@/services/bugService';
 import { toast } from '@/components/ui/use-toast';
+import { useAuth } from '@/context/AuthContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +28,7 @@ interface Bug {
   priority: 'high' | 'medium' | 'low';
   status: 'pending' | 'in_progress' | 'fixed' | 'declined' | 'rejected';
   project_id: string;
+  project_name?: string;
   reported_by: string;
   created_at: string;
 }
@@ -51,10 +53,22 @@ const statusColors = {
 };
 
 export function BugCard({ bug, onDelete }: BugCardProps) {
+  const { currentUser } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const location = useLocation();
   const isFromProject = location.pathname.startsWith('/projects/');
+
+  const canDelete = currentUser?.role === 'admin' || currentUser?.id === bug.reported_by;
+
+  const handleDeleteClick = () => {
+    if (canDelete) {
+      setShowDeleteDialog(true);
+    } else {
+      setShowPermissionDialog(true);
+    }
+  };
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -99,9 +113,17 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
               {(bug.status || 'pending').replace('_', ' ')}
             </Badge>
           </div>
-          <p className="text-xs sm:text-sm text-muted-foreground truncate">
-            Created {formatDistanceToNow(parseISO(bug.created_at), { addSuffix: true })}
-          </p>
+          
+          <div className="flex flex-col gap-1">
+            {bug.project_name && !isFromProject && (
+              <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">
+                Project: {bug.project_name}
+              </p>
+            )}
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">
+              Created {formatDistanceToNow(parseISO(bug.created_at), { addSuffix: true })}
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
@@ -113,22 +135,25 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
               View Details
             </Link>
           </Button>
-          <Button 
-            variant="destructive" 
-            size="sm"
-            className="text-xs sm:text-sm px-3 py-1"
-            onClick={() => setShowDeleteDialog(true)}
-            disabled={isDeleting}
-          >
-            Delete
-          </Button>
+          
+          {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
+            <Button 
+              variant="destructive" 
+              size="sm"
+              className="text-xs sm:text-sm px-3 py-1"
+              onClick={handleDeleteClick}
+              disabled={isDeleting}
+            >
+              Delete
+            </Button>
+          )}
         </div>
       </Card>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="sm:max-w-[425px]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Bug?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the bug and all its associated data.
             </AlertDialogDescription>
@@ -140,6 +165,30 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
+        <AlertDialogContent className="sm:max-w-[425px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permission Denied</AlertDialogTitle>
+            <AlertDialogDescription>
+              You don't have permission to delete this bug. Only the bug reporter and administrators can delete bugs.
+              
+              <div className="mt-4 bg-muted p-3 rounded-md text-sm">
+                <p className="font-medium mb-2">Who can delete bugs:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>The tester who originally reported the bug</li>
+                  <li>System administrators</li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowPermissionDialog(false)}>
+              Understood
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

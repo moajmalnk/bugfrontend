@@ -294,11 +294,24 @@ export default function Profile() {
                     {userStats.total_projects > 0 ? userStats.total_projects : <span className="text-muted-foreground text-base">No projects</span>}
                   </p>
                 </div>
+                
+                {/* Role-based statistics */}
                 <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
-                  <p className="text-xs text-muted-foreground mb-1">Total Bugs</p>
-                  <p className="text-2xl font-bold">
-                    {userStats.total_bugs > 0 ? userStats.total_bugs : <span className="text-muted-foreground text-base">No bugs</span>}
-                  </p>
+                  {(currentUser?.role === "tester" || currentUser?.role === "admin") ? (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-1">Total Bugs</p>
+                      <p className="text-2xl font-bold">
+                        {userStats.total_bugs > 0 ? userStats.total_bugs : <span className="text-muted-foreground text-base">No bugs</span>}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-1">Total Fixes</p>
+                      <p className="text-2xl font-bold">
+                        {userStats.total_fixes > 0 ? userStats.total_fixes : <span className="text-muted-foreground text-base">No fixes</span>}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
@@ -355,14 +368,28 @@ export default function Profile() {
         {/* Recent Activity Section */}
         <Card className="md:col-span-3">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle>
+              {(currentUser?.role === "tester" || currentUser?.role === "admin") 
+                ? "Bugs Recent Activity" 
+                : "Fixes Recent Activity"
+              }
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingStats ? (
               <RecentActivitySkeleton />
             ) : userStats?.recent_activity && userStats.recent_activity.length > 0 ? (
               <div className="space-y-2">
-                 {userStats.recent_activity.map((activity, index) => (
+                 {userStats.recent_activity
+                   .filter((activity) => {
+                     // Filter activities based on user role
+                     if (currentUser?.role === "tester" || currentUser?.role === "admin") {
+                       return activity.type === "bug"; // Show only bug activities
+                     } else {
+                       return activity.type === "fix"; // Show only fix activities
+                     }
+                   })
+                   .map((activity, index) => (
                     <div
                       key={index}
                       className="flex items-start gap-2 text-sm break-words"
@@ -384,7 +411,12 @@ export default function Profile() {
                   ))}
               </div>
             ) : (
-               <div className="text-muted-foreground text-center">No recent activity to display.</div>
+               <div className="text-muted-foreground text-center">
+                 {(currentUser?.role === "tester" || currentUser?.role === "admin") 
+                   ? "No recent bug activity to display." 
+                   : "No recent fix activity to display."
+                 }
+               </div>
             )}
           </CardContent>
         </Card>

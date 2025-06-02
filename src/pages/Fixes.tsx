@@ -14,8 +14,8 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Bug, CheckCircle, Search, Plus, Filter } from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, Bug, CheckCircle, Search, Plus, Filter, Lock } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Select,
@@ -96,21 +96,52 @@ const Fixes = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [skeletonLoading, setSkeletonLoading] = useState(true);
+  const [bugs, setBugs] = useState<BugType[]>([]);
+
+  useEffect(() => {
+    // No timer needed, skeleton loading will be controlled by query status
+  }, []);
 
   // Fetch all bugs
   const {
-    data: bugs,
+    data,
     isLoading,
     error,
   } = useQuery<BugType[]>({
     queryKey: ["bugs"],
     queryFn: () => bugService.getBugs(),
+    retry: (failureCount, error: any) => {
+      // Don't retry on access errors
+      if (error?.message?.includes('access') || error?.message?.includes('permission')) {
+        return false;
+      }
+      return failureCount < 3;
+    }
   });
 
-  // Filter bugs to show only the fixed ones
+  // Update bugs state when data changes
+  useEffect(() => {
+    if (data) {
+      setBugs(data);
+      // Turn off skeleton loading when data is available
+      setSkeletonLoading(false);
+    }
+    
+    // Also turn off skeleton loading when there's an error
+    if (error) {
+      setSkeletonLoading(false);
+    }
+  }, [data, error]);
+
+  const hasAccessError = error && (
+    (error as Error).message?.includes('access') || 
+    (error as Error).message?.includes('permission') ||
+    (error as Error).message?.includes('403')
+  );
+
   const fixedBugs = bugs?.filter((bug) => bug.status === "fixed") || [];
 
-  // Filter by search term and priority
   const filteredBugs = fixedBugs.filter(
     (bug) =>
       (bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -123,7 +154,6 @@ const Fixes = () => {
   console.log("Fixed Bugs:", fixedBugs);
   console.log("Filtered Bugs:", filteredBugs);
 
-  // Determine priorities colors
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "high":
@@ -137,7 +167,6 @@ const Fixes = () => {
     }
   };
 
-  // Format date helper
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -162,7 +191,35 @@ const Fixes = () => {
     </div>
   );
 
-  if (error) {
+  const renderEmptyState = () => {
+    if (hasAccessError) {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Lock className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="mt-4 text-lg font-semibold">No Access</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            You don't have access to any projects. You need to be a member of a project to view fixed bugs.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+          <AlertCircle className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <h3 className="mt-4 text-lg font-semibold">No Fixed Bugs</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          No bugs have been fixed yet.
+        </p>
+      </div>
+    );
+  };
+
+  if (error && !hasAccessError && !skeletonLoading) {
     toast({
       title: "Error",
       description: "Failed to load fixed bugs. Please try again.",
@@ -173,9 +230,7 @@ const Fixes = () => {
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-4 py-6 sm:px-6 md:px-8 lg:px-10">
       <section className="max-w-7xl mx-auto space-y-6 md:space-y-8">
-        {/* Header: Fix Bugs Button and Fixed Bugs Count */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 md:gap-6">
-          {/* Fix Bugs Button */}
           {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
             <Button
               variant="default"
@@ -189,8 +244,7 @@ const Fixes = () => {
             </Button>
           )}
 
-          {/* Fixed Bugs Count */}
-          {!isLoading && fixedBugs.length > 0 && (
+          {!skeletonLoading && !isLoading && fixedBugs.length > 0 && (
             <div className="flex items-center border rounded-md px-4 py-2 bg-green-50">
               <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
               <span className="text-sm font-medium text-green-700">
@@ -200,7 +254,6 @@ const Fixes = () => {
           )}
         </div>
 
-        {/* Search and Filters Section */}
         <div className="space-y-4 md:space-y-6">
           <div className="relative">
             <Input
@@ -209,11 +262,11 @@ const Fixes = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-background/50 h-10 text-sm pl-10"
               aria-label="Search fixed bugs"
+              disabled={skeletonLoading || hasAccessError || (fixedBugs.length === 0 && !isLoading)}
             />
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
 
-          {/* Mobile Filter Button */}
           <div className="block md:hidden">
             <Sheet
               open={isFilterSheetOpen}
@@ -224,6 +277,7 @@ const Fixes = () => {
                   variant="outline"
                   className="w-full h-10 text-sm bg-background/50"
                   aria-label="Open filters"
+                  disabled={skeletonLoading || hasAccessError || (fixedBugs.length === 0 && !isLoading)}
                 >
                   <Filter className="h-4 w-4 mr-2" />
                   Filters
@@ -243,14 +297,12 @@ const Fixes = () => {
             </Sheet>
           </div>
 
-          {/* Desktop Filters */}
           <div className="hidden md:flex gap-4">
             <FilterControls />
           </div>
         </div>
 
-        {/* Content Section */}
-        {isLoading ? (
+        {skeletonLoading ? (
           <>
             {/* Table skeleton for desktop */}
             <div className="hidden md:block rounded-md border overflow-x-auto">
@@ -284,19 +336,44 @@ const Fixes = () => {
                 ))}
             </div>
           </>
-        ) : filteredBugs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <AlertCircle className="h-6 w-6 text-muted-foreground" />
+        ) : isLoading ? (
+          <>
+            {/* Table skeleton for desktop */}
+            <div className="hidden md:block rounded-md border overflow-x-auto">
+              <Table className="min-w-[800px] w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[120px]">Bug ID</TableHead>
+                    <TableHead className="w-[250px]">Title</TableHead>
+                    <TableHead className="w-[100px]">Priority</TableHead>
+                    <TableHead className="w-[150px]">Reported By</TableHead>
+                    <TableHead className="w-[120px]">Fixed Date</TableHead>
+                    <TableHead className="w-[100px] text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array(3)
+                    .fill(0)
+                    .map((_, index) => (
+                      <TableRowSkeleton key={index} />
+                    ))}
+                </TableBody>
+              </Table>
             </div>
-            <h3 className="mt-4 text-lg font-semibold">No Fixed Bugs</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              No bugs have been fixed yet.
-            </p>
-          </div>
+
+            {/* Card skeleton for mobile and tablet */}
+            <div className="md:hidden space-y-4">
+              {Array(2)
+                .fill(0)
+                .map((_, index) => (
+                  <CardSkeleton key={index} />
+                ))}
+            </div>
+          </>
+        ) : hasAccessError || filteredBugs.length === 0 ? (
+          renderEmptyState()
         ) : (
           <>
-            {/* Table for md and up */}
             <div className="hidden md:block rounded-md border overflow-x-auto">
               <Table className="min-w-[800px] w-full">
                 <TableHeader>
@@ -344,7 +421,6 @@ const Fixes = () => {
               </Table>
             </div>
 
-            {/* Card list for mobile and tablet */}
             <div className="md:hidden space-y-4">
               {filteredBugs.map((bug) => (
                 <div

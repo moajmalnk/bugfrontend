@@ -12,8 +12,9 @@ import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { format } from "date-fns";
+import { Lock } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -104,11 +105,31 @@ const BugDetailsSkeleton = () => (
   </div>
 );
 
+// Component to display access error
+const AccessError = () => (
+  <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8">
+    <section className="max-w-7xl mx-auto space-y-8 flex flex-col items-center justify-center text-center py-12">
+      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+        <Lock className="h-10 w-10 text-muted-foreground" />
+      </div>
+      <h1 className="text-2xl font-bold tracking-tight">Access Denied</h1>
+      <p className="text-muted-foreground max-w-md">
+        You don't have permission to view this bug. You need to be a member of the project this bug belongs to.
+      </p>
+    </section>
+  </main>
+);
+
 const BugDetails = () => {
   const { bugId } = useParams();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
+  const [skeletonLoading, setSkeletonLoading] = useState(true);
+
+  useEffect(() => {
+    // No timer needed, skeleton loading will be controlled by query status
+  }, []);
 
   const {
     data: bug,
@@ -118,6 +139,9 @@ const BugDetails = () => {
   } = useQuery({
     queryKey: ["bug", bugId],
     queryFn: async () => {
+      // Set skeleton loading when starting to fetch data
+      setSkeletonLoading(true);
+      
       const token = localStorage.getItem("token");
       const response = await axios.get<ApiResponse<Bug>>(
         `${ENV.API_URL}/bugs/get.php?id=${bugId}`,
@@ -136,35 +160,55 @@ const BugDetails = () => {
 
   useEffect(() => {
     refetch();
-  }, [bugId, refetch]);
+    
+    // Turn off skeleton loading when we have bug data or an error
+    if (bug || error) {
+      setSkeletonLoading(false);
+    }
+  }, [bugId, refetch, bug, error]);
 
-  if (isLoading) {
-    return (
-      <main
-        className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8"
-        aria-busy="true"
-        aria-label="Loading bug details"
-      >
-        <section className="max-w-7xl mx-auto space-y-8">
-          <header>
-            <BugHeaderSkeleton />
-          </header>
+  // Check if this is an access error
+  const isAccessError = error && (
+    (error as Error).message?.toLowerCase().includes('access') || 
+    (error as Error).message?.toLowerCase().includes('permission') || 
+    (error as Error).message?.toLowerCase().includes('forbidden') ||
+    (error as Error).message?.toLowerCase().includes('403')
+  );
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content - Description and Screenshots Skeletons */}
-            <section className="lg:col-span-2 space-y-8">
-              <BugDescriptionSkeleton />
-              <BugScreenshotsSkeleton />
-            </section>
+  // Function to render skeleton UI
+  const renderSkeleton = () => (
+    <main
+      className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8"
+      aria-busy="true"
+      aria-label="Loading bug details"
+    >
+      <section className="max-w-7xl mx-auto space-y-8">
+        <header>
+          <BugHeaderSkeleton />
+        </header>
 
-            {/* Sidebar - Bug Details Skeleton */}
-            <aside className="space-y-8">
-              <BugDetailsSkeleton />
-            </aside>
-          </div>
-        </section>
-      </main>
-    );
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content - Description and Screenshots Skeletons */}
+          <section className="lg:col-span-2 space-y-8">
+            <BugDescriptionSkeleton />
+            <BugScreenshotsSkeleton />
+          </section>
+
+          {/* Sidebar - Bug Details Skeleton */}
+          <aside className="space-y-8">
+            <BugDetailsSkeleton />
+          </aside>
+        </div>
+      </section>
+    </main>
+  );
+
+  if (skeletonLoading || isLoading) {
+    return renderSkeleton();
+  }
+
+  if (isAccessError) {
+    return <AccessError />;
   }
 
   if (error || !bug) {
