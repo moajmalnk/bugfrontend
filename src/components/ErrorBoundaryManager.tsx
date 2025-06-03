@@ -45,12 +45,12 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
   const { logout, currentUser } = useAuth();
 
   // Constants - TEMPORARY SHORTER TIMEOUTS FOR TESTING
-  const INACTIVITY_TIMEOUT = 30 * 1000; // 30 seconds (normally 5 minutes)
-  const INACTIVITY_WARNING = 20 * 1000; // 20 seconds (normally 4 minutes)
+//   const INACTIVITY_TIMEOUT = 30 * 1000; // 30 seconds (normally 5 minutes)
+//   const INACTIVITY_WARNING = 20 * 1000; // 20 seconds (normally 4 minutes)
   
 //   PRODUCTION TIMEOUTS (uncomment these and comment above for production):
-//   const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-//   const INACTIVITY_WARNING = 4 * 60 * 1000; // 4 minutes
+  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  const INACTIVITY_WARNING = 4 * 60 * 1000; // 4 minutes
   
   const VERSION_CHECK_INTERVAL = 30 * 1000; // 30 seconds
   const NETWORK_CHECK_INTERVAL = 10 * 1000; // 10 seconds
