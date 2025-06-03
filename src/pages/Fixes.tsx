@@ -231,74 +231,97 @@ const Fixes = () => {
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
       <section className="max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 md:gap-6">
-          {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
-            <Button
-              variant="default"
-              asChild
-              className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
-              aria-label="Fix a bug"
-            >
-              <Link to="/bugs/" className="flex items-center justify-center">
-                <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Fix Bugs
-              </Link>
-            </Button>
-          )}
+          {skeletonLoading ? (
+            <>
+              <Skeleton className="h-9 sm:h-10 w-full sm:w-32 md:w-28 lg:w-32 rounded-md" />
+              <Skeleton className="h-7 sm:h-8 w-full sm:w-40 md:w-36 lg:w-40 rounded-md" />
+            </>
+          ) : (
+            <>
+              {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                <Button
+                  variant="default"
+                  asChild
+                  className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
+                  aria-label="Fix a bug"
+                >
+                  <Link to="/bugs/" className="flex items-center justify-center">
+                    <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Fix Bugs
+                  </Link>
+                </Button>
+              )}
 
-          {!skeletonLoading && !isLoading && fixedBugs.length > 0 && (
-            <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-green-50">
-              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 mr-2" />
-              <span className="text-xs sm:text-sm font-medium text-green-700">
-                {fixedBugs.length} Issues Fixed
-              </span>
-            </div>
+              {!isLoading && fixedBugs.length > 0 && (
+                <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-green-50">
+                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 mr-2" />
+                  <span className="text-xs sm:text-sm font-medium text-green-700">
+                    {fixedBugs.length} Issues Fixed
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         <div className="space-y-3 sm:space-y-4 md:space-y-6">
           <div className="relative">
-            <Input
-              placeholder="Search fixed bugs..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-background/50 h-9 sm:h-10 text-sm pl-9 sm:pl-10"
-              aria-label="Search fixed bugs"
-              disabled={skeletonLoading || hasAccessError || (fixedBugs.length === 0 && !isLoading)}
-            />
-            <Search className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+            {skeletonLoading ? (
+              <Skeleton className="w-full h-9 sm:h-10 md:h-10 rounded-md" />
+            ) : (
+              <Input
+                placeholder="Search fixed bugs..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-background/50 h-9 sm:h-10 text-sm pl-9 sm:pl-10"
+                aria-label="Search fixed bugs"
+                disabled={hasAccessError || (fixedBugs.length === 0 && !isLoading)}
+              />
+            )}
+            {!skeletonLoading && (
+              <Search className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+            )}
           </div>
 
           <div className="block lg:hidden">
-            <Sheet
-              open={isFilterSheetOpen}
-              onOpenChange={setIsFilterSheetOpen}
-            >
-              <SheetTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full h-9 sm:h-10 text-sm bg-background/50"
-                  aria-label="Open filters"
-                  disabled={skeletonLoading || hasAccessError || (fixedBugs.length === 0 && !isLoading)}
-                >
-                  <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
-                  Filters
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[50vh] px-4 py-6">
-                <SheetHeader className="mb-6">
-                  <SheetTitle className="text-lg">Filters</SheetTitle>
-                  <SheetDescription className="text-sm">
-                    Apply filters to find specific fixed bugs
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="space-y-4">
-                  <FilterControls />
-                </div>
-              </SheetContent>
-            </Sheet>
+            {skeletonLoading ? (
+              <Skeleton className="w-full h-9 sm:h-10 md:h-10 rounded-md" />
+            ) : (
+              <Sheet
+                open={isFilterSheetOpen}
+                onOpenChange={setIsFilterSheetOpen}
+              >
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full h-9 sm:h-10 text-sm bg-background/50"
+                    aria-label="Open filters"
+                    disabled={hasAccessError || (fixedBugs.length === 0 && !isLoading)}
+                  >
+                    <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
+                    Filters
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-[50vh] px-4 py-6">
+                  <SheetHeader className="mb-6">
+                    <SheetTitle className="text-lg">Filters</SheetTitle>
+                    <SheetDescription className="text-sm">
+                      Apply filters to find specific fixed bugs
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="space-y-4">
+                    <FilterControls />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
           </div>
 
           <div className="hidden lg:flex gap-4">
-            <FilterControls />
+            {skeletonLoading ? (
+              <Skeleton className="h-9 w-full sm:w-44 md:w-40 lg:w-44 rounded-md" />
+            ) : (
+              <FilterControls />
+            )}
           </div>
         </div>
 

@@ -2,24 +2,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Trash2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { useState, useEffect } from 'react';
-import { projectService } from '@/services/projectService';
-import { userService } from '@/services/userService';
-import { bugService } from '@/services/bugService';
-import { toast } from '@/components/ui/use-toast';
-import { useAuth } from '@/context/AuthContext';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 interface Bug {
   id: string;
@@ -53,146 +37,151 @@ const statusColors = {
 };
 
 export function BugCard({ bug, onDelete }: BugCardProps) {
-  const { currentUser, isLoading } = useAuth();
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const location = useLocation();
   const isFromProject = location.pathname.startsWith('/projects/');
 
-  const canDelete = currentUser?.role === 'admin' || currentUser?.id === bug.reported_by;
-
-  const handleDeleteClick = () => {
-    if (canDelete) {
-      setShowDeleteDialog(true);
-    } else {
-      setShowPermissionDialog(true);
-    }
-  };
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    try {
-      await bugService.deleteBug(bug.id);
-      toast({
-        title: "Success",
-        description: "Bug deleted successfully",
-      });
-      onDelete?.();
-    } catch (error) {
-      // console.error('Error deleting bug:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete bug",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteDialog(false);
-    }
-  };
-
   return (
-    <>
-      <Card className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 hover:shadow-md transition-shadow">
-        <div className="flex-1 min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-medium text-base sm:text-lg break-words whitespace-pre-line w-full">
-              {bug.title || 'Untitled Bug'}
-            </h4>
-            <Badge 
-              variant="outline" 
-              className={`text-xs ${priorityColors[bug.priority] || priorityColors.medium}`}
-            >
-              {bug.priority || 'medium'}
-            </Badge>
-            <Badge 
-              variant="outline" 
-              className={`text-xs ${statusColors[bug.status] || statusColors.pending}`}
-            >
-              {(bug.status || 'pending').replace('_', ' ')}
-            </Badge>
-          </div>
-          
-          <div className="flex flex-col gap-1">
-            {bug.project_name && !isFromProject && (
-              <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">
-                Project: {bug.project_name}
-              </p>
-            )}
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">
-              Created {formatDistanceToNow(parseISO(bug.created_at), { addSuffix: true })}
+    <Card className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 hover:shadow-md transition-shadow">
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="font-medium text-base sm:text-lg break-words whitespace-pre-line w-full">
+            {bug.title || 'Untitled Bug'}
+          </h4>
+          <Badge 
+            variant="outline" 
+            className={`text-xs ${priorityColors[bug.priority] || priorityColors.medium}`}
+          >
+            {bug.priority || 'medium'}
+          </Badge>
+          <Badge 
+            variant="outline" 
+            className={`text-xs ${statusColors[bug.status] || statusColors.pending}`}
+          >
+            {(bug.status || 'pending').replace('_', ' ')}
+          </Badge>
+        </div>
+        
+        <div className="flex flex-col gap-1">
+          {bug.project_name && !isFromProject && (
+            <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">
+              Project: {bug.project_name}
             </p>
+          )}
+          <p className="text-xs sm:text-sm text-muted-foreground truncate">
+            Created {formatDistanceToNow(parseISO(bug.created_at), { addSuffix: true })}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
+        <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm px-3 py-1">
+          <Link 
+            to={`/bugs/${bug.id}`}
+            state={{ from: isFromProject ? 'project' : 'bugs' }}
+          >
+            View Details
+          </Link>
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+// BugCard Skeleton Component
+export function BugCardSkeleton() {
+  return (
+    <Card className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 hover:shadow-md transition-shadow">
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Title Skeleton */}
+          <Skeleton className="h-5 sm:h-6 w-full max-w-[300px] sm:max-w-[400px]" />
+          {/* Priority Badge Skeleton */}
+          <Skeleton className="h-5 w-16 rounded-full" />
+          {/* Status Badge Skeleton */}
+          <Skeleton className="h-5 w-20 rounded-full" />
+        </div>
+        
+        <div className="flex flex-col gap-1">
+          {/* Project Name Skeleton (conditional) */}
+          <Skeleton className="h-4 w-32 sm:w-40" />
+          {/* Created Date Skeleton */}
+          <Skeleton className="h-3 sm:h-4 w-28 sm:w-36" />
+        </div>
+      </div>
+
+      {/* Action Buttons Skeleton */}
+      <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
+        <Skeleton className="h-7 sm:h-8 w-20 sm:w-24" />
+      </div>
+    </Card>
+  );
+}
+
+// Advanced BugCard Skeleton with more detailed placeholders
+export function BugCardSkeletonDetailed() {
+  return (
+    <Card className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 hover:shadow-md transition-shadow animate-pulse">
+      <div className="flex-1 min-w-0 space-y-3">
+        {/* Header Row with Title and Badges */}
+        <div className="flex flex-wrap items-start gap-2">
+          <div className="w-full space-y-2">
+            {/* Main Title */}
+            <Skeleton className="h-5 sm:h-6 w-full max-w-[280px] sm:max-w-[380px]" />
+            {/* Secondary line for longer titles */}
+            <Skeleton className="h-4 w-3/4 max-w-[200px] sm:max-w-[250px]" />
+          </div>
+          
+          {/* Badges Row */}
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Skeleton className="h-5 w-14 rounded-full" />
+            <Skeleton className="h-5 w-18 rounded-full" />
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
-          <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm px-3 py-1">
-            <Link 
-              to={`/bugs/${bug.id}`}
-              state={{ from: isFromProject ? 'project' : 'bugs' }}
-            >
-              View Details
-            </Link>
-          </Button>
-          
-          {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
-            <Button 
-              variant="destructive" 
-              size="sm"
-              className="text-xs sm:text-sm px-3 py-1"
-              onClick={handleDeleteClick}
-              disabled={isDeleting}
-            >
-              Delete
-            </Button>
-          )}
+        
+        {/* Meta Information */}
+        <div className="flex flex-col gap-1.5">
+          {/* Project Name (when not from project page) */}
+          <div className="flex items-center gap-1">
+            <Skeleton className="h-3 w-12" />
+            <Skeleton className="h-3 w-24 sm:w-32" />
+          </div>
+          {/* Created Date */}
+          <Skeleton className="h-3 sm:h-4 w-32 sm:w-40" />
         </div>
-      </Card>
+      </div>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="sm:max-w-[425px]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Bug?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the bug and all its associated data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-            <AlertDialogCancel className="mt-0">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Action Buttons Section */}
+      <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4 min-w-fit">
+        <Skeleton className="h-7 sm:h-8 w-20 sm:w-24 flex-shrink-0" />
+      </div>
+    </Card>
+  );
+}
 
-      <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
-        <AlertDialogContent className="sm:max-w-[425px]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Permission Denied</AlertDialogTitle>
-            <AlertDialogDescription>
-              You don't have permission to delete this bug. Only the bug reporter and administrators can delete bugs.
-              
-              <div className="mt-4 bg-muted p-3 rounded-md text-sm">
-                <p className="font-medium mb-2">Who can delete bugs:</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>The tester who originally reported the bug</li>
-                  <li>System administrators</li>
-                </ul>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowPermissionDialog(false)}>
-              Understood
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+// Responsive Grid Skeleton for multiple bug cards
+export function BugCardGridSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="grid gap-4 grid-cols-1" aria-busy="true" aria-label="Loading bug list">
+      {Array(count).fill(0).map((_, index) => (
+        <BugCardSkeleton key={index} />
+      ))}
+    </div>
+  );
+}
+
+// Enhanced Grid Skeleton with staggered animation
+export function BugCardGridSkeletonAnimated({ count = 3 }: { count?: number }) {
+  return (
+    <div className="grid gap-4 grid-cols-1" aria-busy="true" aria-label="Loading bug list">
+      {Array(count).fill(0).map((_, index) => (
+        <div
+          key={index}
+          className="animate-in fade-in duration-300"
+          style={{ animationDelay: `${index * 100}ms` }}
+        >
+          <BugCardSkeletonDetailed />
+        </div>
+      ))}
+    </div>
   );
 }

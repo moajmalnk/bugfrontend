@@ -1,6 +1,6 @@
 import { BugContentCards } from "@/components/bugs/details/BugContentCards";
 import { BugDetailsCard } from "@/components/bugs/details/BugDetailsCard";
-import { BugHeader } from "@/components/bugs/details/BugHeader";
+import { BugHeader, BugHeaderSkeletonDetailed } from "@/components/bugs/details/BugHeader";
 import { BugNotFound } from "@/components/bugs/details/BugNotFound";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -184,7 +184,7 @@ const BugDetails = () => {
     >
       <section className="max-w-7xl mx-auto space-y-8">
         <header>
-          <BugHeaderSkeleton />
+          <BugHeaderSkeletonDetailed />
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

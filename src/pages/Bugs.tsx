@@ -1,4 +1,4 @@
-import { BugCard } from "@/components/bugs/BugCard";
+import { BugCard, BugCardSkeleton, BugCardGridSkeletonAnimated } from "@/components/bugs/BugCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,33 +25,6 @@ import { Bug } from "@/types";
 import { Bug as BugIcon, Filter, Lock, Plus, Code, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-
-// BugCardSkeleton component for loading state
-const BugCardSkeleton = () => (
-  <div className="rounded-lg border shadow-sm bg-card text-card-foreground p-5">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="flex-1">
-        <Skeleton className="h-6 w-3/4 mb-2" />
-        <Skeleton className="h-4 w-1/2 mb-4" />
-        <div className="space-y-3">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-3/4" />
-        </div>
-      </div>
-      <div>
-        <Skeleton className="h-8 w-20" />
-      </div>
-    </div>
-    <div className="flex items-center justify-between mt-4 pt-4 border-t">
-      <div className="flex gap-2">
-        <Skeleton className="h-6 w-16" />
-        <Skeleton className="h-6 w-16" />
-      </div>
-      <Skeleton className="h-6 w-24" />
-    </div>
-  </div>
-);
 
 const Bugs = () => {
   const { currentUser } = useAuth();
@@ -328,23 +301,15 @@ const Bugs = () => {
 
         {/* Content */}
         {skeletonLoading ? (
-          <div className="grid gap-4 mt-4 grid-cols-1" aria-busy="true" aria-label="Loading bug list">
-            {Array(3).fill(0).map((_, index) => (
-              <BugCardSkeleton key={index} />
-            ))}
-          </div>
+          <BugCardGridSkeletonAnimated count={3} />
         ) : loading ? (
-          <div className="grid gap-4 mt-4 grid-cols-1" aria-busy="true" aria-label="Loading bug list">
-            {Array(2).fill(0).map((_, index) => (
-              <BugCardSkeleton key={index} />
-            ))}
-          </div>
+          <BugCardGridSkeletonAnimated count={2} />
         ) : filteredBugs.length === 0 ? (
           renderEmptyState()
         ) : (
           <div className="grid gap-4 mt-4 grid-cols-1" style={{ minHeight: 200 }} aria-label="Bug list">
             {filteredBugs.map((bug) => (
-              <BugCard key={bug.id} bug={bug} onDelete={handleDelete} />
+              <BugCard key={bug.id} bug={bug} />
             ))}
           </div>
         )}
@@ -474,7 +439,7 @@ const Bugs = () => {
             ) : (
               <div className="grid gap-4 mt-4 grid-cols-1" style={{ minHeight: 200 }} aria-label="Bug list">
                 {filteredBugs.map((bug) => (
-                  <BugCard key={bug.id} bug={bug} onDelete={handleDelete} />
+                  <BugCard key={bug.id} bug={bug} />
                 ))}
               </div>
             )}
