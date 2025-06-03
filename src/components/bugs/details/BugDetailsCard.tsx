@@ -10,6 +10,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { bugService } from "@/services/bugService";
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
+import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bug, BugStatus, Project } from "@/types";
@@ -67,6 +68,20 @@ export const BugDetailsCard = ({
         const notificationResult = await sendBugStatusUpdateNotification(
           updatedBug
         );
+        
+        // Broadcast browser notification to all users
+        try {
+          await broadcastNotificationService.broadcastStatusChange(
+            updatedBug.title,
+            updatedBug.id,
+            value,
+            currentUser?.name || "Bug Ricer User"
+          );
+          console.log("Broadcast notification sent for status change");
+        } catch (broadcastError) {
+          console.error("Failed to send broadcast notification:", broadcastError);
+        }
+        
         if (notificationResult.success) {
           toast({
             title: "Success",

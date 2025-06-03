@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
+import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -247,11 +248,23 @@ const BugDetails = () => {
       // Send notification if new status is "fixed"
       if (newStatus === "fixed" && bug.status !== "fixed") {
         try {
-          await sendBugStatusUpdateNotification({
+          const bugData = {
             ...bug,
             status: newStatus,
             updated_by_name: currentUser?.name || "Bug Ricer", // Include updater name in notification
-          });
+          };
+          
+          // Send email notification
+          await sendBugStatusUpdateNotification(bugData);
+          
+          // Broadcast browser notification to all users
+          await broadcastNotificationService.broadcastStatusChange(
+            bug.title,
+            bug.id,
+            newStatus,
+            currentUser?.name || "Bug Ricer User"
+          );
+          console.log("Broadcast notification sent for status change");
         } catch (notificationError) {
           // // console.error("Failed to send notification:", notificationError);
         }

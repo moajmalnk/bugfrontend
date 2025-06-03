@@ -16,6 +16,11 @@ import { ErrorBoundaryProvider } from "@/components/ErrorBoundaryManager";
 import { useApiErrorHandler } from "@/hooks/useApiErrorHandler";
 import { DebugInfo } from "@/components/DebugInfo";
 import { TimezoneDebug } from "@/components/TimezoneDebug";
+import { useAuth } from "@/context/AuthContext";
+import { BugProvider } from "@/context/BugContext";
+import { NotificationProvider } from "@/context/NotificationContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 
 // Initialize the query client outside of the component
 const queryClient = new QueryClient();
@@ -161,6 +166,7 @@ function AppContent() {
 
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const { currentUser } = useAuth();
 
   // Initialize service worker and offline detector
   useEffect(() => {
@@ -245,6 +251,22 @@ function AppContent() {
   const handleUpdateDismiss = () => {
     setShowUpdateModal(false);
   };
+
+  // Start notification polling when user is logged in
+  useEffect(() => {
+    if (currentUser) {
+      broadcastNotificationService.startPolling();
+      console.log('Started notification polling for user:', currentUser.name || currentUser.username);
+    } else {
+      broadcastNotificationService.stopPolling();
+      console.log('Stopped notification polling - user not logged in');
+    }
+
+    // Cleanup polling when component unmounts
+    return () => {
+      broadcastNotificationService.stopPolling();
+    };
+  }, [currentUser]);
 
   return (
     <>

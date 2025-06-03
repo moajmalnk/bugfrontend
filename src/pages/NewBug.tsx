@@ -24,6 +24,7 @@ import { ENV } from "@/lib/env";
 import {
   sendNewBugNotification,
 } from "@/services/emailService";
+import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { BugPriority, Project } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -191,8 +192,20 @@ const NewBug = () => {
               attachments: uploadedAttachments
             };
 
+            // Send email notification
             const emailResponse = await sendNewBugNotification(bugData);
             // console.log("Email notification sent:", emailResponse);
+            
+            // Broadcast browser notification to all users
+            if (data.bugId || data.data?.id || data.id) {
+              const bugId = String(data.bugId || data.data?.id || data.id);
+              await broadcastNotificationService.broadcastNewBug(
+                name,
+                bugId,
+                currentUser?.name || "Bug Ricer User"
+              );
+              console.log("Broadcast notification sent for new bug");
+            }
           } catch (emailError) {
             // console.error("Failed to send email notification:", emailError);
           }

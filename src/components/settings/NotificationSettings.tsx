@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { broadcastNotificationService } from '@/services/broadcastNotificationService';
 
 export function NotificationSettingsCard() {
   const [settings, setSettings] = useState<NotificationSettings>({
@@ -26,7 +27,7 @@ export function NotificationSettingsCard() {
     statusChangeNotifications: true,
     notificationSound: true
   });
-  
+
   const [showEmailConfirmDialog, setShowEmailConfirmDialog] = useState(false);
   const [pendingEmailChange, setPendingEmailChange] = useState<boolean | null>(null);
 
@@ -50,14 +51,14 @@ export function NotificationSettingsCard() {
   const updateEmailNotifications = (checked: boolean) => {
     const newSettings = { ...settings, emailNotifications: checked };
     setSettings(newSettings);
-    
+
     // Save immediately when changed
     notificationService.saveSettings(newSettings);
     // console.log('Settings saved:', newSettings); // Debug log
-    
+
     toast({
       title: checked ? "Email notifications enabled" : "Email notifications disabled",
-      description: checked 
+      description: checked
         ? "You will now receive email notifications for bug activities."
         : "You will no longer receive any email notifications from BugRacer.",
     });
@@ -79,7 +80,7 @@ export function NotificationSettingsCard() {
   const handleSettingChange = (key: keyof NotificationSettings, value: boolean) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
-    
+
     // Save immediately when changed
     notificationService.saveSettings(newSettings);
     // console.log('Settings updated and saved:', newSettings); // Debug log
@@ -121,6 +122,28 @@ export function NotificationSettingsCard() {
     }
   };
 
+  const handleTestBroadcastNotification = async () => {
+    try {
+      // Test broadcast a fake notification
+      await broadcastNotificationService.broadcastNewBug(
+        "Test Bug - Broadcast Notification",
+        "test-123",
+        "Test User"
+      );
+      
+      toast({
+        title: "Test broadcast sent",
+        description: "A test notification has been broadcasted to all users.",
+      });
+    } catch (error) {
+      toast({
+        title: "Broadcast test failed",
+        description: "Failed to send test broadcast notification.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <>
       <Card>
@@ -148,9 +171,9 @@ export function NotificationSettingsCard() {
                 onCheckedChange={handleEmailNotificationChange}
               />
             </div>
-            
+
             <Separator />
-            
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="h-5 w-5" />
@@ -164,7 +187,7 @@ export function NotificationSettingsCard() {
               <Switch
                 id="browserNotifications"
                 checked={settings.browserNotifications}
-                onCheckedChange={(checked) => 
+                onCheckedChange={(checked) =>
                   handleSettingChange('browserNotifications', checked)
                 }
               />
@@ -185,14 +208,14 @@ export function NotificationSettingsCard() {
               <Switch
                 id="notificationSound"
                 checked={settings.notificationSound}
-                onCheckedChange={(checked) => 
+                onCheckedChange={(checked) =>
                   handleSettingChange('notificationSound', checked)
                 }
               />
             </div>
 
             <Separator />
-            
+
             <div className="pl-7 space-y-3">
               <h3 className="font-medium">Notification Types</h3>
               <p className="text-sm text-muted-foreground">
@@ -236,15 +259,21 @@ export function NotificationSettingsCard() {
               </div>
             )}
           </div>
-          
-          <div className="flex gap-2">
+
+          <div className="flex gap-2 flex-wrap">
             <Button onClick={handleSave}>Save Preferences</Button>
             <Button 
               variant="outline" 
               onClick={handleTestNotification}
               disabled={!settings.browserNotifications}
             >
-              Test Notification
+              Test Browser Notification
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleTestBroadcastNotification}
+            >
+              Test Broadcast to All Users
             </Button>
           </div>
           
@@ -279,11 +308,11 @@ export function NotificationSettingsCard() {
                   variant="outline" 
                   size="sm"
                   onClick={() => {
-                    // console.log('Current settings:', notificationService.getSettings());
-                    // console.log('localStorage content:', localStorage.getItem('notification_settings'));
+                    console.log('Current settings:', notificationService.getSettings());
+                    console.log('localStorage content:', localStorage.getItem('notification_settings'));
                   }}
                 >
-                  Log Settings to // console
+                  Log Settings to Console
                 </Button>
               </div>
             </div>
@@ -296,14 +325,14 @@ export function NotificationSettingsCard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Disable Email Notifications?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to disable email notifications? This means you will no longer receive 
+              Are you sure you want to disable email notifications? This means you will no longer receive
               emails about:
               <br /><br />
               • New bug reports<br />
               • Bug status changes<br />
               • Bug fixes and updates
               <br /><br />
-              You can still receive browser notifications if enabled. You can re-enable email 
+              You can still receive browser notifications if enabled. You can re-enable email
               notifications at any time from this settings page.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -311,11 +340,11 @@ export function NotificationSettingsCard() {
             <AlertDialogCancel onClick={handleCancelDisableEmail}>
               Keep Email Notifications
             </AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleConfirmDisableEmail}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Disable Email Notifications
+              Disable Email Notifications 
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
