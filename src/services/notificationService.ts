@@ -4,26 +4,26 @@ class NotificationService {
   private getStoredSettings(): NotificationSettings {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
-      console.log('Raw stored settings:', stored); // Debug log
+      // console.log('Raw stored settings:', stored); // Debug log
       
       if (stored) {
         const parsed = JSON.parse(stored);
-        console.log('Parsed settings:', parsed); // Debug log
+        // console.log('Parsed settings:', parsed); // Debug log
         
         // Validate that all required properties exist
         const defaultSettings = this.getDefaultSettings();
         const validatedSettings = { ...defaultSettings, ...parsed };
         
-        console.log('Validated settings:', validatedSettings); // Debug log
+        // console.log('Validated settings:', validatedSettings); // Debug log
         return validatedSettings;
       }
     } catch (error) {
-      console.error('Error reading notification settings from localStorage:', error);
+      // console.error('Error reading notification settings from localStorage:', error);
     }
     
     // Return default settings if no stored settings or error
     const defaultSettings = this.getDefaultSettings();
-    console.log('Using default settings:', defaultSettings); // Debug log
+    // console.log('Using default settings:', defaultSettings); // Debug log
     return defaultSettings;
   }
 
@@ -41,17 +41,17 @@ class NotificationService {
     try {
       const settingsString = JSON.stringify(settings);
       localStorage.setItem(this.STORAGE_KEY, settingsString);
-      console.log('Settings saved to localStorage:', settingsString); // Debug log
+      // console.log('Settings saved to localStorage:', settingsString); // Debug log
       
       // Verify the save was successful
       const savedSettings = localStorage.getItem(this.STORAGE_KEY);
       if (savedSettings !== settingsString) {
-        console.error('Settings save verification failed!');
+        // console.error('Settings save verification failed!');
       } else {
-        console.log('Settings save verified successfully'); // Debug log
+        // console.log('Settings save verified successfully'); // Debug log
       }
     } catch (error) {
-      console.error('Error saving notification settings to localStorage:', error);
+      // console.error('Error saving notification settings to localStorage:', error);
     }
   }
 
@@ -63,9 +63,9 @@ class NotificationService {
   clearSettings(): void {
     try {
       localStorage.removeItem(this.STORAGE_KEY);
-      console.log('Settings cleared from localStorage'); // Debug log
+      // console.log('Settings cleared from localStorage'); // Debug log
     } catch (error) {
-      console.error('Error clearing notification settings:', error);
+      // console.error('Error clearing notification settings:', error);
     }
   }
 

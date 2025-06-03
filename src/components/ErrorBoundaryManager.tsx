@@ -138,7 +138,7 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
         }
       } catch (error) {
         // Version check failed - could be network issue or deployment in progress
-        console.warn('Version check failed:', error);
+        // console.warn('Version check failed:', error);
       }
     };
 

@@ -32,7 +32,7 @@ export function NotificationSettingsCard() {
 
   useEffect(() => {
     const savedSettings = notificationService.getSettings();
-    console.log('Loaded settings:', savedSettings); // Debug log
+    // console.log('Loaded settings:', savedSettings); // Debug log
     setSettings(savedSettings);
   }, []);
 
@@ -53,7 +53,7 @@ export function NotificationSettingsCard() {
     
     // Save immediately when changed
     notificationService.saveSettings(newSettings);
-    console.log('Settings saved:', newSettings); // Debug log
+    // console.log('Settings saved:', newSettings); // Debug log
     
     toast({
       title: checked ? "Email notifications enabled" : "Email notifications disabled",
@@ -82,12 +82,12 @@ export function NotificationSettingsCard() {
     
     // Save immediately when changed
     notificationService.saveSettings(newSettings);
-    console.log('Settings updated and saved:', newSettings); // Debug log
+    // console.log('Settings updated and saved:', newSettings); // Debug log
   };
 
   const handleSave = () => {
     notificationService.saveSettings(settings);
-    console.log('Settings manually saved:', settings); // Debug log
+    // console.log('Settings manually saved:', settings); // Debug log
     toast({
       title: "Notification preferences saved",
       description: "Your notification settings have been updated.",
@@ -279,11 +279,11 @@ export function NotificationSettingsCard() {
                   variant="outline" 
                   size="sm"
                   onClick={() => {
-                    console.log('Current settings:', notificationService.getSettings());
-                    console.log('localStorage content:', localStorage.getItem('notification_settings'));
+                    // console.log('Current settings:', notificationService.getSettings());
+                    // console.log('localStorage content:', localStorage.getItem('notification_settings'));
                   }}
                 >
-                  Log Settings to Console
+                  Log Settings to // console
                 </Button>
               </div>
             </div>

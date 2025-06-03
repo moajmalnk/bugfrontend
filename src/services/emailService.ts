@@ -192,7 +192,7 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
         emailResult = { success: false, message: "No recipients found" };
       }
     } else {
-      console.log("Email notifications or status change notifications are disabled, skipping email");
+      // console.log("Email notifications or status change notifications are disabled, skipping email");
     }
     
     // Send browser notification if enabled
@@ -283,7 +283,7 @@ export const sendNewBugNotification = async (bug: any) => {
         emailResult = { success: false, message: "No recipients found" };
       }
     } else {
-      console.log("Email notifications or new bug notifications are disabled, skipping email");
+      // console.log("Email notifications or new bug notifications are disabled, skipping email");
     }
     
     // Send browser notification if enabled
@@ -298,7 +298,7 @@ export const sendNewBugNotification = async (bug: any) => {
       browserNotificationSent: browserResult
     };
   } catch (error) {
-    console.error("Error sending new bug notification:", error);
+    // console.error("Error sending new bug notification:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
@@ -365,7 +365,7 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
         emailResult = { success: false, message: "No recipients found" };
       }
     } else {
-      console.log("Email notifications or status change notifications are disabled, skipping email");
+      // console.log("Email notifications or status change notifications are disabled, skipping email");
     }
     
     // Send browser notification if enabled
@@ -381,7 +381,7 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
       browserNotificationSent: browserResult
     };
   } catch (error) {
-    console.error("Error sending bug notification:", error);
+    // console.error("Error sending bug notification:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
