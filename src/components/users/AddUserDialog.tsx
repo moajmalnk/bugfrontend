@@ -115,7 +115,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         });
       }
     } catch (error) {
-      // console.error("Error adding user:", error);
+      // // console.error("Error adding user:", error);
       toast({
         title: "Error",
         description: "An unexpected error occurred.",

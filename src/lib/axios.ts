@@ -13,7 +13,7 @@ export const apiClient = axios.create({
 // Request interceptor for debugging
 apiClient.interceptors.request.use(
   (config) => {
-    console.log('API Request:', {
+    // console.log('API Request:', {
       url: config.url,
       method: config.method,
       baseURL: config.baseURL,
@@ -23,7 +23,7 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => {
-    console.error('Request Error:', error);
+    // console.error('Request Error:', error);
     return Promise.reject(error);
   }
 );
@@ -31,7 +31,7 @@ apiClient.interceptors.request.use(
 // Response interceptor for debugging and error handling
 apiClient.interceptors.response.use(
   (response) => {
-    console.log('API Response:', {
+    // console.log('API Response:', {
       url: response.config.url,
       status: response.status,
       data: response.data
@@ -39,7 +39,7 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error('Response Error:', {
+    // console.error('Response Error:', {
       url: error.config?.url,
       status: error.response?.status,
       statusText: error.response?.statusText,

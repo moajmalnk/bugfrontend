@@ -92,7 +92,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
       const token = localStorage.getItem("token");
       
       // Add more detailed logging for production debugging
-      console.log('Submitting bug update:', {
+      // console.log('Submitting bug update:', {
         bugId: bug.id,
         apiUrl: apiClient.defaults.baseURL,
         values: values
@@ -117,7 +117,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
         }
       );
 
-      console.log('Update response:', response.data);
+      // console.log('Update response:', response.data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to update bug");
@@ -140,7 +140,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
             description: "Bug updated and notifications sent",
           });
         } catch (notificationError) {
-          console.warn('Failed to send notification:', notificationError);
+          // console.warn('Failed to send notification:', notificationError);
           toast({
             title: "Success",
             description: "Bug updated successfully (notification failed)",
@@ -159,7 +159,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
 
       setOpen(false);
     } catch (error: any) {
-      console.error("Failed to update bug:", error);
+      // console.error("Failed to update bug:", error);
       
       // Provide more specific error messages based on error type
       let errorMessage = "Failed to update bug. Please try again.";

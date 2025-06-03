@@ -67,34 +67,34 @@ function getCacheStrategy(request) {
 
 // Install event - Cache critical resources
 self.addEventListener('install', event => {
-  console.log('[ServiceWorker] Installing...');
+  // console.log('[ServiceWorker] Installing...');
   
   event.waitUntil(
     Promise.all([
       // Cache critical resources immediately
       caches.open(STATIC_CACHE).then(cache => {
-        console.log('[ServiceWorker] Caching critical resources');
+        // console.log('[ServiceWorker] Caching critical resources');
         return cache.addAll(CRITICAL_RESOURCES);
       }),
       // Cache static resources
       caches.open(STATIC_CACHE).then(cache => {
         return cache.addAll(STATIC_RESOURCES).catch(err => {
-          console.warn('[ServiceWorker] Some static resources failed to cache:', err);
+          // console.warn('[ServiceWorker] Some static resources failed to cache:', err);
         });
       }),
     ]).then(() => {
-      console.log('[ServiceWorker] Installation complete');
+      // console.log('[ServiceWorker] Installation complete');
       // Force activation of new service worker
       return self.skipWaiting();
     }).catch(err => {
-      console.error('[ServiceWorker] Installation failed:', err);
+      // console.error('[ServiceWorker] Installation failed:', err);
     })
   );
 });
 
 // Activate event - Clean up old caches
 self.addEventListener('activate', event => {
-  console.log('[ServiceWorker] Activating...');
+  // console.log('[ServiceWorker] Activating...');
   
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -103,13 +103,13 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (!validCaches.includes(cacheName)) {
-            console.log('[ServiceWorker] Deleting old cache:', cacheName);
+            // console.log('[ServiceWorker] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     }).then(() => {
-      console.log('[ServiceWorker] Activation complete');
+      // console.log('[ServiceWorker] Activation complete');
       // Take control of all pages immediately
       return self.clients.claim();
     })
@@ -151,13 +151,13 @@ async function networkFirst(request) {
     if (networkResponse.ok && shouldCache(request)) {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, networkResponse.clone()).catch(err => {
-        console.warn('[ServiceWorker] Failed to cache response:', err);
+        // console.warn('[ServiceWorker] Failed to cache response:', err);
       });
     }
     
     return networkResponse;
   } catch (error) {
-    console.warn('[ServiceWorker] Network failed, trying cache:', error);
+    // console.warn('[ServiceWorker] Network failed, trying cache:', error);
     
     // Fall back to cache
     const cachedResponse = await caches.match(request);
@@ -194,13 +194,13 @@ async function cacheFirst(request) {
     if (networkResponse.ok && shouldCache(request)) {
       const cache = await caches.open(STATIC_CACHE);
       cache.put(request, networkResponse.clone()).catch(err => {
-        console.warn('[ServiceWorker] Failed to cache static resource:', err);
+        // console.warn('[ServiceWorker] Failed to cache static resource:', err);
       });
     }
     
     return networkResponse;
   } catch (error) {
-    console.error('[ServiceWorker] Failed to fetch static resource:', error);
+    // console.error('[ServiceWorker] Failed to fetch static resource:', error);
     throw error;
   }
 }
@@ -216,12 +216,12 @@ async function staleWhileRevalidate(request) {
     if (response.ok && shouldCache(request)) {
       const cache = caches.open(DYNAMIC_CACHE);
       cache.then(c => c.put(request, response.clone())).catch(err => {
-        console.warn('[ServiceWorker] Failed to update cache:', err);
+        // console.warn('[ServiceWorker] Failed to update cache:', err);
       });
     }
     return response;
   }).catch(error => {
-    console.warn('[ServiceWorker] Network update failed:', error);
+    // console.warn('[ServiceWorker] Network update failed:', error);
     return null;
   });
   
@@ -251,7 +251,7 @@ self.addEventListener('message', event => {
       break;
       
     default:
-      console.log('[ServiceWorker] Unknown message type:', type);
+      // console.log('[ServiceWorker] Unknown message type:', type);
   }
 });
 
@@ -265,11 +265,11 @@ async function clearAllCaches() {
 
 // Handle unexpected errors
 self.addEventListener('error', event => {
-  console.error('[ServiceWorker] Error:', event.error);
+  // console.error('[ServiceWorker] Error:', event.error);
 });
 
 self.addEventListener('unhandledrejection', event => {
-  console.error('[ServiceWorker] Unhandled promise rejection:', event.reason);
+  // console.error('[ServiceWorker] Unhandled promise rejection:', event.reason);
 });
 
-console.log('[ServiceWorker] Script loaded successfully');
+// console.log('[ServiceWorker] Script loaded successfully');

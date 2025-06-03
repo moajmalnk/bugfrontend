@@ -53,7 +53,7 @@ const Bugs = () => {
       
       setSkeletonLoading(false);
     } catch (error: any) {
-      // // console.error("Error fetching bugs:", error);
+      // // // console.error("Error fetching bugs:", error);
       if (error.message?.includes("access")) {
         setAccessError("You don't have access to any projects");
       } else {
@@ -100,7 +100,7 @@ const Bugs = () => {
             
             // Debug logging
             if (isFixed) {
-              // // console.log(`Bug ${bug.id}: status=${bug.status}, updated_by=${bug.updated_by} (${typeof bug.updated_by}), currentUser.id=${currentUser.id} (${typeof currentUser.id}), match=${isUpdatedByCurrentUser}`);
+              // // // console.log(`Bug ${bug.id}: status=${bug.status}, updated_by=${bug.updated_by} (${typeof bug.updated_by}), currentUser.id=${currentUser.id} (${typeof currentUser.id}), match=${isUpdatedByCurrentUser}`);
             }
             
             return isFixed && isUpdatedByCurrentUser;

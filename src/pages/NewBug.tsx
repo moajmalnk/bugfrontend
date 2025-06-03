@@ -178,14 +178,14 @@ const NewBug = () => {
         // Send email notification asynchronously without blocking navigation
         setTimeout(async () => {
           try {
-            // console.log("Sending notification for bug:", name);
+            // // console.log("Sending notification for bug:", name);
 
             // Get the bug ID from the response
             // const bugId = data.bugId || data.data?.id || data.id;
 
             // Safety check - don't proceed with undefined bugId
             // if (!bugId) {
-            //   // console.error(
+            //   // // console.error(
             //     "Bug ID is undefined, can't generate attachment URLs"
             //   );
             //   return;
@@ -219,7 +219,7 @@ const NewBug = () => {
             // allAttachments = [...screenshotUrls, ...fileUrls];
 
             const uploadedAttachments = data.uploadedAttachments || [];
-            // console.log("Uploaded attachment paths from backend:", uploadedAttachments);
+            // // console.log("Uploaded attachment paths from backend:", uploadedAttachments);
 
             const emailResponse = await sendEmailNotification(
               await getNotificationRecipients(), // Get all admins and developers
@@ -279,16 +279,16 @@ const NewBug = () => {
               `,
               uploadedAttachments // Pass the local file paths received from the backend
             );
-            // console.log("Email notification sent:", emailResponse);
+            // // console.log("Email notification sent:", emailResponse);
           } catch (emailError) {
-            // console.error("Failed to send email notification:", emailError);
+            // // console.error("Failed to send email notification:", emailError);
           }
         }, 100);
       } else {
         throw new Error(data.message || "Failed to submit bug report");
       }
     } catch (error) {
-      // console.error("Error submitting bug:", error);
+      // // console.error("Error submitting bug:", error);
       toast({
         title: "Error",
         description:

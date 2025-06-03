@@ -29,7 +29,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
    */
   async register(): Promise<ServiceWorkerRegistration | null> {
     if (!('serviceWorker' in navigator)) {
-      console.warn('[SW Manager] Service workers not supported');
+      // console.warn('[SW Manager] Service workers not supported');
       return null;
     }
 
@@ -39,7 +39,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
         updateViaCache: 'none' // Always check for updates
       });
 
-      console.log('[SW Manager] Service worker registered:', this.registration.scope);
+      // console.log('[SW Manager] Service worker registered:', this.registration.scope);
 
       // Set up update detection
       this.setupUpdateDetection();
@@ -51,7 +51,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
 
       return this.registration;
     } catch (error) {
-      console.error('[SW Manager] Service worker registration failed:', error);
+      // console.error('[SW Manager] Service worker registration failed:', error);
       return null;
     }
   }
@@ -66,11 +66,11 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
 
     try {
       const result = await this.registration.unregister();
-      console.log('[SW Manager] Service worker unregistered:', result);
+      // console.log('[SW Manager] Service worker unregistered:', result);
       this.registration = null;
       return result;
     } catch (error) {
-      console.error('[SW Manager] Failed to unregister service worker:', error);
+      // console.error('[SW Manager] Failed to unregister service worker:', error);
       return false;
     }
   }
@@ -85,9 +85,9 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
 
     try {
       await this.registration.update();
-      console.log('[SW Manager] Service worker update check completed');
+      // console.log('[SW Manager] Service worker update check completed');
     } catch (error) {
-      console.error('[SW Manager] Service worker update failed:', error);
+      // console.error('[SW Manager] Service worker update failed:', error);
       throw error;
     }
   }
@@ -105,10 +105,10 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
       // Fallback: Clear caches directly
       const cacheNames = await caches.keys();
       await Promise.all(cacheNames.map(name => caches.delete(name)));
-      console.log('[SW Manager] All caches cleared (fallback method)');
+      // console.log('[SW Manager] All caches cleared (fallback method)');
       return true;
     } catch (error) {
-      console.error('[SW Manager] Failed to clear cache:', error);
+      // console.error('[SW Manager] Failed to clear cache:', error);
       return false;
     }
   }
@@ -124,7 +124,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
       }
       return 'not-registered';
     } catch (error) {
-      console.error('[SW Manager] Failed to get version:', error);
+      // console.error('[SW Manager] Failed to get version:', error);
       return 'error';
     }
   }
@@ -187,7 +187,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
 
       newWorker.addEventListener('statechange', () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          console.log('[SW Manager] New service worker installed');
+          // console.log('[SW Manager] New service worker installed');
           this.notifyUpdateAvailable();
         }
       });
@@ -195,7 +195,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
 
     // Listen for controller change (new service worker activated)
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[SW Manager] Service worker controller changed');
+      // console.log('[SW Manager] Service worker controller changed');
       // Optionally reload the page
       window.location.reload();
     });
@@ -213,12 +213,12 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
    */
   private setupNetworkListeners(): void {
     window.addEventListener('online', () => {
-      console.log('[SW Manager] Network online');
+      // console.log('[SW Manager] Network online');
       this.onlineCallbacks.forEach(callback => callback());
     });
 
     window.addEventListener('offline', () => {
-      console.log('[SW Manager] Network offline');
+      // console.log('[SW Manager] Network offline');
       this.offlineCallbacks.forEach(callback => callback());
     });
   }
@@ -252,7 +252,7 @@ export async function initializeServiceWorker(): Promise<void> {
   const forceEnable = localStorage.getItem('sw-force-enable') === 'true';
   
   if (!isProduction && !forceEnable) {
-    console.log('[SW Manager] Service worker disabled in development');
+    // console.log('[SW Manager] Service worker disabled in development');
     return;
   }
 
@@ -260,7 +260,7 @@ export async function initializeServiceWorker(): Promise<void> {
     const registration = await serviceWorkerManager.register();
     
     if (registration) {
-      console.log('[SW Manager] Service worker initialized successfully');
+      // console.log('[SW Manager] Service worker initialized successfully');
       
       // Set up update notifications
       serviceWorkerManager.onUpdateAvailable(() => {
@@ -272,17 +272,17 @@ export async function initializeServiceWorker(): Promise<void> {
 
       // Set up network status handling
       serviceWorkerManager.onOffline(() => {
-        console.log('[SW Manager] App is now offline');
+        // console.log('[SW Manager] App is now offline');
         // Show offline indicator
       });
 
       serviceWorkerManager.onOnline(() => {
-        console.log('[SW Manager] App is now online');
+        // console.log('[SW Manager] App is now online');
         // Hide offline indicator
       });
     }
   } catch (error) {
-    console.error('[SW Manager] Failed to initialize service worker:', error);
+    // console.error('[SW Manager] Failed to initialize service worker:', error);
   }
 }
 
@@ -292,6 +292,6 @@ export async function initializeServiceWorker(): Promise<void> {
 export async function clearAllCaches(): Promise<void> {
   if (process.env.NODE_ENV === 'development') {
     await serviceWorkerManager.clearCache();
-    console.log('[SW Manager] Development cache cleared');
+    // console.log('[SW Manager] Development cache cleared');
   }
 } 

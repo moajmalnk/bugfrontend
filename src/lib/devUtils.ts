@@ -18,7 +18,7 @@ export const devUtils = {
    */
   enableServiceWorker: () => {
     localStorage.setItem('sw-force-enable', 'true');
-    console.log('[DevUtils] Service worker enabled for development');
+    // console.log('[DevUtils] Service worker enabled for development');
     window.location.reload();
   },
 
@@ -28,7 +28,7 @@ export const devUtils = {
   disableServiceWorker: async () => {
     localStorage.removeItem('sw-force-enable');
     await serviceWorkerManager.unregister();
-    console.log('[DevUtils] Service worker disabled for development');
+    // console.log('[DevUtils] Service worker disabled for development');
     window.location.reload();
   },
 
@@ -37,7 +37,7 @@ export const devUtils = {
    */
   clearCaches: async () => {
     const success = await serviceWorkerManager.clearCache();
-    console.log('[DevUtils] Cache clearing result:', success);
+    // console.log('[DevUtils] Cache clearing result:', success);
     return success;
   },
 
@@ -46,7 +46,7 @@ export const devUtils = {
    */
   getVersion: async () => {
     const version = await serviceWorkerManager.getVersion();
-    console.log('[DevUtils] Service worker version:', version);
+    // console.log('[DevUtils] Service worker version:', version);
     return version;
   },
 
@@ -56,9 +56,9 @@ export const devUtils = {
   forceUpdate: async () => {
     try {
       await serviceWorkerManager.update();
-      console.log('[DevUtils] Service worker update triggered');
+      // console.log('[DevUtils] Service worker update triggered');
     } catch (error) {
-      console.error('[DevUtils] Service worker update failed:', error);
+      // console.error('[DevUtils] Service worker update failed:', error);
     }
   },
 
@@ -68,7 +68,7 @@ export const devUtils = {
   simulateChunkError: () => {
     const error = new Error('Failed to fetch dynamically imported module');
     window.dispatchEvent(new ErrorEvent('error', { error, message: error.message }));
-    console.log('[DevUtils] Simulated chunk loading error');
+    // console.log('[DevUtils] Simulated chunk loading error');
   },
 
   /**
@@ -76,7 +76,7 @@ export const devUtils = {
    */
   goOffline: () => {
     window.dispatchEvent(new Event('offline'));
-    console.log('[DevUtils] Simulated offline mode');
+    // console.log('[DevUtils] Simulated offline mode');
   },
 
   /**
@@ -84,7 +84,7 @@ export const devUtils = {
    */
   goOnline: () => {
     window.dispatchEvent(new Event('online'));
-    console.log('[DevUtils] Simulated online mode');
+    // console.log('[DevUtils] Simulated online mode');
   },
 
   /**
@@ -93,7 +93,7 @@ export const devUtils = {
   getCacheNames: async () => {
     if ('caches' in window) {
       const names = await caches.keys();
-      console.log('[DevUtils] Cache names:', names);
+      // console.log('[DevUtils] Cache names:', names);
       return names;
     }
     return [];
@@ -104,7 +104,7 @@ export const devUtils = {
    */
   enableSWDebug: () => {
     window.__SW_DEBUG__ = true;
-    console.log('[DevUtils] Service worker debugging enabled');
+    // console.log('[DevUtils] Service worker debugging enabled');
   },
 
   /**
@@ -112,14 +112,14 @@ export const devUtils = {
    */
   disableSWDebug: () => {
     window.__SW_DEBUG__ = false;
-    console.log('[DevUtils] Service worker debugging disabled');
+    // console.log('[DevUtils] Service worker debugging disabled');
   },
 
   /**
    * Show help message
    */
   help: () => {
-    console.log(`
+    // console.log(`
 🔧 BUGRICER DEVELOPMENT UTILITIES
 
 Service Worker Commands:
@@ -162,10 +162,10 @@ export function initDevUtils(): void {
     window.__DEV_UTILS__ = devUtils;
     window.__SW_DEBUG__ = false;
     
-    console.log(`
+    // console.log(`
 🚀 Bugricer Development Mode
 
-Type __DEV_UTILS__.help() in the console for available commands.
+Type __DEV_UTILS__.help() in the // console for available commands.
 
 Quick Start:
 - Enable SW: __DEV_UTILS__.enableServiceWorker()

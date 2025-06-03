@@ -83,7 +83,7 @@ export default function Reports() {
         setUsers(fetchedUsers);
         setBugs(fetchedBugs);
       } catch (error) {
-        // console.error('Failed to load report data:', error);
+        // // console.error('Failed to load report data:', error);
         toast({
           title: "Error",
           description: "Failed to load report data. Please try again.",
@@ -138,7 +138,7 @@ export default function Reports() {
         description: "PDF has been generated successfully.",
       });
     } catch (error) {
-      // console.error('Error generating PDF:', error);
+      // // console.error('Error generating PDF:', error);
       toast({
         title: "Error",
         description: "Failed to generate PDF. Please try again.",
@@ -173,7 +173,7 @@ export default function Reports() {
         description: "CSV has been generated successfully.",
       });
     } catch (error) {
-      // console.error('Error generating CSV:', error);
+      // // console.error('Error generating CSV:', error);
       toast({
         title: "Error",
         description: "Failed to generate CSV. Please try again.",

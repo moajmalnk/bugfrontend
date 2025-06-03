@@ -107,7 +107,7 @@ export function EditProjectDialog({ project, onSubmit, children }: EditProjectDi
         setIsOpen(false);
       }
     } catch (err) {
-      // console.error('Error updating project:', err);
+      // // console.error('Error updating project:', err);
       setError("Failed to update project. Please try again.");
     } finally {
       setIsLoading(false);

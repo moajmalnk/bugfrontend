@@ -44,7 +44,7 @@ class ProjectService {
       
       throw new Error(data.message || 'Failed to fetch projects');
     } catch (error) {
-      // // console.error('Error fetching projects:', error);
+      // // // console.error('Error fetching projects:', error);
       throw error;
     }
   }
@@ -68,7 +68,7 @@ class ProjectService {
       
       throw new Error(data.message || 'Failed to fetch project');
     } catch (error) {
-      // // console.error('Error fetching project:', error);
+      // // // console.error('Error fetching project:', error);
       throw error;
     }
   }
@@ -93,7 +93,7 @@ class ProjectService {
       
       throw new Error(data.message || 'Failed to create project');
     } catch (error) {
-      // // console.error('Error creating project:', error);
+      // // // console.error('Error creating project:', error);
       throw error;
     }
   }
@@ -116,7 +116,7 @@ class ProjectService {
         throw new Error(data.message || 'Failed to update project');
       }
     } catch (error) {
-      // // console.error('Error updating project:', error);
+      // // // console.error('Error updating project:', error);
       throw error;
     }
   }
