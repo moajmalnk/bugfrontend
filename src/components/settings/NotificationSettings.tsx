@@ -178,10 +178,10 @@ export function NotificationSettingsCard() {
           <CardTitle className="text-lg sm:text-xl">Notification Preferences</CardTitle>
           <CardDescription className="text-sm sm:text-base">
             Control how you receive notifications about bug activities
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
             {/* Email Notifications */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
               <div className="flex items-start gap-3">
@@ -190,21 +190,21 @@ export function NotificationSettingsCard() {
                   <Label htmlFor="emailNotifications" className="text-base font-medium cursor-pointer">
                     Email Notifications
                   </Label>
-                  <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                     Receive email notifications for bug reports and status changes
-                  </p>
-                </div>
+                </p>
               </div>
-              <Switch
-                id="emailNotifications"
-                checked={settings.emailNotifications}
+            </div>
+            <Switch
+              id="emailNotifications"
+              checked={settings.emailNotifications}
                 onCheckedChange={handleEmailNotificationChange}
                 className="self-start sm:self-center"
-              />
-            </div>
-
-            <Separator />
-
+            />
+          </div>
+          
+          <Separator />
+          
             {/* Browser Notifications */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
               <div className="flex items-start gap-3">
@@ -213,22 +213,22 @@ export function NotificationSettingsCard() {
                   <Label htmlFor="browserNotifications" className="text-base font-medium cursor-pointer">
                     Browser Notifications
                   </Label>
-                  <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                     Show desktop notifications when using the browser
-                  </p>
-                </div>
+                </p>
               </div>
-              <Switch
-                id="browserNotifications"
-                checked={settings.browserNotifications}
-                onCheckedChange={(checked) =>
-                  handleSettingChange('browserNotifications', checked)
-                }
-                className="self-start sm:self-center"
-              />
             </div>
+            <Switch
+              id="browserNotifications"
+              checked={settings.browserNotifications}
+              onCheckedChange={(checked) => 
+                  handleSettingChange('browserNotifications', checked)
+              }
+                className="self-start sm:self-center"
+            />
+          </div>
 
-            <Separator />
+          <Separator />
 
             {/* WhatsApp Notifications */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
@@ -238,11 +238,11 @@ export function NotificationSettingsCard() {
                   <Label htmlFor="whatsappNotifications" className="text-base font-medium cursor-pointer">
                     WhatsApp Notifications
                   </Label>
-                  <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                     Open WhatsApp with pre-filled messages for bug updates
-                  </p>
-                </div>
+                </p>
               </div>
+            </div>
               <Switch
                 id="whatsappNotifications"
                 checked={settings.whatsappNotifications}
@@ -265,21 +265,21 @@ export function NotificationSettingsCard() {
                   </Label>
                   <p className="text-sm text-muted-foreground">
                     Play a sound when receiving browser notifications
-                  </p>
-                </div>
+                </p>
               </div>
-              <Switch
-                id="notificationSound"
-                checked={settings.notificationSound}
-                onCheckedChange={(checked) =>
-                  handleSettingChange('notificationSound', checked)
-                }
-                className="self-start sm:self-center"
-              />
             </div>
+            <Switch
+              id="notificationSound"
+              checked={settings.notificationSound}
+              onCheckedChange={(checked) => 
+                  handleSettingChange('notificationSound', checked)
+              }
+                className="self-start sm:self-center"
+            />
+          </div>
 
-            <Separator />
-
+          <Separator />
+          
             {/* Notification Types Section */}
             <div className="pl-4 sm:pl-7 space-y-4 border-l-2 border-muted">
               <div className="space-y-2">
@@ -293,35 +293,35 @@ export function NotificationSettingsCard() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 pl-4 py-2 border rounded-lg">
                   <Label htmlFor="newBugNotifications" className="text-sm font-medium cursor-pointer">
                     New bug reports
-                  </Label>
-                  <Switch
-                    id="newBugNotifications"
-                    checked={settings.newBugNotifications}
-                    onCheckedChange={(checked) => 
+              </Label>
+              <Switch
+                id="newBugNotifications"
+                checked={settings.newBugNotifications}
+                onCheckedChange={(checked) => 
                       handleSettingChange('newBugNotifications', checked)
-                    }
+                }
                     disabled={!settings.browserNotifications && !settings.emailNotifications && !settings.whatsappNotifications}
                     className="self-start sm:self-center"
-                  />
-                </div>
-                
+              />
+            </div>
+            
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 pl-4 py-2 border rounded-lg">
                   <Label htmlFor="statusChangeNotifications" className="text-sm font-medium cursor-pointer">
                     Bug status changes
-                  </Label>
-                  <Switch
-                    id="statusChangeNotifications"
-                    checked={settings.statusChangeNotifications}
-                    onCheckedChange={(checked) => 
+              </Label>
+              <Switch
+                id="statusChangeNotifications"
+                checked={settings.statusChangeNotifications}
+                onCheckedChange={(checked) => 
                       handleSettingChange('statusChangeNotifications', checked)
-                    }
+                }
                     disabled={!settings.browserNotifications && !settings.emailNotifications && !settings.whatsappNotifications}
                     className="self-start sm:self-center"
-                  />
-                </div>
-              </div>
+              />
             </div>
-            
+          </div>
+        </div>
+        
             {(!settings.browserNotifications && !settings.emailNotifications && !settings.whatsappNotifications) && (
               <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <div className="flex items-start gap-2">
@@ -343,10 +343,10 @@ export function NotificationSettingsCard() {
               <Button onClick={handleSave} className="w-full">
                 Save Preferences
               </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleTestNotification}
-                disabled={!settings.browserNotifications}
+          <Button 
+            variant="outline" 
+            onClick={handleTestNotification}
+            disabled={!settings.browserNotifications}
                 className="w-full"
               >
                 Test Browser
@@ -474,12 +474,12 @@ export function NotificationSettingsCard() {
                   className="text-xs"
                 >
                   Log to Console
-                </Button>
-              </div>
+          </Button>
+        </div>
             </div>
           </details> */}
-        </CardContent>
-      </Card>
+      </CardContent>
+    </Card>
 
       {/* Email Confirmation Dialog */}
       <AlertDialog open={showEmailConfirmDialog} onOpenChange={setShowEmailConfirmDialog}>
