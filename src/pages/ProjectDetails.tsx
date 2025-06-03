@@ -626,7 +626,7 @@ const ProjectDetails = () => {
 
         <TabsContent value="members">
           <Card className="border shadow-sm">
-            <CardHeader className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 lg:gap-2 pb-4">
+            <CardHeader className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 pb-4">
               <div>
                 <CardTitle className="text-xl">Project Members</CardTitle>
                 <CardDescription>
@@ -635,8 +635,8 @@ const ProjectDetails = () => {
               </div>
               
               {currentUser?.role === "admin" && (
-                <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row gap-3 w-full sm:w-auto md:w-full lg:w-auto">
-                  <div className="relative w-full sm:w-[280px] md:w-full lg:w-[280px]">
+                <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+                  <div className="relative w-full sm:w-[300px] xl:w-[280px]">
                     <select
                       className="appearance-none w-full border rounded-lg px-3 py-2 pr-10 bg-background focus:ring-2 focus:ring-primary/30 focus:border-primary focus:outline-none transition-all duration-200 text-sm"
                       value={selectedUser ?? ""}
@@ -674,7 +674,7 @@ const ProjectDetails = () => {
             </CardHeader>
             
             <CardContent className="space-y-6">
-              <div className="relative w-full max-w-sm md:max-w-md">
+              <div className="relative w-full max-w-sm lg:max-w-md xl:max-w-lg 2xl:max-w-xl">
                 <input
                   type="text"
                   placeholder="Search members..."
@@ -715,7 +715,7 @@ const ProjectDetails = () => {
                   </p>
                 )}
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mt-3">
                   {filteredAdmins.map(admin => (
                     <MemberCard 
                       key={admin.id} 
@@ -740,7 +740,7 @@ const ProjectDetails = () => {
                   </p>
                 )}
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mt-3">
                   {filteredMembers.map(member => (
                     <MemberCard 
                       key={member.id} 
