@@ -1,11 +1,6 @@
 {
-  "version": "1.2.0",
-  "buildTime": "2024-01-15T10:30:00.000Z",
-  "gitCommit": "main",
-  "features": [
-    "professional-error-handling",
-    "service-worker-caching",
-    "date-formatting-system",
-    "offline-support"
-  ]
-} 
+  "version": "1.0.8",
+  "timestamp": "2025-06-03T09:38:55.571Z",
+  "build": "production-debug-1748943535573",
+  "environment": "production"
+}
