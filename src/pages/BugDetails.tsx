@@ -232,7 +232,7 @@ const BugDetails = () => {
   const handleStatusUpdate = async (newStatus: BugStatus) => {
     try {
       const token = localStorage.getItem("token");
-      await axios.put<ApiResponse<Bug>>(
+      await axios.post<ApiResponse<Bug>>(
         `${ENV.API_URL}/bugs/update.php`,
         {
           id: bug.id,
