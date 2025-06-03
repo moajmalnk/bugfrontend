@@ -27,19 +27,19 @@ class BroadcastNotificationService {
         this.lastCheckTime = storedLastCheck;
       }
     } catch (error) {
-      console.warn('Failed to load last notification check time:', error);
+      // console.warn('Failed to load last notification check time:', error);
     }
   }
 
   // Start polling for new notifications
   startPolling(): void {
     if (this.isPolling) {
-      console.log('Notification polling already running');
+      // console.log('Notification polling already running');
       return;
     }
     
     this.isPolling = true;
-    console.log('Starting notification polling...');
+    // console.log('Starting notification polling...');
     
     // Check immediately
     this.checkForNotifications();
@@ -57,7 +57,7 @@ class BroadcastNotificationService {
       this.intervalId = null;
     }
     this.isPolling = false;
-    console.log('Stopped notification polling');
+    // console.log('Stopped notification polling');
   }
 
   // Check for new notifications since last check
@@ -67,19 +67,19 @@ class BroadcastNotificationService {
       
       // Skip if browser notifications are disabled
       if (!settings.browserNotifications) {
-        console.log('Browser notifications disabled, skipping check');
+        // console.log('Browser notifications disabled, skipping check');
         return;
       }
 
       const token = localStorage.getItem('token');
       if (!token) {
-        console.log('No auth token found, stopping polling');
+        // console.log('No auth token found, stopping polling');
         this.stopPolling();
         return;
       }
 
       const url = `${ENV.API_URL}/notifications/get_recent.php`;
-      console.log('Checking for notifications since:', this.lastCheckTime);
+      // console.log('Checking for notifications since:', this.lastCheckTime);
 
       const response = await fetch(url, {
         method: 'POST',
@@ -94,7 +94,7 @@ class BroadcastNotificationService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`HTTP error ${response.status}:`, errorText);
+        // console.error(`HTTP error ${response.status}:`, errorText);
         return;
       }
 
@@ -103,7 +103,7 @@ class BroadcastNotificationService {
       
       // Check if response looks like JSON
       if (!responseText.trim().startsWith('{') && !responseText.trim().startsWith('[')) {
-        console.error('Server returned non-JSON response:', responseText);
+        // console.error('Server returned non-JSON response:', responseText);
         return;
       }
 
@@ -111,20 +111,20 @@ class BroadcastNotificationService {
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('Failed to parse JSON response:', parseError);
-        console.error('Response text:', responseText);
+        // console.error('Failed to parse JSON response:', parseError);
+        // console.error('Response text:', responseText);
         return;
       }
       
       if (data.success && data.notifications && Array.isArray(data.notifications) && data.notifications.length > 0) {
-        console.log(`Found ${data.notifications.length} new notifications`);
+        // console.log(`Found ${data.notifications.length} new notifications`);
         
         // Process each notification
         for (const notification of data.notifications) {
           try {
             await this.showBrowserNotification(notification);
           } catch (error) {
-            console.error('Error showing notification:', error);
+            // console.error('Error showing notification:', error);
           }
         }
         
@@ -133,13 +133,13 @@ class BroadcastNotificationService {
         try {
           localStorage.setItem('lastNotificationCheck', this.lastCheckTime);
         } catch (error) {
-          console.warn('Failed to save last check time:', error);
+          // console.warn('Failed to save last check time:', error);
         }
       } else {
-        console.log('No new notifications found');
+        // console.log('No new notifications found');
       }
     } catch (error) {
-      console.error('Error checking for notifications:', error);
+      // console.error('Error checking for notifications:', error);
     }
   }
 
@@ -150,32 +150,32 @@ class BroadcastNotificationService {
       
       // Check if this type of notification is enabled
       if (notification.type === 'new_bug' && !settings.newBugNotifications) {
-        console.log('New bug notifications disabled, skipping');
+        // console.log('New bug notifications disabled, skipping');
         return;
       }
       
       if (notification.type === 'status_change' && !settings.statusChangeNotifications) {
-        console.log('Status change notifications disabled, skipping');
+        // console.log('Status change notifications disabled, skipping');
         return;
       }
 
       // Check browser support
       if (!('Notification' in window)) {
-        console.warn('Browser does not support notifications');
+        // console.warn('Browser does not support notifications');
         return;
       }
 
       // Request permission if needed
       if (Notification.permission !== 'granted') {
-        console.log('Requesting notification permission...');
+        // console.log('Requesting notification permission...');
         const granted = await notificationService.requestBrowserPermission();
         if (!granted) {
-          console.warn('Notification permission denied');
+          // console.warn('Notification permission denied');
           return;
         }
       }
 
-      console.log('Showing browser notification:', notification.title);
+      // console.log('Showing browser notification:', notification.title);
 
       // Show the notification
       const browserNotification = new Notification(notification.title, {
@@ -191,7 +191,7 @@ class BroadcastNotificationService {
         try {
           notificationService.playNotificationSound();
         } catch (error) {
-          console.warn('Failed to play notification sound:', error);
+          // console.warn('Failed to play notification sound:', error);
         }
       }
 
@@ -200,7 +200,7 @@ class BroadcastNotificationService {
         try {
           browserNotification.close();
         } catch (error) {
-          console.warn('Failed to close notification:', error);
+          // console.warn('Failed to close notification:', error);
         }
       }, 5000);
 
@@ -213,22 +213,22 @@ class BroadcastNotificationService {
           window.location.hash = bugUrl;
           browserNotification.close();
         } catch (error) {
-          console.error('Failed to handle notification click:', error);
+          // console.error('Failed to handle notification click:', error);
         }
       };
 
       browserNotification.onerror = (error) => {
-        console.error('Notification error:', error);
+        // console.error('Notification error:', error);
       };
 
     } catch (error) {
-      console.error('Error showing browser notification:', error);
+      // console.error('Error showing browser notification:', error);
     }
   }
 
   // Manually trigger a notification check
   async checkNow(): Promise<void> {
-    console.log('Manual notification check triggered');
+    // console.log('Manual notification check triggered');
     await this.checkForNotifications();
   }
 
@@ -237,12 +237,12 @@ class BroadcastNotificationService {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        console.warn('No auth token for broadcasting notification');
+        // console.warn('No auth token for broadcasting notification');
         return;
       }
 
       const url = `${ENV.API_URL}/notifications/broadcast.php`;
-      console.log('Broadcasting notification:', notification.title);
+      // console.log('Broadcasting notification:', notification.title);
 
       const response = await fetch(url, {
         method: 'POST',
@@ -255,24 +255,24 @@ class BroadcastNotificationService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Failed to broadcast notification (${response.status}):`, errorText);
+        // console.error(`Failed to broadcast notification (${response.status}):`, errorText);
         return;
       }
 
       const data = await response.json();
       if (data.success) {
-        console.log('Notification broadcasted successfully:', data);
+        // console.log('Notification broadcasted successfully:', data);
       } else {
-        console.error('Broadcast failed:', data.message);
+        // console.error('Broadcast failed:', data.message);
       }
     } catch (error) {
-      console.error('Error broadcasting notification:', error);
+      // console.error('Error broadcasting notification:', error);
     }
   }
 
   // Broadcast new bug notification
   async broadcastNewBug(bugTitle: string, bugId: string, createdBy: string): Promise<void> {
-    console.log('Broadcasting new bug notification:', bugTitle);
+    // console.log('Broadcasting new bug notification:', bugTitle);
     await this.broadcastNotification({
       type: 'new_bug',
       title: 'New Bug Reported',
@@ -285,7 +285,7 @@ class BroadcastNotificationService {
 
   // Broadcast status change notification
   async broadcastStatusChange(bugTitle: string, bugId: string, status: string, updatedBy: string): Promise<void> {
-    console.log('Broadcasting status change notification:', bugTitle, 'to', status);
+    // console.log('Broadcasting status change notification:', bugTitle, 'to', status);
     
     const statusMessages: Record<string, string> = {
       'fixed': `Bug has been fixed: ${bugTitle}`,
@@ -317,9 +317,9 @@ class BroadcastNotificationService {
     this.lastCheckTime = new Date().toISOString();
     try {
       localStorage.setItem('lastNotificationCheck', this.lastCheckTime);
-      console.log('Reset last check time to:', this.lastCheckTime);
+      // console.log('Reset last check time to:', this.lastCheckTime);
     } catch (error) {
-      console.warn('Failed to reset last check time:', error);
+      // console.warn('Failed to reset last check time:', error);
     }
   }
 }
