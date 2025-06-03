@@ -15,6 +15,7 @@ import Fixes from "@/pages/Fixes";
 import { ErrorBoundaryProvider } from "@/components/ErrorBoundaryManager";
 import { useApiErrorHandler } from "@/hooks/useApiErrorHandler";
 import { DebugInfo } from "@/components/DebugInfo";
+import { TimezoneDebug } from "@/components/TimezoneDebug";
 
 // Initialize the query client outside of the component
 const queryClient = new QueryClient();
@@ -262,6 +263,7 @@ function AppContent() {
           onAccept={handleUpdateAccept}
           onDismiss={handleUpdateDismiss}
         />
+        <TimezoneDebug />
       </div>
     </>
   );

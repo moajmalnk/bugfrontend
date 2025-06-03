@@ -5,7 +5,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { bugService } from '@/services/bugService';
 import { useState } from 'react';
-import { formatBugDate, formatTooltipDate } from '@/lib/dateUtils';
+import { BugCreatedDate } from '@/components/ui/DateDisplay';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,17 +18,17 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const priorityColors = {
-  high: 'bg-red-100 text-red-800',
-  medium: 'bg-yellow-100 text-yellow-800',
-  low: 'bg-green-100 text-green-800'
+  high: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
+  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300',
+  low: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
 };
 
 const statusColors = {
-  pending: 'bg-gray-100 text-gray-800',
-  in_progress: 'bg-blue-100 text-blue-800',
-  fixed: 'bg-green-100 text-green-800',
-  declined: 'bg-red-100 text-red-800',
-  rejected: 'bg-red-100 text-red-800'
+  pending: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+  in_progress: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300',
+  fixed: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300',
+  declined: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
+  rejected: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
 };
 
 interface Bug {
@@ -114,12 +114,7 @@ export const BugCard = ({ bug, onDelete }: BugCardProps) => {
                 Project: {bug.project_name}
               </p>
             )}
-            <p 
-              className="text-xs sm:text-sm text-muted-foreground cursor-help"
-              title={formatTooltipDate(bug.created_at)}
-            >
-              Created {formatBugDate(bug.created_at)}
-            </p>
+            <BugCreatedDate date={bug.created_at} />
           </div>
         </div>
         

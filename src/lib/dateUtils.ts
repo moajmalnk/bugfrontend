@@ -1,4 +1,4 @@
-import { formatDistanceToNow, format, isToday, isYesterday, isThisYear, parseISO } from 'date-fns';
+import { formatDistanceToNow, format, isToday, isYesterday, isThisYear, parseISO, isValid, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 
 /**
  * Professional date formatting utility that provides consistent date displays
@@ -9,6 +9,191 @@ export interface DateDisplayOptions {
   includeTime?: boolean;
   relative?: boolean;
   short?: boolean;
+}
+
+/**
+ * Safely parse a date string and convert to local timezone
+ */
+export function safeParseDate(dateString: string | Date): Date {
+  if (dateString instanceof Date) {
+    return dateString;
+  }
+  
+  if (!dateString) {
+    return new Date();
+  }
+
+  try {
+    // Handle ISO strings and various formats
+    const parsed = parseISO(dateString);
+    return isValid(parsed) ? parsed : new Date(dateString);
+  } catch {
+    console.warn('Invalid date string:', dateString);
+    return new Date();
+  }
+}
+
+/**
+ * Professional relative time formatting like GitHub, Slack, etc.
+ */
+export function formatRelativeTime(dateString: string | Date): string {
+  const date = safeParseDate(dateString);
+  const now = new Date();
+  
+  const minutes = Math.abs(differenceInMinutes(now, date));
+  const hours = Math.abs(differenceInHours(now, date));
+  const days = Math.abs(differenceInDays(now, date));
+
+  // Just now (0-1 minute)
+  if (minutes < 1) {
+    return 'just now';
+  }
+  
+  // Minutes (1-59 minutes)
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+  
+  // Hours (1-23 hours)
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+  
+  // Days (1-7 days)
+  if (days < 7) {
+    return `${days}d ago`;
+  }
+  
+  // Weeks (1-4 weeks)
+  if (days < 30) {
+    const weeks = Math.floor(days / 7);
+    return `${weeks}w ago`;
+  }
+  
+  // Months (1-12 months)
+  if (days < 365) {
+    const months = Math.floor(days / 30);
+    return `${months}mo ago`;
+  }
+  
+  // Years
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+}
+
+/**
+ * Professional absolute date formatting
+ */
+export function formatAbsoluteDate(dateString: string | Date): string {
+  const date = safeParseDate(dateString);
+  const now = new Date();
+  
+  const days = Math.abs(differenceInDays(now, date));
+  
+  // Today: "Today at 2:30 PM"
+  if (days === 0) {
+    return `Today at ${format(date, 'h:mm a')}`;
+  }
+  
+  // Yesterday: "Yesterday at 2:30 PM"
+  if (days === 1) {
+    return `Yesterday at ${format(date, 'h:mm a')}`;
+  }
+  
+  // This year: "Mar 15 at 2:30 PM"
+  if (date.getFullYear() === now.getFullYear()) {
+    return format(date, 'MMM d \'at\' h:mm a');
+  }
+  
+  // Previous years: "Mar 15, 2023 at 2:30 PM"
+  return format(date, 'MMM d, yyyy \'at\' h:mm a');
+}
+
+/**
+ * Smart date formatting - shows relative for recent, absolute for older
+ */
+export function formatSmartDate(dateString: string | Date, showTime: boolean = false): string {
+  const date = safeParseDate(dateString);
+  const now = new Date();
+  
+  const minutes = Math.abs(differenceInMinutes(now, date));
+  const hours = Math.abs(differenceInHours(now, date));
+  const days = Math.abs(differenceInDays(now, date));
+
+  // Recent (less than 7 days): use relative time
+  if (days < 7) {
+    return formatRelativeTime(dateString);
+  }
+  
+  // Older: use absolute date
+  if (showTime) {
+    return formatAbsoluteDate(dateString);
+  }
+  
+  // Date only for older dates when time not needed
+  if (date.getFullYear() === now.getFullYear()) {
+    return format(date, 'MMM d');
+  }
+  
+  return format(date, 'MMM d, yyyy');
+}
+
+/**
+ * Bug-specific date formatting for consistent UX
+ */
+export function formatBugDate(dateString: string | Date): string {
+  return formatSmartDate(dateString, false);
+}
+
+/**
+ * Full timestamp for tooltips and detailed views
+ */
+export function formatFullTimestamp(dateString: string | Date): string {
+  const date = safeParseDate(dateString);
+  return format(date, 'EEEE, MMMM do, yyyy \'at\' h:mm:ss a');
+}
+
+/**
+ * ISO date for API calls
+ */
+export function formatISODate(date: Date): string {
+  return date.toISOString();
+}
+
+/**
+ * Simple date for forms
+ */
+export function formatSimpleDate(dateString: string | Date): string {
+  const date = safeParseDate(dateString);
+  return format(date, 'yyyy-MM-dd');
+}
+
+/**
+ * Professional activity feed formatting
+ */
+export function formatActivityDate(dateString: string | Date): string {
+  const date = safeParseDate(dateString);
+  const now = new Date();
+  const hours = Math.abs(differenceInHours(now, date));
+  
+  // Less than 24 hours: use relative
+  if (hours < 24) {
+    return formatRelativeTime(dateString);
+  }
+  
+  // More than 24 hours: use absolute
+  return formatAbsoluteDate(dateString);
+}
+
+/**
+ * Get timezone info for debugging
+ */
+export function getTimezoneInfo() {
+  return {
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    offset: new Date().getTimezoneOffset(),
+    offsetHours: new Date().getTimezoneOffset() / 60,
+  };
 }
 
 /**
@@ -78,16 +263,6 @@ export function formatDateProfessional(
   return includeTime
     ? format(date, 'MMM d, yyyy \'at\' HH:mm')
     : format(date, 'MMM d, yyyy');
-}
-
-/**
- * Format for bug cards and lists - shows relative time with smart fallback
- */
-export function formatBugDate(dateString: string): string {
-  return formatDateProfessional(dateString, { 
-    relative: true, 
-    includeTime: false 
-  });
 }
 
 /**
