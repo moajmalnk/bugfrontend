@@ -1,4 +1,3 @@
-
 import { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -14,23 +13,42 @@ interface AppProvidersProps {
   queryClient: QueryClient;
 }
 
-const AppProviders = ({ children, queryClient }: AppProvidersProps) => {
+// Providers that don't need router context
+export const CoreProviders = ({ children, queryClient }: AppProvidersProps) => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <AuthProvider>
-            <BugProvider>
-              <NotificationProvider>
-                <Toaster />
-                <Sonner />
-                {children}
-              </NotificationProvider>
-            </BugProvider>
-          </AuthProvider>
+          <Toaster />
+          <Sonner />
+          {children}
         </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>
+  );
+};
+
+// Providers that need router context
+export const RouterProviders = ({ children }: { children: ReactNode }) => {
+  return (
+    <AuthProvider>
+      <BugProvider>
+        <NotificationProvider>
+          {children}
+        </NotificationProvider>
+      </BugProvider>
+    </AuthProvider>
+  );
+};
+
+// Legacy export for backward compatibility
+const AppProviders = ({ children, queryClient }: AppProvidersProps) => {
+  return (
+    <CoreProviders queryClient={queryClient}>
+      <RouterProviders>
+        {children}
+      </RouterProviders>
+    </CoreProviders>
   );
 };
 

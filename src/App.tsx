@@ -1,11 +1,11 @@
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { PrivacyOverlay } from "@/components/PrivacyOverlay";
-import AppProviders from "@/components/providers/AppProviders";
+import { CoreProviders, RouterProviders } from "@/components/providers/AppProviders";
 import RouteConfig from "@/components/routes/RouteConfig";
 import { initOfflineDetector } from "@/lib/offline";
 import { QueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { BrowserRouter as Router } from "react-router-dom";
 import { requestNotificationPermission } from "./firebase-messaging-sw";
 import ContextMenu from "./components/ContextMenu";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -13,6 +13,12 @@ import Fixes from "@/pages/Fixes";
 
 // Initialize the query client outside of the component
 const queryClient = new QueryClient();
+
+// Add React Router v7 future flags to eliminate warnings
+const futureConfig = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+};
 
 export function useChunkLoadErrorRefresh() {
   const [showModal, setShowModal] = useState(false);
@@ -170,21 +176,20 @@ function App() {
   const chunkErrorModal = useChunkLoadErrorRefresh();
 
   return (
-    <Router>
-      <AppProviders queryClient={queryClient}>
-        <div>
-          {chunkErrorModal}
-          <KeyboardShortcuts />
+    <CoreProviders queryClient={queryClient}>
+      <Router future={futureConfig}>
+        <RouterProviders>
           <RouteConfig />
+          <KeyboardShortcuts />
           <PrivacyOverlay visible={privacy} />
           <ContextMenu
             mouseX={contextMenu.mouseX}
             mouseY={contextMenu.mouseY}
-            onClose={() => setContextMenu({ mouseX: null, mouseY: null })} // Pass a no-argument function
+            onClose={() => setContextMenu({ mouseX: null, mouseY: null })}
           />
-        </div>
-      </AppProviders>
-    </Router>
+        </RouterProviders>
+      </Router>
+    </CoreProviders>
   );
 }
 

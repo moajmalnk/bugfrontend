@@ -355,8 +355,6 @@ const Projects = () => {
       const baseUrl = `${ENV.API_URL}/projects/delete.php?id=${projectId}`;
       const url = force ? `${baseUrl}&force_delete=true` : baseUrl;
       
-      // console.log(`Sending DELETE request to: ${url} (Force: ${force ? "true" : "false"})`);
-      
       const token = localStorage.getItem("token");
       if (!token) {
         toast({
@@ -376,10 +374,7 @@ const Projects = () => {
         }
       });
       
-      // console.log(`Delete response status: ${response.status}`);
-      
       const data = await response.json();
-      // console.log("Delete response data:", data);
 
       if (data.success) {
         // Update both project arrays
@@ -401,10 +396,6 @@ const Projects = () => {
             data.message?.includes('bugs') || 
             data.message?.includes('constraint')) {
           
-          // Add debug info
-          // console.error(`Force delete failed with URL: ${url}`);
-          // console.error(`Force parameter was: ${force}`);
-          
           setDeleteErrorMessage(data.message);
           setIsErrorDialogOpen(true);
         } else {
@@ -416,7 +407,6 @@ const Projects = () => {
         }
       }
     } catch (error) {
-      // console.error("Project deletion error:", error);
       toast({
         title: "Error",
         description: "Failed to delete project. Please try again.",
@@ -635,7 +625,7 @@ const Projects = () => {
               This action cannot be undone. This will permanently delete the project.
               
               <div className="mt-4 bg-muted p-3 rounded-md text-sm">
-                <p className="font-medium mb-2">Note:</p>
+                <div className="font-medium mb-2">Note:</div>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>Projects with team members or bugs cannot be deleted directly.</li>
                   <li>You will be given the option to force delete if constraints are detected.</li>
@@ -678,7 +668,7 @@ const Projects = () => {
               {deleteErrorMessage}
               
               <div className="mt-4 bg-muted p-3 rounded-md text-sm">
-                <p className="font-medium mb-2">Before deleting a project:</p>
+                <div className="font-medium mb-2">Before deleting a project:</div>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>Remove all team members from the project</li>
                   <li>Resolve or reassign all bugs in the project</li>
@@ -686,20 +676,20 @@ const Projects = () => {
               </div>
               
               <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md text-sm border border-yellow-200 dark:border-yellow-800">
-                <p className="font-medium mb-2 flex items-center">
+                <div className="font-medium mb-2 flex items-center">
                   <AlertCircle className="h-4 w-4 mr-2 text-yellow-600 dark:text-yellow-400" />
                   Alternative: Force Delete
-                </p>
-                <p className="mb-2">
+                </div>
+                <div className="mb-2">
                   You can also force delete this project, which will automatically delete:
-                </p>
+                </div>
                 <ul className="list-disc pl-5 space-y-1 text-yellow-700 dark:text-yellow-300">
                   <li>All team member associations</li>
                   <li>All bugs and their fixes associated with this project</li>
                 </ul>
-                <p className="mt-2 text-yellow-700 dark:text-yellow-300 font-medium">
+                <div className="mt-2 text-yellow-700 dark:text-yellow-300 font-medium">
                   Warning: This action cannot be undone!
-                </p>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -710,7 +700,6 @@ const Projects = () => {
             <AlertDialogAction
               onClick={() => {
                 if (projectToDelete) {
-                  // console.log("Initiating force delete for project:", projectToDelete);
                   handleDelete(projectToDelete, true);
                 }
               }}
