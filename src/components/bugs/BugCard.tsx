@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDistanceToNow, parseISO } from 'date-fns';
+import { formatBugDate, formatTooltipDate } from '@/lib/dateUtils';
 
 interface Bug {
   id: string;
@@ -67,8 +67,11 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
               Project: {bug.project_name}
             </p>
           )}
-          <p className="text-xs sm:text-sm text-muted-foreground truncate">
-            Created {formatDistanceToNow(parseISO(bug.created_at), { addSuffix: true })}
+          <p 
+            className="text-xs sm:text-sm text-muted-foreground cursor-help"
+            title={formatTooltipDate(bug.created_at)}
+          >
+            Created {formatBugDate(bug.created_at)}
           </p>
         </div>
       </div>

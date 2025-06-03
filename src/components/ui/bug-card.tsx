@@ -5,6 +5,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { bugService } from '@/services/bugService';
 import { useState } from 'react';
+import { formatBugDate, formatTooltipDate } from '@/lib/dateUtils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -113,8 +114,11 @@ export const BugCard = ({ bug, onDelete }: BugCardProps) => {
                 Project: {bug.project_name}
               </p>
             )}
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">
-              Created {new Date(bug.created_at).toLocaleDateString()}
+            <p 
+              className="text-xs sm:text-sm text-muted-foreground cursor-help"
+              title={formatTooltipDate(bug.created_at)}
+            >
+              Created {formatBugDate(bug.created_at)}
             </p>
           </div>
         </div>

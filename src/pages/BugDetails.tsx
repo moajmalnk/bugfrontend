@@ -7,11 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
+import { formatDetailedDate } from "@/lib/dateUtils";
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { format } from "date-fns";
 import { Lock } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from 'react';
@@ -219,14 +219,8 @@ const BugDetails = () => {
     );
   }
 
-  const formattedCreatedDate = format(
-    new Date(bug.created_at),
-    "MMMM d, yyyy HH:mm"
-  );
-  const formattedUpdatedDate = format(
-    new Date(bug.updated_at),
-    "MMMM d, yyyy HH:mm"
-  );
+  const formattedCreatedDate = formatDetailedDate(bug.created_at);
+  const formattedUpdatedDate = formatDetailedDate(bug.updated_at);
 
   const canUpdateStatus =
     currentUser?.role === "admin" || currentUser?.role === "developer";

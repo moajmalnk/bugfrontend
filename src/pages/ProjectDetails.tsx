@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
+import { formatBugDate } from "@/lib/dateUtils";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import { Project, projectService, UpdateProjectData } from "@/services/projectService";
 import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
