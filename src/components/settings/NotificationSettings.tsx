@@ -247,6 +247,47 @@ export function NotificationSettingsCard() {
               Test Notification
             </Button>
           </div>
+          
+          {/* Debug section - can be removed in production */}
+          <div className="border-t pt-4 mt-4">
+            <h4 className="text-sm font-medium mb-2">Debug Info</h4>
+            <div className="space-y-2 text-xs">
+              <div>
+                <strong>Current Settings:</strong>
+                <pre className="bg-muted p-2 rounded mt-1 overflow-auto">
+                  {JSON.stringify(settings, null, 2)}
+                </pre>
+              </div>
+              <div>
+                <strong>localStorage Value:</strong>
+                <pre className="bg-muted p-2 rounded mt-1 overflow-auto">
+                  {localStorage.getItem('notification_settings') || 'null'}
+                </pre>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    notificationService.clearSettings();
+                    window.location.reload();
+                  }}
+                >
+                  Clear Settings & Reload
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    console.log('Current settings:', notificationService.getSettings());
+                    console.log('localStorage content:', localStorage.getItem('notification_settings'));
+                  }}
+                >
+                  Log Settings to Console
+                </Button>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
