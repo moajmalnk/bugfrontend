@@ -58,16 +58,51 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       });
       return;
     }
+    
     try {
-      const response = await fetch(selectedImage, { mode: "cors" });
-      if (!response.ok) throw new Error("Image fetch failed");
-      const blob = await response.blob();
-
-      // Convert to PNG if not already PNG, and downscale for speed
-      let pngBlob = blob;
-      if (blob.type !== "image/png" || scaleFactor !== 1) {
+      // First try the modern fetch approach
+      let blob: Blob;
+      try {
+        const response = await fetch(selectedImage, {
+          mode: 'cors',
+          credentials: 'omit'
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        blob = await response.blob();
+      } catch (fetchError) {
+        // Fallback: use canvas approach for CORS-restricted images
+        console.log('Fetch failed, trying canvas approach:', fetchError);
         const img = document.createElement("img");
         img.crossOrigin = "anonymous";
+        
+        const imgLoad = new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          setTimeout(reject, 5000); // 5 second timeout
+        });
+        
+        img.src = selectedImage;
+        await imgLoad;
+
+        // Create canvas and draw the image
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.floor(img.width * scaleFactor));
+        canvas.height = Math.max(1, Math.floor(img.height * scaleFactor));
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // Convert to blob
+        blob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((blob) => {
+            resolve(blob!);
+          }, "image/png", 0.9);
+        });
+      }
+
+      // If we have a blob but need to process it
+      let finalBlob = blob;
+      if (blob.type !== "image/png" || scaleFactor !== 1) {
+        const img = document.createElement("img");
         const imgLoad = new Promise((resolve, reject) => {
           img.onload = resolve;
           img.onerror = reject;
@@ -75,26 +110,33 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         img.src = URL.createObjectURL(blob);
         await imgLoad;
 
-        // Downscale
+        // Create canvas and process the image
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.floor(img.width * scaleFactor));
         canvas.height = Math.max(1, Math.floor(img.height * scaleFactor));
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        const pngDataUrl = canvas.toDataURL("image/png");
-        const res = await fetch(pngDataUrl);
-        pngBlob = await res.blob();
+        // Convert to PNG blob
+        finalBlob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((blob) => {
+            resolve(blob!);
+          }, "image/png", 0.9);
+        });
+        
         URL.revokeObjectURL(img.src);
       }
 
-      await navigator.clipboard.write([new window.ClipboardItem({ "image/png": pngBlob })]);
-      toast({ title: "Success", description: `Image copied to clipboard as PNG.` });
+      await navigator.clipboard.write([new window.ClipboardItem({ "image/png": finalBlob })]);
+      toast({ 
+        title: "Success", 
+        description: scaleFactor < 1 ? `Image copied to clipboard (${Math.round(scaleFactor * 100)}% size)` : "Image copied to clipboard"
+      });
     } catch (error) {
-      // console.error("Copy image error:", error);
+      console.error("Copy image error:", error);
       toast({
         title: "Error",
-        description: "Failed to copy image. Check browser support and CORS.",
+        description: "Failed to copy image. Try right-clicking and 'Copy image' instead.",
         variant: "destructive",
       });
     }
@@ -109,28 +151,98 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       });
       return;
     }
+    
     try {
-      const response = await fetch(selectedImage, { mode: "cors" });
-      if (!response.ok) throw new Error("Image fetch failed");
-      const blob = await response.blob();
-      const file = new File([blob], "screenshot.png", { type: blob.type });
+      let blob: Blob;
+      let fileName = "bug-screenshot.png";
+      
+      try {
+        // Try to fetch the image
+        const response = await fetch(selectedImage, {
+          mode: 'cors',
+          credentials: 'omit'
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        blob = await response.blob();
+        
+        // Try to get original filename from URL
+        const urlParts = selectedImage.split('/');
+        const lastPart = urlParts[urlParts.length - 1];
+        if (lastPart && lastPart.includes('.')) {
+          fileName = lastPart;
+        }
+      } catch (fetchError) {
+        console.log('Fetch failed for sharing, trying canvas approach:', fetchError);
+        // Fallback: create image using canvas
+        const img = document.createElement("img");
+        img.crossOrigin = "anonymous";
+        
+        const imgLoad = new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          setTimeout(reject, 5000); // 5 second timeout
+        });
+        
+        img.src = selectedImage;
+        await imgLoad;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        blob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((blob) => {
+            resolve(blob!);
+          }, "image/png", 0.9);
+        });
+      }
+      
+      const file = new File([blob], fileName, { type: blob.type });
+      
+      // Prepare share content with bug details
+      const shareTitle = `Bug Screenshot: ${bug.title || 'Untitled Bug'}`;
+      let shareText = '';
+      
+      if (bug.description) {
+        // Include full description if not too long, otherwise truncate
+        if (bug.description.length <= 200) {
+          shareText = `Bug Description:\n${bug.description}`;
+        } else {
+          shareText = `Bug Description:\n${bug.description.substring(0, 197)}...`;
+        }
+      }
+      
+      // Add additional bug details
+      if (bug.priority) {
+        shareText += `\n\nPriority: ${bug.priority}`;
+      }
+      if (bug.status) {
+        shareText += `\nStatus: ${bug.status}`;
+      }
+      if (bug.project_id) {
+        shareText += `\nProject: ${bug.project_id}`;
+      }
+      
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: "Bug Screenshot",
-          text: bug.description,
+          title: shareTitle,
+          text: shareText || "Bug Screenshot",
         });
       } else {
         toast({
           title: "Error",
-          description: "Sharing files is not supported in your browser.",
+          description: "File sharing is not supported in your browser.",
           variant: "destructive",
         });
       }
     } catch (error) {
+      console.error("Share image error:", error);
       toast({
         title: "Error",
-        description: "Failed to share image. Check browser support and CORS.",
+        description: "Failed to share image. Try downloading it instead.",
         variant: "destructive",
       });
     }
