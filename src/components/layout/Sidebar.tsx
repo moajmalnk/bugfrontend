@@ -142,7 +142,7 @@ export default function MainLayout({ children }) {
 
       {/* Sidebar drawer for mobile */}
       <div
-        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 md:hidden ${
+        className={`fixed inset-0 z-60 bg-black/40 transition-opacity duration-200 md:hidden ${
           sidebarOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"

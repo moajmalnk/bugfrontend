@@ -44,9 +44,14 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const { logout, currentUser } = useAuth();
 
-  // Constants
-  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-  const INACTIVITY_WARNING = 4 * 60 * 1000; // 4 minutes (1 minute warning)
+  // Constants - TEMPORARY SHORTER TIMEOUTS FOR TESTING
+  const INACTIVITY_TIMEOUT = 30 * 1000; // 30 seconds (normally 5 minutes)
+  const INACTIVITY_WARNING = 20 * 1000; // 20 seconds (normally 4 minutes)
+  
+//   PRODUCTION TIMEOUTS (uncomment these and comment above for production):
+//   const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+//   const INACTIVITY_WARNING = 4 * 60 * 1000; // 4 minutes
+  
   const VERSION_CHECK_INTERVAL = 30 * 1000; // 30 seconds
   const NETWORK_CHECK_INTERVAL = 10 * 1000; // 10 seconds
 
@@ -83,8 +88,10 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     };
   }, []);
 
-  // Activity monitoring
+  // Activity monitoring - TEMPORARILY DISABLED
   useEffect(() => {
+    return; // Disabled during testing
+    
     const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
     
     events.forEach(event => {
@@ -98,8 +105,10 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     };
   }, [updateActivity]);
 
-  // Inactivity checker
+  // Inactivity checker - TEMPORARILY DISABLED
   useEffect(() => {
+    return; // Disabled during testing
+    
     if (!currentUser) return;
 
     const checkInactivity = () => {
@@ -130,8 +139,10 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     return () => clearInterval(interval);
   }, [lastActivity, currentUser, inactivityWarning]);
 
-  // Version checking for deployments
+  // Version checking for deployments - TEMPORARILY DISABLED
   useEffect(() => {
+    return; // Disabled during testing
+    
     const checkVersion = async () => {
       try {
         const response = await fetch('/version.json?' + Date.now(), {
@@ -164,8 +175,10 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     return () => clearInterval(interval);
   }, [appVersion]);
 
-  // API Health monitoring
+  // API Health monitoring - TEMPORARILY DISABLED FOR TESTING
   useEffect(() => {
+    return; // Disabled to prevent interference during testing
+    
     if (!isOnline) return;
 
     const checkApiHealth = async () => {
@@ -309,7 +322,7 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
       {children}
       
       {/* Error Modal */}
-      {errorState && (
+      {errorState && errorState.severity === 'critical' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <Card className="w-full max-w-md mx-4 shadow-2xl border-2">
             <CardHeader className={`pb-3 ${
@@ -357,16 +370,38 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
                         Refresh Page
                       </Button>
                     )}
-                    {errorState.severity === 'warning' && (
-                      <Button onClick={clearError} variant="outline" className="flex-1">
-                        Continue
-                      </Button>
-                    )}
                   </>
                 )}
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Non-critical error notifications */}
+      {errorState && errorState.severity !== 'critical' && (
+        <div className="fixed top-4 right-4 z-40 max-w-sm">
+          <Alert className={`border-2 ${
+            errorState.severity === 'warning' ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20' :
+            'border-orange-200 bg-orange-50 dark:bg-orange-900/20'
+          }`}>
+            {getErrorIcon(errorState.type)}
+            <AlertTitle className="ml-2">{getErrorTitle(errorState.type)}</AlertTitle>
+            <AlertDescription className="ml-2 mt-1">
+              {errorState.message}
+              <div className="flex gap-2 mt-2">
+                {errorState.canRetry && (
+                  <Button onClick={handleRetry} size="sm" variant="outline">
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Refresh
+                  </Button>
+                )}
+                <Button onClick={clearError} size="sm" variant="ghost">
+                  Dismiss
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
         </div>
       )}
 
