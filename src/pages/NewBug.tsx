@@ -25,6 +25,8 @@ import {
   sendNewBugNotification,
 } from "@/services/emailService";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
+import { whatsappService } from "@/services/whatsappService";
+import { notificationService } from "@/services/notificationService";
 import { BugPriority, Project } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -205,6 +207,23 @@ const NewBug = () => {
                 currentUser?.name || "Bug Ricer User"
               );
               console.log("Broadcast notification sent for new bug");
+
+              // Check if WhatsApp notifications are enabled and share
+              const notificationSettings = notificationService.getSettings();
+              if (notificationSettings.whatsappNotifications && notificationSettings.newBugNotifications) {
+                // Get project name for WhatsApp message
+                const selectedProject = projects?.find(p => p.id === projectId);
+                
+                whatsappService.shareNewBug({
+                  bugTitle: name,
+                  bugId: bugId,
+                  priority: priority,
+                  description: description,
+                  reportedBy: currentUser?.name || "Bug Ricer User",
+                  projectName: selectedProject?.name
+                });
+                console.log("WhatsApp share opened for new bug");
+              }
             }
           } catch (emailError) {
             // console.error("Failed to send email notification:", emailError);

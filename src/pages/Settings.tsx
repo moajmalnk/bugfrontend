@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
 import { Moon, Sun } from 'lucide-react';
 import { NotificationSettingsCard } from '@/components/settings/NotificationSettings';
+import { WhatsAppContactsManager } from '@/components/settings/WhatsAppContactsManager';
 
 const Settings = () => {
   const { currentUser } = useAuth();
@@ -43,6 +44,7 @@ const Settings = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
         
         <TabsContent value="general">
@@ -96,6 +98,10 @@ const Settings = () => {
         
         <TabsContent value="notifications">
           <NotificationSettingsCard />
+        </TabsContent>
+
+        <TabsContent value="whatsapp">
+          <WhatsAppContactsManager />
         </TabsContent>
       </Tabs>
     </div>

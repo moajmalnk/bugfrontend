@@ -11,6 +11,8 @@ import { toast } from "@/components/ui/use-toast";
 import { bugService } from "@/services/bugService";
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
+import { whatsappService } from "@/services/whatsappService";
+import { notificationService } from "@/services/notificationService";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bug, BugStatus, Project } from "@/types";
@@ -80,6 +82,19 @@ export const BugDetailsCard = ({
           console.log("Broadcast notification sent for status change");
         } catch (broadcastError) {
           console.error("Failed to send broadcast notification:", broadcastError);
+        }
+
+        // Check if WhatsApp notifications are enabled and share
+        const notificationSettings = notificationService.getSettings();
+        if (notificationSettings.whatsappNotifications && notificationSettings.statusChangeNotifications) {
+          whatsappService.shareStatusUpdate({
+            bugTitle: updatedBug.title,
+            bugId: updatedBug.id,
+            status: value,
+            priority: updatedBug.priority,
+            updatedBy: currentUser?.name || "Bug Ricer User"
+          });
+          console.log("WhatsApp share opened for status change");
         }
         
         if (notificationResult.success) {

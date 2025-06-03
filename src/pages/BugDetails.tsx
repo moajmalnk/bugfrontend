@@ -10,6 +10,8 @@ import { ENV } from "@/lib/env";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
+import { whatsappService } from "@/services/whatsappService";
+import { notificationService } from "@/services/notificationService";
 import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -265,6 +267,19 @@ const BugDetails = () => {
             currentUser?.name || "Bug Ricer User"
           );
           console.log("Broadcast notification sent for status change");
+
+          // Check if WhatsApp notifications are enabled and share
+          const notificationSettings = notificationService.getSettings();
+          if (notificationSettings.whatsappNotifications && notificationSettings.statusChangeNotifications) {
+            whatsappService.shareStatusUpdate({
+              bugTitle: bug.title,
+              bugId: bug.id,
+              status: newStatus,
+              priority: bug.priority,
+              updatedBy: currentUser?.name || "Bug Ricer User"
+            });
+            console.log("WhatsApp share opened for status change");
+          }
         } catch (notificationError) {
           // // console.error("Failed to send notification:", notificationError);
         }

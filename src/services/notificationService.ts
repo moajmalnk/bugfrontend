@@ -1,6 +1,16 @@
 class NotificationService {
   private readonly STORAGE_KEY = 'notification_settings';
 
+  // Default notification settings
+  private readonly DEFAULT_SETTINGS: NotificationSettings = {
+    emailNotifications: true,
+    browserNotifications: true,
+    whatsappNotifications: false, // Disabled by default since it requires manual interaction
+    newBugNotifications: true,
+    statusChangeNotifications: true,
+    notificationSound: true
+  };
+
   private getStoredSettings(): NotificationSettings {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
@@ -31,6 +41,7 @@ class NotificationService {
     return {
       emailNotifications: true,
       browserNotifications: true,
+      whatsappNotifications: false,
       newBugNotifications: true,
       statusChangeNotifications: true,
       notificationSound: true
@@ -173,6 +184,7 @@ class NotificationService {
 export interface NotificationSettings {
   emailNotifications: boolean;
   browserNotifications: boolean;
+  whatsappNotifications: boolean;
   newBugNotifications: boolean;
   statusChangeNotifications: boolean;
   notificationSound: boolean;

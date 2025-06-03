@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom';
 import { bugService } from '@/services/bugService';
 import { toast } from '@/components/ui/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { WhatsAppShareButton } from '@/components/bugs/WhatsAppShareButton';
 
 // Add getStatusColor function
 const getStatusColor = (status: string) => {
@@ -222,6 +223,23 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
                 </Button>
               </EditBugDialog>
             )}
+            
+            {/* WhatsApp Share Button */}
+            <WhatsAppShareButton
+              data={{
+                bugTitle: bug.title,
+                bugId: bug.id,
+                status: bug.status,
+                priority: bug.priority,
+                description: bug.description,
+                reportedBy: bug.reported_by,
+                projectName: bug.project_id
+              }}
+              type={bug.status === 'fixed' ? 'status_update' : 'new_bug'}
+              variant="outline"
+              size="sm"
+              showLabel={false}
+            />
             
             {canDelete && (
               <Button 
