@@ -1,4 +1,3 @@
-
 class NotificationService {
   private readonly STORAGE_KEY = 'notification_settings';
 
@@ -14,7 +13,6 @@ class NotificationService {
       browserNotifications: true,
       newBugNotifications: true,
       statusChangeNotifications: true,
-      mentionNotifications: true,
       notificationSound: true
     };
   }
@@ -71,6 +69,61 @@ class NotificationService {
       });
     }
   }
+
+  async sendBugNotification(title: string, body: string, type: 'new' | 'status_change' = 'status_change'): Promise<boolean> {
+    const settings = this.getSettings();
+    
+    // Check if browser notifications are enabled and the specific type is allowed
+    if (!settings.browserNotifications) {
+      return false;
+    }
+    
+    if (type === 'new' && !settings.newBugNotifications) {
+      return false;
+    }
+    
+    if (type === 'status_change' && !settings.statusChangeNotifications) {
+      return false;
+    }
+
+    if (!('Notification' in window)) {
+      return false;
+    }
+
+    if (Notification.permission !== 'granted') {
+      const granted = await this.requestBrowserPermission();
+      if (!granted) return false;
+    }
+
+    new Notification(title, {
+      body,
+      icon: '/favicon.ico',
+      tag: `bug-${type}-${Date.now()}` // Prevents duplicate notifications
+    });
+
+    // Play notification sound if enabled
+    if (settings.notificationSound) {
+      this.playNotificationSound();
+    }
+
+    return true;
+  }
+
+  async sendNewBugNotification(bugTitle: string): Promise<boolean> {
+    return this.sendBugNotification(
+      'New Bug Reported',
+      `A new bug has been reported: ${bugTitle}`,
+      'new'
+    );
+  }
+
+  async sendBugStatusNotification(bugTitle: string, status: string): Promise<boolean> {
+    return this.sendBugNotification(
+      'Bug Status Updated',
+      `${bugTitle} has been marked as ${status}`,
+      'status_change'
+    );
+  }
 }
 
 export interface NotificationSettings {
@@ -78,7 +131,6 @@ export interface NotificationSettings {
   browserNotifications: boolean;
   newBugNotifications: boolean;
   statusChangeNotifications: boolean;
-  mentionNotifications: boolean;
   notificationSound: boolean;
 }
 

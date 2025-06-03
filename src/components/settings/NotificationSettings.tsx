@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,6 @@ export function NotificationSettingsCard() {
     browserNotifications: true,
     newBugNotifications: true,
     statusChangeNotifications: true,
-    mentionNotifications: true,
     notificationSound: true
   });
 
@@ -75,7 +73,7 @@ export function NotificationSettingsCard() {
               <div>
                 <Label htmlFor="emailNotifications" className="text-base">Email Notifications</Label>
                 <p className="text-sm text-muted-foreground">
-                  Receive email notifications for important events
+                  Receive email notifications for bug reports and status changes
                 </p>
               </div>
             </div>
@@ -96,7 +94,7 @@ export function NotificationSettingsCard() {
               <div>
                 <Label htmlFor="browserNotifications" className="text-base">Browser Notifications</Label>
                 <p className="text-sm text-muted-foreground">
-                  Show desktop notifications when in browser
+                  Show desktop notifications when using the browser
                 </p>
               </div>
             </div>
@@ -117,7 +115,7 @@ export function NotificationSettingsCard() {
               <div>
                 <Label htmlFor="notificationSound" className="text-base">Notification Sound</Label>
                 <p className="text-sm text-muted-foreground">
-                  Play a sound when receiving notifications
+                  Play a sound when receiving browser notifications
                 </p>
               </div>
             </div>
@@ -134,10 +132,13 @@ export function NotificationSettingsCard() {
           
           <div className="pl-7 space-y-3">
             <h3 className="font-medium">Notification Types</h3>
+            <p className="text-sm text-muted-foreground">
+              Choose which types of events trigger notifications
+            </p>
             
             <div className="flex items-center justify-between pl-4">
               <Label htmlFor="newBugNotifications" className="text-sm">
-                New bugs
+                New bug reports
               </Label>
               <Switch
                 id="newBugNotifications"
@@ -151,7 +152,7 @@ export function NotificationSettingsCard() {
             
             <div className="flex items-center justify-between pl-4">
               <Label htmlFor="statusChangeNotifications" className="text-sm">
-                Status changes
+                Bug status changes
               </Label>
               <Switch
                 id="statusChangeNotifications"
@@ -162,21 +163,15 @@ export function NotificationSettingsCard() {
                 disabled={!settings.browserNotifications && !settings.emailNotifications}
               />
             </div>
-            
-            <div className="flex items-center justify-between pl-4">
-              <Label htmlFor="mentionNotifications" className="text-sm">
-                Mentions
-              </Label>
-              <Switch
-                id="mentionNotifications"
-                checked={settings.mentionNotifications}
-                onCheckedChange={(checked) => 
-                  setSettings(prev => ({ ...prev, mentionNotifications: checked }))
-                }
-                disabled={!settings.browserNotifications && !settings.emailNotifications}
-              />
-            </div>
           </div>
+          
+          {(!settings.browserNotifications && !settings.emailNotifications) && (
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm text-muted-foreground">
+                Enable email or browser notifications to receive alerts about bug activities.
+              </p>
+            </div>
+          )}
         </div>
         
         <div className="flex gap-2">
