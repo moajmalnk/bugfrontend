@@ -188,16 +188,16 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       <Card className="overflow-hidden">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base sm:text-lg">Description</CardTitle>
-          {/* Add Copy Description Button */}
+          {/* Responsive Copy Description Button */}
           {bug?.description && navigator.clipboard && navigator.clipboard.writeText && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0.5"
+              className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
               onClick={handleCopyDescription}
               aria-label="Copy description to clipboard"
             >
-              <Copy className="h-4 w-4" />
+              <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           )}
         </CardHeader>
@@ -231,10 +231,11 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 px-3 text-xs"
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
                       onClick={() => handleOpenImage(screenshot.path, index)}
                     >
-                      View Full Size
+                      <span className="hidden xs:inline">View Full Size</span>
+                      <span className="xs:hidden">View</span>
                     </Button>
                   </div>
                 </div>
@@ -254,24 +255,24 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           <CardContent>
             <ul className="space-y-2">
               {bug.files.map((file, index) => (
-                <li key={index} className="flex items-center gap-2">
+                <li key={index} className="flex items-center gap-2 sm:gap-3">
                   <a
                     href={file.path}
-                    className="text-sm sm:text-base text-primary hover:underline"
+                    className="text-sm sm:text-base text-primary hover:underline flex-1 min-w-0"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {file.name}
+                    <span className="truncate block">{file.name}</span>
                   </a>
                   <Button
                     variant="ghost"
                     size="sm"
                     asChild
                     aria-label={`Download file ${file.name}`}
-                    className="h-auto p-1"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                   >
                     <a href={file.path} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-3.5 w-3.5" />
+                      <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </a>
                   </Button>
                 </li>
@@ -293,32 +294,32 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       >
         <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col p-0 gap-0" aria-describedby="screenshot-preview-description">
           <DialogHeader className="p-3 sm:p-4 flex-shrink-0 border-b">
-            <div className="flex items-center justify-between gap-4">
-              <DialogTitle className="text-sm sm:text-base">
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
+              <DialogTitle className="text-sm sm:text-base flex-shrink-0">
                 Screenshot Preview
               </DialogTitle>
-              <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 overflow-x-auto">
                 {bug.screenshots && bug.screenshots.length > 1 && (
                   <>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 w-8"
+                      className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                       onClick={handlePreviousImage}
                       disabled={currentImageIndex === 0}
                       aria-label="Previous image"
                     >
-                      <ArrowLeft className="h-3.5 w-3.5" />
+                      <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 w-8"
+                      className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                       onClick={handleNextImage}
                       disabled={currentImageIndex === (bug.screenshots.length - 1)}
                       aria-label="Next image"
                     >
-                      <ArrowRight className="h-3.5 w-3.5" />
+                      <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                   </>
                 )}
@@ -326,69 +327,69 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 w-8"
+                  className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                   onClick={handleZoomOut}
                   disabled={scale <= 0.5}
                   aria-label="Zoom out"
                 >
-                  <ZoomOut className="h-3.5 w-3.5" />
+                  <ZoomOut className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 w-8"
+                  className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                   onClick={handleZoomIn}
                   disabled={scale >= 3}
                   aria-label="Zoom in"
                 >
-                  <ZoomIn className="h-3.5 w-3.5" />
+                  <ZoomIn className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 w-8"
+                  className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                   onClick={handleRotate}
                   aria-label="Rotate image 90 degrees clockwise"
                 >
-                  <RotateCw className="h-3.5 w-3.5" />
+                  <RotateCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
                 {selectedImage && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                     asChild
                     aria-label="Download image"
                   >
                     <a href={selectedImage} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-3.5 w-3.5" />
+                      <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </a>
                   </Button>
                 )}
 
-                {/* Add Copy Image Button */}
+                {/* Responsive Copy Image Button */}
                 {navigator.clipboard && navigator.clipboard.write && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                     onClick={() => handleCopyImage(0.25)}
-                    aria-label="Copy image to clipboard (2x faster)"
+                    aria-label="Copy image to clipboard"
                   >
-                    <Copy className="h-3.5 w-3.5" />
+                    <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 )}
 
-                {/* Add Share Button */}
+                {/* Responsive Share Button */}
                 {navigator.share && navigator.canShare && bug.screenshots && bug.screenshots.length > 0 && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                     onClick={handleShareImage}
                     aria-label="Share image"
                   >
-                    <Share2 className="h-3.5 w-3.5" />
+                    <Share2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 )}
 
@@ -396,11 +397,11 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0 hidden sm:flex"
                     onClick={handlePrintImage}
                     aria-label="Print image"
                   >
-                    <Printer className="h-3.5 w-3.5" />
+                    <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 )}
 
@@ -408,7 +409,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8 hover:bg-destructive hover:text-destructive-foreground"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 hover:bg-destructive hover:text-destructive-foreground flex-shrink-0"
                     onClick={() => {
                       setSelectedImage(null);
                       setScale(1);
@@ -416,14 +417,14 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                     }}
                     aria-label="Close dialog"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 )}
               </div>
             </div>
           </DialogHeader>
           {selectedImage && bug.screenshots && bug.screenshots.length > 0 && (
-            <div className="relative flex-1 overflow-auto p-3 sm:p-4">
+            <div className="relative flex-1 overflow-auto p-2 sm:p-3 md:p-4">
               <div className="min-h-full flex items-center justify-center">
                 <img
                   src={bug.screenshots[currentImageIndex].path}
