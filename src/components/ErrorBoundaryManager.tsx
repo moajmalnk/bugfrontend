@@ -61,33 +61,6 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     setInactivityWarning(false);
   }, []);
 
-  // Network status monitoring
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      clearError();
-    };
-    
-    const handleOffline = () => {
-      setIsOnline(false);
-      showError({
-        type: 'network',
-        message: 'Internet connection lost. Please check your network and try again.',
-        canRetry: true,
-        requiresLogin: false,
-        severity: 'error'
-      });
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
   // Activity monitoring - TEMPORARILY DISABLED
   useEffect(() => {
     return; // Disabled during testing

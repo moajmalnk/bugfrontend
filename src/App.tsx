@@ -3,6 +3,8 @@ import { PrivacyOverlay } from "@/components/PrivacyOverlay";
 import { CoreProviders, RouterProviders } from "@/components/providers/AppProviders";
 import RouteConfig from "@/components/routes/RouteConfig";
 import { initOfflineDetector } from "@/lib/offline";
+import { initializeServiceWorker, serviceWorkerManager } from "@/lib/serviceWorkerManager";
+import { initDevUtils } from "@/lib/devUtils";
 import { QueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router } from "react-router-dom";
@@ -23,6 +25,131 @@ const futureConfig = {
   v7_relativeSplatPath: true,
 };
 
+// Professional update notification component
+function UpdateNotificationModal({ show, onAccept, onDismiss }: {
+  show: boolean;
+  onAccept: () => void;
+  onDismiss: () => void;
+}) {
+  if (!show) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0,0,0,0.6)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backdropFilter: "blur(4px)"
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 12,
+          padding: "2rem",
+          maxWidth: 420,
+          width: "90%",
+          boxShadow: "0 20px 64px rgba(0,0,0,0.15)",
+          textAlign: "center",
+          border: "1px solid #e5e7eb"
+        }}
+      >
+        <div style={{ marginBottom: 16, fontSize: 24 }}>🚀</div>
+        <h2 style={{ 
+          marginBottom: 12, 
+          color: "#111827",
+          fontSize: "1.25rem",
+          fontWeight: 600
+        }}>
+          New Version Available
+        </h2>
+        <p style={{ 
+          marginBottom: 24, 
+          color: "#6b7280",
+          lineHeight: 1.6
+        }}>
+          A new version of Bugricer is ready with improvements and bug fixes.
+          Would you like to update now?
+        </p>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+          <button
+            style={{
+              background: "#f3f4f6",
+              color: "#374151",
+              border: "1px solid #d1d5db",
+              borderRadius: 6,
+              padding: "0.75rem 1.5rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+            onClick={onDismiss}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = "#e5e7eb";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "#f3f4f6";
+            }}
+          >
+            Later
+          </button>
+          <button
+            style={{
+              background: "#2563eb",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              padding: "0.75rem 1.5rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+            onClick={onAccept}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = "#1d4ed8";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "#2563eb";
+            }}
+          >
+            Update Now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Offline notification banner
+function OfflineBanner({ show }: { show: boolean }) {
+  if (!show) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        background: "#f59e0b",
+        color: "#92400e",
+        padding: "0.75rem 1rem",
+        textAlign: "center",
+        zIndex: 9998,
+        fontSize: "0.875rem",
+        fontWeight: 500,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+      }}
+    >
+      📡 You're currently offline. Some features may be limited.
+    </div>
+  );
+}
+
 // Component that uses the error handler hook inside the provider
 function AppContent() {
   useApiErrorHandler(); // This will set up automatic error handling for API calls
@@ -31,9 +158,35 @@ function AppContent() {
     return localStorage.getItem("privacyMode") === "true";
   });
 
-  // Initialize offline detector
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  // Initialize service worker and offline detector
   useEffect(() => {
+    // Initialize development utilities
+    initDevUtils();
+    
+    // Initialize service worker
+    initializeServiceWorker().catch(error => {
+      console.error('[App] Service worker initialization failed:', error);
+    });
+
+    // Set up service worker event listeners
+    serviceWorkerManager.onUpdateAvailable(() => {
+      setShowUpdateModal(true);
+    });
+
+    serviceWorkerManager.onOffline(() => {
+      setIsOffline(true);
+    });
+
+    serviceWorkerManager.onOnline(() => {
+      setIsOffline(false);
+    });
+
+    // Initialize offline detector as fallback
     const cleanup = initOfflineDetector();
+    
     return cleanup;
   }, []);
 
@@ -70,8 +223,6 @@ function AppContent() {
   };
 
   const handleNativeClick = (event: MouseEvent) => {
-    // You might want to check if the click was outside the context menu before closing
-    // For simplicity, we'll close on any click for now
     setContextMenu({ mouseX: null, mouseY: null });
   };
 
@@ -84,42 +235,67 @@ function AppContent() {
     };
   }, []);
 
+  // Handle service worker update
+  const handleUpdateAccept = () => {
+    serviceWorkerManager.skipWaiting();
+    setShowUpdateModal(false);
+  };
+
+  const handleUpdateDismiss = () => {
+    setShowUpdateModal(false);
+  };
+
   return (
     <>
-      <RouteConfig />
-      <KeyboardShortcuts />
-      <PrivacyOverlay visible={privacy} />
-      <ContextMenu
-        mouseX={contextMenu.mouseX}
-        mouseY={contextMenu.mouseY}
-        onClose={() => setContextMenu({ mouseX: null, mouseY: null })}
-      />
+      <OfflineBanner show={isOffline} />
+      <div style={{ paddingTop: isOffline ? '3rem' : '0' }}>
+        <RouteConfig />
+        <KeyboardShortcuts />
+        <PrivacyOverlay visible={privacy} />
+        <ContextMenu
+          mouseX={contextMenu.mouseX}
+          mouseY={contextMenu.mouseY}
+          onClose={() => setContextMenu({ mouseX: null, mouseY: null })}
+        />
+        <UpdateNotificationModal
+          show={showUpdateModal}
+          onAccept={handleUpdateAccept}
+          onDismiss={handleUpdateDismiss}
+        />
+      </div>
     </>
   );
 }
 
+// Professional chunk loading error handler using service worker
 export function useChunkLoadErrorRefresh() {
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    const handler = (event) => {
+    const handler = (event: ErrorEvent) => {
+      const message = event?.message || '';
       if (
-        event?.message?.includes("Failed to fetch dynamically imported module") ||
-        event?.message?.includes("Loading chunk") ||
-        event?.message?.includes("expected a JavaScript module script")
+        message.includes("Failed to fetch dynamically imported module") ||
+        message.includes("Loading chunk") ||
+        message.includes("expected a JavaScript module script") ||
+        message.includes("Loading CSS chunk")
       ) {
+        console.warn('[App] Chunk loading error detected:', message);
         setShowModal(true);
       }
     };
     window.addEventListener("error", handler);
 
-    // Also handle unhandledrejection for dynamic import errors
-    const rejectionHandler = (event) => {
+    // Handle unhandled promise rejections for dynamic imports
+    const rejectionHandler = (event: PromiseRejectionEvent) => {
+      const reason = event?.reason?.message || '';
       if (
-        event?.reason?.message?.includes("Failed to fetch dynamically imported module") ||
-        event?.reason?.message?.includes("Loading chunk") ||
-        event?.reason?.message?.includes("expected a JavaScript module script")
+        reason.includes("Failed to fetch dynamically imported module") ||
+        reason.includes("Loading chunk") ||
+        reason.includes("expected a JavaScript module script") ||
+        reason.includes("Loading CSS chunk")
       ) {
+        console.warn('[App] Chunk loading promise rejection:', reason);
         setShowModal(true);
       }
     };
@@ -131,47 +307,80 @@ export function useChunkLoadErrorRefresh() {
     };
   }, []);
 
-  // Render the modal if needed
+  const handleRefresh = async () => {
+    // Clear caches before refresh to ensure clean reload
+    try {
+      await serviceWorkerManager.clearCache();
+      console.log('[App] Cache cleared before refresh');
+    } catch (error) {
+      console.warn('[App] Failed to clear cache before refresh:', error);
+    }
+    
+    window.location.reload();
+  };
+
   return showModal ? (
     <div
       style={{
         position: "fixed",
         top: 0, left: 0, right: 0, bottom: 0,
-        background: "rgba(0,0,0,0.5)",
+        background: "rgba(0,0,0,0.6)",
         zIndex: 9999,
         display: "flex",
         alignItems: "center",
-        justifyContent: "center"
+        justifyContent: "center",
+        backdropFilter: "blur(4px)"
       }}
     >
       <div
         style={{
           background: "#fff",
-          borderRadius: 8,
+          borderRadius: 12,
           padding: "2rem",
-          maxWidth: 400,
-          boxShadow: "0 4px 32px rgba(0,0,0,0.2)",
-          textAlign: "center"
+          maxWidth: 420,
+          width: "90%",
+          boxShadow: "0 20px 64px rgba(0,0,0,0.15)",
+          textAlign: "center",
+          border: "1px solid #e5e7eb"
         }}
       >
-        <h2 style={{ marginBottom: 16 }}>Update Available</h2>
-        <p style={{ marginBottom: 24 }}>
-          A new version of this site is available or a network error occurred.<br />
-          Please refresh to continue.
+        <div style={{ marginBottom: 16, fontSize: 24 }}>⚠️</div>
+        <h2 style={{ 
+          marginBottom: 12, 
+          color: "#111827",
+          fontSize: "1.25rem",
+          fontWeight: 600
+        }}>
+          Application Update Required
+        </h2>
+        <p style={{ 
+          marginBottom: 24, 
+          color: "#6b7280",
+          lineHeight: 1.6
+        }}>
+          The application needs to be refreshed to load the latest updates.
+          This may be due to a new deployment or network connectivity issues.
         </p>
         <button
           style={{
-            background: "#2563eb",
+            background: "#dc2626",
             color: "#fff",
             border: "none",
-            borderRadius: 4,
+            borderRadius: 6,
             padding: "0.75rem 1.5rem",
-            fontWeight: 600,
-            cursor: "pointer"
+            fontWeight: 500,
+            cursor: "pointer",
+            transition: "all 0.2s"
           }}
-          onClick={() => window.location.reload()}
+          onClick={handleRefresh}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = "#b91c1c";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = "#dc2626";
+          }}
         >
-          Refresh Now
+          Refresh Application
         </button>
       </div>
     </div>
