@@ -28,14 +28,14 @@ function updateVersion() {
     
     fs.writeFileSync(versionFilePath, JSON.stringify(newVersion, null, 2));
     
-    // console.log('✅ Version updated successfully:');
-    // console.log(`   Previous: ${currentVersion.version}`);
-    // console.log(`   New: ${newVersion.version}`);
-    // console.log(`   Build Date: ${newVersion.buildDate}`);
+    console.log('✅ Version updated successfully:');
+    console.log(`   Previous: ${currentVersion.version}`);
+    console.log(`   New: ${newVersion.version}`);
+    console.log(`   Build Date: ${newVersion.buildDate}`);
     
     return newVersion;
   } catch (error) {
-    // console.error('❌ Error updating version:', error.message);
+    console.error('❌ Error updating version:', error.message);
     process.exit(1);
   }
 }

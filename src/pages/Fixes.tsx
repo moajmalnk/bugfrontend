@@ -149,10 +149,10 @@ const Fixes = () => {
       (priorityFilter === "all" || bug.priority === priorityFilter)
   );
 
-  // // console.log("Search Term:", searchTerm);
-  // // console.log("Priority Filter:", priorityFilter);
-  // // console.log("Fixed Bugs:", fixedBugs);
-  // // console.log("Filtered Bugs:", filteredBugs);
+  // console.log("Search Term:", searchTerm);
+  // console.log("Priority Filter:", priorityFilter);
+  // console.log("Fixed Bugs:", fixedBugs);
+  // console.log("Filtered Bugs:", filteredBugs);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {

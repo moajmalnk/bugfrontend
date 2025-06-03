@@ -80,7 +80,7 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
       navigate(backLink, { replace: true });
       
     } catch (error) {
-      // console.error('Error deleting bug:', error);
+      console.error('Error deleting bug:', error);
       toast({
         title: "Delete Failed",
         description: "Failed to delete the bug. Please try again.",

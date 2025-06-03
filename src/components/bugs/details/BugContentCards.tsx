@@ -91,7 +91,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       await navigator.clipboard.write([new window.ClipboardItem({ "image/png": pngBlob })]);
       toast({ title: "Success", description: `Image copied to clipboard as PNG.` });
     } catch (error) {
-      // // console.error("Copy image error:", error);
+      // console.error("Copy image error:", error);
       toast({
         title: "Error",
         description: "Failed to copy image. Check browser support and CORS.",
@@ -153,7 +153,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         description: "Description copied to clipboard.",
       });
     } catch (error) {
-      // // console.error("Failed to copy description:", error);
+      // console.error("Failed to copy description:", error);
       toast({
         title: "Error",
         description: "Failed to copy description.",

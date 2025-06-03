@@ -125,12 +125,12 @@ export default function Profile() {
       await logout();
       navigate("/login");
     } catch (error) {
-      // // console.error("Logout failed:", error);
+      // console.error("Logout failed:", error);
     }
   }, [logout, navigate]);
 
   const handleUserUpdate = (updatedUser) => {
-    // // // console.log("Updated user data received in handleUserUpdate:", updatedUser);
+    // // console.log("Updated user data received in handleUserUpdate:", updatedUser);
     updateCurrentUser(updatedUser);
   };
 

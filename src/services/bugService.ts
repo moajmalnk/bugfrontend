@@ -26,7 +26,7 @@ export const bugService = {
       const data = await response.json();
       return Array.isArray(data.data?.bugs) ? data.data.bugs : [];
     } catch (error) {
-      // // // console.error('Error fetching bugs:', error);
+      // // console.error('Error fetching bugs:', error);
       throw error;
     }
   },
@@ -50,7 +50,7 @@ export const bugService = {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      // // // console.error('Error fetching bug:', error);
+      // // console.error('Error fetching bug:', error);
       throw error;
     }
   },
@@ -76,7 +76,7 @@ export const bugService = {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      // // // console.error('Error creating bug:', error);
+      // // console.error('Error creating bug:', error);
       throw error;
     }
   },
@@ -102,7 +102,7 @@ export const bugService = {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      // // // console.error('Error updating bug:', error);
+      // // console.error('Error updating bug:', error);
       throw error;
     }
   },
@@ -124,7 +124,7 @@ export const bugService = {
         throw new Error(errorData.message || 'Failed to delete bug');
       }
     } catch (error) {
-      // // // console.error('Error deleting bug:', error);
+      // // console.error('Error deleting bug:', error);
       throw error;
     }
   }

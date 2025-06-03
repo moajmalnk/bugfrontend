@@ -28,7 +28,7 @@ export function safeParseDate(dateString: string | Date): Date {
     const parsed = parseISO(dateString);
     return isValid(parsed) ? parsed : new Date(dateString);
   } catch {
-    // console.warn('Invalid date string:', dateString);
+    console.warn('Invalid date string:', dateString);
     return new Date();
   }
 }

@@ -65,7 +65,7 @@ export function NewProjectDialog({ onSubmit }: NewProjectDialogProps) {
         setIsActive(true);
       }
     } catch (err) {
-      // // console.error('Error creating project:', err);
+      // console.error('Error creating project:', err);
       setError("Failed to create project. Please try again.");
     } finally {
       setIsLoading(false);

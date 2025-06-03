@@ -63,17 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       const data = await response.json();
-      // // // console.log("Auth check response:", data);
+      // // console.log("Auth check response:", data);
 
       if (data.success && data.data) {
         setCurrentUser(data.data);
       } else {
-        // // console.error("Auth check failed:", data);
+        // console.error("Auth check failed:", data);
         localStorage.removeItem("token");
         setCurrentUser(null);
       }
     } catch (error) {
-      // // console.error("Auth check error:", error);
+      // console.error("Auth check error:", error);
       localStorage.removeItem("token");
       setCurrentUser(null);
     } finally {
@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       const data = await response.json();
-      // // // console.log('Login response:', data);
+      // // console.log('Login response:', data);
 
       if (data.success && data.data?.token) {
         localStorage.setItem("token", data.data.token);
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return false;
     } catch (error) {
-      // // console.error("Login error:", error);
+      // console.error("Login error:", error);
       toast({
         title: "Error",
         description: "Failed to connect to the server",
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return false;
     } catch (error) {
-      // // console.error("Registration error:", error);
+      // console.error("Registration error:", error);
       toast({
         title: "Error",
         description: "Failed to connect to the server",

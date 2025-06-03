@@ -78,7 +78,7 @@ const Users = () => {
         throw new Error(data.message || "Failed to fetch users");
       }
     } catch (error) {
-      // // console.error("Error:", error);
+      // console.error("Error:", error);
       toast({
         title: "Error",
         description: "Failed to load users. Please try again.",
@@ -191,7 +191,7 @@ const Users = () => {
     } catch (error: any) {
       // Don't show toast for dependency errors - let the dialog handle them
       if (!error.message.includes("associated data") && !error.message.includes("Cannot delete user")) {
-        // console.error("Error:", error);
+        console.error("Error:", error);
         toast({
           title: "Error",
           description: error.message || "Failed to delete user. Please try again.",

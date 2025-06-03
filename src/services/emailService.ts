@@ -9,10 +9,10 @@ export const sendEmailNotification = async (
   try {
     // Ensure correct API URL path
     const apiUrl = `${ENV.API_URL}/send-bug-notification.php`;
-    // // // console.log("Sending email notification:");
-    // // // console.log("- API URL:", apiUrl);
-    // // // console.log("- Recipients:", to);
-    // // // console.log("- Subject:", subject);
+    // // console.log("Sending email notification:");
+    // // console.log("- API URL:", apiUrl);
+    // // console.log("- Recipients:", to);
+    // // console.log("- Subject:", subject);
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -23,20 +23,20 @@ export const sendEmailNotification = async (
       body: JSON.stringify({ to, subject, body, attachments }),
     });
     
-    // // // console.log("Response status:", response.status);
-    // // // console.log("Response headers:", response.headers);
+    // // console.log("Response status:", response.status);
+    // // console.log("Response headers:", response.headers);
     
     if (!response.ok) {
       const errorText = await response.text();
-      // // // console.error("Email API error response:", errorText);
+      // // console.error("Email API error response:", errorText);
       throw new Error(`HTTP error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
-    // // // console.log("Email API success response:", data);
+    // // console.log("Email API success response:", data);
     return data;
   } catch (error) {
-    // // // console.error("Email notification error:", error);
+    // // console.error("Email notification error:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send email' };
   }
 };
@@ -89,7 +89,7 @@ export const getNotificationRecipients = async (): Promise<string[]> => {
     // Remove duplicates in case someone is both admin and developer
     return [...new Set(allRecipients)];
   } catch (error) {
-    // // // console.error("Error fetching notification recipients:", error);
+    // // console.error("Error fetching notification recipients:", error);
     return []; // Return empty array on error
   }
 };
@@ -123,7 +123,7 @@ export const getBugStatusUpdateRecipients = async (): Promise<string[]> => {
     // Remove duplicates
     return [...new Set(allRecipients)];
   } catch (error) {
-    // // // console.error("Error fetching notification recipients:", error);
+    // // console.error("Error fetching notification recipients:", error);
     return []; // Return empty array on error
   }
 };
@@ -134,7 +134,7 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
     const recipients = await getBugStatusUpdateRecipients();
     
     if (recipients.length === 0) {
-      // // // console.warn("No recipients found for bug status update notification");
+      // // console.warn("No recipients found for bug status update notification");
       return { success: false, message: "No recipients found" };
     }
     
@@ -177,7 +177,7 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
       `
     );
   } catch (error) {
-    // // // console.error("Error sending bug status update notification:", error);
+    // // console.error("Error sending bug status update notification:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };

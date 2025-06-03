@@ -24,7 +24,7 @@ export const BugStatusSelect = ({ status, onChange, disabled = false }: BugStatu
     try {
       await onChange(value as BugStatus);
     } catch (error) {
-      // // console.error('Failed to update bug status:', error);
+      // console.error('Failed to update bug status:', error);
     } finally {
       setIsUpdating(false);
     }
