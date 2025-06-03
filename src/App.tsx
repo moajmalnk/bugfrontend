@@ -10,6 +10,8 @@ import { requestNotificationPermission } from "./firebase-messaging-sw";
 import ContextMenu from "./components/ContextMenu";
 import { MainLayout } from "@/components/layout/MainLayout";
 import Fixes from "@/pages/Fixes";
+import { ErrorBoundaryProvider } from "@/components/ErrorBoundaryManager";
+import { useApiErrorHandler } from "@/hooks/useApiErrorHandler";
 
 // Initialize the query client outside of the component
 const queryClient = new QueryClient();
@@ -19,6 +21,81 @@ const futureConfig = {
   v7_startTransition: true,
   v7_relativeSplatPath: true,
 };
+
+// Component that uses the error handler hook inside the provider
+function AppContent() {
+  useApiErrorHandler(); // This will set up automatic error handling for API calls
+  
+  const [privacy, setPrivacy] = useState(() => {
+    return localStorage.getItem("privacyMode") === "true";
+  });
+
+  // Initialize offline detector
+  useEffect(() => {
+    const cleanup = initOfflineDetector();
+    return cleanup;
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.code === "Space") {
+        e.preventDefault();
+        setPrivacy((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Persist privacy mode
+  useEffect(() => {
+    localStorage.setItem("privacyMode", privacy ? "true" : "false");
+  }, [privacy]);
+
+  // Enable notification permission request
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
+
+  const [contextMenu, setContextMenu] = useState<{ mouseX: number | null; mouseY: number | null }>({ mouseX: null, mouseY: null });
+
+  // Native event handlers for document
+  const handleNativeContextMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({
+      mouseX: event.clientX,
+      mouseY: event.clientY,
+    });
+  };
+
+  const handleNativeClick = (event: MouseEvent) => {
+    // You might want to check if the click was outside the context menu before closing
+    // For simplicity, we'll close on any click for now
+    setContextMenu({ mouseX: null, mouseY: null });
+  };
+
+  useEffect(() => {
+    document.addEventListener('contextmenu', handleNativeContextMenu);
+    document.addEventListener('click', handleNativeClick);
+    return () => {
+      document.removeEventListener('contextmenu', handleNativeContextMenu);
+      document.removeEventListener('click', handleNativeClick);
+    };
+  }, []);
+
+  return (
+    <>
+      <RouteConfig />
+      <KeyboardShortcuts />
+      <PrivacyOverlay visible={privacy} />
+      <ContextMenu
+        mouseX={contextMenu.mouseX}
+        mouseY={contextMenu.mouseY}
+        onClose={() => setContextMenu({ mouseX: null, mouseY: null })}
+      />
+    </>
+  );
+}
 
 export function useChunkLoadErrorRefresh() {
   const [showModal, setShowModal] = useState(false);
@@ -101,94 +178,18 @@ export function useChunkLoadErrorRefresh() {
 }
 
 function App() {
-  const [privacy, setPrivacy] = useState(() => {
-    return localStorage.getItem("privacyMode") === "true";
-  });
-
-  // Initialize offline detector
-  useEffect(() => {
-    const cleanup = initOfflineDetector();
-    return cleanup;
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.code === "Space") {
-        e.preventDefault();
-        setPrivacy((p) => !p);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // Persist privacy mode
-  useEffect(() => {
-    localStorage.setItem("privacyMode", privacy ? "true" : "false");
-  }, [privacy]);
-
-  // Enable notification permission request
-  useEffect(() => {
-    requestNotificationPermission();
-  }, []);
-
-  const [contextMenu, setContextMenu] = useState<{ mouseX: number | null; mouseY: number | null }>({ mouseX: null, mouseY: null });
-
-  // Native event handlers for document
-  const handleNativeContextMenu = (event: MouseEvent) => {
-    event.preventDefault();
-    setContextMenu({
-      mouseX: event.clientX,
-      mouseY: event.clientY,
-    });
-  };
-
-  const handleNativeClick = (event: MouseEvent) => {
-    // You might want to check if the click was outside the context menu before closing
-    // For simplicity, we'll close on any click for now
-    setContextMenu({ mouseX: null, mouseY: null });
-  };
-
-  useEffect(() => {
-    document.addEventListener('contextmenu', handleNativeContextMenu);
-    document.addEventListener('click', handleNativeClick);
-    return () => {
-      document.removeEventListener('contextmenu', handleNativeContextMenu);
-      document.removeEventListener('click', handleNativeClick);
-    };
-  }, []);
-
-  // Handler for React's onContextMenu prop
-  const handleReactContextMenu = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-      event.preventDefault();
-      setContextMenu({
-        mouseX: event.clientX,
-        mouseY: event.clientY,
-      });
-  };
-
-  // Handler for React's onClick prop
-  const handleReactClick = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-      // This will be handled by the native click listener for closing the menu
-      // Add any other click logic here if needed
-  };
-
   const chunkErrorModal = useChunkLoadErrorRefresh();
 
   return (
     <CoreProviders queryClient={queryClient}>
       <Router future={futureConfig}>
         <RouterProviders>
-          <RouteConfig />
-          <KeyboardShortcuts />
-          <PrivacyOverlay visible={privacy} />
-          <ContextMenu
-            mouseX={contextMenu.mouseX}
-            mouseY={contextMenu.mouseY}
-            onClose={() => setContextMenu({ mouseX: null, mouseY: null })}
-          />
+          <ErrorBoundaryProvider>
+            <AppContent />
+          </ErrorBoundaryProvider>
         </RouterProviders>
       </Router>
+      {chunkErrorModal}
     </CoreProviders>
   );
 }
