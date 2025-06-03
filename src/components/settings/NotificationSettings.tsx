@@ -367,6 +367,71 @@ export function NotificationSettingsCard() {
                 Test WhatsApp
               </Button>
             </div>
+            
+            {/* Debug Tools */}
+            <div className="pt-4 border-t">
+              <details>
+                <summary className="cursor-pointer text-sm font-medium mb-3 hover:text-foreground text-muted-foreground">
+                  🔧 Debug Tools (Advanced)
+                </summary>
+                <div className="space-y-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        broadcastNotificationService.resetLastCheckTime();
+                        toast({
+                          title: "Debug",
+                          description: "Last check time reset. Polling will now check for all recent notifications.",
+                        });
+                      }}
+                      className="text-xs"
+                    >
+                      Reset Check Time
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={async () => {
+                        await broadcastNotificationService.checkNow();
+                        toast({
+                          title: "Debug",
+                          description: "Manual notification check triggered. Check console for logs.",
+                        });
+                      }}
+                      className="text-xs"
+                    >
+                      Force Check Now
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const isPolling = broadcastNotificationService.isCurrentlyPolling();
+                        toast({
+                          title: "Debug Info",
+                          description: `Polling status: ${isPolling ? 'Active' : 'Stopped'}`,
+                        });
+                        console.log('Broadcast service polling status:', isPolling);
+                        console.log('Current settings:', notificationService.getSettings());
+                      }}
+                      className="text-xs"
+                    >
+                      Check Status
+                    </Button>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-2">Check browser console for detailed logs</p>
+                    <p className="text-xs text-muted-foreground">
+                      • Reset Check Time: Forces polling to check all recent notifications<br/>
+                      • Force Check Now: Manually triggers notification check<br/>
+                      • Check Status: Shows current polling and settings status
+                    </p>
+                  </div>
+                </div>
+              </details>
+            </div>
           </div>
           
           {/* Debug section - can be removed in production */}
