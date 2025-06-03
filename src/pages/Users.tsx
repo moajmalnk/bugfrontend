@@ -150,39 +150,57 @@ const Users = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async (userId: string, force = false) => {
     try {
-      const response = await fetch(
-        `${ENV.API_URL}/users/delete.php?id=${userId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to delete user");
-      }
+      const url = `${ENV.API_URL}/users/delete.php?id=${userId}${force ? '&force=true' : ''}`;
+      const response = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
       const data = await response.json();
+      
+      if (!response.ok) {
+        // Handle specific error cases
+        if (response.status === 409) {
+          // Conflict - user has dependencies, throw error for dialog to handle
+          throw new Error(data.message || "User has associated data that must be removed first.");
+        } else if (response.status === 404) {
+          toast({
+            title: "User Not Found",
+            description: "The user you're trying to delete no longer exists.",
+            variant: "destructive",
+          });
+          return;
+        } else {
+          throw new Error(data.message || "Failed to delete user");
+        }
+      }
+
       if (data.success) {
         setUsers(users.filter((user) => user.id !== userId));
         toast({
           title: "Success",
-          description: "User has been deleted successfully.",
+          description: data.message || "User has been deleted successfully.",
         });
       } else {
         throw new Error(data.message || "Failed to delete user");
       }
-    } catch (error) {
-      // console.error("Error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete user. Please try again.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      // Don't show toast for dependency errors - let the dialog handle them
+      if (!error.message.includes("associated data") && !error.message.includes("Cannot delete user")) {
+        console.error("Error:", error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to delete user. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        // Re-throw dependency errors for dialog to handle
+        throw error;
+      }
     }
   };
 

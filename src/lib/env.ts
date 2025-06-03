@@ -15,7 +15,15 @@ const getApiUrl = () => {
     return 'http://localhost/Bugricer/backend/api';
   }
   
-  // Production fallback
+  // Production detection - check if we're on the bug tracker domain
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname.includes('bugs.moajmalnk.in')) {
+      return 'https://bugbackend.moajmalnk.in/api';
+    }
+  }
+  
+  // Default production fallback
   return 'https://bugbackend.moajmalnk.in/api';
 };
 
@@ -25,8 +33,9 @@ export const ENV = {
 
 // Log the current environment for debugging
 if (typeof window !== 'undefined') {
-  // console.log('Environment detected:', isLocalhost ? 'Local' : 'Production');
-  // console.log('API URL:', ENV.API_URL);
+  console.log('Environment detected:', isLocalhost ? 'Local' : 'Production');
+  console.log('Current hostname:', window.location.hostname);
+  console.log('API URL:', ENV.API_URL);
 }
 
 // Validate required environment variables
@@ -36,7 +45,7 @@ export const validateEnv = () => {
   if (!ENV.API_URL) missingVars.push('API_URL');
   
   if (missingVars.length > 0) {
-    // console.error(`Missing environment variables: ${missingVars.join(', ')}`);
+    console.error(`Missing environment variables: ${missingVars.join(', ')}`);
     return false;
   }
   

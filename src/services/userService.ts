@@ -119,9 +119,10 @@ class UserService {
     return response.data; // Assuming response.data contains the UserStats object
   }
 
-  async deleteUser(userId: string): Promise<boolean> {
+  async deleteUser(userId: string, force = false): Promise<boolean> {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${this.baseUrl}/delete.php?id=${userId}`, {
+    const url = `${this.baseUrl}/delete.php?id=${userId}${force ? '&force=true' : ''}`;
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -131,7 +132,19 @@ class UserService {
 
     const data = await response.json();
     
-    if (!response.ok || !data.success) {
+    if (!response.ok) {
+      // Handle specific error cases with detailed messages
+      if (response.status === 409) {
+        // Conflict - user has dependencies
+        throw new Error(data.message || 'Cannot delete user. User has associated data that must be removed first.');
+      } else if (response.status === 404) {
+        throw new Error('User not found.');
+      } else {
+        throw new Error(data.message || 'Failed to delete user');
+      }
+    }
+    
+    if (!data.success) {
       throw new Error(data.message || 'Failed to delete user');
     }
 

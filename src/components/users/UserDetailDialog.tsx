@@ -66,7 +66,7 @@ export function UserDetailDialog({
   loggedInUserRole,
 }: UserDetailDialogProps & {
   onUserUpdate: (user: User) => void;
-  onUserDelete: (userId: string) => Promise<void>;
+  onUserDelete: (userId: string, force?: boolean) => Promise<void>;
   onPasswordChange: (userId: string, newPassword: string) => Promise<void>;
 }) {
   const [stats, setStats] = useState<UserStats>({
@@ -229,8 +229,8 @@ export function UserDetailDialog({
             <div className="flex-1 min-w-0">
               <DeleteUserDialog
                 user={user}
-                onUserDelete={async (userId) => {
-                  await onUserDelete(userId);
+                onUserDelete={async (userId, force) => {
+                  await onUserDelete(userId, force);
                   onOpenChange(false);
                 }}
                 trigger={

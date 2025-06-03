@@ -37,7 +37,7 @@ import { z } from "zod";
 
 const formSchema = z.object({
   title: z.string().min(3, "Bug title must be at least 3 characters"),
-  description: z.string().min(10, "Description must be at least 10 characters"),
+  description: z.string().min(2, "Description must be at least 2 characters"),
   priority: z.enum(["low", "medium", "high"] as const),
   status: z.enum([
     "pending",
@@ -90,6 +90,14 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem("token");
+      
+      // Add more detailed logging for production debugging
+      console.log('Submitting bug update:', {
+        bugId: bug.id,
+        apiUrl: apiClient.defaults.baseURL,
+        values: values
+      });
+
       const response = await apiClient.post<ApiResponse<Bug>>(
         "/bugs/update.php",
         {
@@ -98,14 +106,18 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
           description: values.description,
           priority: values.priority,
           status: values.status,
+          updated_by: bug.updated_by || bug.reported_by, // Ensure we have an updater
         },
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          timeout: 30000, // 30 second timeout
         }
       );
+
+      console.log('Update response:', response.data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to update bug");
@@ -121,11 +133,19 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
           status: values.status,
         };
 
-        await sendBugStatusUpdateNotification(updatedBug);
-        toast({
-          title: "Success",
-          description: "Bug updated and notifications sent",
-        });
+        try {
+          await sendBugStatusUpdateNotification(updatedBug);
+          toast({
+            title: "Success",
+            description: "Bug updated and notifications sent",
+          });
+        } catch (notificationError) {
+          console.warn('Failed to send notification:', notificationError);
+          toast({
+            title: "Success",
+            description: "Bug updated successfully (notification failed)",
+          });
+        }
       } else {
         toast({
           title: "Success",
@@ -138,11 +158,31 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
       queryClient.invalidateQueries({ queryKey: ["bugs"] });
 
       setOpen(false);
-    } catch (error) {
-      // console.error("Failed to update bug:", error);
+    } catch (error: any) {
+      console.error("Failed to update bug:", error);
+      
+      // Provide more specific error messages based on error type
+      let errorMessage = "Failed to update bug. Please try again.";
+      
+      if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      } else if (error.response?.status === 401) {
+        errorMessage = "Authentication failed. Please login again.";
+      } else if (error.response?.status === 403) {
+        errorMessage = "You don't have permission to edit this bug.";
+      } else if (error.response?.status === 404) {
+        errorMessage = "Bug not found. It may have been deleted.";
+      } else if (error.response?.status >= 500) {
+        errorMessage = "Server error. Please try again later.";
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "Error",
-        description: "Failed to update bug. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
