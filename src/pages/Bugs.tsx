@@ -102,7 +102,9 @@ const Bugs = () => {
       const matchesPriority =
         priorityFilter === "all" || bug.priority === priorityFilter;
       const matchesStatus = statusFilter === "all" || bug.status === statusFilter;
-      return matchesSearch && matchesPriority && matchesStatus;
+      // Exclude fixed bugs from Bugs page (they should only appear on Fixes page)
+      const isNotFixed = bug.status !== "fixed";
+      return matchesSearch && matchesPriority && matchesStatus && isNotFixed;
     });
   };
 
@@ -138,11 +140,14 @@ const Bugs = () => {
 
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
+    // Filter out fixed bugs from all counts since they belong on Fixes page
+    const nonFixedBugs = bugs.filter(bug => bug.status !== "fixed");
+    
     switch (tabType) {
       case "all-bugs":
-        return bugs.length;
+        return nonFixedBugs.length;
       case "my-bugs":
-        return bugs.filter(bug => bug.reported_by === currentUser?.id).length;
+        return nonFixedBugs.filter(bug => bug.reported_by === currentUser?.id).length;
       default:
         return 0;
     }
@@ -333,14 +338,17 @@ const Bugs = () => {
         ) : (
           <div className="space-y-4">
             {/* Total Bugs Count for non-admin users */}
-            {!skeletonLoading && !loading && bugs.length > 0 && (
-              <div className="flex items-center border rounded-md px-3 py-1 bg-blue-50 w-fit">
-                <BugIcon className="h-4 w-4 text-blue-500 mr-2" />
-                <span className="text-sm font-medium text-blue-700">
-                  {bugs.length} Total Bugs
-                </span>
-              </div>
-            )}
+            {!skeletonLoading && !loading && bugs.length > 0 && (() => {
+              const nonFixedBugs = bugs.filter(bug => bug.status !== "fixed");
+              return nonFixedBugs.length > 0 && (
+                <div className="flex items-center border rounded-md px-3 py-1 bg-blue-50 w-fit">
+                  <BugIcon className="h-4 w-4 text-blue-500 mr-2" />
+                  <span className="text-sm font-medium text-blue-700">
+                    {nonFixedBugs.length} Total Bugs
+                  </span>
+                </div>
+              );
+            })()}
 
             {/* Search and Filters Section for non-admin users */}
             <div className="space-y-3">
