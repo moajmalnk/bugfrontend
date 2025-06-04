@@ -167,17 +167,17 @@ const MemberCard = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className="shadow-sm hover:shadow transition-shadow duration-200 border">
-        <CardContent className="p-4">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-full ${colorScheme}`}>
-                <RoleIcon className="h-5 w-5" />
+      <Card className="shadow-sm hover:shadow transition-shadow duration-200 border h-full">
+        <CardContent className="p-3 sm:p-4 lg:p-5 h-full">
+          <div className="flex justify-between items-start h-full">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              <div className={`p-1.5 sm:p-2 rounded-full ${colorScheme} flex-shrink-0`}>
+                <RoleIcon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <div>
-                <h4 className="font-medium text-base">{member.username}</h4>
-                <p className="text-xs text-muted-foreground">{member.email}</p>
-                <span className={`inline-block mt-1.5 px-2 py-0.5 text-xs rounded-full ${colorScheme} border`}>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-medium text-sm sm:text-base truncate">{member.username}</h4>
+                <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                <span className={`inline-block mt-1 sm:mt-1.5 px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${colorScheme} border`}>
                   {isAdmin ? "Admin" : member.role}
                 </span>
               </div>
@@ -187,10 +187,10 @@ const MemberCard = ({
               <Button 
                 size="sm" 
                 variant="ghost"
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive rounded-full"
+                className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-destructive rounded-full flex-shrink-0 ml-2"
                 onClick={() => onRemove(member.id)}
               >
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="sr-only">Remove</span>
               </Button>
             )}
@@ -744,7 +744,7 @@ const ProjectDetails = () => {
               
               {currentUser?.role === "admin" && (
                 <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
-                  <div className="relative w-full sm:w-[300px] xl:w-[280px]">
+                  <div className="relative w-full sm:w-[280px] lg:w-[320px] xl:w-[280px]">
                     <select
                       className="appearance-none w-full border rounded-lg px-3 py-2 pr-10 bg-background focus:ring-2 focus:ring-primary/30 focus:border-primary focus:outline-none transition-all duration-200 text-sm"
                       value={selectedUser ?? ""}
@@ -782,26 +782,26 @@ const ProjectDetails = () => {
             </CardHeader>
             
             <CardContent className="space-y-6">
-              <div className="relative w-full max-w-sm lg:max-w-md xl:max-w-lg 2xl:max-w-xl">
+              <div className="relative w-full max-w-xs sm:max-w-sm lg:max-w-md xl:max-w-lg">
                 <input
                   type="text"
                   placeholder="Search members..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-10 border border-border rounded-md pl-10 pr-12 py-2 
+                  className="w-full h-9 sm:h-10 border border-border rounded-md pl-9 sm:pl-10 pr-10 sm:pr-12 py-2 
                   focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none 
                   shadow-sm hover:border-primary/50 transition-all duration-200 
-                  bg-background/50 backdrop-blur-sm"
+                  bg-background/50 backdrop-blur-sm text-sm sm:text-base"
                 />
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">
-                  <Search className="h-4 w-4" />
+                <div className="absolute inset-y-0 left-0 flex items-center pl-2.5 sm:pl-3 pointer-events-none text-muted-foreground">
+                  <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </div>
                 {searchQuery && (
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 sm:pr-3">
                     <Button
                       size="sm"
                       variant="ghost" 
-                      className="h-6 w-6 p-0 rounded-full opacity-70 hover:opacity-100"
+                      className="h-5 w-5 sm:h-6 sm:w-6 p-0 rounded-full opacity-70 hover:opacity-100"
                       onClick={() => setSearchQuery("")}
                     >
                       <X className="h-3 w-3" />
@@ -812,18 +812,18 @@ const ProjectDetails = () => {
               </div>
               
               <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center">
-                  <Shield className="h-5 w-5 mr-2 text-blue-600" /> 
+                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 flex items-center">
+                  <Shield className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 text-blue-600" /> 
                   Administrators
                 </h3>
                 
                 {filteredAdmins.length === 0 && (
-                  <p className="text-muted-foreground text-sm italic">
+                  <p className="text-muted-foreground text-xs sm:text-sm italic">
                     {searchQuery ? "No administrators match your search." : "No administrators assigned."}
                   </p>
                 )}
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 mt-3">
                   {filteredAdmins.map(admin => (
                     <MemberCard 
                       key={admin.id} 
@@ -835,20 +835,20 @@ const ProjectDetails = () => {
               </div>
               
               <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center">
-                  <UserRound className="h-5 w-5 mr-2 text-purple-600" /> 
+                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 flex items-center">
+                  <UserRound className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 text-purple-600" /> 
                   Project Members
                 </h3>
                 
                 {filteredMembers.length === 0 && (
-                  <p className="text-muted-foreground text-sm italic">
+                  <p className="text-muted-foreground text-xs sm:text-sm italic">
                     {searchQuery 
                       ? "No members match your search." 
                       : "No members assigned to this project yet."}
                   </p>
                 )}
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 mt-3">
                   {filteredMembers.map(member => (
                     <MemberCard 
                       key={member.id} 
