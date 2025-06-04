@@ -130,7 +130,7 @@ interface Dashboard {
   created_at: string;
 }
 
-function isValidUUID(uuid) {
+function isValidUUID(uuid: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     uuid
   );
@@ -281,34 +281,125 @@ const ProjectDetails = () => {
   };
 
   const fetchAvailableMembers = async () => {
-    const res = await fetch(
-      `${ENV.API_URL}/projects/get_available_members.php?project_id=${projectId}`
-    );
-    const data = await res.json();
-    setAvailableMembers(data.users);
+    try {
+      const res = await fetch(
+        `${ENV.API_URL}/projects/get_available_members.php?project_id=${projectId}`
+      );
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setAvailableMembers(data.data?.users || []);
+      } else {
+        console.error("Failed to fetch available members:", data.message);
+        setAvailableMembers([]);
+      }
+    } catch (error) {
+      console.error("Error fetching available members:", error);
+      setAvailableMembers([]);
+      toast({
+        title: "Error",
+        description: "Failed to load available members. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const fetchMembers = async () => {
-    const res = await fetch(`${ENV.API_URL}/projects/get_members.php?project_id=${projectId}`);
-    const data = await res.json();
-    setMembers(data.members || []);
-    setAdmins(data.admins || []);
+    try {
+      const res = await fetch(`${ENV.API_URL}/projects/get_members.php?project_id=${projectId}`);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        // Handle both old and new API response formats
+        const responseData = data.data || data;
+        setMembers(responseData.members || []);
+        setAdmins(responseData.admins || []);
+      } else {
+        console.error("Failed to fetch members:", data.message);
+        setMembers([]);
+        setAdmins([]);
+        toast({
+          title: "Error", 
+          description: data.message || "Failed to load project members",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching members:", error);
+      setMembers([]);
+      setAdmins([]);
+      toast({
+        title: "Error",
+        description: "Failed to load project members. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAddMember = async () => {
-    const token = localStorage.getItem("token");
-    const selectedMember = availableMembers.find(u => u.id === selectedUser);
-    const role = selectedMember?.role;
-    if (!selectedUser || !role) return;
-    await fetch(`${ENV.API_URL}/projects/add_member.php`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ project_id: projectId, user_id: selectedUser, role }),
-    });
-    setSelectedUser(null);
-    fetchAvailableMembers();
-    fetchMembers();
-    toast({ title: "Success", description: "Member added!" });
+    if (!selectedUser || !Array.isArray(availableMembers)) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const selectedMember = availableMembers.find(u => u.id === selectedUser);
+      const role = selectedMember?.role;
+      
+      if (!selectedUser || !role) {
+        toast({
+          title: "Error",
+          description: "Please select a valid user and role",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const response = await fetch(`${ENV.API_URL}/projects/add_member.php`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json", 
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ 
+          project_id: projectId, 
+          user_id: selectedUser, 
+          role 
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setSelectedUser(null);
+        await Promise.all([fetchAvailableMembers(), fetchMembers()]);
+        toast({ 
+          title: "Success", 
+          description: "Member added successfully!" 
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to add member",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error adding member:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while adding member",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleRemoveMember = async (userId: string) => {
@@ -379,16 +470,20 @@ const ProjectDetails = () => {
     }
   };
 
-  // Filter members based on search query
-  const filteredMembers = members.filter(member => 
-    member.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    member.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter members based on search query - with safe array handling
+  const filteredMembers = Array.isArray(members) 
+    ? members.filter(member => 
+        member?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        member?.email?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
   
-  const filteredAdmins = admins.filter(admin => 
-    admin.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    admin.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAdmins = Array.isArray(admins)
+    ? admins.filter(admin => 
+        admin?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        admin?.email?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
   // Render skeleton loading UI
   if (isLoading) {
