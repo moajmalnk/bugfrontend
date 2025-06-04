@@ -379,25 +379,127 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     }
   };
 
-  const handlePrintImage = () => {
+  const handlePrintImage = async () => {
     if (!selectedImage) return;
-    // Open a new window with just the image and print it
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Image</title>
-          <style>
-            body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
-            img { max-width: 100vw; max-height: 100vh; }
-          </style>
-        </head>
-        <body>
-          <img src="${selectedImage}" onload="window.print();window.close()" />
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    
+    try {
+      let imageUrl = selectedImage;
+      let shouldCreateBlob = false;
+      
+      // Check if we need to convert to blob for printing
+      try {
+        const response = await fetch(selectedImage, { mode: 'cors', credentials: 'omit' });
+        if (!response.ok) {
+          shouldCreateBlob = true;
+        } else {
+          const blob = await response.blob();
+          if (!blob.type.startsWith('image/')) {
+            shouldCreateBlob = true;
+          }
+        }
+      } catch (fetchError) {
+        shouldCreateBlob = true;
+      }
+      
+      // If we need to create a blob (CORS issues), use canvas approach
+      if (shouldCreateBlob) {
+        try {
+          const img = document.createElement("img");
+          img.crossOrigin = "anonymous";
+          
+          const imgLoad = new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            setTimeout(() => reject(new Error('Timeout')), 10000);
+          });
+          
+          img.src = selectedImage;
+          await imgLoad;
+
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+
+          const blob = await new Promise<Blob>((resolve) => {
+            canvas.toBlob((blob) => {
+              resolve(blob!);
+            }, "image/png", 1.0);
+          });
+          
+          imageUrl = URL.createObjectURL(blob);
+        } catch (canvasError) {
+          console.log('Canvas approach failed for printing:', canvasError);
+          toast({
+            title: "Print Error",
+            description: "Could not prepare image for printing. Try downloading instead.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      
+      // Create print window
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      
+      if (!printWindow) {
+        toast({
+          title: "Print Error",
+          description: "Could not open print window. Please check popup blocker settings.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Create simple print HTML
+      const printHtml = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Print Bug Screenshot</title>
+            <style>
+              body { margin: 0; padding: 20px; font-family: Arial, sans-serif; text-align: center; }
+              h1 { font-size: 18px; margin-bottom: 10px; }
+              .details { font-size: 12px; color: #666; margin-bottom: 20px; }
+              img { max-width: 100%; max-height: 80vh; border: 1px solid #ddd; }
+              @media print { body { padding: 0; } img { max-height: 90vh; } }
+            </style>
+          </head>
+          <body>
+            <h1>Bug Screenshot: ${bug.title || 'Untitled Bug'}</h1>
+            <div class="details">
+              ${bug.description ? `Description: ${bug.description.substring(0, 200)}${bug.description.length > 200 ? '...' : ''}` : ''}
+              ${bug.priority ? ` | Priority: ${bug.priority}` : ''}
+              ${bug.status ? ` | Status: ${bug.status}` : ''}
+            </div>
+            <img src="${imageUrl}" alt="Bug Screenshot" onload="setTimeout(() => { window.print(); setTimeout(() => window.close(), 1000); }, 500);" />
+          </body>
+        </html>
+      `;
+      
+      printWindow.document.write(printHtml);
+      printWindow.document.close();
+      
+      // Clean up blob URL if we created one
+      if (shouldCreateBlob && imageUrl.startsWith('blob:')) {
+        setTimeout(() => URL.revokeObjectURL(imageUrl), 30000);
+      }
+      
+      toast({
+        title: "Print Window Opened",
+        description: "Print dialog should open shortly.",
+        variant: "default",
+      });
+      
+    } catch (error) {
+      console.error("Print error:", error);
+      toast({
+        title: "Print Error",
+        description: "Could not print image. Try downloading and printing manually.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
