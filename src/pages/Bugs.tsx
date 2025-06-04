@@ -89,23 +89,6 @@ const Bugs = () => {
             return String(bug.reported_by) === String(currentUser.id);
           });
           break;
-        case "all-fixes":
-          filteredByTab = bugs.filter(bug => bug.status === "fixed");
-          break;
-        case "my-fixes":
-          filteredByTab = bugs.filter(bug => {
-            // Convert both to strings for comparison to handle type mismatches
-            const isFixed = bug.status === "fixed";
-            const isUpdatedByCurrentUser = String(bug.updated_by) === String(currentUser.id);
-            
-            // Debug logging
-            if (isFixed) {
-              // // console.log(`Bug ${bug.id}: status=${bug.status}, updated_by=${bug.updated_by} (${typeof bug.updated_by}), currentUser.id=${currentUser.id} (${typeof currentUser.id}), match=${isUpdatedByCurrentUser}`);
-            }
-            
-            return isFixed && isUpdatedByCurrentUser;
-          });
-          break;
         default:
           filteredByTab = bugs;
       }
@@ -146,7 +129,6 @@ const Bugs = () => {
           <SelectItem value="all">All Statuses</SelectItem>
           <SelectItem value="pending">Pending</SelectItem>
           <SelectItem value="in_progress">In Progress</SelectItem>
-          <SelectItem value="fixed">Fixed</SelectItem>
           <SelectItem value="declined">Declined</SelectItem>
           <SelectItem value="rejected">Rejected</SelectItem>
         </SelectContent>
@@ -161,10 +143,6 @@ const Bugs = () => {
         return bugs.length;
       case "my-bugs":
         return bugs.filter(bug => bug.reported_by === currentUser?.id).length;
-      case "all-fixes":
-        return bugs.filter(bug => bug.status === "fixed").length;
-      case "my-fixes":
-        return bugs.filter(bug => bug.status === "fixed" && bug.updated_by === currentUser?.id).length;
       default:
         return 0;
     }
@@ -193,10 +171,6 @@ const Bugs = () => {
         switch (activeTab) {
           case "my-bugs":
             return "You haven't reported any bugs yet.";
-          case "all-fixes":
-            return "No bugs have been fixed yet.";
-          case "my-fixes":
-            return "You haven't fixed any bugs yet.";
           default:
             return "No bugs found.";
         }
@@ -210,7 +184,7 @@ const Bugs = () => {
           <BugIcon className="h-6 w-6 text-muted-foreground" />
         </div>
         <h3 className="mt-4 text-base sm:text-lg font-semibold">
-          {currentUser?.role === "admin" && (activeTab === "all-fixes" || activeTab === "my-fixes") ? "No fixes found" : "No bugs found"}
+          No bugs found
         </h3>
         <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-[300px]">
           {getEmptyMessage()}
@@ -234,7 +208,7 @@ const Bugs = () => {
   // Admin Tabs Component
   const AdminTabs = () => (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-4 mb-4">
+      <TabsList className="grid w-full grid-cols-2 mb-4">
         <TabsTrigger value="all-bugs" className="text-xs sm:text-sm">
           <BugIcon className="h-4 w-4 mr-1" />
           All Bugs ({getTabCount("all-bugs")})
@@ -242,14 +216,6 @@ const Bugs = () => {
         <TabsTrigger value="my-bugs" className="text-xs sm:text-sm">
           <User className="h-4 w-4 mr-1" />
           My Bugs ({getTabCount("my-bugs")})
-        </TabsTrigger>
-        <TabsTrigger value="all-fixes" className="text-xs sm:text-sm">
-          <Code className="h-4 w-4 mr-1" />
-          All Fixes ({getTabCount("all-fixes")})
-        </TabsTrigger>
-        <TabsTrigger value="my-fixes" className="text-xs sm:text-sm">
-          <Code className="h-4 w-4 mr-1" />
-          My Fixes ({getTabCount("my-fixes")})
         </TabsTrigger>
       </TabsList>
 
