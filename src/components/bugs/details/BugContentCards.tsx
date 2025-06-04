@@ -189,6 +189,9 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     }
     
     try {
+      let blob: Blob | null = null;
+      let fileName = "bug-screenshot.png";
+      
       // Prepare share content with bug details
       const shareTitle = `Bug Screenshot: ${bug.title || 'Untitled Bug'}`;
       let shareText = '';
@@ -211,88 +214,109 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         shareText += `\nProject: ${bug.project_id}`;
       }
       
-      // Add current bug URL
-      shareText += `\n\nView bug: ${window.location.href}`;
-      
-      // First try: Share with image file (for mobile devices)
-      if ('canShare' in navigator) {
-        try {
-          let blob: Blob | null = null;
-          let fileName = "bug-screenshot.png";
-          
-          // Try to get the image as blob
-          try {
-            const response = await fetch(selectedImage, {
-              mode: 'cors',
-              credentials: 'omit',
-            });
-            if (response.ok) {
-              const fetchedBlob = await response.blob();
-              if (fetchedBlob.type && fetchedBlob.type.startsWith('image/')) {
-                blob = fetchedBlob;
-                
-                // Get filename from URL
-                const urlParts = selectedImage.split('/');
-                const lastPart = urlParts[urlParts.length - 1];
-                if (lastPart && lastPart.includes('.')) {
-                  const cleanFileName = lastPart.split('?')[0];
-                  if (cleanFileName.includes('.')) {
-                    fileName = cleanFileName;
-                  }
-                }
+      // Try to get the image as blob first (for all devices)
+      try {
+        const response = await fetch(selectedImage, {
+          mode: 'cors',
+          credentials: 'omit',
+        });
+        if (response.ok) {
+          const fetchedBlob = await response.blob();
+          if (fetchedBlob.type && fetchedBlob.type.startsWith('image/')) {
+            blob = fetchedBlob;
+            
+            // Get filename from URL
+            const urlParts = selectedImage.split('/');
+            const lastPart = urlParts[urlParts.length - 1];
+            if (lastPart && lastPart.includes('.')) {
+              const cleanFileName = lastPart.split('?')[0];
+              if (cleanFileName.includes('.')) {
+                fileName = cleanFileName;
               }
             }
-          } catch (fetchError) {
-            console.log('Could not fetch image for file sharing:', fetchError);
           }
+        }
+      } catch (fetchError) {
+        console.log('Could not fetch image for sharing:', fetchError);
+        
+        // Fallback: Try canvas approach
+        try {
+          const img = document.createElement("img");
+          img.crossOrigin = "anonymous";
           
-          // If we have a blob, try sharing with file
-          if (blob) {
-            const file = new File([blob], fileName, { type: blob.type });
-            
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: shareTitle,
-                text: shareText,
-              });
-              
-              toast({
-                title: "Shared Successfully",
-                description: "Image and bug details shared!",
-                variant: "default",
-              });
-              return;
-            }
-          }
-        } catch (fileShareError) {
-          console.log('File sharing failed:', fileShareError);
-          // Continue to text sharing below
+          const imgLoad = new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            setTimeout(() => reject(new Error('Timeout')), 10000);
+          });
+          
+          img.src = selectedImage;
+          await imgLoad;
+
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+
+          blob = await new Promise<Blob>((resolve) => {
+            canvas.toBlob((blob) => {
+              resolve(blob!);
+            }, "image/png", 0.9);
+          });
+          fileName = "bug-screenshot.png";
+        } catch (canvasError) {
+          console.log('Canvas approach also failed:', canvasError);
         }
       }
       
-      // Second try: Share text content only (more compatible)
+      // First Priority: Share image file (all devices)
+      if (blob && 'canShare' in navigator) {
+        try {
+          const file = new File([blob], fileName, { type: blob.type });
+          
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: shareTitle,
+              text: shareText,
+            });
+            
+            toast({
+              title: "Shared Successfully",
+              description: "Image and bug details shared!",
+              variant: "default",
+            });
+            return;
+          }
+        } catch (fileShareError) {
+          console.log('File sharing failed:', fileShareError);
+        }
+      }
+      
+      // Second Priority: Share text with URL (fallback)
       try {
-        // Check if we can share text
-        if (navigator.canShare({ title: shareTitle, text: shareText, url: window.location.href })) {
+        const textWithUrl = shareText + `\n\nView bug: ${window.location.href}`;
+        
+        if (navigator.canShare({ title: shareTitle, text: textWithUrl, url: window.location.href })) {
           await navigator.share({
             title: shareTitle,
-            text: shareText,
+            text: textWithUrl,
             url: window.location.href,
           });
           
           toast({
-            title: "Shared Successfully",
-            description: "Bug details shared! Image link included in description.",
+            title: "Shared Successfully", 
+            description: "Bug details shared with image link!",
             variant: "default",
           });
           return;
         }
       } catch (textShareError) {
-        console.log('Text sharing failed:', textShareError);
+        console.log('Text sharing with URL failed:', textShareError);
       }
       
-      // Third try: Basic share (most compatible)
+      // Third Priority: Basic text sharing
       try {
         await navigator.share({
           title: shareTitle,
@@ -309,7 +333,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         console.log('Basic sharing failed:', basicShareError);
       }
       
-      // If all sharing methods fail, fallback to opening image
+      // Last resort: Open image in new tab
       toast({
         title: "Share Failed",
         description: "Could not share directly. Opening image in new tab for manual sharing.",
@@ -320,7 +344,6 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     } catch (error) {
       console.error("Share error:", error);
       
-      // Final fallback
       toast({
         title: "Share Error",
         description: "Sharing failed. Opening image in new tab.",
