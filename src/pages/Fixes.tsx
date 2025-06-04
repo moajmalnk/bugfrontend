@@ -10,11 +10,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Bug, CheckCircle, Search, Plus, Filter, Lock } from "lucide-react";
+import { AlertCircle, Bug, CheckCircle, Search, Plus, Filter, Lock, Code, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -98,6 +99,7 @@ const Fixes = () => {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [skeletonLoading, setSkeletonLoading] = useState(true);
   const [bugs, setBugs] = useState<BugType[]>([]);
+  const [activeTab, setActiveTab] = useState("all-fixes");
 
   useEffect(() => {
     // No timer needed, skeleton loading will be controlled by query status
@@ -142,12 +144,41 @@ const Fixes = () => {
 
   const fixedBugs = bugs?.filter((bug) => bug.status === "fixed") || [];
 
-  const filteredBugs = fixedBugs.filter(
+  // Filter bugs based on active tab
+  const getFilteredBugsByTab = () => {
+    switch (activeTab) {
+      case "all-fixes":
+        return fixedBugs;
+      case "my-fixes":
+        return fixedBugs.filter(bug => {
+          // Convert both to strings for comparison to handle type mismatches
+          return String(bug.updated_by) === String(currentUser?.id);
+        });
+      default:
+        return fixedBugs;
+    }
+  };
+
+  const tabFilteredBugs = getFilteredBugsByTab();
+
+  const filteredBugs = tabFilteredBugs.filter(
     (bug) =>
       (bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       bug.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
       (priorityFilter === "all" || bug.priority === priorityFilter)
   );
+
+  // Get tab-specific count
+  const getTabCount = (tabType: string) => {
+    switch (tabType) {
+      case "all-fixes":
+        return fixedBugs.length;
+      case "my-fixes":
+        return fixedBugs.filter(bug => String(bug.updated_by) === String(currentUser?.id)).length;
+      default:
+        return 0;
+    }
+  };
 
   // console.log("Search Term:", searchTerm);
   // console.log("Priority Filter:", priorityFilter);
@@ -206,14 +237,25 @@ const Fixes = () => {
       );
     }
 
+    const getEmptyMessage = () => {
+      switch (activeTab) {
+        case "my-fixes":
+          return "You haven't fixed any bugs yet.";
+        default:
+          return "No bugs have been fixed yet.";
+      }
+    };
+
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 sm:p-8 text-center">
         <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-muted">
           <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
         </div>
-        <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-semibold">No Fixed Bugs</h3>
+        <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-semibold">
+          {activeTab === "my-fixes" ? "No fixes found" : "No Fixed Bugs"}
+        </h3>
         <p className="mt-2 text-xs sm:text-sm text-muted-foreground">
-          No bugs have been fixed yet.
+          {getEmptyMessage()}
         </p>
       </div>
     );
@@ -227,54 +269,34 @@ const Fixes = () => {
     });
   }
 
-  return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
-      <section className="max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 md:gap-6">
-          {skeletonLoading ? (
-            <>
-              <Skeleton className="h-9 sm:h-10 w-full sm:w-32 md:w-28 lg:w-32 rounded-md" />
-              <Skeleton className="h-7 sm:h-8 w-full sm:w-40 md:w-36 lg:w-40 rounded-md" />
-            </>
-          ) : (
-            <>
-              {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
-                <Button
-                  variant="default"
-                  asChild
-                  className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
-                  aria-label="Fix a bug"
-                >
-                  <Link to="/bugs/" className="flex items-center justify-center">
-                    <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Fix Bugs
-                  </Link>
-                </Button>
-              )}
+  // Fixes Tabs Component
+  const FixesTabs = () => (
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <TabsList className="grid w-full grid-cols-2 mb-4">
+        <TabsTrigger value="all-fixes" className="text-xs sm:text-sm">
+          <Code className="h-4 w-4 mr-1" />
+          All Fixes ({getTabCount("all-fixes")})
+        </TabsTrigger>
+        <TabsTrigger value="my-fixes" className="text-xs sm:text-sm">
+          <User className="h-4 w-4 mr-1" />
+          My Fixes ({getTabCount("my-fixes")})
+        </TabsTrigger>
+      </TabsList>
 
-              {!isLoading && fixedBugs.length > 0 && (
-                <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-green-50">
-                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 mr-2" />
-                  <span className="text-xs sm:text-sm font-medium text-green-700">
-                    {fixedBugs.length} Issues Fixed
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
+      <TabsContent value={activeTab} className="space-y-4">
+        {/* Search and Filters */}
         <div className="space-y-3 sm:space-y-4 md:space-y-6">
           <div className="relative">
             {skeletonLoading ? (
               <Skeleton className="w-full h-9 sm:h-10 md:h-10 rounded-md" />
             ) : (
               <Input
-                placeholder="Search fixed bugs..."
+                placeholder={`Search ${activeTab.replace('-', ' ')}...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-background/50 h-9 sm:h-10 text-sm pl-9 sm:pl-10"
-                aria-label="Search fixed bugs"
-                disabled={hasAccessError || (fixedBugs.length === 0 && !isLoading)}
+                aria-label={`Search ${activeTab.replace('-', ' ')}`}
+                disabled={hasAccessError || (getTabCount(activeTab) === 0 && !isLoading)}
               />
             )}
             {!skeletonLoading && (
@@ -295,7 +317,7 @@ const Fixes = () => {
                     variant="outline"
                     className="w-full h-9 sm:h-10 text-sm bg-background/50"
                     aria-label="Open filters"
-                    disabled={hasAccessError || (fixedBugs.length === 0 && !isLoading)}
+                    disabled={hasAccessError || (getTabCount(activeTab) === 0 && !isLoading)}
                   >
                     <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
                     Filters
@@ -325,6 +347,7 @@ const Fixes = () => {
           </div>
         </div>
 
+        {/* Content */}
         {skeletonLoading ? (
           <>
             {/* Table skeleton for desktop and large tablets */}
@@ -484,6 +507,47 @@ const Fixes = () => {
             </div>
           </>
         )}
+      </TabsContent>
+    </Tabs>
+  );
+
+  return (
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
+      <section className="max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 md:gap-6">
+          {skeletonLoading ? (
+            <>
+              <Skeleton className="h-9 sm:h-10 w-full sm:w-32 md:w-28 lg:w-32 rounded-md" />
+              <Skeleton className="h-7 sm:h-8 w-full sm:w-40 md:w-36 lg:w-40 rounded-md" />
+            </>
+          ) : (
+            <>
+              {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                <Button
+                  variant="default"
+                  asChild
+                  className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
+                  aria-label="Fix a bug"
+                >
+                  <Link to="/bugs/" className="flex items-center justify-center">
+                    <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Fix Bugs
+                  </Link>
+                </Button>
+              )}
+
+              {!isLoading && getTabCount(activeTab) > 0 && (
+                <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-green-50">
+                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 mr-2" />
+                  <span className="text-xs sm:text-sm font-medium text-green-700">
+                    {getTabCount(activeTab)} Issues Fixed
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <FixesTabs />
       </section>
     </main>
   );
