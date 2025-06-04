@@ -22,8 +22,29 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 
-// Initialize the query client outside of the component
-const queryClient = new QueryClient();
+// Initialize the query client outside of the component with optimized defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+      gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (renamed from cacheTime in v5)
+      retry: (failureCount, error: any) => {
+        // Don't retry on auth errors (401, 403)
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          return false;
+        }
+        // Retry up to 2 times for other errors
+        return failureCount < 2;
+      },
+      refetchOnWindowFocus: false, // Don't refetch when window gains focus
+      refetchOnReconnect: true, // Refetch when internet connection is restored
+      refetchOnMount: (query) => {
+        // Only refetch on mount if data is stale
+        return query.state.dataUpdatedAt === 0 || query.isStale();
+      },
+    },
+  },
+});
 
 // Add React Router v7 future flags to eliminate warnings
 const futureConfig = {

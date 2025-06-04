@@ -128,23 +128,17 @@ const BugDetails = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
-  const [skeletonLoading, setSkeletonLoading] = useState(true);
-
-  useEffect(() => {
-    // No timer needed, skeleton loading will be controlled by query status
-  }, []);
 
   const {
     data: bug,
     isLoading,
     error,
-    refetch
+    refetch,
+    isFetching,
+    isStale
   } = useQuery({
     queryKey: ["bug", bugId],
     queryFn: async () => {
-      // Set skeleton loading when starting to fetch data
-      setSkeletonLoading(true);
-      
       const token = localStorage.getItem("token");
       const response = await axios.get<ApiResponse<Bug>>(
         `${ENV.API_URL}/bugs/get.php?id=${bugId}`,
@@ -159,16 +153,16 @@ const BugDetails = () => {
       }
       throw new Error(response.data.message || "Failed to fetch bug details");
     },
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (renamed from cacheTime in v5)
   });
 
   useEffect(() => {
-    refetch();
-    
-    // Turn off skeleton loading when we have bug data or an error
-    if (bug || error) {
-      setSkeletonLoading(false);
+    // Only refetch if we don't have cached data or if it's stale
+    if (!bug || isStale) {
+      refetch();
     }
-  }, [bugId, refetch, bug, error]);
+  }, [bugId, refetch, bug, isStale]);
 
   // Check if this is an access error
   const isAccessError = error && (
@@ -177,6 +171,11 @@ const BugDetails = () => {
     (error as Error).message?.toLowerCase().includes('forbidden') ||
     (error as Error).message?.toLowerCase().includes('403')
   );
+
+  // Show skeleton only when:
+  // 1. Initial loading (no cached data) OR
+  // 2. We have no bug data and we're currently loading/fetching
+  const shouldShowSkeleton = (isLoading && !bug) || (!bug && isFetching);
 
   // Function to render skeleton UI
   const renderSkeleton = () => (
@@ -206,7 +205,7 @@ const BugDetails = () => {
     </main>
   );
 
-  if (skeletonLoading || isLoading) {
+  if (shouldShowSkeleton) {
     return renderSkeleton();
   }
 
@@ -304,6 +303,15 @@ const BugDetails = () => {
 
   return (
     <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8">
+      {/* Background refetch indicator */}
+      {isFetching && bug && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="bg-primary/10 border border-primary/20 text-primary px-3 py-2 rounded-md shadow-md text-sm font-medium animate-pulse">
+            Updating...
+          </div>
+        </div>
+      )}
+      
       <section className="max-w-7xl mx-auto space-y-8">
         <header>
           <BugHeader
