@@ -17,6 +17,7 @@ import { formatBugDate } from "@/lib/dateUtils";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import { Project, projectService, UpdateProjectData } from "@/services/projectService";
 import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
+import { ActivityList } from "@/components/activities/ActivityList";
 import {
   AlertCircle,
   Bug,
@@ -45,6 +46,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { motion } from "framer-motion";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 
 // Skeleton components for loading state
 const ProjectHeaderSkeleton = () => (
@@ -208,6 +210,7 @@ const ProjectDetails = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
   const { currentUser } = useAuth();
+  const { logMemberActivity, logProjectActivity } = useActivityLogger();
   const [availableMembers, setAvailableMembers] = useState<ProjectUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [members, setMembers] = useState<ProjectUser[]>([]);
@@ -381,6 +384,12 @@ const ProjectDetails = () => {
       if (data.success) {
         setSelectedUser(null);
         await Promise.all([fetchAvailableMembers(), fetchMembers()]);
+        
+        // Log the activity
+        if (selectedMember && projectId) {
+          await logMemberActivity(projectId, selectedMember.username, 'added', role);
+        }
+        
         toast({ 
           title: "Success", 
           description: "Member added successfully!" 
@@ -412,6 +421,10 @@ const ProjectDetails = () => {
     
     try {
       const token = localStorage.getItem("token");
+      
+      // Find the member to get their username for activity logging
+      const memberToLog = [...members, ...admins].find(m => m.id === memberToRemove);
+      
       const response = await fetch(`${ENV.API_URL}/projects/remove_member.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -421,6 +434,12 @@ const ProjectDetails = () => {
       const data = await response.json();
       if (data.success) {
         fetchMembers();
+        
+        // Log the activity
+        if (memberToLog && projectId) {
+          await logMemberActivity(projectId, memberToLog.username, 'removed', memberToLog.role);
+        }
+        
         toast({ title: "Success", description: "Member removed successfully" });
       } else {
         toast({ 
@@ -451,6 +470,13 @@ const ProjectDetails = () => {
           ...project,
           ...updateData,
           updated_at: new Date().toISOString()
+        });
+      }
+      
+      // Log the project update activity
+      if (projectId) {
+        await logProjectActivity('project_updated', projectId, 'updated project details', {
+          updated_fields: Object.keys(updateData)
         });
       }
       
@@ -624,26 +650,13 @@ const ProjectDetails = () => {
           </div>
 
           <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>
-                  Latest updates in this project
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-6 sm:py-8">
-                  <Clock className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground opacity-50" />
-                  <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-medium">
-                    Feature Coming Soon
-                  </h3>
-                  <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-lg mx-auto">
-                    We're working hard to bring you project activity tracking.
-                    Check back soon!
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <ActivityList 
+              projectId={projectId}
+              limit={8}
+              showPagination={false}
+              autoRefresh={true}
+              refreshInterval={30000}
+            />
           </div>
         </TabsContent>
 
