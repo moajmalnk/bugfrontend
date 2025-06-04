@@ -40,46 +40,46 @@ export const BugCard = ({ bug }: BugCardProps) => {
   const isFromProject = location.pathname.startsWith('/projects/');
 
   return (
-    <div className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 rounded-lg border bg-background transition-shadow hover:shadow-md">
-      <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h4 className="font-medium text-base sm:text-lg break-all whitespace-pre-line w-full max-w-full">
-            {bug.title || 'Untitled Bug'}
-          </h4>
-          <Badge 
-            variant="outline" 
-            className={`text-xs ${priorityColors[bug.priority] || priorityColors.medium}`}
-          >
-            {bug.priority || 'medium'}
-          </Badge>
-          <Badge 
-            variant="outline" 
-            className={`text-xs ${statusColors[bug.status] || statusColors.pending}`}
-          >
-            {(bug.status || 'pending').replace('_', ' ')}
-          </Badge>
+      <div className="w-full h-full flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 rounded-lg border bg-background transition-shadow hover:shadow-md">
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="font-medium text-base sm:text-lg break-all whitespace-pre-line w-full max-w-full">
+              {bug.title || 'Untitled Bug'}
+            </h4>
+            <Badge 
+              variant="outline" 
+              className={`text-xs ${priorityColors[bug.priority] || priorityColors.medium}`}
+            >
+              {bug.priority || 'medium'}
+            </Badge>
+            <Badge 
+              variant="outline" 
+              className={`text-xs ${statusColors[bug.status] || statusColors.pending}`}
+            >
+              {(bug.status || 'pending').replace('_', ' ')}
+            </Badge>
+          </div>
+          
+          <div className="flex flex-col gap-1">
+            {bug.project_name && !isFromProject && (
+              <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">
+                Project: {bug.project_name}
+              </p>
+            )}
+            <BugCreatedDate date={bug.created_at} />
+          </div>
         </div>
         
-        <div className="flex flex-col gap-1">
-          {bug.project_name && !isFromProject && (
-            <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">
-              Project: {bug.project_name}
-            </p>
-          )}
-          <BugCreatedDate date={bug.created_at} />
-        </div>
+        <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
+          <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm px-3 py-1">
+            <Link 
+              to={`/bugs/${bug.id}`}
+              state={{ from: isFromProject ? 'project' : 'bugs' }}
+            >
+              View Details
+            </Link>
+          </Button>
       </div>
-      
-      <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
-        <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm px-3 py-1">
-          <Link 
-            to={`/bugs/${bug.id}`}
-            state={{ from: isFromProject ? 'project' : 'bugs' }}
-          >
-            View Details
-          </Link>
-        </Button>
-      </div>
-    </div>
+              </div>
   );
 };
