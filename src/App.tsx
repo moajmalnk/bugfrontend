@@ -21,6 +21,7 @@ import { BugProvider } from "@/context/BugContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
+import NetworkError from './components/NetworkError';
 
 // Initialize the query client outside of the component with optimized defaults
 const queryClient = new QueryClient({
@@ -289,6 +290,8 @@ function AppContent() {
     };
   }, [currentUser]);
 
+  const networkError = false; // Replace with actual network error logic
+
   return (
     <>
       <OfflineBanner show={isOffline} />
@@ -307,6 +310,7 @@ function AppContent() {
           onDismiss={handleUpdateDismiss}
         />
         <TimezoneDebug />
+        {networkError && <NetworkError />}
       </div>
     </>
   );
