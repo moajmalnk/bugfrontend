@@ -38,7 +38,7 @@ import { useToast } from "@/components/ui/use-toast";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  type: z.enum(["feature", "fix", "maintenance"], {
+    type: z.enum(["feature", "updation", "maintenance"], {
     required_error: "Please select an update type",
   }),
   description: z.string().min(1, "Description is required"),
