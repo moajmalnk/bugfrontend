@@ -385,3 +385,68 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
+
+export const sendNewUpdateNotification = async (update: any) => {
+  try {
+    // Check if email notifications are enabled
+    const settings = notificationService.getSettings();
+
+    let emailResult = { success: true, message: 'Email notifications disabled' };
+    let browserResult = false;
+
+    // Send email notification if enabled
+    if (settings.emailNotifications) {
+      // Fetch all admin and developer emails
+      const adminResponse = await fetch(`${ENV.API_URL}/get_all_admins.php`);
+      const adminData = await adminResponse.json();
+      const adminEmails = adminData.success ? adminData.emails : [];
+
+      const devResponse = await fetch(`${ENV.API_URL}/get_all_developers.php`);
+      const devData = await devResponse.json();
+      const devEmails = devData.success ? devData.emails : [];
+
+      const recipients = [...new Set([...adminEmails, ...devEmails])];
+
+      if (recipients.length > 0) {
+        emailResult = await sendEmailNotification(
+          recipients,
+          `New Update: ${update.title}`,
+          `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f7f6; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <div style="background-color: #2563eb; color: #ffffff; padding: 20px; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px;">BugRicer Update</h1>
+                <p style="margin: 5px 0 0 0; font-size: 16px;">New Update Posted</p>
+              </div>
+              <div style="padding: 20px; border-bottom: 1px solid #e2e8f0;">
+                <h3 style="margin-top: 0; color: #1e293b; font-size: 18px;">${update.title}</h3>
+                <p style="white-space: pre-line; margin-bottom: 15px; font-size: 14px;">${update.description || "No description provided."}</p>
+                <p style="font-size: 14px; margin-bottom: 5px;"><strong>Type:</strong> <span style="font-weight: normal; text-transform: capitalize;">${update.type}</span></p>
+                <p style="font-size: 14px; margin-bottom: 0;"><strong>Created On:</strong> <span style="font-weight: normal;">${new Date(update.created_at).toLocaleString()}</span></p>
+                <p style="font-size: 14px; margin-bottom: 0;"><strong>Created By:</strong> <span style="font-weight: normal;">${update.created_by || 'Bug Ricer User'}</span></p>
+              </div>
+              <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
+                <p style="margin: 0;">This is an automated notification from Bug Ricer. Please do not reply to this email.</p>
+                <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} Bug Ricer. All rights reserved.</p>
+              </div>
+            </div>
+          </div>
+          `
+        );
+      } else {
+        emailResult = { success: false, message: "No recipients found" };
+      }
+    }
+
+    // Optionally, send browser notification if you want
+    // if (settings.browserNotifications) { ... }
+
+    return { 
+      success: emailResult.success,
+      message: emailResult.message,
+      emailSent: emailResult.success
+    };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
+  }
+};

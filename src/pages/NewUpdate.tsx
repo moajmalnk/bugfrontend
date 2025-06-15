@@ -33,6 +33,7 @@ import { useForm } from "react-hook-form";
 import { useState } from "react";
 import * as z from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { sendNewUpdateNotification } from "@/services/emailService";
 
 const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
@@ -71,10 +72,17 @@ const NewUpdate = () => {
       });
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.success) {
         toast({ title: "Success", description: "Update created successfully" });
         queryClient.invalidateQueries({ queryKey: ["updates"] });
+        await sendNewUpdateNotification({
+          title: data.title,
+          description: data.description,
+          type: data.type,
+          created_at: new Date().toISOString(),
+          created_by: currentUser?.username || "Unknown"
+        });
         navigate("/updates");
       } else {
         toast({ title: "Error", description: data.message, variant: "destructive" });
