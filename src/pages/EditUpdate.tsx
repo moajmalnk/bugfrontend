@@ -42,6 +42,7 @@ const formSchema = z.object({
     required_error: "Please select an update type",
   }),
   description: z.string().min(1, "Description is required"),
+  status: z.enum(["pending", "approved", "declined"]).optional(),
 });
 
 const API_BASE = import.meta.env.VITE_API_URL + "/updates";
@@ -54,11 +55,6 @@ const EditUpdate = () => {
   const [isLoading, setIsLoading] = useState(true);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [showApproveDialog, setShowApproveDialog] = useState(false);
-  const [showDeclineDialog, setShowDeclineDialog] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
-  const [isDeclining, setIsDeclining] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<string | undefined>(undefined);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -66,6 +62,7 @@ const EditUpdate = () => {
       title: "",
       type: undefined,
       description: "",
+      status: "pending",
     },
   });
 
@@ -110,8 +107,8 @@ const EditUpdate = () => {
             title: data.data.title,
             type: data.data.type,
             description: data.data.description,
+            status: data.data.status || "pending",
           });
-          setUpdateStatus(data.data.status);
         } else {
           throw new Error(data.message || "Failed to fetch update");
         }
@@ -237,6 +234,39 @@ const EditUpdate = () => {
                   )}
                 />
 
+                {/* Status Dropdown for Admins */}
+                {currentUser?.role === "admin" && (
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          disabled={isSubmitting}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="approved">Approved</SelectItem>
+                            <SelectItem value="declined">Declined</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Set the status of this update
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
                 <FormField
                   control={form.control}
                   name="description"
@@ -259,28 +289,7 @@ const EditUpdate = () => {
                   )}
                 />
 
-                <div className="flex flex-wrap gap-2 justify-end">
-                  {currentUser?.role === "admin" && updateStatus === "pending" && (
-                    <>
-                      <Button
-                        variant="default"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        type="button"
-                        onClick={() => setShowApproveDialog(true)}
-                        disabled={isApproving}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        type="button"
-                        onClick={() => setShowDeclineDialog(true)}
-                        disabled={isDeclining}
-                      >
-                        Decline
-                      </Button>
-                    </>
-                  )}
+                <div className="flex justify-end">
                   <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting ? "Saving..." : "Save Changes"}
                   </Button>
@@ -289,105 +298,6 @@ const EditUpdate = () => {
             </Form>
           </CardContent>
         </Card>
-
-        <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Approve Update</DialogTitle>
-            </DialogHeader>
-            <p>Are you sure you want to approve this update?</p>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowApproveDialog(false)}
-                disabled={isApproving}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={async () => {
-                  setIsApproving(true);
-                  try {
-                    const response = await fetch(`${API_BASE}/approve.php?id=${updateId}`, {
-                      method: "POST",
-                      headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                      },
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                      toast({ title: "Approved", description: "Update approved" });
-                      queryClient.invalidateQueries({ queryKey: ["updates"] });
-                      queryClient.invalidateQueries({ queryKey: ["update", updateId] });
-                      setShowApproveDialog(false);
-                      setUpdateStatus("approved");
-                    } else {
-                      toast({ title: "Error", description: data.message, variant: "destructive" });
-                    }
-                  } catch (error) {
-                    toast({ title: "Error", description: "Failed to approve update", variant: "destructive" });
-                  } finally {
-                    setIsApproving(false);
-                  }
-                }}
-                disabled={isApproving}
-              >
-                {isApproving ? "Approving..." : "Approve"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Decline Update</DialogTitle>
-            </DialogHeader>
-            <p>Are you sure you want to decline this update?</p>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowDeclineDialog(false)}
-                disabled={isDeclining}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={async () => {
-                  setIsDeclining(true);
-                  try {
-                    const response = await fetch(`${API_BASE}/decline.php?id=${updateId}`, {
-                      method: "POST",
-                      headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                      },
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                      toast({ title: "Declined", description: "Update declined" });
-                      queryClient.invalidateQueries({ queryKey: ["updates"] });
-                      queryClient.invalidateQueries({ queryKey: ["update", updateId] });
-                      setShowDeclineDialog(false);
-                      setUpdateStatus("declined");
-                    } else {
-                      toast({ title: "Error", description: data.message, variant: "destructive" });
-                    }
-                  } catch (error) {
-                    toast({ title: "Error", description: "Failed to decline update", variant: "destructive" });
-                  } finally {
-                    setIsDeclining(false);
-                  }
-                }}
-                disabled={isDeclining}
-              >
-                {isDeclining ? "Declining..." : "Decline"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </section>
     </main>
   );
