@@ -199,7 +199,7 @@ const Projects = () => {
           const data = await response.json();
           if (data.success) {
             // Check if current user is in the members list
-            const members = data.members || [];
+            const members = data.data?.members || [];
             const isMember = members.some(member => String(member.id) === String(currentUser.id));
             memberships[project.id] = isMember;
             console.log("API members for project", project.id, data.members);
@@ -267,7 +267,7 @@ const Projects = () => {
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
-            const members = data.members || [];
+            const members = data.data?.members || [];
             const devCount = members.filter(m => m.role === 'developer').length;
             const testerCount = members.filter(m => m.role === 'tester').length;
             

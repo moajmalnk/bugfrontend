@@ -99,7 +99,22 @@ const NewBug = () => {
         }
       );
       if (response.data.success) {
-        return response.data.data;
+        // Only show projects where the current user is a member
+        const allProjects = response.data.data;
+        if (!currentUser) return [];
+        // Check if user is in project.members (if available), else fallback to created_by
+        return allProjects.filter((project: any) => {
+          if (Array.isArray(project.members)) {
+            // If array of IDs
+            if (typeof project.members[0] === "string") {
+              return project.members.includes(currentUser.id);
+            }
+            // If array of objects
+            return project.members.some((m) => m.id === currentUser.id || m.user_id === currentUser.id);
+          }
+          // fallback: show if user is creator
+          return project.created_by === currentUser.id;
+        });
       }
       throw new Error(response.data.message || "Failed to fetch projects");
     },

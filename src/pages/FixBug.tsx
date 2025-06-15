@@ -145,11 +145,6 @@ const FixBug = () => { // Changed component name
             formData.append("fix_description", fixDescription); // Include fix description
             formData.append("fixed_by", currentUser.id); // Record who fixed it
 
-            // Add fix attachments
-            fixAttachments.forEach((file) => {
-                formData.append(`fix_attachments[]`, file);
-            });
-
             // Assuming an update endpoint exists
             const response = await fetch(`${ENV.API_URL}/bugs/update.php`, { // Assuming an update endpoint
                 method: "POST",
@@ -393,101 +388,6 @@ const FixBug = () => { // Changed component name
                         </div>
 
 
-                        <div className="space-y-4">
-                            <Label className="text-sm sm:text-base">Fix Attachments (Screenshots, logs, etc.)</Label>
-
-                            {/* Hidden file input */}
-                            <input
-                                type="file"
-                                ref={fixAttachmentInputRef}
-                                onChange={handleFixAttachmentChange}
-                                className="hidden"
-                                multiple
-                            />
-
-                            <div className="space-y-3">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="h-24 w-full flex flex-col items-center justify-center"
-                                    onClick={handleFixAttachmentClick}
-                                >
-                                    <Paperclip className="h-8 w-8 mb-2 text-muted-foreground" />
-                                    <span>Attach Fix Files</span>
-                                    <span className="text-xs text-muted-foreground mt-1">
-                                        (Screenshots, logs, etc.)
-                                    </span>
-                                </Button>
-
-                                {/* Preview of attachments */}
-                                {fixAttachments.length > 0 && (
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">
-                                            Attachments ({fixAttachments.length})
-                                        </Label>
-                                        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                                            {fixAttachments.map((file, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="relative rounded border p-1 group flex flex-col"
-                                                >
-                                                    {file.type.startsWith("image/") ? (
-                                                        <img
-                                                            src={file.preview}
-                                                            alt={`Fix attachment ${index + 1}`}
-                                                            className="h-24 w-full object-cover rounded flex-shrink-0"
-                                                        />
-                                                    ) : file.type.startsWith("video/") ? (
-                                                        <video
-                                                            src={file.preview}
-                                                            controls
-                                                            className="h-24 w-full object-cover rounded flex-shrink-0"
-                                                            id={`video-preview-${index}`}
-                                                        />
-                                                    ) : (
-                                                        <div className="h-24 w-full flex items-center justify-center bg-muted rounded flex-shrink-0">
-                                                            <File className="h-8 w-8 text-muted-foreground" />
-                                                        </div>
-                                                    )}
-                                                    <Button
-                                                        type="button"
-                                                        variant="destructive"
-                                                        size="icon"
-                                                        className="h-6 w-6 absolute top-2 right-2 opacity-70 hover:opacity-100"
-                                                        onClick={() => removeFixAttachment(index)}
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </Button>
-                                                    <div className="text-xs truncate mt-1 px-1 flex-grow">
-                                                        {file.name}
-                                                    </div>
-                                                    {/* Speed control for videos */}
-                                                    {file.type.startsWith("video/") && (
-                                                        <div className="mt-2 px-1 flex items-center gap-2">
-                                                            <Label htmlFor={`speed-${index}`} className="text-xs">Speed:</Label>
-                                                            <select
-                                                                id={`speed-${index}`}
-                                                                className="text-xs px-1 py-0.5 border rounded bg-background"
-                                                                onChange={(e) => {
-                                                                    const videoElement = document.getElementById(`video-preview-${index}`) as HTMLVideoElement;
-                                                                    if (videoElement) {
-                                                                        videoElement.playbackRate = parseFloat(e.target.value);
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <option value="1">1x</option>
-                                                                <option value="2">2x</option>
-                                                                <option value="4">4x</option>
-                                                            </select>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
                     </CardContent>
                     <CardFooter className="flex justify-between">
                         <Button

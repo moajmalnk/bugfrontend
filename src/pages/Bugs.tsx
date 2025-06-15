@@ -78,7 +78,7 @@ const Bugs = () => {
   const getFilteredBugs = () => {
     let filteredByTab = bugs;
 
-    if (currentUser?.role === "admin") {
+    if (currentUser?.role === "admin" || currentUser?.role === "tester") {
       switch (activeTab) {
         case "all-bugs":
           filteredByTab = bugs;
@@ -210,83 +210,7 @@ const Bugs = () => {
     );
   };
 
-  // Admin Tabs Component
-  const AdminTabs = () => (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-4">
-        <TabsTrigger value="all-bugs" className="text-xs sm:text-sm">
-          <BugIcon className="h-4 w-4 mr-1" />
-          All Bugs ({getTabCount("all-bugs")})
-        </TabsTrigger>
-        <TabsTrigger value="my-bugs" className="text-xs sm:text-sm">
-          <User className="h-4 w-4 mr-1" />
-          My Bugs ({getTabCount("my-bugs")})
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value={activeTab} className="space-y-4">
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          <Input
-            placeholder={`Search ${activeTab.replace('-', ' ')}...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-background/50 h-9 text-xs sm:text-sm"
-            aria-label={`Search ${activeTab.replace('-', ' ')}`}
-            disabled={(bugs.length === 0 && !loading) || skeletonLoading}
-          />
-
-          {/* Mobile Filter Button */}
-          <div className="block sm:hidden">
-            <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full h-9 text-xs bg-background/50"
-                  aria-label="Open filters"
-                  disabled={(bugs.length === 0 && !loading) || skeletonLoading}
-                >
-                  <Filter className="h-3.5 w-3.5 mr-2" />
-                  Filters
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[45vh] px-4 py-6">
-                <SheetHeader className="mb-4">
-                  <SheetTitle className="text-base">Filters</SheetTitle>
-                  <SheetDescription className="text-xs">
-                    Apply filters to find specific bugs
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="space-y-3">
-                  <FilterControls />
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-
-          {/* Desktop Filters */}
-          <div className="hidden sm:flex gap-3">
-            <FilterControls />
-          </div>
-        </div>
-
-        {/* Content */}
-        {skeletonLoading ? (
-          <BugCardGridSkeletonAnimated count={3} />
-        ) : loading ? (
-          <BugCardGridSkeletonAnimated count={2} />
-        ) : filteredBugs.length === 0 ? (
-          renderEmptyState()
-        ) : (
-          <div className="grid gap-4 mt-4 grid-cols-1" style={{ minHeight: 200 }} aria-label="Bug list">
-            {filteredBugs.map((bug) => (
-              <BugCard key={bug.id} bug={bug} />
-            ))}
-          </div>
-        )}
-      </TabsContent>
-    </Tabs>
-  );
+  const canViewTabs = currentUser?.role === "admin" || currentUser?.role === "tester";
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
@@ -333,90 +257,93 @@ const Bugs = () => {
         </div>
 
         {/* Admin Tabs or Regular Content */}
-        {currentUser?.role === "admin" ? (
-          <AdminTabs />
-        ) : (
-          <div className="space-y-4">
-            {/* Total Bugs Count for non-admin users */}
-            {!skeletonLoading && !loading && bugs.length > 0 && (() => {
-              const nonFixedBugs = bugs.filter(bug => bug.status !== "fixed");
-              return nonFixedBugs.length > 0 && (
-                <div className="flex items-center border rounded-md px-3 py-1 bg-blue-50 w-fit">
-                  <BugIcon className="h-4 w-4 text-blue-500 mr-2" />
-                  <span className="text-sm font-medium text-blue-700">
-                    {nonFixedBugs.length} Total Bugs
-                  </span>
+        {canViewTabs ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="all-bugs" className="text-xs sm:text-sm">
+                <BugIcon className="h-4 w-4 mr-1" />
+                All Bugs ({getTabCount("all-bugs")})
+              </TabsTrigger>
+              <TabsTrigger value="my-bugs" className="text-xs sm:text-sm">
+                <User className="h-4 w-4 mr-1" />
+                My Bugs ({getTabCount("my-bugs")})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value={activeTab} className="space-y-4">
+              {/* Search and Filters */}
+              <div className="space-y-3">
+                <Input
+                  placeholder={`Search ${activeTab.replace('-', ' ')}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-background/50 h-9 text-xs sm:text-sm"
+                  aria-label={`Search ${activeTab.replace('-', ' ')}`}
+                  disabled={(bugs.length === 0 && !loading) || skeletonLoading}
+                />
+
+                {/* Mobile Filter Button */}
+                <div className="block sm:hidden">
+                  <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+                    <SheetTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full h-9 text-xs bg-background/50"
+                        aria-label="Open filters"
+                        disabled={(bugs.length === 0 && !loading) || skeletonLoading}
+                      >
+                        <Filter className="h-3.5 w-3.5 mr-2" />
+                        Filters
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="h-[45vh] px-4 py-6">
+                      <SheetHeader className="mb-4">
+                        <SheetTitle className="text-base">Filters</SheetTitle>
+                        <SheetDescription className="text-xs">
+                          Apply filters to find specific bugs
+                        </SheetDescription>
+                      </SheetHeader>
+                      <div className="space-y-3">
+                        <FilterControls />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
                 </div>
-              );
-            })()}
 
-            {/* Search and Filters Section for non-admin users */}
-            <div className="space-y-3">
-              <Input
-                placeholder="Search bugs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-background/50 h-9 text-xs sm:text-sm"
-                aria-label="Search bugs"
-                disabled={(bugs.length === 0 && !loading) || skeletonLoading}
-              />
-
-              {/* Mobile Filter Button */}
-              <div className="block sm:hidden">
-                <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-                  <SheetTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full h-9 text-xs bg-background/50"
-                      aria-label="Open filters"
-                      disabled={(bugs.length === 0 && !loading) || skeletonLoading}
-                    >
-                      <Filter className="h-3.5 w-3.5 mr-2" />
-                      Filters
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="bottom" className="h-[45vh] px-4 py-6">
-                    <SheetHeader className="mb-4">
-                      <SheetTitle className="text-base">Filters</SheetTitle>
-                      <SheetDescription className="text-xs">
-                        Apply filters to find specific bugs
-                      </SheetDescription>
-                    </SheetHeader>
-                    <div className="space-y-3">
-                      <FilterControls />
-                    </div>
-                  </SheetContent>
-                </Sheet>
+                {/* Desktop Filters */}
+                <div className="hidden sm:flex gap-3">
+                  <FilterControls />
+                </div>
               </div>
 
-              {/* Desktop Filters */}
-              <div className="hidden sm:flex gap-3">
-                <FilterControls />
-              </div>
+              {/* Content */}
+              {skeletonLoading ? (
+                <BugCardGridSkeletonAnimated count={3} />
+              ) : loading ? (
+                <BugCardGridSkeletonAnimated count={2} />
+              ) : filteredBugs.length === 0 ? (
+                renderEmptyState()
+              ) : (
+                <div className="grid gap-4 mt-4 grid-cols-1" style={{ minHeight: 200 }} aria-label="Bug list">
+                  {filteredBugs.map((bug) => (
+                    <BugCard key={bug.id} bug={bug} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div>
+            {/* ...search/filter controls... */}
+            <div>
+              {filteredBugs.length === 0 ? renderEmptyState() : (
+                <div>
+                  {filteredBugs.map((bug) => (
+                    <BugCard key={bug.id} bug={bug} />
+                  ))}
+                </div>
+              )}
             </div>
-
-            {/* Bugs List for non-admin users */}
-            {skeletonLoading ? (
-              <div className="grid gap-4 mt-4 grid-cols-1" aria-busy="true" aria-label="Loading bug list">
-                {Array(3).fill(0).map((_, index) => (
-                  <BugCardSkeleton key={index} />
-                ))}
-              </div>
-            ) : loading ? (
-              <div className="grid gap-4 mt-4 grid-cols-1" aria-busy="true" aria-label="Loading bug list">
-                {Array(2).fill(0).map((_, index) => (
-                  <BugCardSkeleton key={index} />
-                ))}
-              </div>
-            ) : filteredBugs.length === 0 ? (
-              renderEmptyState()
-            ) : (
-              <div className="grid gap-4 mt-4 grid-cols-1" style={{ minHeight: 200 }} aria-label="Bug list">
-                {filteredBugs.map((bug) => (
-                  <BugCard key={bug.id} bug={bug} />
-                ))}
-              </div>
-            )}
           </div>
         )}
       </section>

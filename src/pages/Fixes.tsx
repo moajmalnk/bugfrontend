@@ -97,24 +97,17 @@ const Fixes = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [skeletonLoading, setSkeletonLoading] = useState(true);
-  const [bugs, setBugs] = useState<BugType[]>([]);
   const [activeTab, setActiveTab] = useState("all-fixes");
-
-  useEffect(() => {
-    // No timer needed, skeleton loading will be controlled by query status
-  }, []);
 
   // Fetch all bugs
   const {
-    data,
+    data: bugs = [],
     isLoading,
     error,
   } = useQuery<BugType[]>({
     queryKey: ["bugs"],
     queryFn: () => bugService.getBugs(),
     retry: (failureCount, error: any) => {
-      // Don't retry on access errors
       if (error?.message?.includes('access') || error?.message?.includes('permission')) {
         return false;
       }
@@ -122,79 +115,37 @@ const Fixes = () => {
     }
   });
 
-  // Update bugs state when data changes
-  useEffect(() => {
-    if (data) {
-      setBugs(data);
-      // Turn off skeleton loading when data is available
-      setSkeletonLoading(false);
-    }
-    
-    // Also turn off skeleton loading when there's an error
-    if (error) {
-      setSkeletonLoading(false);
-    }
-  }, [data, error]);
+  const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
 
-  const hasAccessError = error && (
-    (error as Error).message?.includes('access') || 
-    (error as Error).message?.includes('permission') ||
-    (error as Error).message?.includes('403')
-  );
+  // Only show tabs for admin/developer
+  const showTabs = currentUser?.role === "admin" || currentUser?.role === "developer";
 
-  const fixedBugs = bugs?.filter((bug) => bug.status === "fixed") || [];
-
-  // Filter bugs based on active tab
+  // Tab logic
   const getFilteredBugsByTab = () => {
-    switch (activeTab) {
-      case "all-fixes":
-        return fixedBugs;
-      case "my-fixes":
-        return fixedBugs.filter(bug => {
-          // Convert both to strings for comparison to handle type mismatches
-          return String(bug.updated_by) === String(currentUser?.id);
-        });
-      default:
-        return fixedBugs;
+    if (!showTabs) return fixedBugs;
+    if (activeTab === "my-fixes") {
+      return fixedBugs.filter(bug => String(bug.updated_by) === String(currentUser?.id));
     }
+    return fixedBugs;
   };
 
   const tabFilteredBugs = getFilteredBugsByTab();
 
+  // Search and filter
   const filteredBugs = tabFilteredBugs.filter(
     (bug) =>
       (bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bug.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        bug.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
       (priorityFilter === "all" || bug.priority === priorityFilter)
   );
 
-  // Get tab-specific count
-  const getTabCount = (tabType: string) => {
-    switch (tabType) {
-      case "all-fixes":
-        return fixedBugs.length;
-      case "my-fixes":
-        return fixedBugs.filter(bug => String(bug.updated_by) === String(currentUser?.id)).length;
-      default:
-        return 0;
-    }
-  };
-
-  // console.log("Search Term:", searchTerm);
-  // console.log("Priority Filter:", priorityFilter);
-  // console.log("Fixed Bugs:", fixedBugs);
-  // console.log("Filtered Bugs:", filteredBugs);
-
+  // Priority color
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "high":
-        return "text-red-500";
-      case "medium":
-        return "text-yellow-500";
-      case "low":
-        return "text-green-500";
-      default:
-        return "";
+      case "high": return "text-red-500";
+      case "medium": return "text-yellow-500";
+      case "low": return "text-green-500";
+      default: return "";
     }
   };
 
@@ -206,6 +157,7 @@ const Fixes = () => {
     });
   };
 
+  // Filter controls
   const FilterControls = () => (
     <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
       <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -222,332 +174,246 @@ const Fixes = () => {
     </div>
   );
 
-  const renderEmptyState = () => {
-    if (hasAccessError) {
-      return (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 sm:p-8 text-center">
-          <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-muted">
-            <Lock className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-          </div>
-          <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-semibold">No Access</h3>
-          <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-md">
-            You don't have access to any projects. You need to be a member of a project to view fixed bugs.
-          </p>
-        </div>
-      );
-    }
-
-    const getEmptyMessage = () => {
-      switch (activeTab) {
-        case "my-fixes":
-          return "You haven't fixed any bugs yet.";
-        default:
-          return "No bugs have been fixed yet.";
-      }
-    };
-
-    return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 sm:p-8 text-center">
-        <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-muted">
-          <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-        </div>
-        <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-semibold">
-          {activeTab === "my-fixes" ? "No fixes found" : "No Fixed Bugs"}
-        </h3>
-        <p className="mt-2 text-xs sm:text-sm text-muted-foreground">
-          {getEmptyMessage()}
-        </p>
-      </div>
-    );
-  };
-
-  if (error && !hasAccessError && !skeletonLoading) {
-    toast({
-      title: "Error",
-      description: "Failed to load fixed bugs. Please try again.",
-      variant: "destructive",
-    });
-  }
-
-  // Fixes Tabs Component
-  const FixesTabs = () => (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-4">
-        <TabsTrigger value="all-fixes" className="text-xs sm:text-sm">
-          <Code className="h-4 w-4 mr-1" />
-          All Fixes ({getTabCount("all-fixes")})
-        </TabsTrigger>
-        <TabsTrigger value="my-fixes" className="text-xs sm:text-sm">
-          <User className="h-4 w-4 mr-1" />
-          My Fixes ({getTabCount("my-fixes")})
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value={activeTab} className="space-y-4">
-        {/* Search and Filters */}
-        <div className="space-y-3 sm:space-y-4 md:space-y-6">
-          <div className="relative">
-            {skeletonLoading ? (
-              <Skeleton className="w-full h-9 sm:h-10 md:h-10 rounded-md" />
-            ) : (
-              <Input
-                placeholder={`Search ${activeTab.replace('-', ' ')}...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-background/50 h-9 sm:h-10 text-sm pl-9 sm:pl-10"
-                aria-label={`Search ${activeTab.replace('-', ' ')}`}
-                disabled={hasAccessError || (getTabCount(activeTab) === 0 && !isLoading)}
-              />
-            )}
-            {!skeletonLoading && (
-              <Search className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-            )}
-          </div>
-
-          <div className="block lg:hidden">
-            {skeletonLoading ? (
-              <Skeleton className="w-full h-9 sm:h-10 md:h-10 rounded-md" />
-            ) : (
-              <Sheet
-                open={isFilterSheetOpen}
-                onOpenChange={setIsFilterSheetOpen}
-              >
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full h-9 sm:h-10 text-sm bg-background/50"
-                    aria-label="Open filters"
-                    disabled={hasAccessError || (getTabCount(activeTab) === 0 && !isLoading)}
-                  >
-                    <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
-                    Filters
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="h-[50vh] px-4 py-6">
-                  <SheetHeader className="mb-6">
-                    <SheetTitle className="text-lg">Filters</SheetTitle>
-                    <SheetDescription className="text-sm">
-                      Apply filters to find specific fixed bugs
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="space-y-4">
-                    <FilterControls />
-                  </div>
-                </SheetContent>
-              </Sheet>
-            )}
-          </div>
-
-          <div className="hidden lg:flex gap-4">
-            {skeletonLoading ? (
-              <Skeleton className="h-9 w-full sm:w-44 md:w-40 lg:w-44 rounded-md" />
-            ) : (
-              <FilterControls />
-            )}
-          </div>
-        </div>
-
-        {/* Content */}
-        {skeletonLoading ? (
-          <>
-            {/* Table skeleton for desktop and large tablets */}
-            <div className="hidden lg:block rounded-md border overflow-x-auto">
-              <Table className="min-w-[800px] w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[120px]">Bug ID</TableHead>
-                    <TableHead className="w-[250px]">Title</TableHead>
-                    <TableHead className="w-[100px]">Priority</TableHead>
-                    <TableHead className="w-[150px]">Reported By</TableHead>
-                    <TableHead className="w-[120px]">Fixed Date</TableHead>
-                    <TableHead className="w-[100px] text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Array(5)
-                    .fill(0)
-                    .map((_, index) => (
-                      <TableRowSkeleton key={index} />
-                    ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Card skeleton for mobile and tablets */}
-            <div className="lg:hidden space-y-3 sm:space-y-4">
-              {Array(3)
-                .fill(0)
-                .map((_, index) => (
-                  <CardSkeleton key={index} />
-                ))}
-            </div>
-          </>
-        ) : isLoading ? (
-          <>
-            {/* Table skeleton for desktop and large tablets */}
-            <div className="hidden lg:block rounded-md border overflow-x-auto">
-              <Table className="min-w-[800px] w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[120px]">Bug ID</TableHead>
-                    <TableHead className="w-[250px]">Title</TableHead>
-                    <TableHead className="w-[100px]">Priority</TableHead>
-                    <TableHead className="w-[150px]">Reported By</TableHead>
-                    <TableHead className="w-[120px]">Fixed Date</TableHead>
-                    <TableHead className="w-[100px] text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Array(3)
-                    .fill(0)
-                    .map((_, index) => (
-                      <TableRowSkeleton key={index} />
-                    ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Card skeleton for mobile and tablets */}
-            <div className="lg:hidden space-y-3 sm:space-y-4">
-              {Array(2)
-                .fill(0)
-                .map((_, index) => (
-                  <CardSkeleton key={index} />
-                ))}
-            </div>
-          </>
-        ) : hasAccessError || filteredBugs.length === 0 ? (
-          renderEmptyState()
-        ) : (
-          <>
-            <div className="hidden lg:block rounded-md border overflow-x-auto">
-              <Table className="min-w-[800px] w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[120px]">Bug ID</TableHead>
-                    <TableHead className="w-[250px]">Title</TableHead>
-                    <TableHead className="w-[100px]">Priority</TableHead>
-                    <TableHead className="w-[150px]">Reported By</TableHead>
-                    <TableHead className="w-[120px]">Fixed Date</TableHead>
-                    <TableHead className="w-[100px] text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBugs.map((bug) => (
-                    <TableRow key={bug.id}>
-                      <TableCell className="font-medium max-w-[120px] break-all">
-                        <div className="flex items-center space-x-2">
-                          <Bug className="h-4 w-4 text-muted-foreground" />
-                          <span>{bug.id.substring(0, 8)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[250px] break-words">
-                        {bug.title}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={getPriorityColor(bug.priority)}
-                        >
-                          {bug.priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[150px] break-words">
-                        {bug.reported_by}
-                      </TableCell>
-                      <TableCell>{formatDate(bug.updated_at)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/bugs/${bug.id}`}>View Details</Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <div className="lg:hidden space-y-3 sm:space-y-4">
-              {filteredBugs.map((bug) => (
-                <div
-                  key={bug.id}
-                  className="rounded-lg border p-3 sm:p-4 bg-background flex flex-col gap-2 sm:gap-3"
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Bug className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                    <span className="font-semibold text-xs sm:text-sm break-all">
-                      {bug.id.substring(0, 8)}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs ${getPriorityColor(bug.priority)}`}
-                    >
-                      {bug.priority}
-                    </Badge>
-                  </div>
-                  <div className="font-bold text-sm sm:text-base break-words">
-                    {bug.title}
-                  </div>
-                  <div className="flex flex-col gap-1 text-xs sm:text-sm">
-                    <div className="text-muted-foreground break-words">
-                      Reported by:{" "}
-                      <span className="font-medium">{bug.reported_by}</span>
-                    </div>
-                    <div className="text-muted-foreground">
-                      Fixed: {formatDate(bug.updated_at)}
-                    </div>
-                  </div>
-                  <div className="flex justify-end mt-1">
-                    <Button variant="outline" size="sm" asChild className="text-xs">
-                      <Link to={`/bugs/${bug.id}`}>View Details</Link>
-                    </Button>
-                  </div>
+  // Responsive rendering (table for desktop, cards for mobile)
+  const renderBugsTable = () => (
+    <div className="hidden lg:block rounded-md border overflow-x-auto">
+      <Table className="min-w-[800px] w-full">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[120px]">Bug ID</TableHead>
+            <TableHead className="w-[250px]">Title</TableHead>
+            <TableHead className="w-[100px]">Priority</TableHead>
+            <TableHead className="w-[150px]">Reported By</TableHead>
+            <TableHead className="w-[120px]">Fixed Date</TableHead>
+            <TableHead className="w-[100px] text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredBugs.map((bug) => (
+            <TableRow key={bug.id}>
+              <TableCell className="font-medium max-w-[120px] break-all">
+                <div className="flex items-center space-x-2">
+                  <Bug className="h-4 w-4 text-muted-foreground" />
+                  <span>{bug.id.substring(0, 8)}</span>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
-      </TabsContent>
-    </Tabs>
+              </TableCell>
+              <TableCell className="max-w-[250px] break-words">{bug.title}</TableCell>
+              <TableCell>
+                <Badge variant="outline" className={getPriorityColor(bug.priority)}>
+                  {bug.priority}
+                </Badge>
+              </TableCell>
+              <TableCell className="max-w-[150px] break-words">{bug.reported_by}</TableCell>
+              <TableCell>{formatDate(bug.updated_at)}</TableCell>
+              <TableCell className="text-right">
+                <Button variant="outline" size="sm" asChild>
+                  <Link to={`/bugs/${bug.id}`}>View Details</Link>
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 
+  const renderBugsCards = () => (
+    <div className="lg:hidden space-y-3 sm:space-y-4">
+      {filteredBugs.map((bug) => (
+        <div
+          key={bug.id}
+          className="rounded-lg border p-3 sm:p-4 bg-background flex flex-col gap-2 sm:gap-3"
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <Bug className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+            <span className="font-semibold text-xs sm:text-sm break-all">
+              {bug.id.substring(0, 8)}
+            </span>
+            <Badge variant="outline" className={`text-xs ${getPriorityColor(bug.priority)}`}>{bug.priority}</Badge>
+          </div>
+          <div className="font-bold text-sm sm:text-base break-words">{bug.title}</div>
+          <div className="flex flex-col gap-1 text-xs sm:text-sm">
+            <div className="text-muted-foreground break-words">
+              Reported by: <span className="font-medium">{bug.reported_by}</span>
+            </div>
+            <div className="text-muted-foreground">Fixed: {formatDate(bug.updated_at)}</div>
+          </div>
+          <div className="flex justify-end mt-1">
+            <Button variant="outline" size="sm" asChild className="text-xs">
+              <Link to={`/bugs/${bug.id}`}>View Details</Link>
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Empty state
+  const renderEmptyState = () => (
+    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 sm:p-8 text-center">
+      <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-muted">
+        <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+      </div>
+      <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-semibold">
+        {showTabs && activeTab === "my-fixes" ? "No fixes found" : "No Fixed Bugs"}
+      </h3>
+      <p className="mt-2 text-xs sm:text-sm text-muted-foreground">
+        {showTabs && activeTab === "my-fixes" ? "You haven't fixed any bugs yet." : "No bugs have been fixed yet."}
+      </p>
+    </div>
+  );
+
+  // Main render
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
       <section className="max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 md:gap-6">
-          {skeletonLoading ? (
-            <>
-              <Skeleton className="h-9 sm:h-10 w-full sm:w-32 md:w-28 lg:w-32 rounded-md" />
-              <Skeleton className="h-7 sm:h-8 w-full sm:w-40 md:w-36 lg:w-40 rounded-md" />
-            </>
-          ) : (
-            <>
-              {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
-                <Button
-                  variant="default"
-                  asChild
-                  className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
-                  aria-label="Fix a bug"
-                >
-                  <Link to="/bugs/" className="flex items-center justify-center">
-                    <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Fix Bugs
-                  </Link>
-                </Button>
-              )}
-
-              {!isLoading && getTabCount(activeTab) > 0 && (
-                <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-green-50">
-                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 mr-2" />
-                  <span className="text-xs sm:text-sm font-medium text-green-700">
-                    {getTabCount(activeTab)} Issues Fixed
-                  </span>
-                </div>
-              )}
-            </>
+          {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+            <Button
+              variant="default"
+              asChild
+              className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
+              aria-label="Fix a bug"
+            >
+              <Link to="/bugs/" className="flex items-center justify-center">
+                <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Fix Bugs
+              </Link>
+            </Button>
+          )}
+          {!isLoading && filteredBugs.length > 0 && (
+            <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-green-50">
+              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 mr-2" />
+              <span className="text-xs sm:text-sm font-medium text-green-700">
+                {filteredBugs.length} Issues Fixed
+              </span>
+            </div>
           )}
         </div>
 
-        <FixesTabs />
+        {/* Tabs for admin/developer, else just show all fixes */}
+        {showTabs ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="all-fixes" className="text-xs sm:text-sm">
+                <Code className="h-4 w-4 mr-1" />
+                All Fixes ({fixedBugs.length})
+              </TabsTrigger>
+              <TabsTrigger value="my-fixes" className="text-xs sm:text-sm">
+                <User className="h-4 w-4 mr-1" />
+                My Fixes ({fixedBugs.filter(bug => String(bug.updated_by) === String(currentUser?.id)).length})
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value={activeTab} className="space-y-4">
+              {/* Search and Filters */}
+              <div className="space-y-3 sm:space-y-4 md:space-y-6">
+                <div className="relative">
+                  <Input
+                    placeholder={`Search ${activeTab.replace('-', ' ')}...`}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-background/50 h-9 sm:h-10 text-sm pl-9 sm:pl-10"
+                    aria-label={`Search ${activeTab.replace('-', ' ')}`}
+                  />
+                  <Search className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                </div>
+                <div className="block lg:hidden">
+                  <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+                    <SheetTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full h-9 sm:h-10 text-sm bg-background/50"
+                        aria-label="Open filters"
+                      >
+                        <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
+                        Filters
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="h-[50vh] px-4 py-6">
+                      <SheetHeader className="mb-6">
+                        <SheetTitle className="text-lg">Filters</SheetTitle>
+                        <SheetDescription className="text-sm">
+                          Apply filters to find specific fixed bugs
+                        </SheetDescription>
+                      </SheetHeader>
+                      <div className="space-y-4">
+                        <FilterControls />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
+                <div className="hidden lg:flex gap-4">
+                  <FilterControls />
+                </div>
+              </div>
+              {/* Content */}
+              {isLoading ? (
+                <HeaderSkeleton />
+              ) : filteredBugs.length === 0 ? (
+                renderEmptyState()
+              ) : (
+                <>
+                  {renderBugsTable()}
+                  {renderBugsCards()}
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
+        ) : (
+          // For testers: just show all fixes, no tabs
+          <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4 md:space-y-6">
+              <div className="relative">
+                <Input
+                  placeholder="Search all fixes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-background/50 h-9 sm:h-10 text-sm pl-9 sm:pl-10"
+                  aria-label="Search all fixes"
+                />
+                <Search className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+              </div>
+              <div className="block lg:hidden">
+                <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full h-9 sm:h-10 text-sm bg-background/50"
+                      aria-label="Open filters"
+                    >
+                      <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
+                      Filters
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="h-[50vh] px-4 py-6">
+                    <SheetHeader className="mb-6">
+                      <SheetTitle className="text-lg">Filters</SheetTitle>
+                      <SheetDescription className="text-sm">
+                        Apply filters to find specific fixed bugs
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="space-y-4">
+                      <FilterControls />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </div>
+              <div className="hidden lg:flex gap-4">
+                <FilterControls />
+              </div>
+            </div>
+            {/* Content */}
+            {isLoading ? (
+              <HeaderSkeleton />
+            ) : filteredBugs.length === 0 ? (
+              renderEmptyState()
+            ) : (
+              <>
+                {renderBugsTable()}
+                {renderBugsCards()}
+              </>
+            )}
+          </div>
+        )}
       </section>
     </main>
   );
