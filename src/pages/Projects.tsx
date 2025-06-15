@@ -177,6 +177,7 @@ const Projects = () => {
           memberships[project.id] = true;
         });
         setUserProjectMemberships(memberships);
+        console.log("Memberships:", memberships);
         setSkeletonLoading(false);
         return;
       }
@@ -199,13 +200,15 @@ const Projects = () => {
           if (data.success) {
             // Check if current user is in the members list
             const members = data.members || [];
-            const isMember = members.some(member => member.id === currentUser.id);
+            const isMember = members.some(member => String(member.id) === String(currentUser.id));
             memberships[project.id] = isMember;
+            console.log("API members for project", project.id, data.members);
           }
         }
       }
       
       setUserProjectMemberships(memberships);
+      console.log("Memberships:", memberships);
       
       // Turn off skeleton loading only after membership check is complete
       setSkeletonLoading(false);
@@ -217,13 +220,13 @@ const Projects = () => {
   
   // Apply all filters (search and membership)
   const applyFilters = () => {
-    // Don't filter if we don't have projects or memberships yet
     if (projects.length === 0 || Object.keys(userProjectMemberships).length === 0) {
+      setFilteredProjects([]);
       return;
     }
-    
+
     let filtered = projects;
-    
+
     // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(
@@ -232,12 +235,12 @@ const Projects = () => {
           project.description.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    
-    // Filter by user membership - only apply this filter once memberships are loaded
-    if (Object.keys(userProjectMemberships).length > 0) {
-      filtered = filtered.filter(project => userProjectMemberships[project.id] === true);
+
+    // Admins see all, others see only assigned projects
+    if (currentUser?.role !== "admin") {
+      filtered = filtered.filter(project => userProjectMemberships[project.id]);
     }
-    
+
     setFilteredProjects(filtered);
   };
 
@@ -325,6 +328,8 @@ const Projects = () => {
         title: "Success",
         description: "Project created successfully",
       });
+      await checkUserMembership();
+      applyFilters();
       return true;
     } catch (error) {
       toast({

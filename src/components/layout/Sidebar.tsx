@@ -4,6 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import {
+  Bell,
   Bug,
   CheckCircle,
   FolderKanban,
@@ -79,6 +80,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 label="Fixes"
               />
             </div>
+            <NavLink
+                to="/updates"
+                icon={<Bell className="h-5 w-5" />}
+                label="Updates"
+              />
             {currentUser?.role === "admin" && (
               <>
                 <Separator />

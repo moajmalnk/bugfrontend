@@ -56,6 +56,10 @@ const Reports = lazy(() => import("@/pages/Reports"));
 const Fixes = lazy(() => import("@/pages/Fixes"));
 const Messages = lazy(() => import("@/pages/Messages"));
 const FixBug = lazy(() => import("@/pages/FixBug"));
+const Updates = lazy(() => import("@/pages/Updates"));
+const NewUpdate = lazy(() => import("@/pages/NewUpdate"));
+const UpdateDetails = lazy(() => import("@/pages/UpdateDetails"));
+const EditUpdate = lazy(() => import("@/pages/EditUpdate"));
 
 const RouteConfig = () => {
   return (
@@ -193,7 +197,46 @@ const RouteConfig = () => {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/new-update"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={<SkeletonFallback />}>
+              <NewUpdate />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/updates"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={<SkeletonFallback />}>
+              <Updates />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/updates/:updateId"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={<SkeletonFallback />}>
+              <UpdateDetails />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/updates/:updateId/edit"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={<SkeletonFallback />}>
+              <EditUpdate />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
       {/* Redirect root to projects */}
       <Route
         path="/"
