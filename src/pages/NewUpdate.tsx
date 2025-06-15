@@ -60,7 +60,7 @@ const NewUpdate = () => {
     },
   });
 
-  const mutation = useMutation({
+  const mutation = useMutation<unknown, unknown, z.infer<typeof formSchema>>({
     mutationFn: async (values) => {
       const response = await fetch(`${API_BASE}/create.php`, {
         method: "POST",
@@ -72,14 +72,13 @@ const NewUpdate = () => {
       });
       return response.json();
     },
-    onSuccess: async (data) => {
+    onSuccess: async (data: { success: boolean; message: string; data: { id: string } }, values: z.infer<typeof formSchema>) => {
       if (data.success) {
         toast({ title: "Success", description: "Update created successfully" });
         queryClient.invalidateQueries({ queryKey: ["updates"] });
         await sendNewUpdateNotification({
-          title: data.title,
-          description: data.description,
-          type: data.type,
+          ...values,
+          id: data.data?.id,
           created_at: new Date().toISOString(),
           created_by: currentUser?.username || "BugRicer"
         });

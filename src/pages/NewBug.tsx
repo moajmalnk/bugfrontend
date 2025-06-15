@@ -99,10 +99,10 @@ const NewBug = () => {
         }
       );
       if (response.data.success) {
-        // Only show projects where the current user is a member
         const allProjects = response.data.data;
-        if (!currentUser) return [];
-        // Check if user is in project.members (if available), else fallback to created_by
+        if (currentUser?.role === "admin") {
+          return allProjects; // Admin sees all projects
+        }
         return allProjects.filter((project: any) => {
           if (Array.isArray(project.members)) {
             // If array of IDs
@@ -200,13 +200,15 @@ const NewBug = () => {
             const uploadedAttachments = data.uploadedAttachments || [];
             // console.log("Uploaded attachment paths from backend:", uploadedAttachments);
 
+            const bugId = data.data?.bug?.id || data.bugId || data.data?.id || data.id;
             const bugData = {
               title: name,
               description: description,
               priority: priority,
               status: "pending",
               reported_by_name: currentUser?.name || "Bug Ricer User",
-              attachments: uploadedAttachments
+              attachments: uploadedAttachments,
+              id: bugId
             };
 
             // Send email notification
@@ -214,8 +216,8 @@ const NewBug = () => {
             // console.log("Email notification sent:", emailResponse);
             
             // Broadcast browser notification to all users
-            if (data.bugId || data.data?.id || data.id) {
-              const bugId = String(data.bugId || data.data?.id || data.id);
+            if (data.id) {
+              const bugId = String(data.id);
               await broadcastNotificationService.broadcastNewBug(
                 name,
                 bugId,

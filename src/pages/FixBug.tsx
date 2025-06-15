@@ -161,6 +161,7 @@ const FixBug = () => { // Changed component name
                 if (status === "fixed") {
                     await sendBugStatusUpdateNotification({
                         ...bug,
+                        id: bug.id,
                         status: "fixed",
                         updated_by_name: currentUser?.name || "Bug Ricer"
                     });
