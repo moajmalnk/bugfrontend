@@ -68,7 +68,7 @@ const UpdateDetails = () => {
     switch (type) {
       case "feature":
         return "text-blue-500";
-      case "fix":
+      case "updation":
         return "text-green-500";
       case "maintenance":
         return "text-yellow-500";

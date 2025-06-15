@@ -359,9 +359,16 @@ const Updates = () => {
                       </TableCell>
                       <TableCell>{formatDate(update.created_at)}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/updates/${update.id}`}>View Details</Link>
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link to={`/updates/${update.id}`}>View Details</Link>
+                          </Button>
+                          {(currentUser?.role === "admin" || update.created_by === currentUser?.username) && (
+                            <Button variant="outline" size="sm" asChild>
+                              <Link to={`/updates/${update.id}/edit`}>Edit</Link>
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -399,10 +406,15 @@ const Updates = () => {
                       Date: {formatDate(update.created_at)}
                     </div>
                   </div>
-                  <div className="flex justify-end mt-1">
+                  <div className="flex justify-end mt-1 gap-2">
                     <Button variant="outline" size="sm" asChild className="text-xs">
                       <Link to={`/updates/${update.id}`}>View Details</Link>
                     </Button>
+                    {(currentUser?.role === "admin" || update.created_by === currentUser?.username) && (
+                      <Button variant="outline" size="sm" asChild className="text-xs">
+                        <Link to={`/updates/${update.id}/edit`}>Edit</Link>
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -424,18 +436,16 @@ const Updates = () => {
             </>
           ) : (
             <>
-              {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
-                <Button
-                  variant="default"
-                  asChild
-                  className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
-                  aria-label="Create new update"
-                >
-                  <Link to="/new-update" className="flex items-center justify-center">
-                    <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> New Update
-                  </Link>
-                </Button>
-              )}
+              <Button
+                variant="default"
+                asChild
+                className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
+                aria-label="Create new update"
+              >
+                <Link to="/new-update" className="flex items-center justify-center">
+                  <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> New Update
+                </Link>
+              </Button>
 
               {!skeletonLoading && getTabCount(activeTab) > 0 && (
                 <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50">
