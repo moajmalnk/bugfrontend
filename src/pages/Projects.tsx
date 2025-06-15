@@ -46,8 +46,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Tabs } from "@/components/ui/tabs";
 
 // Project Card Skeleton component for loading state
 const ProjectCardSkeleton = () => (
@@ -104,6 +105,8 @@ const Projects = () => {
   const [userProjectMemberships, setUserProjectMemberships] = useState<Record<string, boolean>>({});
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") || "overview";
 
   useEffect(() => {
     // Fetch projects when component mounts
@@ -420,6 +423,10 @@ const Projects = () => {
     }
   };
 
+  const handleTabChange = (tab) => {
+    setSearchParams({ tab });
+  };
+
   return (
     <div className="space-y-6 px-2 sm:px-4 md:px-8 py-4 sm:py-6 w-full max-w-[1800px] mx-auto">
       {/* Header */}
@@ -715,6 +722,10 @@ const Projects = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Tabs value={tabFromUrl} onValueChange={handleTabChange} className="w-full">
+        {/* ... */}
+      </Tabs>
     </div>
   );
 };

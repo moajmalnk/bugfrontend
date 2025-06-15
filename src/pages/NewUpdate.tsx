@@ -81,7 +81,7 @@ const NewUpdate = () => {
           description: data.description,
           type: data.type,
           created_at: new Date().toISOString(),
-          created_by: currentUser?.username || "Unknown"
+          created_by: currentUser?.username || "BugRicer"
         });
         navigate("/updates");
       } else {
@@ -160,8 +160,8 @@ const NewUpdate = () => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="updation">Updation</SelectItem>
                           <SelectItem value="feature">Feature</SelectItem>
-                          <SelectItem value="fix">Fix</SelectItem>
                           <SelectItem value="maintenance">Maintenance</SelectItem>
                         </SelectContent>
                       </Select>

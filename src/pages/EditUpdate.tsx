@@ -221,8 +221,8 @@ const EditUpdate = () => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="updation">Updation</SelectItem>
                           <SelectItem value="feature">Feature</SelectItem>
-                          <SelectItem value="fix">Fix</SelectItem>
                           <SelectItem value="maintenance">Maintenance</SelectItem>
                         </SelectContent>
                       </Select>
