@@ -18,6 +18,7 @@ interface AuthContextType {
   logout: () => void;
   register: (data: RegisterData) => Promise<boolean>;
   updateCurrentUser: (user: User) => void;
+  storeIntendedDestination: (path: string) => void;
 }
 
 interface RegisterData {
@@ -43,6 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateCurrentUser = (user: User) => {
     setCurrentUser(user);
+  };
+
+  const storeIntendedDestination = (path: string) => {
+    if (path !== '/login') {
+      localStorage.setItem('intendedDestination', path);
+    }
   };
 
   const checkAuthStatus = async () => {
@@ -109,7 +116,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.success && data.data?.token) {
         localStorage.setItem("token", data.data.token);
         setCurrentUser(data.data.user);
-        navigate("/projects", { replace: true });
+        
+        // Get the intended destination or default to /projects
+        const intendedDestination = localStorage.getItem('intendedDestination') || '/projects';
+        localStorage.removeItem('intendedDestination'); // Clear the stored destination
+        navigate(intendedDestination, { replace: true });
         return true;
       }
 
@@ -189,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     register,
     updateCurrentUser,
+    storeIntendedDestination,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

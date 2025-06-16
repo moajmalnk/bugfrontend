@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { BugIcon } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -9,14 +9,16 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, storeIntendedDestination } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
+      storeIntendedDestination(location.pathname);
       navigate('/login');
     }
-  }, [isLoading, isAuthenticated, navigate]);
+  }, [isLoading, isAuthenticated, navigate, location.pathname, storeIntendedDestination]);
 
   if (isLoading) {
     return (

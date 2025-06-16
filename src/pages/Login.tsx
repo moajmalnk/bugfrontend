@@ -21,9 +21,9 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated && !isAuthLoading) {
-      navigate('/projects');
+      return;
     }
-  }, [isAuthenticated, isAuthLoading, navigate]);
+  }, [isAuthenticated, isAuthLoading]);
 
   if (isAuthLoading) {
     return (
@@ -46,9 +46,7 @@ const Login = () => {
 
     try {
       const success = await login(username, password);
-      if (success) {
-        navigate('/projects');
-      } else {
+      if (!success) {
         toast({
           title: "Login failed",
           description: "Invalid username or password",
