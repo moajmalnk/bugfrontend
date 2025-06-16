@@ -95,9 +95,11 @@ const HeaderSkeleton = () => (
 const Fixes = () => {
   const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all-fixes");
+  const [typeFilter, setTypeFilter] = useState("all");
 
   // Fetch all bugs
   const {
@@ -161,10 +163,10 @@ const Fixes = () => {
   const FilterControls = () => (
     <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
       <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-        <SelectTrigger className="w-full sm:min-w-[120px] sm:max-w-[160px] bg-background/50 h-9 text-xs sm:text-sm">
+        <SelectTrigger className="...">
           <SelectValue placeholder="Priority" />
         </SelectTrigger>
-        <SelectContent position="popper">
+        <SelectContent>
           <SelectItem value="all">All Priorities</SelectItem>
           <SelectItem value="high">High</SelectItem>
           <SelectItem value="medium">Medium</SelectItem>

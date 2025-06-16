@@ -32,6 +32,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { format } from 'date-fns';
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -164,11 +165,7 @@ const Updates = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return format(new Date(dateString), "PPPp");
   };
 
   const FilterControls = () => (
@@ -357,7 +354,7 @@ const Updates = () => {
                       <TableCell className="max-w-[150px] break-words">
                         {update.created_by}
                       </TableCell>
-                      <TableCell>{formatDate(update.created_at)}</TableCell>
+                      <TableCell>{format(new Date(update.created_at), "PPPP 'at' p")}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" size="sm" asChild>
@@ -403,7 +400,7 @@ const Updates = () => {
                       <span className="font-medium">{update.created_by}</span>
                     </div>
                     <div className="text-muted-foreground">
-                      Date: {formatDate(update.created_at)}
+                      Date: {format(new Date(update.created_at), "PPPP 'at' p")}
                     </div>
                   </div>
                   <div className="flex justify-end mt-1 gap-2">

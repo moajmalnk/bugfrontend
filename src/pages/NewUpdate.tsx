@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,12 +29,13 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
 import * as z from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { sendNewUpdateNotification } from "@/services/emailService";
+import { Skeleton } from '@/components/ui/skeleton';
 
 const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
@@ -44,6 +46,12 @@ const formSchema = z.object({
   }),
   description: z.string().min(1, "Description is required"),
 });
+
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center p-4">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
 
 const NewUpdate = () => {
   const navigate = useNavigate();
@@ -76,12 +84,14 @@ const NewUpdate = () => {
       if (data.success) {
         toast({ title: "Success", description: "Update created successfully" });
         queryClient.invalidateQueries({ queryKey: ["updates"] });
-        await sendNewUpdateNotification({
+        
+        sendNewUpdateNotification({
           ...values,
           id: data.data?.id,
           created_at: new Date().toISOString(),
           created_by: currentUser?.username || "BugRicer"
         });
+        
         navigate("/updates");
       } else {
         toast({ title: "Error", description: data.message, variant: "destructive" });
@@ -92,8 +102,11 @@ const NewUpdate = () => {
     }
   });
 
-  const onSubmit = (values) => {
-    mutation.mutate(values);
+  const onSubmit = async (values) => {
+    setIsSubmitting(true);
+    mutation.mutate(values, {
+      onSettled: () => setIsSubmitting(false)
+    });
   };
 
   return (
@@ -128,11 +141,13 @@ const NewUpdate = () => {
                     <FormItem>
                       <FormLabel>Title</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="Enter update title"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
+                        {isSubmitting ? <Skeleton className="w-full h-10" /> : (
+                          <Input
+                            placeholder="Enter update title"
+                            {...field}
+                            disabled={isSubmitting}
+                          />
+                        )}
                       </FormControl>
                       <FormDescription>
                         A clear and concise title for the update
@@ -179,12 +194,14 @@ const NewUpdate = () => {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Enter update description"
-                          className="min-h-[120px]"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
+                        {isSubmitting ? <Skeleton className="w-full h-10" /> : (
+                          <Textarea
+                            placeholder="Enter update description"
+                            className="min-h-[120px]"
+                            {...field}
+                            disabled={isSubmitting}
+                          />
+                        )}
                       </FormControl>
                       <FormDescription>
                         Detailed description of the update

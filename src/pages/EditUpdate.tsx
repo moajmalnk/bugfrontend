@@ -35,6 +35,7 @@ import * as z from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { Skeleton } from '@/components/ui/skeleton';
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
