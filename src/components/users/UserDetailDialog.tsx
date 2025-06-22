@@ -61,9 +61,11 @@ async function handlePasswordChange(
       },
     });
   } catch (error: any) {
-    throw new Error(error?.response?.data?.message || error?.message || "Failed to update password. Please try again.");
+    console.error("Password change error:", error);
+    throw error;
   }
 }
+
 
 export function UserDetailDialog({
   user,
