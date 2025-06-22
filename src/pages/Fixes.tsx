@@ -83,11 +83,11 @@ const formatDate = (dateString: string) => {
   });
 };
 
-const getPriorityBadgeVariant = (priority: string): "destructive" | "warning" | "success" | "default" => {
+const getPriorityBadgeVariant = (priority: string): "destructive" | "secondary" | "default" => {
   switch (priority) {
     case "high": return "destructive";
-    case "medium": return "warning";
-    case "low": return "success";
+    case "medium": return "secondary";
+    case "low": return "default";
     default: return "default";
   }
 };

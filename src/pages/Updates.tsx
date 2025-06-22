@@ -15,7 +15,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Plus, Search, Filter, Lock, Bell, User } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Select,
@@ -33,6 +33,13 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { format } from 'date-fns';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -55,6 +62,9 @@ const TableRowSkeleton = () => (
     <TableCell>
       <Skeleton className="h-4 w-28" />
     </TableCell>
+    <TableCell>
+      <Skeleton className="h-4 w-28" />
+    </TableCell>
     <TableCell className="text-right">
       <Skeleton className="h-9 w-[90px] ml-auto" />
     </TableCell>
@@ -63,28 +73,34 @@ const TableRowSkeleton = () => (
 
 // Card skeleton for mobile view
 const CardSkeleton = () => (
-  <div className="rounded-lg border p-4 bg-background space-y-3">
-    <div className="flex items-center gap-2">
-      <Skeleton className="h-4 w-4 rounded-full" />
-      <Skeleton className="h-4 w-16" />
-    </div>
-    <Skeleton className="h-5 w-[200px]" />
-    <div className="space-y-2">
-      <Skeleton className="h-4 w-[150px]" />
-      <Skeleton className="h-4 w-[120px]" />
-    </div>
-  </div>
+  <Card>
+    <CardHeader>
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="h-6 w-16 rounded-md" />
+      </div>
+    </CardHeader>
+    <CardContent className="space-y-3">
+      <Skeleton className="h-5 w-4/5" />
+      <div className="space-y-2 text-sm">
+        <Skeleton className="h-4 w-3/5" />
+        <Skeleton className="h-4 w-1/2" />
+      </div>
+    </CardContent>
+    <CardFooter>
+      <Skeleton className="h-9 w-[120px]" />
+    </CardFooter>
+  </Card>
 );
 
 // Header skeleton
 const HeaderSkeleton = () => (
   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-    <h1 className="text-2xl font-bold tracking-tight break-words">
-      Updates
-    </h1>
-    <div className="flex items-center space-x-2 sm:space-x-0 sm:ml-auto">
-      <Skeleton className="h-[34px] w-36 rounded-md" />
+    <div className="space-y-1">
+      <Skeleton className="h-8 w-32" />
+      <Skeleton className="h-4 w-48" />
     </div>
+    <Skeleton className="h-10 w-full sm:w-32 rounded-lg" />
   </div>
 );
 
@@ -101,7 +117,6 @@ const Updates = () => {
   const {
     data: updates = [],
     isLoading: skeletonLoading,
-    error,
   } = useQuery({
     queryKey: ["updates"],
     queryFn: async () => {
@@ -133,6 +148,8 @@ const Updates = () => {
     },
     enabled: !!currentUser,
   });
+  
+  const isLoading = skeletonLoading || projectsLoading;
 
   // Filter updates based on active tab
   const getFilteredUpdatesByTab = () => {
@@ -150,8 +167,8 @@ const Updates = () => {
 
   const filteredUpdates = tabFilteredUpdates.filter(
     (update) =>
-      update.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      update.description.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (update.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      update.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
       (typeFilter === "all" || update.type === typeFilter)
   );
 
@@ -170,18 +187,14 @@ const Updates = () => {
   const getTypeColor = (type: string) => {
     switch (type) {
       case "feature":
-        return "text-blue-500";
+        return "text-blue-500 border-blue-200 bg-blue-50";
       case "fix":
-        return "text-green-500";
+        return "text-green-500 border-green-200 bg-green-50";
       case "maintenance":
-        return "text-yellow-500";
+        return "text-yellow-500 border-yellow-200 bg-yellow-50";
       default:
         return "";
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "PPPp");
   };
 
   const FilterControls = () => (
@@ -202,17 +215,17 @@ const Updates = () => {
 
   const renderEmptyState = () => {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 sm:p-8 text-center">
-        <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-muted">
-          <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+      <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 sm:p-8 text-center min-h-[400px]">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+          <AlertCircle className="h-6 w-6 text-muted-foreground" />
         </div>
-        <h3 className="mt-3 sm:mt-4 text-base sm:text-lg font-semibold">
+        <h3 className="mt-4 text-lg font-semibold">
           {activeTab === "my-updates" ? "No updates found" : "No Updates"}
         </h3>
-        <p className="mt-2 text-xs sm:text-sm text-muted-foreground">
-          {activeTab === "my-updates" 
-            ? "You haven't created any updates yet."
-            : "No updates have been created yet."}
+        <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+          {activeTab === "my-updates"
+            ? "You haven't created any updates yet. Click 'New Update' to get started."
+            : "There are no updates to display right now. Check back later or create a new one."}
         </p>
       </div>
     );
@@ -223,39 +236,39 @@ const Updates = () => {
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="grid w-full grid-cols-2 mb-4">
         <TabsTrigger value="all-updates" className="text-xs sm:text-sm">
-          <Bell className="h-4 w-4 mr-1" />
+          <Bell className="h-4 w-4 mr-2" />
           All Updates ({getTabCount("all-updates")})
         </TabsTrigger>
         <TabsTrigger value="my-updates" className="text-xs sm:text-sm">
-          <User className="h-4 w-4 mr-1" />
+          <User className="h-4 w-4 mr-2" />
           My Updates ({getTabCount("my-updates")})
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value={activeTab} className="space-y-4">
         {/* Search and Filters */}
-        <div className="space-y-3 sm:space-y-4 md:space-y-6">
+        <div className="space-y-3">
           <div className="relative">
-            {skeletonLoading ? (
-              <Skeleton className="w-full h-9 sm:h-10 md:h-10 rounded-md" />
+            {isLoading ? (
+              <Skeleton className="w-full h-10 rounded-md" />
             ) : (
               <Input
-                placeholder={`Search ${activeTab.replace('-', ' ')}...`}
+                placeholder={`Search in ${activeTab.replace('-', ' ')}...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-background/50 h-9 sm:h-10 text-sm pl-9 sm:pl-10"
+                className="w-full bg-background/50 h-10 text-sm pl-10"
                 aria-label={`Search ${activeTab.replace('-', ' ')}`}
-                disabled={getTabCount(activeTab) === 0 && !skeletonLoading}
+                disabled={getTabCount(activeTab) === 0 && !isLoading}
               />
             )}
-            {!skeletonLoading && (
-              <Search className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+            {!isLoading && (
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             )}
           </div>
 
           <div className="block lg:hidden">
-            {skeletonLoading ? (
-              <Skeleton className="w-full h-9 sm:h-10 md:h-10 rounded-md" />
+            {isLoading ? (
+              <Skeleton className="w-full h-9 rounded-md" />
             ) : (
               <Sheet
                 open={isFilterSheetOpen}
@@ -264,11 +277,11 @@ const Updates = () => {
                 <SheetTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-full h-9 sm:h-10 text-sm bg-background/50"
+                    className="w-full h-9"
                     aria-label="Open filters"
-                    disabled={getTabCount(activeTab) === 0 && !skeletonLoading}
+                    disabled={getTabCount(activeTab) === 0 && !isLoading}
                   >
-                    <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
+                    <Filter className="h-4 w-4 mr-2" />
                     Filters
                   </Button>
                 </SheetTrigger>
@@ -288,8 +301,8 @@ const Updates = () => {
           </div>
 
           <div className="hidden lg:flex gap-4">
-            {skeletonLoading ? (
-              <Skeleton className="h-9 w-full sm:w-44 md:w-40 lg:w-44 rounded-md" />
+            {isLoading ? (
+              <Skeleton className="h-9 w-44 rounded-md" />
             ) : (
               <FilterControls />
             )}
@@ -297,11 +310,11 @@ const Updates = () => {
         </div>
 
         {/* Content */}
-        {skeletonLoading ? (
+        {isLoading ? (
           <>
             {/* Table skeleton for desktop and large tablets */}
-            <div className="hidden lg:block rounded-md border overflow-x-auto">
-              <Table className="min-w-[800px] w-full">
+            <div className="hidden lg:block rounded-md border">
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[120px]">Update ID</TableHead>
@@ -314,7 +327,7 @@ const Updates = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {Array(3)
+                  {Array(5)
                     .fill(0)
                     .map((_, index) => (
                       <TableRowSkeleton key={index} />
@@ -324,8 +337,8 @@ const Updates = () => {
             </div>
 
             {/* Card skeleton for mobile and tablets */}
-            <div className="lg:hidden space-y-3 sm:space-y-4">
-              {Array(2)
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
+              {Array(4)
                 .fill(0)
                 .map((_, index) => (
                   <CardSkeleton key={index} />
@@ -336,8 +349,8 @@ const Updates = () => {
           renderEmptyState()
         ) : (
           <>
-            <div className="hidden lg:block rounded-md border overflow-x-auto">
-              <Table className="min-w-[800px] w-full">
+            <div className="hidden lg:block rounded-md border">
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[120px]">Update ID</TableHead>
@@ -364,7 +377,7 @@ const Updates = () => {
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className={getTypeColor(update.type)}
+                          className={`font-medium ${getTypeColor(update.type)}`}
                         >
                           {update.type}
                         </Badge>
@@ -375,7 +388,7 @@ const Updates = () => {
                       <TableCell className="max-w-[150px] break-words">
                         <span className="font-medium">{update.created_by || "Unknown"}</span>
                       </TableCell>
-                      <TableCell>{format(new Date(update.created_at), "PPPP 'at' p")}</TableCell>
+                      <TableCell>{format(new Date(update.created_at), "PPPp")}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" size="sm" asChild>
@@ -394,48 +407,55 @@ const Updates = () => {
               </Table>
             </div>
 
-            <div className="lg:hidden space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
               {filteredUpdates.map((update) => (
-                <div
+                <Card
                   key={update.id}
-                  className="rounded-lg border p-3 sm:p-4 bg-background flex flex-col gap-2 sm:gap-3"
+                  className="flex flex-col justify-between"
                 >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                    <span className="font-semibold text-xs sm:text-sm break-all">
-                      {update.id}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs ${getTypeColor(update.type)}`}
-                    >
-                      {update.type}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground ml-2">{update.project_name}</span>
-                  </div>
-                  <div className="font-bold text-sm sm:text-base break-words">
-                    {update.title}
-                  </div>
-                  <div className="flex flex-col gap-1 text-xs sm:text-sm">
-                    <div className="text-muted-foreground break-words">
-                      Created by:{" "}
-                      <span className="font-medium">{update.created_by || "BugRicer"}</span>
+                  <CardHeader>
+                    <div className="flex justify-between items-start gap-2">
+                      <CardTitle className="text-base font-bold leading-tight break-all">
+                        <Link to={`/updates/${update.id}`} className="hover:underline">
+                          {update.title}
+                        </Link>
+                      </CardTitle>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs h-fit shrink-0 ${getTypeColor(update.type)}`}
+                      >
+                        {update.type}
+                      </Badge>
                     </div>
-                    <div className="text-muted-foreground">
-                      Date: {format(new Date(update.created_at), "PPPP 'at' p")}
-                    </div>
-                  </div>
-                  <div className="flex justify-end mt-1 gap-2">
-                    <Button variant="outline" size="sm" asChild className="text-xs">
-                      <Link to={`/updates/${update.id}`}>View Details</Link>
-                    </Button>
-                    {(currentUser?.role === "admin" || update.created_by === currentUser?.username) && (
-                      <Button variant="outline" size="sm" asChild className="text-xs">
-                        <Link to={`/updates/${update.id}/edit`}>Edit</Link>
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                     <div className="flex items-center text-muted-foreground">
+                        <Bell className="h-4 w-4 mr-2" /> ID: {update.id}
+                     </div>
+                     <div className="flex items-center text-muted-foreground">
+                        <Lock className="h-4 w-4 mr-2" /> Project: {update.project_name}
+                     </div>
+                     <div className="flex items-center text-muted-foreground">
+                        <User className="h-4 w-4 mr-2" /> By:{" "}
+                        <span className="font-medium text-foreground">{update.created_by || "BugRicer"}</span>
+                     </div>
+                  </CardContent>
+                  <CardFooter className="flex-col items-start gap-2">
+                     <div className="text-xs text-muted-foreground">
+                        {format(new Date(update.created_at), "PPPp")}
+                     </div>
+                     <div className="flex justify-end w-full gap-2">
+                       <Button variant="outline" size="sm" asChild className="w-full">
+                         <Link to={`/updates/${update.id}`}>View Details</Link>
+                       </Button>
+                       {(currentUser?.role === "admin" || update.created_by === currentUser?.username) && (
+                         <Button variant="outline" size="sm" asChild className="w-full">
+                           <Link to={`/updates/${update.id}/edit`}>Edit</Link>
+                         </Button>
+                       )}
+                     </div>
+                  </CardFooter>
+                </Card>
               ))}
             </div>
           </>
@@ -445,41 +465,36 @@ const Updates = () => {
   );
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
-      <section className="max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 md:gap-6">
-          {skeletonLoading ? (
-            <>
-              <Skeleton className="h-9 sm:h-10 w-full sm:w-32 md:w-28 lg:w-32 rounded-md" />
-              <Skeleton className="h-7 sm:h-8 w-full sm:w-40 md:w-36 lg:w-40 rounded-md" />
-            </>
-          ) : (
-            <>
+    <main className="min-h-[calc(100vh-4rem)] bg-background p-4 sm:p-6 lg:p-8">
+      <section className="max-w-7xl mx-auto space-y-6">
+        {isLoading ? (
+          <HeaderSkeleton />
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Updates</h1>
+              <p className="text-muted-foreground text-sm mt-1">
+                A log of all features, fixes, and maintenance updates.
+              </p>
+            </div>
+            <div className="flex-shrink-0 w-full sm:w-auto">
               <Button
-                variant="default"
                 asChild
-                className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
-                aria-label="Create new update"
-                disabled={projects.length === 0}
+                className="w-full sm:w-auto"
+                disabled={projects.length === 0 && !isLoading}
               >
-                <Link to="/new-update" className="flex items-center justify-center">
-                  <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> New Update
+                <Link to="/new-update">
+                  <Plus className="mr-2 h-4 w-4" /> New Update
                 </Link>
               </Button>
-              {projects.length === 0 && (
-                <div className="text-xs text-muted-foreground mt-2">You are not assigned to any projects. Contact your admin to create updates.</div>
+              {projects.length === 0 && !isLoading && (
+                <p className="text-xs text-muted-foreground mt-2 text-center sm:text-left">
+                  You must be in a project to create an update.
+                </p>
               )}
-              {!skeletonLoading && getTabCount(activeTab) > 0 && (
-                <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50">
-                  <Bell className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 mr-2" />
-                  <span className="text-xs sm:text-sm font-medium text-blue-700">
-                    {getTabCount(activeTab)} Updates
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
 
         <UpdatesTabs />
       </section>
