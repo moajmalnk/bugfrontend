@@ -450,7 +450,7 @@ function App() {
               <NotificationProvider>
                 <NotificationSettingsProvider>
                   <ErrorBoundaryProvider>
-                    <RouteConfig />
+                    <AppContent />
                   </ErrorBoundaryProvider>
                 </NotificationSettingsProvider>
               </NotificationProvider>
@@ -458,6 +458,7 @@ function App() {
           </AuthProvider>
         </AppProviders>
       </ThemeProvider>
+      {chunkErrorModal}
     </Router>
   );
 }
