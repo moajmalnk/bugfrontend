@@ -123,8 +123,8 @@ const BugCard = ({ bug }: { bug: BugType }) => (
                     <Link to={`/bugs/${bug.id}`}>View Details</Link>
                 </Button>
             </div>
-        </div>
     </div>
+  </div>
 );
 
 const Fixes = () => {
@@ -140,21 +140,21 @@ const Fixes = () => {
   });
 
   const filteredBugs = useMemo(() => {
-    const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
+  const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
 
     let tabFilteredBugs = fixedBugs;
     if (currentUser?.role === "admin" || currentUser?.role === "developer") {
-      if (activeTab === "my-fixes") {
+    if (activeTab === "my-fixes") {
         tabFilteredBugs = fixedBugs.filter(bug => String(bug.updated_by) === String(currentUser?.id));
       }
     }
 
     return tabFilteredBugs.filter(
-      (bug) =>
-        (bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (bug) =>
+      (bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           bug.id.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        (priorityFilter === "all" || bug.priority === priorityFilter)
-    );
+      (priorityFilter === "all" || bug.priority === priorityFilter)
+  );
   }, [bugs, activeTab, currentUser?.id, searchTerm, priorityFilter]);
 
   const showTabs = currentUser?.role === "admin" || currentUser?.role === "developer";
@@ -191,9 +191,9 @@ const Fixes = () => {
           {/* Desktop Table Skeleton */}
           <div className="hidden md:block">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[250px]">Title</TableHead>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[250px]">Title</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead className="hidden md:table-cell">Reported By</TableHead>
                   <TableHead className="hidden lg:table-cell">Fixed By</TableHead>
@@ -254,31 +254,31 @@ const Fixes = () => {
                 <TableHead>Fixed By</TableHead>
                 <TableHead>Fixed Date</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredBugs.map((bug) => (
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredBugs.map((bug) => (
                 <TableRow key={bug.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium max-w-[250px]">
                       <p className="truncate font-semibold">{bug.title}</p>
                       <p className="text-xs text-muted-foreground font-mono">{bug.id}</p>
-                  </TableCell>
-                  <TableCell>
+              </TableCell>
+              <TableCell>
                     <Badge variant={getPriorityBadgeVariant(bug.priority)} className="capitalize">{bug.priority}</Badge>
-                  </TableCell>
+              </TableCell>
                   <TableCell>{bug.reporter_name || 'N/A'}</TableCell>
                   <TableCell>{bug.updated_by_name || 'N/A'}</TableCell>
-                  <TableCell>{formatDate(bug.updated_at)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/bugs/${bug.id}`}>View Details</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              <TableCell>{formatDate(bug.updated_at)}</TableCell>
+              <TableCell className="text-right">
+                <Button variant="outline" size="sm" asChild>
+                  <Link to={`/bugs/${bug.id}`}>View Details</Link>
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
         {/* Mobile View */}
         <div className="grid md:hidden grid-cols-1 sm:grid-cols-2 gap-4">
           {filteredBugs.map((bug) => <BugCard key={bug.id} bug={bug} />)}
@@ -306,7 +306,7 @@ const Fixes = () => {
                         <Plus className="mr-2 h-4 w-4" />
                         Fix a Bug
                     </Button>
-                </Link>
+              </Link>
             )}
             <div className="hidden sm:flex items-center border rounded-md px-3 py-2 bg-background">
               <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
@@ -351,15 +351,15 @@ const Fixes = () => {
               <div className="space-y-4">
                 <div className="hidden md:flex"><FilterControls /></div>
                 <div className="md:hidden">
-                    <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-                        <SheetTrigger asChild>
+                  <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+                    <SheetTrigger asChild>
                             <Button variant="outline" className="w-full"><Filter className="mr-2 h-4 w-4" />Filters</Button>
-                        </SheetTrigger>
+                    </SheetTrigger>
                         <SheetContent side="bottom" className="rounded-t-lg">
                             <SheetHeader className="text-left mb-4"><SheetTitle>Filter My Fixes</SheetTitle></SheetHeader>
                             <div className="space-y-4"><FilterControls/></div>
-                        </SheetContent>
-                    </Sheet>
+                    </SheetContent>
+                  </Sheet>
                 </div>
                 {renderContent()}
               </div>
@@ -370,13 +370,13 @@ const Fixes = () => {
             <div className="hidden md:flex"><FilterControls /></div>
             <div className="md:hidden">
                 <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-                    <SheetTrigger asChild>
+                  <SheetTrigger asChild>
                         <Button variant="outline" className="w-full"><Filter className="mr-2 h-4 w-4" />Filters</Button>
-                    </SheetTrigger>
+                  </SheetTrigger>
                     <SheetContent side="bottom" className="rounded-t-lg">
                         <SheetHeader className="text-left mb-4"><SheetTitle>Filter Fixes</SheetTitle></SheetHeader>
                         <div className="space-y-4"><FilterControls/></div>
-                    </SheetContent>
+                  </SheetContent>
                 </Sheet>
             </div>
             {renderContent()}
