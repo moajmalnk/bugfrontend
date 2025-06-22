@@ -53,7 +53,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkAuthStatus = async () => {
-    const token = localStorage.getItem("token");
+    // 1. Check for token in URL (for admin deep links)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+
+    if (urlToken) {
+      // Use the token from the URL and store it in sessionStorage for this tab only
+      sessionStorage.setItem('token', urlToken);
+      // Remove token from URL to keep it clean
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    // 2. Prioritize sessionStorage token, then fall back to localStorage
+    const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+
     if (!token) {
       setIsLoading(false);
       return;
@@ -77,11 +90,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // console.error("Auth check failed:", data);
         localStorage.removeItem("token");
+        sessionStorage.removeItem("token"); // Also clear from session storage
         setCurrentUser(null);
       }
     } catch (error) {
       // console.error("Auth check error:", error);
       localStorage.removeItem("token");
+      sessionStorage.removeItem("token"); // Also clear from session storage
       setCurrentUser(null);
     } finally {
       setIsLoading(false);
@@ -188,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("token");
+    sessionStorage.removeItem("token"); // Also clear from session storage
     setCurrentUser(null);
     navigate("/login", { replace: true });
   };

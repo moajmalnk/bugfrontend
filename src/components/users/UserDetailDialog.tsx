@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -11,11 +12,13 @@ import { ENV } from "@/lib/env";
 import { User } from "@/types";
 import axios from "axios";
 import { format, formatDistanceToNow } from "date-fns";
-import { AtSign, Bug, Calendar, Code2, Mail, Shield } from "lucide-react";
+import { AtSign, Bug, Calendar, Code2, Mail, Shield, ExternalLink, Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
+import { userService } from "@/services/userService";
+import { toast } from "@/hooks/use-toast";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -86,6 +89,7 @@ export function UserDetailDialog({
     recent_activity: [],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
   useEffect(() => {
     const fetchUserStats = async () => {
@@ -148,52 +152,85 @@ export function UserDetailDialog({
     }
   };
 
+  const handleGenerateDashboardLink = async () => {
+    if (loggedInUserRole !== 'admin') {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can generate dashboard links.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingLink(true);
+    try {
+      const linkData = await userService.generateUserDashboardLink(user.id);
+      
+      // Open the dashboard link in a new tab
+      window.open(linkData.url, '_blank', 'noopener,noreferrer');
+      
+      toast({
+        title: "Dashboard Link Generated",
+        description: `Link will expire in ${Math.floor(linkData.ttl_seconds / 60)} minutes.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate dashboard link",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingLink(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="
-          w-full 
-          max-w-[95vw] 
-          sm:max-w-[500px] 
-          p-0 
-          overflow-hidden
-          flex flex-col
-          "
-        style={{ maxHeight: "80vh" }}
+        className="w-full max-w-[95vw] sm:max-w-lg p-0 flex flex-col"
+        style={{ maxHeight: "90vh" }}
       >
-        <DialogHeader className="bg-primary/5 px-4 sm:px-6 py-4 border-b flex-shrink-0">
-          <DialogTitle className="text-lg">User Details</DialogTitle>
+        <DialogHeader className="bg-muted/30 px-6 py-4 border-b flex-shrink-0 text-left">
+          <DialogTitle className="text-xl font-bold">User Details</DialogTitle>
           <DialogDescription>
             Detailed information about{" "}
-            <span className="font-medium">{user.name}</span>
+            <span className="font-semibold text-foreground">{user.name}</span>
           </DialogDescription>
         </DialogHeader>
-        {/* User Header - fixed */}
-        <div className="flex flex-col sm:flex-row items-center gap-6 px-4 sm:px-6 pt-4 pb-2 flex-shrink-0 bg-background z-10">
+
+        <DialogClose asChild>
+          <Button variant="ghost" size="icon" className="absolute top-3 right-4">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </Button>
+        </DialogClose>
+        
+        {/* User Header */}
+        <div className="flex flex-col sm:flex-row items-center gap-6 px-6 pt-6 pb-4 flex-shrink-0">
           <div className="flex-shrink-0">
             <img
               src={user.avatar}
               alt={`${user.name}'s avatar`}
-              className="h-20 w-20 rounded-full border-2 border-primary shadow"
+              className="h-24 w-24 rounded-full border-4 border-primary/20 shadow-md"
             />
           </div>
           <div className="flex-1 min-w-0 text-center sm:text-left">
-            <h3 className="text-xl font-semibold truncate">{user.name}</h3>
+            <h3 className="text-2xl font-bold truncate">{user.name}</h3>
             <div className="flex items-center justify-center sm:justify-start mt-1 text-muted-foreground gap-2">
               {getRoleIcon(user.role)}
-              <span className="capitalize">{user.role}</span>
+              <span className="capitalize font-medium text-lg">{user.role}</span>
             </div>
-            <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-2 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
+            <div className="flex flex-col items-center sm:items-start gap-1 mt-3 text-sm text-muted-foreground">
+              <span className="flex items-center gap-2">
                 <AtSign className="h-4 w-4" />
                 {user.username}
               </span>
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
                 {user.email}
               </span>
               {user.created_at && (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   Joined {format(new Date(user.created_at), "PPP")}
                 </span>
@@ -201,93 +238,85 @@ export function UserDetailDialog({
             </div>
           </div>
         </div>
-        {/* Scrollable content below */}
-        <div className="p-4 sm:p-6 space-y-8 overflow-y-auto custom-scrollbar flex-1">
+        
+        {/* Scrollable content */}
+        <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 w-full">
-            <div className="flex-1 min-w-0">
-              <EditUserDialog
-                user={user}
-                onUserUpdate={onUserUpdate}
-                loggedInUserRole={loggedInUserRole}
-                trigger={
-                  <Button
-                    variant="outline"
-                    className="w-full h-11 font-semibold flex items-center justify-center"
-                  >
-                    Edit User
+          <div className="grid grid-cols-2 gap-3">
+            <EditUserDialog
+              user={user}
+              onUserUpdate={onUserUpdate}
+              loggedInUserRole={loggedInUserRole}
+              trigger={
+                <Button variant="outline" className="w-full">
+                  Edit User
+                </Button>
+              }
+            />
+            <ChangePasswordDialog
+              user={user}
+              onPasswordChange={handlePasswordChange}
+              trigger={
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full" title="Change Password">
+                    Change Password
                   </Button>
-                }
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <ChangePasswordDialog
-                user={user}
-                onPasswordChange={handlePasswordChange}
-                trigger={
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full h-11 font-semibold flex items-center justify-center"
-                      title="Change Password" // <-- Tooltip title
-                    >
-                      Change Password
-                    </Button>
-                  </DialogTrigger>
-                }
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <DeleteUserDialog
-                user={user}
-                onUserDelete={async (userId, force) => {
-                  await onUserDelete(userId, force);
-                  onOpenChange(false);
-                }}
-                trigger={
-                  <Button
-                    variant="outline"
-                    className="w-full h-11 font-semibold flex items-center justify-center"
-                    title="Delete User" // <-- Tooltip title
-                  >
-                    Delete User
-                  </Button>
-                }
-              />
-            </div>
+                </DialogTrigger>
+              }
+            />
+            {loggedInUserRole === 'admin' && (
+                <Button
+                  variant="outline"
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={handleGenerateDashboardLink}
+                  disabled={isGeneratingLink}
+                  title="Open user's dashboard in a new tab"
+                >
+                  {isGeneratingLink ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4" />
+                  )}
+                  User Dashboard
+                </Button>
+            )}
+            <DeleteUserDialog
+              user={user}
+              onUserDelete={async (userId, force) => {
+                await onUserDelete(userId, force);
+                onOpenChange(false);
+              }}
+              trigger={
+                <Button variant="destructive" className="w-full" title="Delete User">
+                  Delete User
+                </Button>
+              }
+            />
           </div>
 
           {/* Stats */}
           <div>
-            <h4 className="text-base font-medium mb-3">User Statistics</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
-                <p className="text-xs text-muted-foreground mb-1">
+            <h4 className="text-lg font-semibold mb-3">User Statistics</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted/30 rounded-lg p-4 flex flex-col items-center justify-center shadow-sm">
+                <p className="text-sm text-muted-foreground mb-1">
                   Total Projects
                 </p>
-                <p className="text-2xl font-bold">
+                <p className="text-3xl font-bold">
                   {isLoading ? (
                     <span className="animate-pulse">...</span>
-                  ) : stats.total_projects > 0 ? (
-                    stats.total_projects
                   ) : (
-                    <span className="text-muted-foreground text-base">
-                      No projects
-                    </span>
+                    stats.total_projects
                   )}
                 </p>
               </div>
-              <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
-                <p className="text-xs text-muted-foreground mb-1">Total Bugs</p>
-                <p className="text-2xl font-bold">
+              <div className="bg-muted/30 rounded-lg p-4 flex flex-col items-center justify-center shadow-sm">
+                <p className="text-sm text-muted-foreground mb-1">Total Bugs</p>
+                <p className="text-3xl font-bold">
                   {isLoading ? (
                     <span className="animate-pulse">...</span>
-                  ) : stats.total_bugs > 0 ? (
-                    stats.total_bugs
                   ) : (
-                    <span className="text-muted-foreground text-base">
-                      No bugs
-                    </span>
+                    stats.total_bugs
                   )}
                 </p>
               </div>
@@ -296,44 +325,37 @@ export function UserDetailDialog({
 
           {/* Recent Activity */}
           <div>
-            <h4 className="text-base font-medium mb-3 flex items-center gap-2">
+            <h4 className="text-lg font-semibold mb-3 flex items-center gap-2">
               Recent Activity
-              <span className="text-xs text-muted-foreground">
+              <span className="text-sm font-normal text-muted-foreground">
                 (Coming Soon)
               </span>
             </h4>
-            <div className="bg-card rounded-lg p-4 shadow-sm min-h-[60px] overflow-x-auto">
+            <div className="bg-muted/30 rounded-lg p-4 shadow-sm min-h-[80px] overflow-x-auto">
               {isLoading ? (
-                <div className="animate-pulse text-muted-foreground">
+                <div className="flex items-center justify-center h-full text-muted-foreground">
                   Loading...
                 </div>
               ) : stats.recent_activity.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {stats.recent_activity.map((activity, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-2 text-sm break-words"
-                    >
+                    <div key={index} className="flex items-start gap-3 text-sm">
                       {activity.type === "bug" ? (
-                        <Bug className="h-4 w-4 mt-0.5 text-yellow-500" />
+                        <Bug className="h-4 w-4 mt-0.5 text-yellow-500 flex-shrink-0" />
                       ) : (
-                        <Code2 className="h-4 w-4 mt-0.5 text-green-500" />
+                        <Code2 className="h-4 w-4 mt-0.5 text-green-500 flex-shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="break-words max-w-[180px] sm:max-w-[260px] md:max-w-[340px] lg:max-w-[400px]">
-                          {activity.title}
-                        </p>
+                        <p className="truncate">{activity.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(activity.created_at), {
-                            addSuffix: true,
-                          })}
+                          {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
                         </p>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-muted-foreground text-sm italic">
+                <div className="flex items-center justify-center h-full text-muted-foreground italic">
                   No recent activity
                 </div>
               )}

@@ -60,11 +60,22 @@ const Updates = lazy(() => import("@/pages/Updates"));
 const NewUpdate = lazy(() => import("@/pages/NewUpdate"));
 const UpdateDetails = lazy(() => import("@/pages/UpdateDetails"));
 const EditUpdate = lazy(() => import("@/pages/EditUpdate"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
 
 const RouteConfig = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+
+      {/* Dashboard route - accessible via token */}
+      <Route
+        path="/dashboard"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <Dashboard />
+          </Suspense>
+        }
+      />
 
       {/* Protected Routes with Skeleton Loading */}
       <Route

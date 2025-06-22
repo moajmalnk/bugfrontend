@@ -1,5 +1,6 @@
 import { ENV } from '@/lib/env';
 import { User, UserRole } from '@/types';
+import axios from 'axios';
 
 interface NewUserData {
   username: string;
@@ -40,7 +41,7 @@ class UserService {
   }
 
   private async fetchWithAuth(url: string, options: RequestInit = {}) {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
@@ -149,6 +150,34 @@ class UserService {
     }
 
     return true;
+  }
+
+  async generateUserDashboardLink(userId: string): Promise<{ url: string; expires_at: string; ttl_seconds: number }> {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.post<{ success: boolean; data: { url: string; expires_at: string; ttl_seconds: number }; message?: string }>(
+        `${ENV.API_URL}/users/generate-dashboard-link.php`,
+        { userId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to generate dashboard link');
+      }
+    } catch (error: any) {
+      console.error('Error generating dashboard link:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to generate dashboard link');
+    }
   }
 }
 
