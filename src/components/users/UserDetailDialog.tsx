@@ -46,13 +46,22 @@ async function handlePasswordChange(
   newPassword: string
 ) {
   try {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error("Authentication token not found.");
+    }
+
     await axios.post(`${ENV.API_URL}/users/change-password.php`, {
       userId,
       currentPassword,
       newPassword,
+    }, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
   } catch (error: any) {
-    throw error.response?.data?.message || "Failed to update password";
+    throw new Error(error?.response?.data?.message || error?.message || "Failed to update password. Please try again.");
   }
 }
 

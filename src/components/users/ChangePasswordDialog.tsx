@@ -16,6 +16,7 @@ import { User } from "@/types";
 import axios from "axios";
 import { KeyRound } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export interface ChangePasswordDialogProps {
   user: User;
@@ -37,6 +38,11 @@ export function ChangePasswordDialog({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
+  const { currentUser } = useAuth();
+
+  const isAdmin = currentUser?.role === 'admin';
+  const isChangingOwnPassword = currentUser?.id === user.id;
+  const showCurrentPasswordField = !isAdmin || isChangingOwnPassword;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,22 +95,24 @@ export function ChangePasswordDialog({
         <DialogHeader>
           <DialogTitle>Change Password</DialogTitle>
           <DialogDescription>
-            Set a new password for {user.name}'s account.
+            {isChangingOwnPassword ? "Set a new password for your account." : `Set a new password for ${user.name || 'this user'}'s account.`}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <Input
-                id="current-password"
-                type="password"
-                placeholder="Enter current password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
-              />
-            </div>
+            {showCurrentPasswordField && (
+              <div className="space-y-2">
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  placeholder="Enter current password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
               <Input
