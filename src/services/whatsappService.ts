@@ -33,7 +33,7 @@ class WhatsAppService {
       
       localStorage.setItem(this.CONTACTS_STORAGE_KEY, JSON.stringify(contacts));
     } catch (error) {
-      console.error('Error saving WhatsApp contact:', error);
+      //.error('Error saving WhatsApp contact:', error);
     }
   }
 
@@ -43,7 +43,7 @@ class WhatsAppService {
       const stored = localStorage.getItem(this.CONTACTS_STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.error('Error loading WhatsApp contacts:', error);
+      //.error('Error loading WhatsApp contacts:', error);
       return [];
     }
   }
@@ -54,7 +54,7 @@ class WhatsAppService {
       const contacts = this.getContacts().filter(c => c.phone !== phone);
       localStorage.setItem(this.CONTACTS_STORAGE_KEY, JSON.stringify(contacts));
     } catch (error) {
-      console.error('Error deleting WhatsApp contact:', error);
+      //.error('Error deleting WhatsApp contact:', error);
     }
   }
 

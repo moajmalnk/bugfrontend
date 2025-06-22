@@ -8,44 +8,36 @@ export const sendEmailNotification = async (
   attachments: string[] = []
 ) => {
   try {
-    // Check if email notifications are enabled
+    // Check if user email notifications are enabled (per-user setting)
     const settings = notificationService.getSettings();
     if (!settings.emailNotifications) {
-      console.log("Email notifications are disabled, skipping email");
-      return { success: true, message: 'Email notifications disabled' };
+      return { success: true, message: 'User email notifications disabled' };
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+        return { success: false, message: 'User is not authenticated.' };
     }
 
     // Ensure correct API URL path
     const apiUrl = `${ENV.API_URL}/send-bug-notification.php`;
-    // // console.log("Sending email notification:");
-    // // console.log("- API URL:", apiUrl);
-    // // console.log("- Recipients:", to);
-    // // console.log("- Subject:", subject);
-    
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ to, subject, body, attachments }),
     });
-    
-    // // console.log("Response status:", response.status);
-    // // console.log("Response headers:", response.headers);
-    
     if (!response.ok) {
       const errorText = await response.text();
-      // // console.error("Email API error response:", errorText);
       throw new Error(`HTTP error: ${response.status} - ${errorText}`);
     }
-    
     const data = await response.json();
-    // // console.log("Email API success response:", data);
     return data;
   } catch (error) {
-    // // console.error("Email notification error:", error);
-    return { success: false, message: error instanceof Error ? error.message : 'Failed to send email' };
+    return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
 
@@ -69,70 +61,43 @@ export const sendEmailNotification = async (
 // );
 
 // Add this function to get all notification recipients
-export const getNotificationRecipients = async (): Promise<string[]> => {
-  try {
-    // Fetch admin emails
-    const adminResponse = await fetch(`${ENV.API_URL}/get_all_admins.php`, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-    const adminData = await adminResponse.json();
-    const adminEmails = adminData.success ? adminData.emails : [];
-    
-    // Fetch developer emails
-    const devResponse = await fetch(`${ENV.API_URL}/get_all_developers.php`, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-    const devData = await devResponse.json();
-    const devEmails = devData.success ? devData.emails : [];
-    
-    // Combine both arrays of emails
-    const allRecipients = [...adminEmails, ...devEmails];
-    
-    // Remove duplicates in case someone is both admin and developer
-    return [...new Set(allRecipients)];
-  } catch (error) {
-    // // console.error("Error fetching notification recipients:", error);
-    return []; // Return empty array on error
+export const getNotificationRecipients = async (projectId: string): Promise<string[]> => {
+  if (!projectId) {
+    //.error("No project ID provided for fetching notification recipients.");
+    return [];
   }
-};
-
-// Add this function to get tester and admin recipients
-export const getBugStatusUpdateRecipients = async (): Promise<string[]> => {
   try {
-    // Fetch admin emails
-    const adminResponse = await fetch(`${ENV.API_URL}/get_all_admins.php`, {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      // Not a fatal error, just means user is not logged in.
+      // The backend will handle the auth check.
+      return [];
+    }
+
+    const res = await fetch(`${ENV.API_URL}/projects/get_notification_recipients.php?project_id=${projectId}`, {
       headers: {
-        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-      },
+        'Accept': 'application/json'
+      }
     });
-    const adminData = await adminResponse.json();
-    const adminEmails = adminData.success ? adminData.emails : [];
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Failed to fetch recipients: ${res.status} ${res.statusText} - ${errorText}`);
+    }
     
-    // Fetch tester emails
-    const testerResponse = await fetch(`${ENV.API_URL}/get_all_testers.php`, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-    const testerData = await testerResponse.json();
-    const testerEmails = testerData.success ? testerData.emails : [];
-    
-    // Combine both arrays of emails
-    const allRecipients = [...adminEmails, ...testerEmails];
-    
-    // Remove duplicates
-    return [...new Set(allRecipients)];
+    const data = await res.json();
+
+    if (data.success && Array.isArray(data.emails)) {
+        return data.emails;
+    }
+
+    //.error("Failed to parse recipients from API response:", data.message || 'Unknown error');
+    return [];
   } catch (error) {
-    // // console.error("Error fetching notification recipients:", error);
-    return []; // Return empty array on error
+    //.error("Error fetching project notification recipients:", error);
+    return [];
   }
 };
 
@@ -141,14 +106,17 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
   try {
     // Check if email notifications are enabled
     const settings = notificationService.getSettings();
-    
+    if (!settings.statusChangeNotifications) {
+      return { success: true, message: 'Email notifications disabled' };
+    }
+
     let emailResult = { success: true, message: 'Email notifications disabled' };
     let browserResult = false;
-    
+
     // Send email notification if enabled
-    if (settings.emailNotifications && settings.statusChangeNotifications) {
-      const recipients = await getBugStatusUpdateRecipients();
-      
+    if (settings.statusChangeNotifications) {
+      const recipients = await getNotificationRecipients(bug.project_id);
+
       if (recipients.length > 0) {
         emailResult = await sendEmailNotification(
           recipients,
@@ -192,23 +160,21 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
       } else {
         emailResult = { success: false, message: "No recipients found" };
       }
-    } else {
-      // console.log("Email notifications or status change notifications are disabled, skipping email");
     }
-    
+
     // Send browser notification if enabled
     if (settings.browserNotifications && settings.statusChangeNotifications) {
       browserResult = await notificationService.sendBugStatusNotification(bug.title, bug.status);
     }
-    
-    return { 
-      success: emailResult.success || browserResult, 
+
+    return {
+      success: emailResult.success || browserResult,
       message: emailResult.message,
       emailSent: emailResult.success,
       browserNotificationSent: browserResult
     };
   } catch (error) {
-    // // console.error("Error sending bug status update notification:", error);
+    // //.error("Error sending bug status update notification:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
@@ -233,14 +199,17 @@ export const sendNewBugNotification = async (bug: any) => {
   try {
     // Check if email notifications are enabled
     const settings = notificationService.getSettings();
-    
+    if (!settings.newBugNotifications) {
+      return { success: true, message: 'User new bug notifications disabled' };
+    }
+
     let emailResult = { success: true, message: 'Email notifications disabled' };
     let browserResult = false;
-    
+
     // Send email notification if enabled
-    if (settings.emailNotifications && settings.newBugNotifications) {
-      const recipients = await getNotificationRecipients();
-      
+    if (settings.newBugNotifications) {
+      const recipients = await getNotificationRecipients(bug.project_id);
+
       if (recipients.length > 0) {
         emailResult = await sendEmailNotification(
           recipients,
@@ -284,23 +253,21 @@ export const sendNewBugNotification = async (bug: any) => {
       } else {
         emailResult = { success: false, message: "No recipients found" };
       }
-    } else {
-      // console.log("Email notifications or new bug notifications are disabled, skipping email");
     }
-    
+
     // Send browser notification if enabled
     if (settings.browserNotifications && settings.newBugNotifications) {
       browserResult = await notificationService.sendNewBugNotification(bug.title);
     }
-    
-    return { 
-      success: emailResult.success || browserResult, 
+
+    return {
+      success: emailResult.success || browserResult,
       message: emailResult.message,
       emailSent: emailResult.success,
       browserNotificationSent: browserResult
     };
   } catch (error) {
-    // console.error("Error sending new bug notification:", error);
+    //.error("Error sending new bug notification:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
@@ -310,14 +277,17 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
   try {
     // Check if email notifications are enabled
     const settings = notificationService.getSettings();
-    
+    if (!settings.statusChangeNotifications) {
+      return { success: true, message: 'Email notifications disabled' };
+    }
+
     let emailResult = { success: true, message: 'Email notifications disabled' };
     let browserResult = false;
-    
+
     // Send email notification if enabled
-    if (settings.emailNotifications && settings.statusChangeNotifications) {
-      const recipients = await getBugStatusUpdateRecipients();
-      
+    if (settings.statusChangeNotifications) {
+      const recipients = await getNotificationRecipients(bug.project_id);
+
       if (recipients.length > 0) {
         const statusChangeContent = statusChange ? `
           <p style="font-size: 14px; margin-bottom: 5px;"><strong>Previous Status:</strong> <span style="font-weight: normal; text-transform: capitalize;">${statusChange.from}</span></p>
@@ -325,7 +295,7 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
         ` : `
           <p style="font-size: 14px; margin-bottom: 5px;"><strong>Status:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.status}</span></p>
         `;
-        
+
         emailResult = await sendEmailNotification(
           recipients,
           subject,
@@ -366,24 +336,22 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
       } else {
         emailResult = { success: false, message: "No recipients found" };
       }
-    } else {
-      // console.log("Email notifications or status change notifications are disabled, skipping email");
     }
-    
+
     // Send browser notification if enabled
     if (settings.browserNotifications && settings.statusChangeNotifications) {
       const statusText = statusChange ? statusChange.to : bug.status;
       browserResult = await notificationService.sendBugStatusNotification(bug.title, statusText);
     }
-    
-    return { 
-      success: emailResult.success || browserResult, 
+
+    return {
+      success: emailResult.success || browserResult,
       message: emailResult.message,
       emailSent: emailResult.success,
       browserNotificationSent: browserResult
     };
   } catch (error) {
-    // console.error("Error sending bug notification:", error);
+    //.error("Error sending bug notification:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
@@ -392,22 +360,16 @@ export const sendNewUpdateNotification = async (update: any) => {
   try {
     // Check if email notifications are enabled
     const settings = notificationService.getSettings();
+    if (!settings.emailNotifications) {
+      return { success: true, message: 'User email notifications disabled' };
+    }
 
     let emailResult = { success: true, message: 'Email notifications disabled' };
     let browserResult = false;
 
     // Send email notification if enabled
     if (settings.emailNotifications) {
-      // Fetch all admin and developer emails
-      const adminResponse = await fetch(`${ENV.API_URL}/get_all_admins.php`);
-      const adminData = await adminResponse.json();
-      const adminEmails = adminData.success ? adminData.emails : [];
-
-      const devResponse = await fetch(`${ENV.API_URL}/get_all_developers.php`);
-      const devData = await devResponse.json();
-      const devEmails = devData.success ? devData.emails : [];
-
-      const recipients = [...new Set([...adminEmails, ...devEmails])];
+      const recipients = await getNotificationRecipients(update.project_id);
 
       if (recipients.length > 0) {
         emailResult = await sendEmailNotification(
@@ -426,6 +388,7 @@ export const sendNewUpdateNotification = async (update: any) => {
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Type:</strong> <span style="font-weight: normal; text-transform: capitalize;">${update.type}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Created On:</strong> <span style="font-weight: normal;">${new Date(update.created_at).toLocaleString()}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Created By:</strong> <span style="font-weight: normal;">${update.created_by || 'Bug Ricer User'}</span></p>
+                <p style="font-size: 14px; margin-bottom: 0;"><strong>Project:</strong> <span style="font-weight: normal;">${update.project_name || 'BugRicer Project'}</span></p>
                 <p style="font-size: 14px; margin-top: 10px;"><strong>Update Link:</strong> <a href="${window.location.origin}/updates/${update.id}" style="color: #2563eb; text-decoration: none;">View Update Details</a></p>
               </div>
               <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
@@ -444,12 +407,23 @@ export const sendNewUpdateNotification = async (update: any) => {
     // Optionally, send browser notification if you want
     // if (settings.browserNotifications) { ... }
 
-    return { 
+    return {
       success: emailResult.success,
       message: emailResult.message,
       emailSent: emailResult.success
     };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
+  }
+};
+
+// Add function to check global email enabled
+export const isGlobalEmailEnabled = async (): Promise<boolean> => {
+  try {
+    const res = await fetch(`${ENV.API_URL}/settings/get.php`);
+    const data = await res.json();
+    return !!data.data?.email_notifications_enabled;
+  } catch {
+    return true; // fallback to enabled
   }
 };

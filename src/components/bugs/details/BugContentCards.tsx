@@ -79,7 +79,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           success = true;
         }
       } catch (fetchError) {
-        console.log('CORS fetch failed:', fetchError);
+        //.log('CORS fetch failed:', fetchError);
       }
       
       // Approach 2: Try with no-cors mode if CORS failed
@@ -92,13 +92,13 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           // Note: no-cors responses are opaque, so we can't read them
           // This approach won't work for copying, but we need to try canvas
         } catch (noCorsError) {
-          console.log('No-CORS fetch also failed:', noCorsError);
+          //.log('No-CORS fetch also failed:', noCorsError);
         }
       }
       
       // Approach 3: Canvas approach (fallback)
       if (!success) {
-        console.log('Trying canvas approach...');
+        //.log('Trying canvas approach...');
         const img = document.createElement("img");
         img.crossOrigin = "anonymous";
         
@@ -165,7 +165,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         throw new Error('Could not load image with any method');
       }
     } catch (error) {
-      console.error("Copy image error:", error);
+      //.error("Copy image error:", error);
       toast({
         title: "Error",
         description: "Failed to copy image. Try right-clicking and selecting 'Copy image' instead.",
@@ -237,7 +237,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           }
         }
       } catch (fetchError) {
-        console.log('Could not fetch image for sharing:', fetchError);
+        //.log('Could not fetch image for sharing:', fetchError);
         
         // Fallback: Try canvas approach
         try {
@@ -266,7 +266,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           });
           fileName = "bug-screenshot.png";
         } catch (canvasError) {
-          console.log('Canvas approach also failed:', canvasError);
+          //.log('Canvas approach also failed:', canvasError);
         }
       }
       
@@ -290,7 +290,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
             return;
           }
         } catch (fileShareError) {
-          console.log('File sharing failed:', fileShareError);
+          //.log('File sharing failed:', fileShareError);
         }
       }
       
@@ -313,7 +313,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           return;
         }
       } catch (textShareError) {
-        console.log('Text sharing with URL failed:', textShareError);
+        //.log('Text sharing with URL failed:', textShareError);
       }
       
       // Third Priority: Basic text sharing
@@ -330,7 +330,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         });
         return;
       } catch (basicShareError) {
-        console.log('Basic sharing failed:', basicShareError);
+        //.log('Basic sharing failed:', basicShareError);
       }
       
       // Last resort: Open image in new tab
@@ -342,7 +342,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       window.open(selectedImage, '_blank');
       
     } catch (error) {
-      console.error("Share error:", error);
+      //.error("Share error:", error);
       
       toast({
         title: "Share Error",
@@ -370,7 +370,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         description: "Description copied to clipboard.",
       });
     } catch (error) {
-      // console.error("Failed to copy description:", error);
+      // //.error("Failed to copy description:", error);
       toast({
         title: "Error",
         description: "Failed to copy description.",
@@ -430,7 +430,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           
           imageUrl = URL.createObjectURL(blob);
         } catch (canvasError) {
-          console.log('Canvas approach failed for printing:', canvasError);
+          //.log('Canvas approach failed for printing:', canvasError);
           toast({
             title: "Print Error",
             description: "Could not prepare image for printing. Try downloading instead.",
@@ -493,7 +493,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       });
       
     } catch (error) {
-      console.error("Print error:", error);
+      //.error("Print error:", error);
       toast({
         title: "Print Error",
         description: "Could not print image. Try downloading and printing manually.",

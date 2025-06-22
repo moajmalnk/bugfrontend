@@ -94,7 +94,7 @@ class ActivityService {
 
       return result.data;
     } catch (error) {
-      console.error('Error fetching project activities:', error);
+      //.error('Error fetching project activities:', error);
       throw error;
     }
   }
@@ -127,7 +127,7 @@ class ActivityService {
 
       return result.data;
     } catch (error) {
-      console.error('Error fetching user activities:', error);
+      //.error('Error fetching user activities:', error);
       throw error;
     }
   }
@@ -157,7 +157,7 @@ class ActivityService {
 
       return result.data;
     } catch (error) {
-      console.error('Error fetching activity stats:', error);
+      //.error('Error fetching activity stats:', error);
       throw error;
     }
   }
@@ -188,7 +188,7 @@ class ActivityService {
 
       return result.data;
     } catch (error) {
-      console.error('Error logging activity:', error);
+      //.error('Error logging activity:', error);
       throw error;
     }
   }

@@ -32,7 +32,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useState, useEffect } from "react";
 import * as z from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,6 +44,8 @@ const formSchema = z.object({
   }),
   description: z.string().min(1, "Description is required"),
   status: z.enum(["pending", "approved", "declined"]).optional(),
+  project_id: z.string().min(1, "Project is required"),
+  project_name: z.string().optional(),
 });
 
 const API_BASE = import.meta.env.VITE_API_URL + "/updates";
@@ -56,6 +58,23 @@ const EditUpdate = () => {
   const [isLoading, setIsLoading] = useState(true);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [canEdit, setCanEdit] = useState(true);
+
+  // Fetch projects the user is a member of
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects", currentUser?.username],
+    queryFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/projects/getAll.php`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) return data.data;
+      return [];
+    },
+    enabled: !!currentUser,
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -64,6 +83,8 @@ const EditUpdate = () => {
       type: undefined,
       description: "",
       status: "pending",
+      project_id: "",
+      project_name: "",
     },
   });
 
@@ -86,11 +107,19 @@ const EditUpdate = () => {
         queryClient.invalidateQueries({ queryKey: ["update", updateId] });
         navigate(`/updates/${updateId}`);
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        let errorMsg = data.message || "Failed to update update";
+        if (data.message && (data.message.includes("Unauthorized") || data.message.includes("not a member") || data.message.includes("permission"))) {
+          errorMsg = "You do not have permission to update this update.";
+        }
+        toast({ title: "Error", description: errorMsg, variant: "destructive" });
       }
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to update update", variant: "destructive" });
+    onError: (error: any) => {
+      let errorMsg = "Failed to update update";
+      if (error?.message && (error.message.includes("401") || error.message.includes("403"))) {
+        errorMsg = "You do not have permission to update this update.";
+      }
+      toast({ title: "Error", description: errorMsg, variant: "destructive" });
     }
   });
 
@@ -102,6 +131,15 @@ const EditUpdate = () => {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
+        if (response.status === 403 || response.status === 404) {
+          toast({
+            title: "Error",
+            description: "You do not have permission to edit this update.",
+            variant: "destructive",
+          });
+          navigate("/updates");
+          return;
+        }
         const data = await response.json();
         if (data.success) {
           form.reset({
@@ -109,7 +147,13 @@ const EditUpdate = () => {
             type: data.data.type,
             description: data.data.description,
             status: data.data.status || "pending",
+            project_id: data.data.project_id || "",
+            project_name: data.data.project_name || "",
           });
+          // Only allow editing if admin or creator
+          if (currentUser?.role !== "admin" && data.data.created_by !== currentUser?.username) {
+            setCanEdit(false);
+          }
         } else {
           throw new Error(data.message || "Failed to fetch update");
         }
@@ -124,9 +168,8 @@ const EditUpdate = () => {
         setIsLoading(false);
       }
     };
-
     fetchUpdate();
-  }, [updateId, form, navigate]);
+  }, [updateId, form, navigate, currentUser]);
 
   const onSubmit = (values) => {
     mutation.mutate(values);
@@ -182,121 +225,142 @@ const EditUpdate = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Title</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter update title"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        A clear and concise title for the update
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled={isSubmitting}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select update type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="updation">Updation</SelectItem>
-                          <SelectItem value="feature">Feature</SelectItem>
-                          <SelectItem value="maintenance">Maintenance</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        The type of update
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Status Dropdown for Admins */}
-                {currentUser?.role === "admin" && (
+            {!canEdit ? (
+              <div className="text-center text-muted-foreground py-8">
+                <p className="mb-2">You do not have permission to edit this update.</p>
+              </div>
+            ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
                     control={form.control}
-                    name="status"
+                    name="project_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          disabled={isSubmitting}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="approved">Approved</SelectItem>
-                            <SelectItem value="declined">Declined</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>Project</FormLabel>
+                        <FormControl>
+                          <Input
+                            value={form.getValues('project_name') || "BugRicer Project"}
+                            disabled
+                            readOnly
+                          />
+                        </FormControl>
                         <FormDescription>
-                          Set the status of this update
+                          The project this update belongs to
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter update title"
+                            {...field}
+                            disabled={isSubmitting || !canEdit}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          A clear and concise title for the update
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter update description"
-                          className="min-h-[120px]"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Detailed description of the update
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          disabled={isSubmitting || !canEdit}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select update type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="updation">Updation</SelectItem>
+                            <SelectItem value="feature">Feature</SelectItem>
+                            <SelectItem value="maintenance">Maintenance</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          The type of update
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {/* Status Dropdown for Admins */}
+                  {currentUser?.role === "admin" && (
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            disabled={isSubmitting || !canEdit}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="approved">Approved</SelectItem>
+                              <SelectItem value="declined">Declined</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Set the status of this update
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
-                />
-
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter update description"
+                            className="min-h-[120px]"
+                            {...field}
+                            disabled={isSubmitting || !canEdit}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Detailed description of the update
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex justify-end">
+                    <Button type="submit" disabled={isSubmitting || !canEdit}>
+                      {isSubmitting ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            )}
           </CardContent>
         </Card>
       </section>

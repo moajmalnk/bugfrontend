@@ -120,7 +120,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({
       setHasMore(response.pagination.hasMore);
       
     } catch (error) {
-      console.error('Error fetching activities:', error);
+      //.error('Error fetching activities:', error);
       toast({
         title: 'Error',
         description: 'Failed to load activities. Please try again.',

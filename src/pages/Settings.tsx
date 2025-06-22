@@ -11,11 +11,28 @@ import { toast } from '@/components/ui/use-toast';
 import { Moon, Sun } from 'lucide-react';
 import { NotificationSettingsCard } from '@/components/settings/NotificationSettings';
 import { WhatsAppContactsManager } from '@/components/settings/WhatsAppContactsManager';
+import { useNotificationSettings } from "@/context/NotificationSettingsContext";
+import { ENV } from '@/lib/env';
+
+const updateGlobalEmailSetting = async (enabled: boolean) => {
+  const token = localStorage.getItem("token");
+  const response = await fetch(`${ENV.API_URL}/settings/update.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({ email_notifications_enabled: enabled }),
+  });
+  const data = await response.json();
+  return data;
+};
 
 const Settings = () => {
   const { currentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [autoAssign, setAutoAssign] = useState(true);
+  const { emailNotificationsEnabled, refreshGlobalSettings } = useNotificationSettings();
 
   // Only admin should access this page
   if (currentUser?.role !== 'admin') {
@@ -32,6 +49,25 @@ const Settings = () => {
       title: "Settings saved",
       description: "Your general settings have been updated.",
     });
+  };
+
+  const handleGlobalEmailToggle = async (checked: boolean) => {
+    const result = await updateGlobalEmailSetting(checked);
+    if (result && result.data && result.data.email_notifications_enabled !== undefined) {
+      refreshGlobalSettings();
+      toast({
+        title: "Global email notifications updated",
+        description: checked
+          ? "Email notifications are now enabled for all users."
+          : "Email notifications are now disabled for all users.",
+      });
+    } else {
+      toast({
+        title: "Failed to update global email notifications",
+        description: result?.message || "An error occurred.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

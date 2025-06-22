@@ -118,6 +118,22 @@ const Updates = () => {
     },
   });
 
+  // Fetch projects to determine if user can create new update
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects", currentUser?.username],
+    queryFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/projects/getAll.php`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) return data.data;
+      return [];
+    },
+    enabled: !!currentUser,
+  });
+
   // Filter updates based on active tab
   const getFilteredUpdatesByTab = () => {
     switch (activeTab) {
@@ -291,6 +307,7 @@ const Updates = () => {
                     <TableHead className="w-[120px]">Update ID</TableHead>
                     <TableHead className="w-[250px]">Title</TableHead>
                     <TableHead className="w-[100px]">Type</TableHead>
+                    <TableHead className="w-[150px]">Project</TableHead>
                     <TableHead className="w-[150px]">Created By</TableHead>
                     <TableHead className="w-[120px]">Date</TableHead>
                     <TableHead className="w-[100px] text-right">Actions</TableHead>
@@ -326,6 +343,7 @@ const Updates = () => {
                     <TableHead className="w-[120px]">Update ID</TableHead>
                     <TableHead className="w-[250px]">Title</TableHead>
                     <TableHead className="w-[100px]">Type</TableHead>
+                    <TableHead className="w-[150px]">Project</TableHead>
                     <TableHead className="w-[150px]">Created By</TableHead>
                     <TableHead className="w-[120px]">Date</TableHead>
                     <TableHead className="w-[100px] text-right">Actions</TableHead>
@@ -352,7 +370,10 @@ const Updates = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-[150px] break-words">
-                        {update.created_by}
+                        {update.project_name}
+                      </TableCell>
+                      <TableCell className="max-w-[150px] break-words">
+                        <span className="font-medium">{update.created_by || "Unknown"}</span>
                       </TableCell>
                       <TableCell>{format(new Date(update.created_at), "PPPP 'at' p")}</TableCell>
                       <TableCell className="text-right">
@@ -390,6 +411,7 @@ const Updates = () => {
                     >
                       {update.type}
                     </Badge>
+                    <span className="text-xs text-muted-foreground ml-2">{update.project_name}</span>
                   </div>
                   <div className="font-bold text-sm sm:text-base break-words">
                     {update.title}
@@ -397,7 +419,7 @@ const Updates = () => {
                   <div className="flex flex-col gap-1 text-xs sm:text-sm">
                     <div className="text-muted-foreground break-words">
                       Created by:{" "}
-                      <span className="font-medium">{update.created_by}</span>
+                      <span className="font-medium">{update.created_by || "BugRicer"}</span>
                     </div>
                     <div className="text-muted-foreground">
                       Date: {format(new Date(update.created_at), "PPPP 'at' p")}
@@ -438,12 +460,15 @@ const Updates = () => {
                 asChild
                 className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
                 aria-label="Create new update"
+                disabled={projects.length === 0}
               >
                 <Link to="/new-update" className="flex items-center justify-center">
                   <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> New Update
                 </Link>
               </Button>
-
+              {projects.length === 0 && (
+                <div className="text-xs text-muted-foreground mt-2">You are not assigned to any projects. Contact your admin to create updates.</div>
+              )}
               {!skeletonLoading && getTabCount(activeTab) > 0 && (
                 <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50">
                   <Bell className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 mr-2" />

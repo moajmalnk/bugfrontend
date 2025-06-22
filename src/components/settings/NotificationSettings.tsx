@@ -19,56 +19,69 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { broadcastNotificationService } from '@/services/broadcastNotificationService';
+import { useNotificationSettings } from "@/context/NotificationSettingsContext";
+import { ENV } from '@/lib/env';
+
+const updateGlobalEmailSetting = async (enabled: boolean) => {
+  const token = localStorage.getItem("token");
+  const response = await fetch(`${ENV.API_URL}/settings/update.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({ email_notifications_enabled: enabled }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update global email setting.');
+  }
+  const data = await response.json();
+  return data;
+};
 
 export function NotificationSettingsCard() {
-  const [settings, setSettings] = useState<NotificationSettings>({
-    emailNotifications: true,
-    browserNotifications: true,
-    whatsappNotifications: false,
-    newBugNotifications: true,
-    statusChangeNotifications: true,
-    notificationSound: true
-  });
-
+  const [settings, setSettings] = useState(() => notificationService.getSettings());
   const [showEmailConfirmDialog, setShowEmailConfirmDialog] = useState(false);
   const [pendingEmailChange, setPendingEmailChange] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    const savedSettings = notificationService.getSettings();
-    // console.log('Loaded settings:', savedSettings); // Debug log
-    setSettings(savedSettings);
-  }, []);
+  const { emailNotificationsEnabled, refreshGlobalSettings } = useNotificationSettings();
 
-  const handleEmailNotificationChange = (checked: boolean) => {
-    if (!checked) {
-      // If disabling email notifications, show confirmation dialog
-      setPendingEmailChange(checked);
-      setShowEmailConfirmDialog(true);
-    } else {
-      // If enabling, just apply immediately
-      updateEmailNotifications(checked);
+  const executeGlobalUpdate = async (checked: boolean) => {
+    try {
+      const result = await updateGlobalEmailSetting(checked);
+      if (result?.data?.email_notifications_enabled !== undefined) {
+        refreshGlobalSettings();
+        toast({
+          title: "Global email notifications updated",
+          description: checked
+            ? "Email notifications are now enabled for all users."
+            : "Email notifications are now disabled for all users.",
+        });
+      } else {
+        throw new Error(result?.message || "An unknown error occurred.");
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to update setting",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+      refreshGlobalSettings();
     }
   };
 
-  const updateEmailNotifications = (checked: boolean) => {
-    const newSettings = { ...settings, emailNotifications: checked };
-    setSettings(newSettings);
-
-    // Save immediately when changed
-    notificationService.saveSettings(newSettings);
-    // console.log('Settings saved:', newSettings); // Debug log
-
-    toast({
-      title: checked ? "Email notifications enabled" : "Email notifications disabled",
-      description: checked
-        ? "You will now receive email notifications for bug activities."
-        : "You will no longer receive any email notifications from BugRacer.",
-    });
+  const handleGlobalEmailToggle = (checked: boolean) => {
+    if (checked) {
+      executeGlobalUpdate(true);
+    } else {
+      setPendingEmailChange(false);
+      setShowEmailConfirmDialog(true);
+    }
   };
 
   const handleConfirmDisableEmail = () => {
-    if (pendingEmailChange !== null) {
-      updateEmailNotifications(pendingEmailChange);
+    if (pendingEmailChange === false) {
+      executeGlobalUpdate(false);
     }
     setShowEmailConfirmDialog(false);
     setPendingEmailChange(null);
@@ -77,20 +90,17 @@ export function NotificationSettingsCard() {
   const handleCancelDisableEmail = () => {
     setShowEmailConfirmDialog(false);
     setPendingEmailChange(null);
+    refreshGlobalSettings();
   };
 
-  const handleSettingChange = (key: keyof NotificationSettings, value: boolean) => {
+  const handleSettingChange = (key: Exclude<keyof NotificationSettings, 'emailNotifications'>, value: boolean) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
-
-    // Save immediately when changed
     notificationService.saveSettings(newSettings);
-    // console.log('Settings updated and saved:', newSettings); // Debug log
   };
 
   const handleSave = () => {
     notificationService.saveSettings(settings);
-    // console.log('Settings manually saved:', settings); // Debug log
     toast({
       title: "Notification preferences saved",
       description: "Your notification settings have been updated.",
@@ -191,15 +201,15 @@ export function NotificationSettingsCard() {
                     Email Notifications
                   </Label>
                 <p className="text-sm text-muted-foreground">
-                    Receive email notifications for bug reports and status changes
+                    Receive email notifications for bug reports and status changes (Global Setting)
                 </p>
               </div>
             </div>
             <Switch
               id="emailNotifications"
-              checked={settings.emailNotifications}
-                onCheckedChange={handleEmailNotificationChange}
-                className="self-start sm:self-center"
+              checked={emailNotificationsEnabled}
+              onCheckedChange={handleGlobalEmailToggle}
+              className="self-start sm:self-center"
             />
           </div>
           
@@ -300,7 +310,7 @@ export function NotificationSettingsCard() {
                 onCheckedChange={(checked) => 
                       handleSettingChange('newBugNotifications', checked)
                 }
-                    disabled={!settings.browserNotifications && !settings.emailNotifications && !settings.whatsappNotifications}
+                    disabled={!settings.browserNotifications && !emailNotificationsEnabled && !settings.whatsappNotifications}
                     className="self-start sm:self-center"
               />
             </div>
@@ -315,14 +325,14 @@ export function NotificationSettingsCard() {
                 onCheckedChange={(checked) => 
                       handleSettingChange('statusChangeNotifications', checked)
                 }
-                    disabled={!settings.browserNotifications && !settings.emailNotifications && !settings.whatsappNotifications}
+                    disabled={!settings.browserNotifications && !emailNotificationsEnabled && !settings.whatsappNotifications}
                     className="self-start sm:self-center"
               />
             </div>
           </div>
         </div>
         
-            {(!settings.browserNotifications && !settings.emailNotifications && !settings.whatsappNotifications) && (
+            {(!settings.browserNotifications && !emailNotificationsEnabled && !settings.whatsappNotifications) && (
               <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <div className="flex items-start gap-2">
                   <BellRing className="h-5 w-5 text-yellow-600 mt-0.5" />
@@ -413,8 +423,8 @@ export function NotificationSettingsCard() {
                           title: "Debug Info",
                           description: `Polling status: ${isPolling ? 'Active' : 'Stopped'}`,
                         });
-                        console.log('Broadcast service polling status:', isPolling);
-                        console.log('Current settings:', notificationService.getSettings());
+                        // console.log('Broadcast service polling status:', isPolling);
+                        // console.log('Current settings:', notificationService.getSettings());
                       }}
                       className="text-xs"
                     >

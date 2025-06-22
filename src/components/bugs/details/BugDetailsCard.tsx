@@ -79,9 +79,9 @@ export const BugDetailsCard = ({
             value,
             currentUser?.name || "Bug Ricer User"
           );
-          console.log("Broadcast notification sent for status change");
+          //.log("Broadcast notification sent for status change");
         } catch (broadcastError) {
-          console.error("Failed to send broadcast notification:", broadcastError);
+          //.error("Failed to send broadcast notification:", broadcastError);
         }
 
         // Check if WhatsApp notifications are enabled and share
@@ -94,7 +94,7 @@ export const BugDetailsCard = ({
             priority: updatedBug.priority,
             updatedBy: currentUser?.name || "Bug Ricer User"
           });
-          console.log("WhatsApp share opened for status change");
+          //.log("WhatsApp share opened for status change");
         }
         
         if (notificationResult.success) {

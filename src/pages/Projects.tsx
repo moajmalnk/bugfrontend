@@ -180,7 +180,7 @@ const Projects = () => {
           memberships[project.id] = true;
         });
         setUserProjectMemberships(memberships);
-        console.log("Memberships:", memberships);
+        //.log("Memberships:", memberships);
         setSkeletonLoading(false);
         return;
       }
@@ -205,13 +205,13 @@ const Projects = () => {
             const members = data.data?.members || [];
             const isMember = members.some(member => String(member.id) === String(currentUser.id));
             memberships[project.id] = isMember;
-            console.log("API members for project", project.id, data.members);
+            //.log("API members for project", project.id, data.members);
           }
         }
       }
       
       setUserProjectMemberships(memberships);
-      console.log("Memberships:", memberships);
+      //.log("Memberships:", memberships);
       
       // Turn off skeleton loading only after membership check is complete
       setSkeletonLoading(false);

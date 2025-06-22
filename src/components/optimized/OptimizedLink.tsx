@@ -140,7 +140,7 @@ export const OptimizedLink: React.FC<OptimizedLinkProps> = ({
       }
       
     } catch (error) {
-      console.warn('Failed to preload route:', path, error);
+      //.warn('Failed to preload route:', path, error);
       preloadCache.delete(path);
     }
   }, [hasCodeSplitting]);
@@ -179,7 +179,7 @@ export const OptimizedLink: React.FC<OptimizedLinkProps> = ({
           });
         }
       } catch (error) {
-        console.warn('Analytics tracking failed:', error);
+        //.warn('Analytics tracking failed:', error);
       }
     }
     
@@ -195,7 +195,7 @@ export const OptimizedLink: React.FC<OptimizedLinkProps> = ({
         await new Promise(resolve => setTimeout(resolve, 50));
         
       } catch (error) {
-        console.error('Failed to preload route before navigation:', error);
+        //.error('Failed to preload route before navigation:', error);
       } finally {
         setIsLoading(false);
       }
@@ -334,7 +334,7 @@ export const useRoutePreloader = () => {
         await componentLoader();
       }
     } catch (error) {
-      console.warn('Failed to preload route:', path, error);
+      //.warn('Failed to preload route:', path, error);
       preloadCache.delete(path);
     }
   }, []);

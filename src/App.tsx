@@ -1,6 +1,6 @@
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { PrivacyOverlay } from "@/components/PrivacyOverlay";
-import { CoreProviders, RouterProviders } from "@/components/providers/AppProviders";
+import AppProviders, { CoreProviders, RouterProviders } from "@/components/providers/AppProviders";
 import RouteConfig from "@/components/routes/RouteConfig";
 import { initOfflineDetector } from "@/lib/offline";
 import { initializeServiceWorker, serviceWorkerManager } from "@/lib/serviceWorkerManager";
@@ -22,6 +22,8 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import NetworkError from './components/NetworkError';
+import { AuthProvider } from "./context/AuthContext";
+import { NotificationSettingsProvider } from "./context/NotificationSettingsContext";
 
 // Initialize the query client outside of the component with optimized defaults
 const queryClient = new QueryClient({
@@ -197,7 +199,7 @@ function AppContent() {
     
     // Initialize service worker
     initializeServiceWorker().catch(error => {
-      // console.error('[App] Service worker initialization failed:', error);
+      // //.error('[App] Service worker initialization failed:', error);
     });
 
     // Set up service worker event listeners
@@ -278,10 +280,10 @@ function AppContent() {
   useEffect(() => {
     if (currentUser) {
       broadcastNotificationService.startPolling();
-      console.log('Started notification polling for user:', currentUser.name || currentUser.username);
+      //.log('Started notification polling for user:', currentUser.name || currentUser.username);
     } else {
       broadcastNotificationService.stopPolling();
-      console.log('Stopped notification polling - user not logged in');
+      //.log('Stopped notification polling - user not logged in');
     }
 
     // Cleanup polling when component unmounts
@@ -329,7 +331,7 @@ export function useChunkLoadErrorRefresh() {
         message.includes("expected a JavaScript module script") ||
         message.includes("Loading CSS chunk")
       ) {
-        // console.warn('[App] Chunk loading error detected:', message);
+        // //.warn('[App] Chunk loading error detected:', message);
         setShowModal(true);
       }
     };
@@ -344,7 +346,7 @@ export function useChunkLoadErrorRefresh() {
         reason.includes("expected a JavaScript module script") ||
         reason.includes("Loading CSS chunk")
       ) {
-        // console.warn('[App] Chunk loading promise rejection:', reason);
+        // //.warn('[App] Chunk loading promise rejection:', reason);
         setShowModal(true);
       }
     };
@@ -360,9 +362,9 @@ export function useChunkLoadErrorRefresh() {
     // Clear caches before refresh to ensure clean reload
     try {
       await serviceWorkerManager.clearCache();
-      // console.log('[App] Cache cleared before refresh');
+      // //.log('[App] Cache cleared before refresh');
     } catch (error) {
-      // console.warn('[App] Failed to clear cache before refresh:', error);
+      // //.warn('[App] Failed to clear cache before refresh:', error);
     }
     
     window.location.reload();
@@ -440,16 +442,23 @@ function App() {
   const chunkErrorModal = useChunkLoadErrorRefresh();
 
   return (
-    <CoreProviders queryClient={queryClient}>
-      <Router future={futureConfig}>
-        <RouterProviders>
-          <ErrorBoundaryProvider>
-            <AppContent />
-          </ErrorBoundaryProvider>
-        </RouterProviders>
-      </Router>
-      {chunkErrorModal}
-    </CoreProviders>
+    <Router>
+      <ThemeProvider>
+        <AppProviders queryClient={queryClient}>
+          <AuthProvider>
+            <BugProvider>
+              <NotificationProvider>
+                <NotificationSettingsProvider>
+                  <ErrorBoundaryProvider>
+                    <RouteConfig />
+                  </ErrorBoundaryProvider>
+                </NotificationSettingsProvider>
+              </NotificationProvider>
+            </BugProvider>
+          </AuthProvider>
+        </AppProviders>
+      </ThemeProvider>
+    </Router>
   );
 }
 

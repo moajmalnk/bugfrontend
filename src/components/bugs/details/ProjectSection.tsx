@@ -16,7 +16,7 @@ export const ProjectSection = ({ project }: ProjectSectionProps) => {
             {project.name}
           </Link>
         ) : (
-          <span className="text-muted-foreground">Unknown project</span>
+          <span className="text-muted-foreground">BugRicer Project</span>
         )}
       </div>
     </div>

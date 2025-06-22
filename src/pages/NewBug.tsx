@@ -208,7 +208,8 @@ const NewBug = () => {
               status: "pending",
               reported_by_name: currentUser?.name || "Bug Ricer User",
               attachments: uploadedAttachments,
-              id: bugId
+              id: bugId,
+              project_id: projectId
             };
 
             // Send email notification
@@ -223,7 +224,7 @@ const NewBug = () => {
                 bugId,
                 currentUser?.name || "Bug Ricer User"
               );
-              console.log("Broadcast notification sent for new bug");
+              // console.log("Broadcast notification sent for new bug");
 
               // Check if WhatsApp notifications are enabled and share
               const notificationSettings = notificationService.getSettings();
@@ -239,7 +240,7 @@ const NewBug = () => {
                   reportedBy: currentUser?.name || "Bug Ricer User",
                   projectName: selectedProject?.name
                 });
-                console.log("WhatsApp share opened for new bug");
+                // console.log("WhatsApp share opened for new bug");
               }
             }
           } catch (emailError) {

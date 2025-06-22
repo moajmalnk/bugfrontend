@@ -2,8 +2,7 @@ class NotificationService {
   private readonly STORAGE_KEY = 'notification_settings';
 
   // Default notification settings
-  private readonly DEFAULT_SETTINGS: NotificationSettings = {
-    emailNotifications: true,
+  private readonly DEFAULT_SETTINGS: Omit<NotificationSettings, 'emailNotifications'> = {
     browserNotifications: true,
     whatsappNotifications: false, // Disabled by default since it requires manual interaction
     newBugNotifications: true,
@@ -39,7 +38,7 @@ class NotificationService {
 
   private getDefaultSettings(): NotificationSettings {
     return {
-      emailNotifications: true,
+      emailNotifications: true, // This property is managed globally now, but we keep it for type consistency
       browserNotifications: true,
       whatsappNotifications: false,
       newBugNotifications: true,
@@ -48,9 +47,10 @@ class NotificationService {
     };
   }
 
-  saveSettings(settings: NotificationSettings): void {
+  saveSettings(settings: Omit<NotificationSettings, 'emailNotifications'>): void {
     try {
-      const settingsString = JSON.stringify(settings);
+      const settingsToSave = { ...this.getStoredSettings(), ...settings };
+      const settingsString = JSON.stringify(settingsToSave);
       localStorage.setItem(this.STORAGE_KEY, settingsString);
       // console.log('Settings saved to localStorage:', settingsString); // Debug log
       

@@ -298,11 +298,11 @@ const ProjectDetails = () => {
       if (data.success) {
         setAvailableMembers(data.data?.users || []);
       } else {
-        console.error("Failed to fetch available members:", data.message);
+        //.error("Failed to fetch available members:", data.message);
         setAvailableMembers([]);
       }
     } catch (error) {
-      console.error("Error fetching available members:", error);
+      //.error("Error fetching available members:", error);
       setAvailableMembers([]);
       toast({
         title: "Error",
@@ -328,7 +328,7 @@ const ProjectDetails = () => {
         setMembers(responseData.members || []);
         setAdmins(responseData.admins || []);
       } else {
-        console.error("Failed to fetch members:", data.message);
+        //.error("Failed to fetch members:", data.message);
         setMembers([]);
         setAdmins([]);
         toast({
@@ -338,7 +338,7 @@ const ProjectDetails = () => {
         });
       }
     } catch (error) {
-      console.error("Error fetching members:", error);
+      //.error("Error fetching members:", error);
       setMembers([]);
       setAdmins([]);
       toast({
@@ -402,7 +402,7 @@ const ProjectDetails = () => {
         });
       }
     } catch (error) {
-      console.error("Error adding member:", error);
+      //.error("Error adding member:", error);
       toast({
         title: "Error",
         description: "An unexpected error occurred while adding member",

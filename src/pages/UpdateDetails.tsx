@@ -31,6 +31,7 @@ const UpdateDetails = () => {
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isDeclining, setIsDeclining] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
 
   const {
     data: update,
@@ -44,6 +45,10 @@ const UpdateDetails = () => {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
+      if (response.status === 403 || response.status === 404) {
+        setPermissionError("You do not have access to this update.");
+        return null;
+      }
       const data = await response.json();
       if (data.success) {
         return data.data;
@@ -87,7 +92,7 @@ const UpdateDetails = () => {
     });
   };
 
-  if (error) {
+  if (permissionError) {
     return (
       <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
         <section className="max-w-3xl mx-auto space-y-4">
@@ -105,7 +110,7 @@ const UpdateDetails = () => {
             <CardHeader>
               <CardTitle className="text-xl sm:text-2xl">Error</CardTitle>
               <CardDescription>
-                Failed to load update details. Please try again.
+                {permissionError}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -156,12 +161,18 @@ const UpdateDetails = () => {
                   <CardDescription className="mt-1">
                     Update ID: {update?.id}
                   </CardDescription>
+                  {update?.project_name && (
+                    <div className="text-sm text-muted-foreground mt-1">Project: <span className="font-semibold">{update.project_name}</span></div>
+                  )}
                 </div>
                 <Badge
                   variant="outline"
                   className={`text-sm ${getTypeColor(update?.type || "")}`}
                 >
                   {update?.type}
+                </Badge>
+                <Badge variant="outline" className="ml-2 text-xs">
+                  Status: {update?.status}
                 </Badge>
               </div>
             </CardHeader>
@@ -176,10 +187,17 @@ const UpdateDetails = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t">
                 <div className="space-y-1">
                   <div className="flex items-center text-sm text-muted-foreground">
+                    <Bell className="h-4 w-4 mr-2" />
+                    Project
+                  </div>
+                  <p className="text-sm font-medium">{update?.project_name || "BugRicer Project"}</p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <User className="h-4 w-4 mr-2" />
                     Created by
                   </div>
-                  <p className="text-sm font-medium">{update?.created_by}</p>
+                  <p className="text-sm font-medium">{update?.created_by_name || update?.created_by}</p>
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center text-sm text-muted-foreground">
@@ -222,7 +240,7 @@ const UpdateDetails = () => {
                   >
                     Delete Update
                   </Button>
-                  {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                  {(currentUser?.role === "admin" || update?.created_by === currentUser?.username) && (
                     <Button asChild>
                       <Link to={`/updates/${updateId}/edit`}>Edit Update</Link>
                     </Button>
