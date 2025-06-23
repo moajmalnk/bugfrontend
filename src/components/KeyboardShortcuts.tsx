@@ -9,13 +9,27 @@ export function KeyboardShortcuts() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // // console.log('Key pressed:', e.key, 'Code:', e.code, 'Shift:', e.shiftKey, 'Ctrl:', e.ctrlKey);
-      if (e.ctrlKey && (e.key === "b" || e.key === "B")) {
+      if (e.ctrlKey && !e.shiftKey && (e.key === "b" || e.key === "B")) {
         e.preventDefault();
         navigate("/bugs/new", { state: { from: window.location.pathname } });
+      }
+      if (e.ctrlKey && e.shiftKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        navigate('/bugs', { state: { from: window.location.pathname } });
       }
       if (e.ctrlKey && e.shiftKey && (e.key === "f" || e.key === "F")) {
         e.preventDefault();
         navigate("/fixes", { state: { from: window.location.pathname } });
+      }
+      // Shortcut for New Update: Ctrl + U
+      if (e.ctrlKey && !e.shiftKey && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        navigate('/new-update', { state: { from: window.location.pathname } });
+      }
+      // Shortcut for Updates page: Ctrl + Shift + U
+      if (e.ctrlKey && e.shiftKey && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        navigate('/updates', { state: { from: window.location.pathname } });
       }
       if (e.shiftKey && e.code === "Space") {
         e.preventDefault();

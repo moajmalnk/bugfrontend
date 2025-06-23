@@ -9,7 +9,7 @@ import {
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from '@/context/ThemeContext';
-import { Laptop, Moon, Sun, Folder, Bug, CheckSquare, Users, Settings, User as UserIcon, RefreshCw, Lock } from 'lucide-react';
+import { Laptop, Moon, Sun, Folder, Bug, CheckSquare, Users, Settings, User as UserIcon, RefreshCw, Lock, Bell, Rss, PlusSquare } from 'lucide-react';
 
 interface ContextMenuItem {
     label: string;
@@ -42,9 +42,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
             return [
                 { label: 'New Bug', action: () => { navigate('/bugs/new'); onClose(); }, shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
                 { label: 'Fix Bugs', action: () => { navigate('/bugs'); onClose(); }, shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'New Update', action: () => { navigate('/new-update'); onClose(); }, shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
                 { label: 'Projects', action: () => { navigate('/projects'); onClose(); }, icon: <Folder className="h-4 w-4" /> },
-                { label: 'Bugs', action: () => { navigate('/bugs'); onClose(); }, icon: <Bug className="h-4 w-4" /> },
-                { label: 'Fixes', action: () => { navigate('/fixes'); onClose(); }, icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'Bugs', action: () => { navigate('/bugs'); onClose(); }, icon: <Bug className="h-4 w-4" />, shortcut: 'Ctrl+Shift+B' },
+                { label: 'Fixes', action: () => { navigate('/fixes'); onClose(); }, shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'Updates', action: () => { navigate('/updates'); onClose(); }, shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
                 { label: 'Users', action: () => { navigate('/users'); onClose(); }, icon: <Users className="h-4 w-4" /> },
                 { label: 'Settings', action: () => { navigate('/settings'); onClose(); }, icon: <Settings className="h-4 w-4" />, shortcut: 'Ctrl+Shift+S' },
                 ...commonItems,
@@ -53,12 +55,16 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
             return [
                 { label: 'Fixes', action: () => { navigate('/fixes'); onClose(); }, icon: <CheckSquare className="h-4 w-4" /> },
                 { label: 'Fix Bugs', action: () => { navigate('/bugs'); onClose(); }, shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'New Update', action: () => { navigate('/new-update'); onClose(); }, shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
+                { label: 'Updates', action: () => { navigate('/updates'); onClose(); }, shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
                 ...commonItems,
             ];
         } else if (role === 'tester') {
             return [
-                { label: 'Bugs', action: () => { navigate('/bugs'); onClose(); }, icon: <Bug className="h-4 w-4" /> },
+                { label: 'Bugs', action: () => { navigate('/bugs'); onClose(); }, icon: <Bug className="h-4 w-4" />, shortcut: 'Ctrl+Shift+B' },
                 { label: 'New Bug', action: () => { navigate('/bugs/new'); onClose(); }, shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
+                { label: 'New Update', action: () => { navigate('/new-update'); onClose(); }, shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
+                { label: 'Updates', action: () => { navigate('/updates'); onClose(); }, shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
                 ...commonItems,
             ];
         }
