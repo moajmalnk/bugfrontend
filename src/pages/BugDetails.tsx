@@ -265,7 +265,7 @@ const BugDetails = () => {
             newStatus,
             currentUser?.name || "Bug Ricer User"
           );
-          console.log("Broadcast notification sent for status change");
+          //console.log("Broadcast notification sent for status change");
 
           // Check if WhatsApp notifications are enabled and share
           const notificationSettings = notificationService.getSettings();
@@ -277,7 +277,7 @@ const BugDetails = () => {
               priority: bug.priority,
               updatedBy: currentUser?.name || "Bug Ricer User"
             });
-            console.log("WhatsApp share opened for status change");
+           // console.log("WhatsApp share opened for status change");
           }
         } catch (notificationError) {
           // // console.error("Failed to send notification:", notificationError);

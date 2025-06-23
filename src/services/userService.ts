@@ -78,7 +78,7 @@ class UserService {
     return data.emails;
   }
 
-  async addUser(userData: NewUserData): Promise<User> {
+  async addUser(userData: NewUserData): Promise<{ user: User, message: string }> {
     const response = await fetch(`${this.baseUrl}/create.php`, {
       method: "POST",
       headers: {
@@ -92,7 +92,7 @@ class UserService {
     if (!response.ok || !data.success) {
       throw new Error(data.message || "Failed to add user.");
     }
-    return data.data;
+    return { user: data.data, message: data.message };
   }
 
   async updateUser(userId: string, userData: UpdateUserData): Promise<User> {
@@ -175,7 +175,7 @@ class UserService {
         throw new Error(response.data.message || 'Failed to generate dashboard link');
       }
     } catch (error: any) {
-      console.error('Error generating dashboard link:', error);
+      //console.error('Error generating dashboard link:', error);
       throw new Error(error.response?.data?.message || error.message || 'Failed to generate dashboard link');
     }
   }

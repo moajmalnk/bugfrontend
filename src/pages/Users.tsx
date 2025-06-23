@@ -114,10 +114,10 @@ const Users = () => {
         password: userData.password,
         role: userData.role,
       };
-      await userService.addUser(payload);
+      const result = await userService.addUser(payload);
       toast({
         title: "Success",
-        description: "User added successfully.",
+        description: result.message,
       });
       fetchUsers(); // Refresh user list after adding
       return true;

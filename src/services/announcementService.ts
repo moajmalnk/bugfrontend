@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { apiClient } from '@/lib/axios';
 
 export interface Announcement {
   id: number;
@@ -14,46 +14,46 @@ export type AnnouncementPayload = Omit<Announcement, 'id' | 'created_at' | 'last
 
 class AnnouncementService {
   async getLatestActive(): Promise<Announcement | null> {
-    const response = await api.get<{ success: boolean; data: Announcement | null }>('announcements/get_latest.php');
-    if (response.success) {
-      return response.data;
+    const response = await apiClient.get<{ success: boolean; data: Announcement | null }>('/announcements/get_latest.php');
+    if (response.data.success) {
+      return response.data.data;
     }
     return null;
   }
 
   async getAll(): Promise<Announcement[]> {
-    const response = await api.get<{ success: boolean, data: Announcement[] }>('announcements/getAll.php');
-    if (response.success) {
-      return response.data || [];
+    const response = await apiClient.get<{ success: boolean, data: Announcement[] }>('/announcements/getAll.php');
+    if (response.data.success) {
+      return response.data.data || [];
     }
     return [];
   }
 
   async create(payload: AnnouncementPayload): Promise<Announcement> {
-    const response = await api.post<{ success: boolean, data: Announcement }>('announcements/create.php', payload);
-    if (!response.success) {
+    const response = await apiClient.post<{ success: boolean, data: Announcement }>('/announcements/create.php', payload);
+    if (!response.data.success) {
       throw new Error('Failed to create announcement');
     }
-    return response.data;
+    return response.data.data;
   }
 
   async update(id: number, payload: Partial<AnnouncementPayload>): Promise<void> {
-    const response = await api.post(`announcements/update.php?id=${id}`, payload);
-    if (!(response as any).success) {
+    const response = await apiClient.post(`/announcements/update.php?id=${id}`, payload);
+    if (!(response.data as any).success) {
         throw new Error('Failed to update announcement');
     }
   }
 
   async broadcast(id: number): Promise<void> {
-    const response = await api.post(`announcements/broadcast.php?id=${id}`, {});
-    if (!(response as any).success) {
+    const response = await apiClient.post(`/announcements/broadcast.php?id=${id}`, {});
+    if (!(response.data as any).success) {
       throw new Error('Failed to broadcast announcement');
     }
   }
 
   async delete(id: number): Promise<void> {
-    const response = await api.delete(`announcements/delete.php?id=${id}`);
-    if (!(response as any).success) {
+    const response = await apiClient.delete(`/announcements/delete.php?id=${id}`);
+    if (!(response.data as any).success) {
         throw new Error('Failed to delete announcement');
     }
   }

@@ -7,7 +7,7 @@ export const useActivityLogger = () => {
 
   const logActivity = useCallback(async (activityData: LogActivityRequest) => {
     if (!currentUser) {
-      console.warn('Cannot log activity: user not authenticated');
+      //console.warn('Cannot log activity: user not authenticated');
       return;
     }
 
@@ -15,7 +15,7 @@ export const useActivityLogger = () => {
       await activityService.logActivity(activityData);
     } catch (error) {
       // Silently fail activity logging to not disrupt user experience
-      console.warn('Failed to log activity:', error);
+      //console.warn('Failed to log activity:', error);
     }
   }, [currentUser]);
 

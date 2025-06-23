@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { apiClient } from '@/lib/axios';
 import { ENV } from '@/lib/env';
 
 export interface Project {
@@ -27,24 +27,13 @@ const API_URL = `${ENV.API_URL}/projects`;
 class ProjectService {
   async getProjects(): Promise<Project[]> {
     try {
-      const response = await fetch(`${API_URL}/getAll.php`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        return data.data;
+      const response = await apiClient.get<{ success: boolean; data: Project[] }>('/projects/getAll.php');
+      if (response.data.success) {
+        return response.data.data || [];
       }
-      
-      throw new Error(data.message || 'Failed to fetch projects');
+      return [];
     } catch (error) {
-      // // console.error('Error fetching projects:', error);
+    //console.error('Error fetching projects:', error);
       throw error;
     }
   }

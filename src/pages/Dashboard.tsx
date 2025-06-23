@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, Navigate } from "react-router-dom";
 import { ENV } from "@/lib/env";
 import { User } from "@/types";
-import axios from "axios";
+import { apiClient } from "@/lib/axios";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,7 @@ export default function Dashboard() {
       await fetchUserDetails(payload.user_id, tokenString);
 
     } catch (error) {
-      console.error('Token validation error:', error);
+      //console.error('Token validation error:', error);
       setError('Invalid access token');
       setIsLoading(false);
     }
@@ -105,7 +105,7 @@ export default function Dashboard() {
 
   const fetchUserDetails = async (userId: string, authToken: string) => {
     try {
-      const response = await axios.get<ApiResponse<User>>(`${ENV.API_URL}/users/get.php?id=${userId}`, {
+      const response = await apiClient.get<ApiResponse<User>>(`/users/get.php?id=${userId}`, {
           headers: { Authorization: `Bearer ${authToken}` }
       });
 
@@ -116,7 +116,7 @@ export default function Dashboard() {
         setError('Failed to fetch user details');
       }
     } catch (error) {
-      console.error('Error fetching user details:', error);
+     // console.error('Error fetching user details:', error);
       setError('Failed to fetch user details');
     } finally {
       setIsLoading(false);
@@ -125,7 +125,7 @@ export default function Dashboard() {
 
   const fetchUserStats = async (userId: string, authToken: string) => {
     try {
-        const response = await axios.get<ApiResponse<UserStats>>(`${ENV.API_URL}/users/stats.php?id=${userId}`, {
+        const response = await apiClient.get<ApiResponse<UserStats>>(`/users/stats.php?id=${userId}`, {
             headers: { Authorization: `Bearer ${authToken}` }
         });
 
@@ -133,7 +133,7 @@ export default function Dashboard() {
         setStats(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching user stats:', error);
+      //console.error('Error fetching user stats:', error);
     }
   };
 

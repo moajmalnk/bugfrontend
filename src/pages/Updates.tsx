@@ -40,6 +40,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { updateService } from "@/services/updateService";
+import { projectService } from "@/services/projectService";
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -117,35 +119,16 @@ const Updates = () => {
   const {
     data: updates = [],
     isLoading: skeletonLoading,
+    error: updatesError,
   } = useQuery({
     queryKey: ["updates"],
-    queryFn: async () => {
-      const response = await fetch(`${API_BASE}/getAll.php`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      const data = await response.json();
-      if (data.success) {
-        return data.data;
-      }
-      throw new Error(data.message || "Failed to fetch updates");
-    },
+    queryFn: () => updateService.getUpdates(),
   });
 
   // Fetch projects to determine if user can create new update
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ["projects", currentUser?.username],
-    queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/projects/getAll.php`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      const data = await response.json();
-      if (data.success) return data.data;
-      return [];
-    },
+    queryKey: ["projects", currentUser?.id],
+    queryFn: () => projectService.getProjects(),
     enabled: !!currentUser,
   });
   

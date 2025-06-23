@@ -66,7 +66,7 @@ async function handlePasswordChange(
       },
     });
   } catch (error: any) {
-    console.error("Password change error:", error);
+    // console.error("Password change error:", error);
     throw error;
   }
 }

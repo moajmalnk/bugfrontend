@@ -24,7 +24,7 @@ const AnnouncementPopup: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Failed to fetch announcement:', error);
+        //console.error('Failed to fetch announcement:', error);
       }
     };
 

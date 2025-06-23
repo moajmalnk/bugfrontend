@@ -102,18 +102,8 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
     try {
       const result = await handleAddUser(data);
       if (result) {
-        toast({
-          title: "Success",
-          description: "User has been added successfully.",
-        });
         form.reset();
         setOpen(false);
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to add the user. Please try again.",
-          variant: "destructive",
-        });
       }
     } catch (error) {
       // console.error("Error adding user:", error);

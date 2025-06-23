@@ -633,15 +633,23 @@ const Projects = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Project?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the project.
-              
-              <div className="mt-4 bg-muted p-3 rounded-md text-sm">
-                <div className="font-medium mb-2">Note:</div>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Projects with team members or bugs cannot be deleted directly.</li>
-                  <li>You will be given the option to force delete if constraints are detected.</li>
-                </ul>
+            <AlertDialogDescription asChild>
+              <div>
+                This action cannot be undone. This will permanently delete the
+                project.
+                <div className="mt-4 bg-muted p-3 rounded-md text-sm">
+                  <div className="font-medium mb-2">Note:</div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>
+                      Projects with team members or bugs cannot be deleted
+                      directly.
+                    </li>
+                    <li>
+                      You will be given the option to force delete if
+                      constraints are detected.
+                    </li>
+                  </ul>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -676,31 +684,33 @@ const Projects = () => {
               <AlertCircle className="h-5 w-5 text-destructive" />
               Cannot Delete Project
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-left">
-              {deleteErrorMessage}
-              
-              <div className="mt-4 bg-muted p-3 rounded-md text-sm">
-                <div className="font-medium mb-2">Before deleting a project:</div>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Remove all team members from the project</li>
-                  <li>Resolve or reassign all bugs in the project</li>
-                </ul>
-              </div>
-              
-              <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md text-sm border border-yellow-200 dark:border-yellow-800">
-                <div className="font-medium mb-2 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-2 text-yellow-600 dark:text-yellow-400" />
-                  Alternative: Force Delete
+            <AlertDialogDescription asChild>
+              <div className="text-left">
+                {deleteErrorMessage}
+                
+                <div className="mt-4 bg-muted p-3 rounded-md text-sm">
+                  <div className="font-medium mb-2">Before deleting a project:</div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Remove all team members from the project</li>
+                    <li>Resolve or reassign all bugs in the project</li>
+                  </ul>
                 </div>
-                <div className="mb-2">
-                  You can also force delete this project, which will automatically delete:
-                </div>
-                <ul className="list-disc pl-5 space-y-1 text-yellow-700 dark:text-yellow-300">
-                  <li>All team member associations</li>
-                  <li>All bugs and their fixes associated with this project</li>
-                </ul>
-                <div className="mt-2 text-yellow-700 dark:text-yellow-300 font-medium">
-                  Warning: This action cannot be undone!
+                
+                <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md text-sm border border-yellow-200 dark:border-yellow-800">
+                  <div className="font-medium mb-2 flex items-center">
+                    <AlertCircle className="h-4 w-4 mr-2 text-yellow-600 dark:text-yellow-400" />
+                    Alternative: Force Delete
+                  </div>
+                  <div className="mb-2">
+                    You can also force delete this project, which will automatically delete:
+                  </div>
+                  <ul className="list-disc pl-5 space-y-1 text-yellow-700 dark:text-yellow-300">
+                    <li>All team member associations</li>
+                    <li>All bugs and their fixes associated with this project</li>
+                  </ul>
+                  <div className="mt-2 text-yellow-700 dark:text-yellow-300 font-medium">
+                    Warning: This action cannot be undone!
+                  </div>
                 </div>
               </div>
             </AlertDialogDescription>

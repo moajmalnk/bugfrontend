@@ -45,7 +45,7 @@ export const NotificationSettingsProvider: React.FC<{ children: React.ReactNode 
         setEmailNotificationsEnabled(response.data.data.email_notifications_enabled);
       }
     } catch (error) {
-      console.error("Failed to fetch global notification settings:", error);
+      //console.error("Failed to fetch global notification settings:", error);
     } finally {
       setIsLoading(false);
     }

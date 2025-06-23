@@ -13,13 +13,17 @@ export const apiClient = axios.create({
 // Request interceptor for debugging
 apiClient.interceptors.request.use(
   (config) => {
-    console.log('API Request:', {
-      url: config.url,
-      method: config.method,
-      baseURL: config.baseURL,
-      headers: config.headers,
-      data: config.data
-    });
+    // console.log('API Request:', {
+    //   url: config.url,
+    //   method: config.method,
+    //   baseURL: config.baseURL,
+    //   headers: config.headers,
+    //   data: config.data
+    // });
+    const token = sessionStorage.getItem('token') || localStorage.getItem('auth_token') || localStorage.getItem('token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
@@ -31,21 +35,21 @@ apiClient.interceptors.request.use(
 // Response interceptor for debugging and error handling
 apiClient.interceptors.response.use(
   (response) => {
-    console.log('API Response:', {
-      url: response.config.url,
-      status: response.status,
-      data: response.data
-    });
+    // console.log('API Response:', {
+    //   url: response.config.url,
+    //   status: response.status,
+    //   data: response.data
+    // });
     return response;
   },
   (error) => {
-    console.error('Response Error:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    });
+    // console.error('Response Error:', {
+    //   url: error.config?.url,
+    //   status: error.response?.status,
+    //   statusText: error.response?.statusText,
+    //   data: error.response?.data,
+    //   message: error.message
+    // });
     
     // Add specific handling for common production issues
     if (error.code === 'ERR_NETWORK') {

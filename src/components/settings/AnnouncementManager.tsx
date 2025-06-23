@@ -39,7 +39,7 @@ export const AnnouncementManager = () => {
         description: "Could not retrieve announcement data.",
         variant: "destructive",
       });
-      console.error('Failed to fetch announcements:', error);
+      // console.error('Failed to fetch announcements:', error);
     } finally {
       setLoading(false);
     }
