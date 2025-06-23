@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Edit, BellRing } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 import { toast } from '../ui/use-toast';
@@ -48,6 +48,22 @@ export const AnnouncementManager = () => {
   useEffect(() => {
     fetchAnnouncements();
   }, [fetchAnnouncements]);
+
+  const handleBroadcast = async (announcement: Announcement) => {
+    try {
+      await announcementService.broadcast(announcement.id);
+      toast({
+        title: "Announcement Broadcast",
+        description: `"${announcement.title}" will be shown to all users.`,
+      });
+      fetchAnnouncements();
+    } catch (error) {
+      toast({
+        title: "Error broadcasting announcement",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleEdit = (announcement: Announcement) => {
     setSelectedAnnouncement(announcement);
@@ -145,6 +161,10 @@ export const AnnouncementManager = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleBroadcast(announcement)}>
+                          <BellRing className="mr-2 h-4 w-4" />
+                          Notify
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEdit(announcement)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit

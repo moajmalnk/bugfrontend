@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { Bug } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { announcementService, Announcement } from '@/services/announcementService';
 
@@ -14,8 +14,11 @@ const AnnouncementPopup: React.FC = () => {
       try {
         const data = await announcementService.getLatestActive();
         if (data) {
-          const seen = localStorage.getItem(`seen_announcement_${data.id}`);
-          if (!seen) {
+          const seenInfo = localStorage.getItem(`seen_announcement_${data.id}`);
+          const lastSeenDate = seenInfo ? new Date(seenInfo) : null;
+          const broadcastDate = data.last_broadcast_at ? new Date(data.last_broadcast_at) : null;
+
+          if (!lastSeenDate || (broadcastDate && lastSeenDate < broadcastDate)) {
             setAnnouncement(data);
             setIsVisible(true);
           }
@@ -28,20 +31,10 @@ const AnnouncementPopup: React.FC = () => {
     fetchAnnouncement();
   }, []);
 
-  useEffect(() => {
-    if (isVisible) {
-      const timer = setTimeout(() => {
-        handleClose();
-      }, 8000); // Auto-dismiss after 8 seconds
-
-      return () => clearTimeout(timer);
-    }
-  }, [isVisible]);
-
   const handleClose = () => {
     setIsVisible(false);
     if (announcement) {
-      localStorage.setItem(`seen_announcement_${announcement.id}`, 'true');
+      localStorage.setItem(`seen_announcement_${announcement.id}`, new Date().toISOString());
     }
   };
 
@@ -50,18 +43,17 @@ const AnnouncementPopup: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 w-full max-w-sm">
-      <Card className="shadow-lg animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <CardTitle>{announcement.title}</CardTitle>
-            <Button variant="ghost" size="sm" onClick={handleClose}>
-              <X className="h-4 w-4" />
-            </Button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in-0">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="text-center">
+          <div className="flex items-center justify-center mb-4">
+            <Bug className="h-8 w-8 text-primary mr-2" />
+            <h2 className="text-2xl font-bold">BugRacer</h2>
           </div>
+          <CardTitle className="text-xl">{announcement.title}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="prose prose-sm dark:prose-invert">
+          <div className="prose prose-sm dark:prose-invert max-w-none text-center mx-auto">
             <ReactMarkdown
               components={{
                   a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" />,
@@ -71,9 +63,12 @@ const AnnouncementPopup: React.FC = () => {
             </ReactMarkdown>
           </div>
         </CardContent>
+        <CardFooter className="flex justify-center">
+          <Button onClick={handleClose}>Continue</Button>
+        </CardFooter>
       </Card>
     </div>
   );
 };
 
-export default AnnouncementPopup; 
+export default AnnouncementPopup;

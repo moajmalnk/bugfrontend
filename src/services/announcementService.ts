@@ -7,9 +7,10 @@ export interface Announcement {
   is_active: number;
   expiry_date: string | null;
   created_at: string;
+  last_broadcast_at: string | null;
 }
 
-export type AnnouncementPayload = Omit<Announcement, 'id' | 'created_at'>;
+export type AnnouncementPayload = Omit<Announcement, 'id' | 'created_at' | 'last_broadcast_at'>;
 
 class AnnouncementService {
   async getLatestActive(): Promise<Announcement | null> {
@@ -40,6 +41,13 @@ class AnnouncementService {
     const response = await api.post(`announcements/update.php?id=${id}`, payload);
     if (!(response as any).success) {
         throw new Error('Failed to update announcement');
+    }
+  }
+
+  async broadcast(id: number): Promise<void> {
+    const response = await api.post(`announcements/broadcast.php?id=${id}`, {});
+    if (!(response as any).success) {
+      throw new Error('Failed to broadcast announcement');
     }
   }
 
