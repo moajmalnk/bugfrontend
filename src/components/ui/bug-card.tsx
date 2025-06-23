@@ -72,7 +72,7 @@ export const BugCard = ({ bug }: BugCardProps) => {
         <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
           <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm px-3 py-1">
             <Link 
-              to={`/bugs/${bug.id}`}
+              to={currentUser?.role ? `/${currentUser.role}/bugs/${bug.id}` : `/bugs/${bug.id}`}
               state={{ from: isFromProject ? 'project' : 'bugs' }}
             >
               View Details

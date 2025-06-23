@@ -176,7 +176,7 @@ const FixBug = () => { // Changed component name
                 queryClient.invalidateQueries({ queryKey: ["bug", bugId] });
 
                 // Redirect back to the bug details page or bugs list
-                navigate(`/bugs/${bugId}`);
+                navigate(currentUser?.role ? `/${currentUser.role}/bugs/${bugId}` : `/bugs/${bugId}`);
             } else {
                 throw new Error(data.message || "Failed to update bug status");
             }

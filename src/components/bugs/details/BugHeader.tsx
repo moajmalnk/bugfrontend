@@ -12,6 +12,7 @@ import { bugService } from '@/services/bugService';
 import { toast } from '@/components/ui/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WhatsAppShareButton } from '@/components/bugs/WhatsAppShareButton';
+import { useAuth } from '@/context/AuthContext';
 
 // Add getStatusColor function
 const getStatusColor = (status: string) => {
@@ -39,14 +40,15 @@ interface BugHeaderProps {
 export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }: BugHeaderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { currentUser: authUser } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
   const isFromProject = location.state?.from === 'project';
 
   const backLink = isFromProject 
-    ? `/projects/${bug.project_id}?tab=bugs`
-    : '/bugs';
+    ? `/${authUser?.role || 'tester'}/projects/${bug.project_id}?tab=bugs`
+    : `/${authUser?.role || 'tester'}/bugs`;
 
   const backText = isFromProject 
     ? 'Back to Project Bugs'
@@ -268,7 +270,7 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
                   variant="default"
                   size="sm"
                   className="ml-auto hidden sm:flex"
-                  onClick={() => navigate(`/bugs/${bug.id}/fix`)}
+                  onClick={() => navigate(`/${authUser?.role || 'tester'}/bugs/${bug.id}/fix`)}
               >
                   <CheckSquare className="mr-2 h-4 w-4" /> Fix Bug
               </Button>

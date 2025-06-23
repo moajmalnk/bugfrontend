@@ -529,7 +529,7 @@ const Projects = () => {
                   </div>
                   <CardTitle>
                     <Link
-                      to={`/projects/${project.id}`}
+                      to={currentUser?.role ? `/${currentUser.role}/projects/${project.id}` : `/projects/${project.id}`}
                       className="hover:underline break-words text-base md:text-lg hover:text-primary transition-colors"
                     >
                       {project.name}

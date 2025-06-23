@@ -236,11 +236,14 @@ const Fixes = () => {
           <p className="mt-2 text-sm text-muted-foreground">
             There are no fixed bugs to display.
           </p>
-          <Button asChild className="mt-4">
-            <Link to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"} className="w-full md:w-auto">
-              View All Bugs
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button asChild>
+              <Link to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"} className="w-full md:w-auto">
+                <Bug className="mr-2 h-4 w-4" />
+                View All Bugs
+              </Link>
+            </Button>
+          </div>
         </div>
       );
     }
@@ -322,7 +325,7 @@ const Fixes = () => {
           </div>
           <div className="flex items-center gap-2">
             {showTabs && (
-                <Link to="/bugs" className="w-full md:w-auto">
+                <Link to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"} className="w-full md:w-auto">
                     <Button variant="default" className="w-full md:w-auto">
                         <Plus className="mr-2 h-4 w-4" />
                         Fix a Bug

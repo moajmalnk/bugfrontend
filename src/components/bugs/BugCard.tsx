@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BugCreatedDate } from '@/components/ui/DateDisplay';
+import { useAuth } from '@/context/AuthContext';
 
 interface Bug {
   id: string;
@@ -38,6 +39,7 @@ const statusColors = {
 
 export function BugCard({ bug, onDelete }: BugCardProps) {
   const location = useLocation();
+  const { currentUser } = useAuth();
   const isFromProject = location.pathname.startsWith('/projects/');
 
   return (
@@ -74,7 +76,7 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
       <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
         <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm px-3 py-1">
           <Link 
-            to={`/bugs/${bug.id}`}
+            to={`/${currentUser?.role || 'tester'}/bugs/${bug.id}`}
             state={{ from: isFromProject ? 'project' : 'bugs' }}
           >
             View Details
