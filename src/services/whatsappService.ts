@@ -1,12 +1,18 @@
 interface WhatsAppMessageData {
-  bugTitle: string;
-  bugId: string;
+  bugTitle?: string;
+  bugId?: string;
   status?: string;
   priority?: string;
   description?: string;
   reportedBy?: string;
   updatedBy?: string;
   projectName?: string;
+  // For general updates
+  updateTitle?: string;
+  updateId?: string;
+  updateType?: string;
+  updateStatus?: string;
+  createdBy?: string;
 }
 
 interface WhatsAppContact {
@@ -70,6 +76,12 @@ class WhatsAppService {
     return this.createWhatsAppLink(message, phoneNumber);
   }
 
+  // Generate WhatsApp deep link for general update
+  generateUpdateDetailsLink(data: WhatsAppMessageData, phoneNumber?: string): string {
+    const message = this.formatUpdateDetailsMessage(data);
+    return this.createWhatsAppLink(message, phoneNumber);
+  }
+
   // Format message for new bug notification
   private formatNewBugMessage(data: WhatsAppMessageData): string {
     const bugUrl = `${window.location.origin}/bugs/${data.bugId}`;
@@ -122,6 +134,42 @@ class WhatsAppService {
     }
     
     message += `\n🔗 *View Bug:* ${bugUrl}`;
+    message += `\n\n_Sent from BugRacer 🚀_`;
+    
+    return message;
+  }
+
+  // Format message for a general update
+  private formatUpdateDetailsMessage(data: WhatsAppMessageData): string {
+    const updateUrl = `${window.location.origin}/updates/${data.updateId}`;
+    
+    let message = `📣 *New Update Published*\n\n`;
+    message += `📋 *Title:* ${data.updateTitle}\n`;
+    
+    if (data.projectName) {
+      message += `📁 *Project:* ${data.projectName}\n`;
+    }
+    
+    if (data.updateType) {
+      message += `🔧 *Type:* ${data.updateType.charAt(0).toUpperCase() + data.updateType.slice(1)}\n`;
+    }
+
+    if (data.updateStatus) {
+      message += `📊 *Status:* ${data.updateStatus.charAt(0).toUpperCase() + data.updateStatus.slice(1)}\n`;
+    }
+    
+    if (data.createdBy) {
+      message += `👤 *Published by:* ${data.createdBy}\n`;
+    }
+    
+    if (data.description && data.description.length > 0) {
+      const shortDescription = data.description.length > 100 
+        ? data.description.substring(0, 100) + '...' 
+        : data.description;
+      message += `\n📝 *Description:*\n${shortDescription}\n`;
+    }
+    
+    message += `\n🔗 *View Update:* ${updateUrl}`;
     message += `\n\n_Sent from BugRacer 🚀_`;
     
     return message;
@@ -190,8 +238,14 @@ class WhatsAppService {
     this.openWhatsApp(link);
   }
 
+  // Share update details via WhatsApp
+  shareUpdateDetails(data: WhatsAppMessageData, phoneNumber?: string): void {
+    const link = this.generateUpdateDetailsLink(data, phoneNumber);
+    this.openWhatsApp(link);
+  }
+
   // Share to multiple contacts at once
-  shareToMultipleContacts(data: WhatsAppMessageData, type: 'new_bug' | 'status_update', contacts: WhatsAppContact[]): void {
+  shareToMultipleContacts(data: WhatsAppMessageData, type: 'new_bug' | 'status_update' | 'update_details', contacts: WhatsAppContact[]): void {
     contacts.forEach(contact => {
       const link = this.getShareableLink(data, type, contact.phone);
       // Open with a small delay to avoid overwhelming the browser
@@ -209,11 +263,13 @@ class WhatsAppService {
   }
 
   // Get shareable link (for copying to clipboard)
-  getShareableLink(data: WhatsAppMessageData, type: 'new_bug' | 'status_update', phoneNumber?: string): string {
+  getShareableLink(data: WhatsAppMessageData, type: 'new_bug' | 'status_update' | 'update_details', phoneNumber?: string): string {
     if (type === 'new_bug') {
       return this.generateNewBugLink(data, phoneNumber);
-    } else {
+    } else if (type === 'status_update') {
       return this.generateStatusUpdateLink(data, phoneNumber);
+    } else {
+      return this.generateUpdateDetailsLink(data, phoneNumber);
     }
   }
 

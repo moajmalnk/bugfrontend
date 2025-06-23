@@ -9,398 +9,291 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Bell, User } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
+import { format } from "date-fns";
+import { useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_URL + "/updates";
+
+// Skeleton for the main content
+const UpdateDetailsSkeleton = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-4 w-1/4 mb-4" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-5/6" />
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+        <div className="lg:col-span-1 space-y-6">
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-6 w-1/2" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-4 w-2/3" />
+                    </div>
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-4 w-2/3" />
+                    </div>
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-4 w-2/3" />
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+);
 
 const UpdateDetails = () => {
   const navigate = useNavigate();
   const { updateId } = useParams<{ updateId: string }>();
   const { currentUser } = useAuth();
   const { toast } = useToast();
-  const [showSkeleton, setShowSkeleton] = useState(true);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
+
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
-  const [isDeclining, setIsDeclining] = useState(false);
-  const [permissionError, setPermissionError] = useState<string | null>(null);
 
-  const {
-    data: update,
-    isLoading,
-    error,
-  } = useQuery({
+  const { data: update, isLoading, isError, error } = useQuery({
     queryKey: ["update", updateId],
     queryFn: async () => {
       const response = await fetch(`${API_BASE}/get.php?id=${updateId}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
-      if (response.status === 403 || response.status === 404) {
-        setPermissionError("You do not have access to this update.");
-        return null;
+      if (!response.ok) {
+        if (response.status === 403 || response.status === 404) {
+          throw new Error("Update not found or you do not have permission to view it.");
+        }
+        throw new Error("Failed to fetch update details.");
       }
       const data = await response.json();
-      if (data.success) {
-        return data.data;
-      }
-      throw new Error(data.message || "Failed to fetch update");
+      if (data.success) return data.data;
+      throw new Error(data.message || "An unknown error occurred.");
     },
     enabled: !!updateId,
+    retry: 1,
   });
 
-  useEffect(() => {
-    if (isLoading) {
-      const timer = setTimeout(() => {
-        setShowSkeleton(false);
-      }, 1500);
-      return () => clearTimeout(timer);
-    } else {
-      setShowSkeleton(false);
-    }
-  }, [isLoading]);
+  const mutationOptions = {
+    onSuccess: (successMessage: string) => {
+      toast({ title: "Success", description: successMessage });
+      queryClient.invalidateQueries({ queryKey: ["updates"] });
+      queryClient.invalidateQueries({ queryKey: ["update", updateId] });
+      setShowApproveDialog(false);
+      setShowDeclineDialog(false);
+      setShowDeleteDialog(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  };
 
-  const getTypeColor = (type: string) => {
+  const approveMutation = useMutation({
+    mutationFn: () => fetch(`${API_BASE}/approve.php?id=${updateId}`, { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then(res => res.json().then(data => { if (!data.success) throw new Error(data.message); return "Update approved successfully."; })),
+    ...mutationOptions,
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: () => fetch(`${API_BASE}/decline.php?id=${updateId}`, { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then(res => res.json().then(data => { if (!data.success) throw new Error(data.message); return "Update declined successfully."; })),
+    ...mutationOptions,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => fetch(`${API_BASE}/delete.php?id=${updateId}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then(res => res.json().then(data => { if (!data.success) throw new Error(data.message); return "Update deleted successfully."; })),
+    onSuccess: (successMessage) => {
+      toast({ title: "Success", description: successMessage });
+      queryClient.invalidateQueries({ queryKey: ["updates"] });
+      navigate("/updates");
+    },
+    onError: mutationOptions.onError,
+  });
+  
+  const getTypeBadgeStyle = (type: string) => {
     switch (type) {
-      case "feature":
-        return "text-blue-500";
-      case "updation":
-        return "text-green-500";
-      case "maintenance":
-        return "text-yellow-500";
-      default:
-        return "";
+      case "feature": return "bg-blue-100 text-blue-800 border-blue-200";
+      case "fix": return "bg-green-100 text-green-800 border-green-200";
+      case "maintenance": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
+  
+  const getStatusBadgeStyle = (status: string) => {
+     switch (status) {
+      case "approved": return "bg-green-100 text-green-800 border-green-200";
+      case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "declined": return "bg-red-100 text-red-800 border-red-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  if (permissionError) {
-    return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
-        <section className="max-w-3xl mx-auto space-y-4">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              className="flex items-center text-muted-foreground hover:text-foreground"
-              onClick={() => navigate(-1)}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-          </div>
-          <Card>
+  if (isLoading) return <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"><UpdateDetailsSkeleton /></main>;
+  
+  if (isError) return (
+    <main className="min-h-[calc(100vh-10rem)] flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center">
             <CardHeader>
-              <CardTitle className="text-xl sm:text-2xl">Error</CardTitle>
-              <CardDescription>
-                {permissionError}
-              </CardDescription>
+                <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
+                <CardTitle className="mt-4">Loading Failed</CardTitle>
+                <CardDescription>{(error as Error).message || "An unexpected error occurred."}</CardDescription>
             </CardHeader>
-          </Card>
-        </section>
-      </main>
-    );
-  }
+            <CardContent>
+                 <Button onClick={() => navigate('/updates')}>Go to Updates</Button>
+            </CardContent>
+        </Card>
+    </main>
+  );
+  
+  const canPerformActions = currentUser?.role === "admin" || (currentUser?.role === "developer" && update?.created_by === currentUser?.username) || (currentUser?.role === "tester" && update?.created_by === currentUser?.username)
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
-      <section className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            className="flex items-center text-muted-foreground hover:text-foreground"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
+    <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+        <div>
+            <Button variant="ghost" onClick={() => navigate(-1)} className="mb-2 -ml-4">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Updates
+            </Button>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{update.title}</h1>
+             <p className="text-sm text-muted-foreground mt-1">Update ID: <span className="font-mono">{update.id}</span></p>
         </div>
-
-        {showSkeleton || isLoading ? (
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-8 w-3/4 mb-2" />
-              <Skeleton className="h-4 w-1/2" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-20 w-full" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-4 w-48" />
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                  <CardTitle className="text-xl sm:text-2xl">
-                    {update?.title}
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    Update ID: {update?.id}
-                  </CardDescription>
-                  {update?.project_name && (
-                    <div className="text-sm text-muted-foreground mt-1">Project: <span className="font-semibold">{update.project_name}</span></div>
-                  )}
-                </div>
-                <Badge
-                  variant="outline"
-                  className={`text-sm ${getTypeColor(update?.type || "")}`}
-                >
-                  {update?.type}
-                </Badge>
-                <Badge variant="outline" className="ml-2 text-xs">
-                  Status: {update?.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">Description</h3>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {update?.description}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t">
-                <div className="space-y-1">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Bell className="h-4 w-4 mr-2" />
-                    Project
-                  </div>
-                  <p className="text-sm font-medium">{update?.project_name || "BugRicer Project"}</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <User className="h-4 w-4 mr-2" />
-                    Created by
-                  </div>
-                  <p className="text-sm font-medium">{update?.created_by_name || update?.created_by}</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Bell className="h-4 w-4 mr-2" />
-                    Created at
-                  </div>
-                  <p className="text-sm font-medium">
-                    {formatDate(update?.created_at || "")}
-                  </p>
-                </div>
-              </div>
-
-              {(currentUser?.role === "admin" ||
-                ((currentUser?.role === "tester" || currentUser?.role === "developer") && update?.created_by === currentUser?.username)
-              ) && (
-                <div className="flex justify-end pt-4 border-t gap-2 flex-wrap">
-                  {currentUser?.role === "admin" && update?.status === "pending" && (
-                    <>
-                      <Button
-                        variant="default"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => setShowApproveDialog(true)}
-                        disabled={isApproving}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => setShowDeclineDialog(true)}
-                        disabled={isDeclining}
-                      >
-                        Decline
-                      </Button>
-                    </>
-                  )}
-                  <Button
-                    variant="destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                    disabled={isDeleting}
-                  >
-                    Delete Update
-                  </Button>
+        <div className="flex items-center gap-2 self-start sm:self-center">
+            {canPerformActions && (
+                 <>
                   {(currentUser?.role === "admin" || update?.created_by === currentUser?.username) && (
-                    <Button asChild>
-                      <Link to={`/updates/${updateId}/edit`}>Edit Update</Link>
-                    </Button>
+                    <Button asChild variant="outline" size="sm"><Link to={`/updates/${updateId}/edit`}><Pencil className="mr-2 h-4 w-4"/>Edit</Link></Button>
                   )}
-                </div>
-              )}
+                   <WhatsAppShareButton
+                    data={{
+                      updateId: update.id,
+                      updateTitle: update.title,
+                      updateStatus: update.status,
+                      updateType: update.type,
+                      projectName: update.project_name,
+                      createdBy: update.created_by_name || update.created_by,
+                      description: update.description,
+                    }}
+                    type="update_details"
+                    size="sm"
+                  />
+                  <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}><Trash2 className="mr-2 h-4 w-4"/>Delete</Button>
+                 </>
+            )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+           <Card>
+            <CardHeader>
+                <CardTitle>Description</CardTitle>
+            </CardHeader>
+            <CardContent className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+              <p>{update.description}</p>
             </CardContent>
           </Card>
-        )}
+            {currentUser?.role === "admin" && update?.status === "pending" && (
+                <Card className="border-yellow-300 bg-yellow-50">
+                    <CardHeader className="flex-row items-center justify-between">
+                        <div>
+                            <CardTitle>Admin Action Required</CardTitle>
+                            <CardDescription>This update is awaiting your approval.</CardDescription>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="flex gap-4">
+                         <Button onClick={() => setShowApproveDialog(true)} className="bg-green-600 hover:bg-green-700 text-white"><Check className="mr-2 h-4 w-4" />Approve</Button>
+                         <Button variant="destructive" onClick={() => setShowDeclineDialog(true)}><X className="mr-2 h-4 w-4"/>Decline</Button>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+        
+        <div className="lg:col-span-1 space-y-6">
+          <Card>
+            <CardHeader><CardTitle>Details</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Type:</span>
+                <Badge variant="outline" className={getTypeBadgeStyle(update.type)}>{update.type}</Badge>
+              </div>
+               <div className="flex items-center gap-2 text-sm">
+                <Check className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Status:</span>
+                <Badge variant="outline" className={getStatusBadgeStyle(update.status)}>{update.status}</Badge>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Bell className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Project:</span>
+                <span className="font-medium">{update.project_name || "N/A"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Created by:</span>
+                <span className="font-medium">{update.created_by_name || update.created_by}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Created on:</span>
+                <span className="font-medium">{format(new Date(update.created_at), "PPPp")}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-        {/* Approve Confirmation Dialog */}
-        <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Approve Update</DialogTitle>
-            </DialogHeader>
-            <p>Are you sure you want to approve this update?</p>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowApproveDialog(false)}
-                disabled={isApproving}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={async () => {
-                  setIsApproving(true);
-                  try {
-                    const response = await fetch(`${API_BASE}/approve.php?id=${updateId}`, {
-                      method: "POST",
-                      headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                      },
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                      toast({ title: "Approved", description: "Update approved" });
-                      queryClient.invalidateQueries({ queryKey: ["updates"] });
-                      queryClient.invalidateQueries({ queryKey: ["update", updateId] });
-                      setShowApproveDialog(false);
-                    } else {
-                      toast({ title: "Error", description: data.message, variant: "destructive" });
-                    }
-                  } catch (error) {
-                    toast({ title: "Error", description: "Failed to approve update", variant: "destructive" });
-                  } finally {
-                    setIsApproving(false);
-                  }
-                }}
-                disabled={isApproving}
-              >
-                {isApproving ? "Approving..." : "Approve"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Decline Confirmation Dialog */}
-        <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Decline Update</DialogTitle>
-            </DialogHeader>
-            <p>Are you sure you want to decline this update?</p>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowDeclineDialog(false)}
-                disabled={isDeclining}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={async () => {
-                  setIsDeclining(true);
-                  try {
-                    const response = await fetch(`${API_BASE}/decline.php?id=${updateId}`, {
-                      method: "POST",
-                      headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                      },
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                      toast({ title: "Declined", description: "Update declined" });
-                      queryClient.invalidateQueries({ queryKey: ["updates"] });
-                      queryClient.invalidateQueries({ queryKey: ["update", updateId] });
-                      setShowDeclineDialog(false);
-                    } else {
-                      toast({ title: "Error", description: data.message, variant: "destructive" });
-                    }
-                  } catch (error) {
-                    toast({ title: "Error", description: "Failed to decline update", variant: "destructive" });
-                  } finally {
-                    setIsDeclining(false);
-                  }
-                }}
-                disabled={isDeclining}
-              >
-                {isDeclining ? "Declining..." : "Decline"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete Update</DialogTitle>
-            </DialogHeader>
-            <p>Are you sure you want to delete this update? This action cannot be undone.</p>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowDeleteDialog(false)}
-                disabled={isDeleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={async () => {
-                  setIsDeleting(true);
-                  try {
-                    const response = await fetch(`${API_BASE}/delete.php?id=${updateId}`, {
-                      method: "DELETE",
-                      headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                      },
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                      toast({ title: "Deleted", description: "Update deleted successfully" });
-                      setShowDeleteDialog(false);
-                      queryClient.invalidateQueries({ queryKey: ["updates"] });
-                      navigate("/updates");
-                    } else {
-                      toast({ title: "Error", description: data.message || "Failed to delete update", variant: "destructive" });
-                    }
-                  } catch (error) {
-                    toast({ title: "Error", description: "Failed to delete update", variant: "destructive" });
-                  } finally {
-                    setIsDeleting(false);
-                  }
-                }}
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </section>
+        {/* Confirmation Dialogs */}
+        <ConfirmationDialog open={showApproveDialog} onOpenChange={setShowApproveDialog} onConfirm={() => approveMutation.mutate()} title="Approve Update" description="Are you sure you want to approve this update?" confirmText="Approve" isLoading={approveMutation.isPending} />
+        <ConfirmationDialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog} onConfirm={() => declineMutation.mutate()} title="Decline Update" description="Are you sure you want to decline this update? This cannot be undone." confirmText="Decline" isLoading={declineMutation.isPending} variant="destructive" />
+        <ConfirmationDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} onConfirm={() => deleteMutation.mutate()} title="Delete Update" description="Are you sure you want to permanently delete this update? This action cannot be undone." confirmText="Delete" isLoading={deleteMutation.isPending} variant="destructive" />
     </main>
   );
 };
+
+// Generic Confirmation Dialog Component
+const ConfirmationDialog = ({ open, onOpenChange, onConfirm, title, description, confirmText, isLoading, variant = 'default' }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onConfirm: () => void;
+    title: string;
+    description: string;
+    confirmText: string;
+    isLoading: boolean;
+    variant?: 'default' | 'destructive';
+}) => (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription>{description}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="sm:justify-end gap-2">
+                 <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                 <Button type="button" variant={variant} onClick={onConfirm} disabled={isLoading}>
+                    {isLoading ? `${confirmText}...` : confirmText}
+                 </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+);
 
 export default UpdateDetails;

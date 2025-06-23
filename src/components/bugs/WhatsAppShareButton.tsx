@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { whatsappService, WhatsAppMessageData } from "@/services/whatsappService";
-import { MessageCircle, Copy } from "lucide-react";
+import { MessageCircle, Copy, MessageSquareQuote } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -12,7 +12,7 @@ import {
 
 interface WhatsAppShareButtonProps {
   data: WhatsAppMessageData;
-  type: 'new_bug' | 'status_update';
+  type: 'new_bug' | 'status_update' | 'update_details';
   variant?: 'default' | 'outline' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   showLabel?: boolean;
@@ -30,8 +30,10 @@ export function WhatsAppShareButton({
   const handleShare = () => {
     if (type === 'new_bug') {
       whatsappService.shareNewBug(data);
-    } else {
+    } else if (type === 'status_update') {
       whatsappService.shareStatusUpdate(data);
+    } else {
+      whatsappService.shareUpdateDetails(data);
     }
     
     toast({
@@ -61,20 +63,29 @@ export function WhatsAppShareButton({
 
   const getButtonText = () => {
     if (!showLabel) return '';
-    return type === 'new_bug' ? 'Share Bug' : 'Share Update';
+    if (type === 'new_bug') return 'Share Bug';
+    if (type === 'status_update') return 'Share Status';
+    return 'Share Update';
+  };
+  
+  const getIcon = () => {
+    if (type === 'update_details') {
+      return <MessageSquareQuote className="h-4 w-4" />;
+    }
+    return <MessageCircle className="h-4 w-4" />;
   };
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant={variant} size={size} className="gap-2">
-          <MessageCircle className="h-4 w-4" />
+          {getIcon()}
           {showLabel && getButtonText()}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem onClick={handleShare} className="gap-2">
-          <MessageCircle className="h-4 w-4" />
+          {getIcon()}
           Open WhatsApp
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleCopyLink} className="gap-2">
