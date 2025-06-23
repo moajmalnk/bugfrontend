@@ -285,18 +285,25 @@ export function UserDetailDialog({
                   User Dashboard
                 </Button>
             )}
-            <DeleteUserDialog
-              user={user}
-              onUserDelete={async (userId, force) => {
-                await onUserDelete(userId, force);
-                onOpenChange(false);
-              }}
-              trigger={
-                <Button variant="destructive" className="w-full" title="Delete User">
-                  Delete User
-                </Button>
-              }
-            />
+            {loggedInUserRole === 'admin' && currentUser?.id !== user.id && (
+              <DeleteUserDialog
+                user={user}
+                onUserDelete={async (userId, force) => {
+                  await onUserDelete(userId, force);
+                  onOpenChange(false);
+                }}
+                trigger={
+                  <Button
+                    variant="destructive"
+                    className="w-full"
+                    title={user.role === 'admin' ? "Administrators cannot be deleted" : "Delete User"}
+                    disabled={user.role === 'admin'}
+                  >
+                    Delete User
+                  </Button>
+                }
+              />
+            )}
           </div>
 
           {/* Stats */}
