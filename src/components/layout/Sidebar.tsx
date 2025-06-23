@@ -26,8 +26,18 @@ const defaultAvatar =
 export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
   const location = useLocation();
+  const role = currentUser?.role;
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    if (!role) return false;
+    const fullPath = `/${role}${path}`;
+    // Highlight "Projects" for both /projects and /projects/ID
+    if (path === '/projects') {
+      return location.pathname.startsWith(fullPath);
+    }
+    // For other links, do a more specific match to avoid highlighting multiple items
+    return location.pathname.startsWith(fullPath) && (location.pathname === fullPath || location.pathname.charAt(fullPath.length) === '/');
+  };
 
   const NavLink = ({
     to,
@@ -37,20 +47,24 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     to: string;
     icon: JSX.Element;
     label: string;
-  }) => (
-    <Link to={to} onClick={closeSidebar}>
-      <Button
-        variant="ghost"
-        className={cn(
-          "w-full justify-start mb-1 rounded-lg px-3 py-2 transition-colors text-base sm:text-sm",
-          isActive(to) && "bg-accent text-accent-foreground font-semibold"
-        )}
-      >
-        {icon}
-        <span className="ml-2 truncate">{label}</span>
-      </Button>
-    </Link>
-  );
+  }) => {
+    const destination = role ? `/${role}${to}` : to;
+    const active = isActive(to);
+    return (
+      <Link to={destination} onClick={closeSidebar}>
+        <Button
+          variant="ghost"
+          className={cn(
+            "w-full justify-start mb-1 rounded-lg px-3 py-2 transition-colors text-base sm:text-sm",
+            active && "bg-accent text-accent-foreground font-semibold"
+          )}
+        >
+          {icon}
+          <span className="ml-2 truncate">{label}</span>
+        </Button>
+      </Link>
+    );
+  };
 
   return (
     <nav
@@ -115,7 +129,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
       </div>
       <div className="mt-auto p-4 border-t">
         <Link
-          to="/profile"
+          to={role ? `/${role}/profile` : "/profile"}
           className="flex items-center hover:bg-accent rounded-lg p-2 transition-colors"
           onClick={closeSidebar}
         >

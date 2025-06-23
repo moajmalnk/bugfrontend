@@ -105,7 +105,7 @@ const EditUpdate = () => {
         toast({ title: "Success", description: "Update updated successfully" });
         queryClient.invalidateQueries({ queryKey: ["updates"] });
         queryClient.invalidateQueries({ queryKey: ["update", updateId] });
-        navigate(`/updates/${updateId}`);
+        navigate(currentUser?.role ? `/${currentUser.role}/updates/${updateId}` : `/updates/${updateId}`);
       } else {
         let errorMsg = data.message || "Failed to update update";
         if (data.message && (data.message.includes("Unauthorized") || data.message.includes("not a member") || data.message.includes("permission"))) {
@@ -137,7 +137,7 @@ const EditUpdate = () => {
             description: "You do not have permission to edit this update.",
             variant: "destructive",
           });
-          navigate("/updates");
+          navigate(currentUser?.role ? `/${currentUser.role}/updates` : "/updates");
           return;
         }
         const data = await response.json();
@@ -163,7 +163,7 @@ const EditUpdate = () => {
           description: error instanceof Error ? error.message : "Failed to fetch update",
           variant: "destructive",
         });
-        navigate("/updates");
+        navigate(currentUser?.role ? `/${currentUser.role}/updates` : "/updates");
       } finally {
         setIsLoading(false);
       }

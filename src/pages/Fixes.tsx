@@ -92,7 +92,10 @@ const getPriorityBadgeVariant = (priority: string): "destructive" | "secondary" 
   }
 };
 
-const BugCard = ({ bug }: { bug: BugType }) => (
+const BugCard = ({ bug }: { bug: BugType }) => {
+    const { currentUser } = useAuth();
+    const role = currentUser?.role;
+    return (
     <div className="rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md">
         <div className="p-4">
             <div className="flex justify-between items-start mb-2">
@@ -120,12 +123,13 @@ const BugCard = ({ bug }: { bug: BugType }) => (
             </div>
             <div className="flex justify-end pt-4">
                 <Button variant="secondary" size="sm" asChild>
-                    <Link to={`/bugs/${bug.id}`}>View Details</Link>
+                    <Link to={role ? `/${role}/bugs/${bug.id}` : `/bugs/${bug.id}`}>View Details</Link>
                 </Button>
             </div>
     </div>
   </div>
-);
+  )
+};
 
 const Fixes = () => {
   const { currentUser } = useAuth();
@@ -191,9 +195,9 @@ const Fixes = () => {
           {/* Desktop Table Skeleton */}
           <div className="hidden md:block">
             <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[250px]">Title</TableHead>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[250px]">Title</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead className="hidden md:table-cell">Reported By</TableHead>
                   <TableHead className="hidden lg:table-cell">Fixed By</TableHead>
@@ -213,30 +217,45 @@ const Fixes = () => {
         </>
       );
     }
-    
+
     if (error) {
-        return (
-            <div className="text-center py-10 px-4 rounded-lg border border-dashed border-destructive/50 bg-destructive/5">
-                <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
-                <h3 className="mt-4 text-lg font-medium text-destructive">Failed to load fixes</h3>
-                <p className="mt-2 text-sm text-muted-foreground">There was an error fetching the data. Please try again later.</p>
-            </div>
-        )
+      return (
+        <div className="text-center py-10 px-4 rounded-lg border border-dashed border-destructive/50 bg-destructive/5">
+          <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
+          <h3 className="mt-4 text-lg font-medium text-destructive">Failed to load fixes</h3>
+          <p className="mt-2 text-sm text-muted-foreground">There was an error fetching the data. Please try again later.</p>
+        </div>
+      )
+    }
+
+    if (bugs.filter((bug) => bug.status === "fixed").length === 0) {
+      return (
+        <div className="text-center py-10 px-4 rounded-lg border border-dashed">
+          <CheckCircle className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-4 text-lg font-medium">All Clear!</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            There are no fixed bugs to display.
+          </p>
+          <Button asChild className="mt-4">
+            <Link to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"} className="w-full md:w-auto">
+              View All Bugs
+            </Link>
+          </Button>
+        </div>
+      );
     }
 
     if (filteredBugs.length === 0) {
       return (
         <div className="text-center py-10 px-4 rounded-lg border border-dashed">
-            <CheckCircle className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-medium">All Clear!</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-                {searchTerm || priorityFilter !== 'all' ? "No fixes match your current filters." : "There are no fixed bugs to display."}
-            </p>
-            {(searchTerm || priorityFilter !== 'all') && (
-                <Button variant="ghost" className="mt-4" onClick={() => { setSearchTerm(''); setPriorityFilter('all'); }}>
-                    Clear Filters
-                </Button>
-            )}
+          <CheckCircle className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-4 text-lg font-medium">All Clear!</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            No fixes match your current filters.
+          </p>
+          <Button variant="ghost" className="mt-4" onClick={() => { setSearchTerm(''); setPriorityFilter('all'); }}>
+            Clear Filters
+          </Button>
         </div>
       );
     }
@@ -248,40 +267,42 @@ const Fixes = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[30%]">Title</TableHead>
+                <TableHead className="w-[300px]">Title</TableHead>
                 <TableHead>Priority</TableHead>
-                <TableHead>Reported By</TableHead>
-                <TableHead>Fixed By</TableHead>
-                <TableHead>Fixed Date</TableHead>
+                <TableHead className="hidden md:table-cell">Reported By</TableHead>
+                <TableHead className="hidden lg:table-cell">Fixed By</TableHead>
+                <TableHead className="hidden lg:table-cell">Fixed Date</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredBugs.map((bug) => (
-                <TableRow key={bug.id} className="hover:bg-muted/50">
-                  <TableCell className="font-medium max-w-[250px]">
-                      <p className="truncate font-semibold">{bug.title}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{bug.id}</p>
-              </TableCell>
-              <TableCell>
-                    <Badge variant={getPriorityBadgeVariant(bug.priority)} className="capitalize">{bug.priority}</Badge>
-              </TableCell>
-                  <TableCell>{bug.reporter_name || 'BugRicer'}</TableCell>
-                  <TableCell>{bug.updated_by_name || 'BugRicer'}</TableCell>
-              <TableCell>{formatDate(bug.updated_at)}</TableCell>
-              <TableCell className="text-right">
-                <Button variant="outline" size="sm" asChild>
-                  <Link to={`/bugs/${bug.id}`}>View Details</Link>
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredBugs.map((bug) => (
+                <TableRow key={bug.id}>
+                  <TableCell className="font-medium max-w-[300px] truncate">{bug.title}</TableCell>
+                  <TableCell>
+                    <Badge variant={getPriorityBadgeVariant(bug.priority)} className="capitalize">
+                      {bug.priority}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">{bug.reporter_name || 'N/A'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{bug.updated_by_name || 'N/A'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{formatDate(bug.updated_at)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={currentUser?.role ? `/${currentUser.role}/bugs/${bug.id}` : `/bugs/${bug.id}`}>View Details</Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
         {/* Mobile View */}
         <div className="grid md:hidden grid-cols-1 sm:grid-cols-2 gap-4">
-          {filteredBugs.map((bug) => <BugCard key={bug.id} bug={bug} />)}
+            {filteredBugs.map((bug) => (
+                <BugCard key={bug.id} bug={bug} />
+            ))}
         </div>
       </>
     );

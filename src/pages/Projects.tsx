@@ -592,12 +592,11 @@ const Projects = () => {
                 </CardContent>
                 <CardFooter className="flex flex-col gap-2 sm:flex-row pt-2 mt-auto">
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full sm:w-auto shadow-sm hover:shadow transition-all duration-200"
                     asChild
+                    variant="default"
+                    className="w-full sm:w-auto shadow-sm hover:shadow transition-all duration-200"
                   >
-                    <Link to={`/projects/${project.id}`}>View Project</Link>
+                    <Link to={currentUser?.role ? `/${currentUser.role}/projects/${project.id}` : `/projects/${project.id}`}>View Project</Link>
                   </Button>
                   {currentUser?.role === "admin" && (
                     <TooltipProvider>

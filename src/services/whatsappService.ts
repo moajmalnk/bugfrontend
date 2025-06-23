@@ -1,3 +1,5 @@
+import { useAuth } from '@/context/AuthContext';
+
 interface WhatsAppMessageData {
   bugTitle?: string;
   bugId?: string;
@@ -24,6 +26,23 @@ class WhatsAppService {
   // Base URL for WhatsApp deep links
   private readonly WA_BASE_URL = 'https://wa.me';
   private readonly CONTACTS_STORAGE_KEY = 'whatsapp_contacts';
+
+  // Helper method to get role-based URL
+  private getRoleBasedUrl(path: string): string {
+    try {
+      // Get user role from localStorage or sessionStorage
+      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        const role = user.role || 'tester'; // Default to tester if no role
+        return `${window.location.origin}/${role}${path}`;
+      }
+    } catch (error) {
+      // console.error('Error parsing user data:', error);
+    }
+    // Fallback to original URL structure
+    return `${window.location.origin}${path}`;
+  }
 
   // Save frequently used contacts
   saveContact(contact: WhatsAppContact): void {
@@ -98,7 +117,7 @@ class WhatsAppService {
 
   // Format message for new bug notification
   private formatNewBugMessage(data: WhatsAppMessageData): string {
-    const bugUrl = `${window.location.origin}/bugs/${data.bugId}`;
+    const bugUrl = this.getRoleBasedUrl(`/bugs/${data.bugId}`);
     
     let message = `🐛 *New Bug Reported*\n\n`;
     message += `📋 *Title:* ${data.bugTitle}\n`;
@@ -131,7 +150,7 @@ class WhatsAppService {
 
   // Format message for status update notification
   private formatStatusUpdateMessage(data: WhatsAppMessageData): string {
-    const bugUrl = `${window.location.origin}/bugs/${data.bugId}`;
+    const bugUrl = this.getRoleBasedUrl(`/bugs/${data.bugId}`);
     const statusEmoji = this.getStatusEmoji(data.status || '');
     
     let message = `${statusEmoji} *Bug Status Updated*\n\n`;
@@ -155,7 +174,7 @@ class WhatsAppService {
 
   // Format message for a general update
   private formatUpdateDetailsMessage(data: WhatsAppMessageData): string {
-    const updateUrl = `${window.location.origin}/updates/${data.updateId}`;
+    const updateUrl = this.getRoleBasedUrl(`/updates/${data.updateId}`);
     
     let message = `📣 *New Update Published*\n\n`;
     message += `📋 *Title:* ${data.updateTitle}\n`;

@@ -130,10 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.success && data.data?.token) {
         localStorage.setItem("token", data.data.token);
-        setCurrentUser(data.data.user);
+        const user = data.data.user;
+        setCurrentUser(user);
         
-        // Get the intended destination or default to /projects
-        const intendedDestination = localStorage.getItem('intendedDestination') || '/projects';
+        // Get the intended destination or default to the user's role-specific projects page
+        const intendedDestination = localStorage.getItem('intendedDestination') || `/${user.role}/projects`;
         localStorage.removeItem('intendedDestination'); // Clear the stored destination
         navigate(intendedDestination, { replace: true });
         return true;
@@ -175,8 +176,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (result.success && result.data?.token) {
         localStorage.setItem("token", result.data.token);
-        setCurrentUser(result.data.user);
-        navigate("/projects", { replace: true });
+        const user = result.data.user;
+        setCurrentUser(user);
+        navigate(`/${user.role}/projects`, { replace: true });
         return true;
       }
 

@@ -1,9 +1,10 @@
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/context/AuthContext";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 // Professional Skeleton Loading Component
 const SkeletonFallback = () => (
@@ -42,6 +43,15 @@ const SkeletonFallback = () => (
   </div>
 );
 
+// New layout for role-based routes
+const ProtectedRoleLayout = () => (
+  <ProtectedRoute>
+    <Suspense fallback={<SkeletonFallback />}>
+      <Outlet />
+    </Suspense>
+  </ProtectedRoute>
+);
+
 // Lazy loaded pages
 const Projects = lazy(() => import("@/pages/Projects"));
 const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
@@ -63,6 +73,13 @@ const EditUpdate = lazy(() => import("@/pages/EditUpdate"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 
 const RouteConfig = () => {
+  const { isLoading, isAuthenticated, currentUser } = useAuth();
+  const role = currentUser?.role;
+
+  if (isLoading) {
+    return <SkeletonFallback />;
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -77,186 +94,41 @@ const RouteConfig = () => {
         }
       />
 
-      {/* Protected Routes with Skeleton Loading */}
-      <Route
-        path="/projects"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Projects />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/projects/:projectId"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <ProjectDetails />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/bugs"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Bugs />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/bugs/:bugId"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <BugDetails />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/bugs/new"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <NewBug />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/activity"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Activity />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/users"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Users />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/fixes"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Fixes />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Settings />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Profile />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/reports"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Reports />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/messages"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Messages />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/bugs/:bugId/fix"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <FixBug />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/new-update"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <NewUpdate />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/updates"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Updates />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/updates/:updateId"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <UpdateDetails />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/updates/:updateId/edit"
-        element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <EditUpdate />
-            </Suspense>
-          </ProtectedRoute>
-        }
-      />
-      {/* Redirect root to projects */}
+      {/* Protected Routes with role prefix */}
+      {isAuthenticated && role && (
+        <Route path={`/${role}`} element={<ProtectedRoleLayout />}>
+          <Route path="projects" element={<Projects />} />
+          <Route path="projects/:projectId" element={<ProjectDetails />} />
+          <Route path="bugs" element={<Bugs />} />
+          <Route path="bugs/:bugId" element={<BugDetails />} />
+          <Route path="bugs/new" element={<NewBug />} />
+          <Route path="activity" element={<Activity />} />
+          <Route path="users" element={<Users />} />
+          <Route path="fixes" element={<Fixes />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="messages" element={<Messages />} />
+          <Route path="bugs/:bugId/fix" element={<FixBug />} />
+          <Route path="new-update" element={<NewUpdate />} />
+          <Route path="updates" element={<Updates />} />
+          <Route path="updates/:updateId" element={<UpdateDetails />} />
+          <Route path="updates/:updateId/edit" element={<EditUpdate />} />
+          {/* Redirect from /:role to /:role/projects */}
+          <Route index element={<Navigate to="projects" replace />} />
+        </Route>
+      )}
+
+      {/* Redirect root to projects or login */}
       <Route
         path="/"
         element={
-          <ProtectedRoute>
-            <Suspense fallback={<SkeletonFallback />}>
-              <Projects />
-            </Suspense>
-          </ProtectedRoute>
+          <Navigate
+            to={
+              isAuthenticated && role ? `/${role}/projects` : "/login"
+            }
+            replace
+          />
         }
       />
       <Route path="*" element={<NotFound />} />

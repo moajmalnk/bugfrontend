@@ -201,7 +201,7 @@ const Bugs = () => {
             asChild
             aria-label="Report a new bug"
           >
-            <Link to="/bugs/new" state={{ from: "/bugs" }}>
+            <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new` : "/bugs/new"} state={{ from: currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs" }}>
               Report Bug
             </Link>
           </Button>
@@ -232,8 +232,8 @@ const Bugs = () => {
                   aria-label="Report a new bug"
                 >
                   <Link
-                    to="/bugs/new"
-                    state={{ from: "/bugs" }}
+                    to={currentUser?.role ? `/${currentUser.role}/bugs/new` : "/bugs/new"}
+                    state={{ from: currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs" }}
                     className="flex items-center justify-center"
                   >
                     <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Report Bug

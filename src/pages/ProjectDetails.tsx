@@ -679,7 +679,7 @@ const ProjectDetails = () => {
                     className="w-full sm:w-auto"
                 size="sm"
               >
-                <Link to={`/bugs/new?projectId=${projectId}`}>
+                <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new?projectId=${projectId}` : `/bugs/new?projectId=${projectId}`}>
                   <Plus className="mr-2 h-4 w-4" /> Report Bug
                 </Link>
               </Button>
@@ -693,7 +693,7 @@ const ProjectDetails = () => {
                     size="sm"
                     variant="outline"
                   >
-                    <Link to={`/bugs?project_id=${projectId}&status=pending,in_progress`}>
+                    <Link to={currentUser?.role ? `/${currentUser.role}/bugs?project_id=${projectId}&status=pending,in_progress` : `/bugs?project_id=${projectId}&status=pending,in_progress`}>
                       <Wrench className="mr-2 h-4 w-4" /> Fix Bugs
                     </Link>
                   </Button>
@@ -702,23 +702,21 @@ const ProjectDetails = () => {
             </CardHeader>
             <CardContent>
               {bugs.length === 0 ? (
-                <EmptyState
-                  title="No bugs reported"
-                  description="This project doesn't have any bugs reported yet."
-                  action={
-                    (currentUser?.role === "tester" || currentUser?.role === "admin") ? (
-                    <Button asChild size="sm">
-                      <Link to={`/bugs/new?projectId=${projectId}`}>
-                        Report First Bug
-                      </Link>
-                    </Button>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        No bugs to fix yet
-                      </div>
-                    )
-                  }
-                />
+                <div className="flex flex-col items-center justify-center p-8 text-center border-2 border-dashed rounded-lg h-full">
+                  <Bug className="w-12 h-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-semibold">
+                    No Pending Bugs
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    This project is all clear for now!
+                  </p>
+                  <Button asChild className="mt-4">
+                    <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new?projectId=${projectId}` : `/bugs/new?projectId=${projectId}`}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Report a New Bug
+                    </Link>
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {bugs.map((bug) => (

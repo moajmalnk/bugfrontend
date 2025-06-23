@@ -196,7 +196,8 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
     // Listen for controller change (new service worker activated)
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       // console.log('[SW Manager] Service worker controller changed');
-      // Optionally reload the page
+      // Optionally reload the page - this maintains the current route structure
+      // In the future, this could be enhanced to preserve role-based routes
       window.location.reload();
     });
 

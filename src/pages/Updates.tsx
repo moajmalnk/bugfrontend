@@ -375,11 +375,11 @@ const Updates = () => {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" size="sm" asChild>
-                            <Link to={`/updates/${update.id}`}>View Details</Link>
+                            <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}` : `/updates/${update.id}`}>View Details</Link>
                           </Button>
                           {(currentUser?.role === "admin" || update.created_by === currentUser?.username) && (
                             <Button variant="outline" size="sm" asChild>
-                              <Link to={`/updates/${update.id}/edit`}>Edit</Link>
+                              <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}/edit` : `/updates/${update.id}/edit`}>Edit</Link>
                             </Button>
                           )}
                         </div>
@@ -399,7 +399,7 @@ const Updates = () => {
                   <CardHeader>
                     <div className="flex justify-between items-start gap-2">
                       <CardTitle className="text-base font-bold leading-tight break-all">
-                        <Link to={`/updates/${update.id}`} className="hover:underline">
+                        <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}`: `/updates/${update.id}`} className="hover:underline">
                           {update.title}
                         </Link>
                       </CardTitle>
@@ -429,11 +429,11 @@ const Updates = () => {
                      </div>
                      <div className="flex justify-end w-full gap-2">
                        <Button variant="outline" size="sm" asChild className="w-full">
-                         <Link to={`/updates/${update.id}`}>View Details</Link>
+                         <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}` : `/updates/${update.id}`}>View Details</Link>
                        </Button>
                        {(currentUser?.role === "admin" || update.created_by === currentUser?.username) && (
                          <Button variant="outline" size="sm" asChild className="w-full">
-                           <Link to={`/updates/${update.id}/edit`}>Edit</Link>
+                           <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}/edit` : `/updates/${update.id}/edit`}>Edit</Link>
                          </Button>
                        )}
                      </div>
@@ -461,15 +461,14 @@ const Updates = () => {
               </p>
             </div>
             <div className="flex-shrink-0 w-full sm:w-auto">
-              <Button
-                asChild
-                className="w-full sm:w-auto"
-                disabled={projects.length === 0 && !isLoading}
-              >
-                <Link to="/new-update">
-                  <Plus className="mr-2 h-4 w-4" /> New Update
+              {projects.length > 0 && (
+                <Link to={currentUser?.role ? `/${currentUser.role}/new-update` : "/new-update"}>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Update
+                  </Button>
                 </Link>
-              </Button>
+              )}
               {projects.length === 0 && !isLoading && (
                 <p className="text-xs text-muted-foreground mt-2 text-center sm:text-left">
                   You must be in a project to create an update.

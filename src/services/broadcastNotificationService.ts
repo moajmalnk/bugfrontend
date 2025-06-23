@@ -19,6 +19,23 @@ class BroadcastNotificationService {
   private isPolling: boolean = false;
   private intervalId: NodeJS.Timeout | null = null;
 
+  // Helper method to get role-based URL
+  private getRoleBasedUrl(path: string): string {
+    try {
+      // Get user role from localStorage or sessionStorage
+      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        const role = user.role || 'tester'; // Default to tester if no role
+        return `/${role}${path}`;
+      }
+    } catch (error) {
+      // console.error('Error parsing user data:', error);
+    }
+    // Fallback to original URL structure
+    return path;
+  }
+
   constructor() {
     // Initialize last check time from localStorage
     try {
@@ -209,7 +226,7 @@ class BroadcastNotificationService {
         try {
           window.focus();
           // Use router navigation instead of direct href change
-          const bugUrl = `/bugs/${notification.bugId}`;
+          const bugUrl = this.getRoleBasedUrl(`/bugs/${notification.bugId}`);
           window.location.hash = bugUrl;
           browserNotification.close();
         } catch (error) {

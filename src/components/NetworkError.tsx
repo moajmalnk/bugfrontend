@@ -5,9 +5,11 @@ import { MdOutlineMailOutline } from "react-icons/md";
 import { GoGlobe } from "react-icons/go";
 import { FaRegQuestionCircle } from "react-icons/fa";
 import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 const NetworkError = () => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -29,7 +31,7 @@ const NetworkError = () => {
         {/* Action Buttons */}
         <div className="flex flex-col xs:flex-row gap-3 w-full">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate(`/${currentUser?.role || 'tester'}/projects`)}
             className="px-4 py-2 rounded-lg bg-gray-100 text-sm text-gray-700 font-medium 
             hover:bg-gray-200 transition-colors w-full xs:w-auto"
           >

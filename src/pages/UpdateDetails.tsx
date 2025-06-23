@@ -123,7 +123,7 @@ const UpdateDetails = () => {
     onSuccess: (successMessage) => {
       toast({ title: "Success", description: successMessage });
       queryClient.invalidateQueries({ queryKey: ["updates"] });
-      navigate("/updates");
+      navigate(currentUser?.role ? `/${currentUser.role}/updates` : '/updates');
     },
     onError: mutationOptions.onError,
   });
@@ -157,7 +157,7 @@ const UpdateDetails = () => {
                 <CardDescription>{(error as Error).message || "An unexpected error occurred."}</CardDescription>
             </CardHeader>
             <CardContent>
-                 <Button onClick={() => navigate('/updates')}>Go to Updates</Button>
+                 <Button onClick={() => navigate(currentUser?.role ? `/${currentUser.role}/updates` : '/updates')}>Go to Updates</Button>
             </CardContent>
         </Card>
     </main>
@@ -180,7 +180,7 @@ const UpdateDetails = () => {
             {canPerformActions && (
                  <>
                   {(currentUser?.role === "admin" || update?.created_by === currentUser?.username) && (
-                    <Button asChild variant="outline" size="sm"><Link to={`/updates/${updateId}/edit`}><Pencil className="mr-2 h-4 w-4"/>Edit</Link></Button>
+                    <Button asChild variant="outline" size="sm"><Link to={currentUser?.role ? `/${currentUser.role}/updates/${updateId}/edit` : `/updates/${updateId}/edit`}><Pencil className="mr-2 h-4 w-4"/>Edit</Link></Button>
                   )}
                    <WhatsAppShareButton
                     data={{

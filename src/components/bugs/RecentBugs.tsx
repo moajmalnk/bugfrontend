@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Bug } from '@/types';
 import { useBugs } from '@/context/BugContext';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { 
   Card, 
@@ -18,6 +19,8 @@ interface RecentBugsProps {
 }
 
 export function RecentBugs({ title, bugs }: RecentBugsProps) {
+  const { currentUser } = useAuth();
+  const role = currentUser?.role;
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -28,7 +31,7 @@ export function RecentBugs({ title, bugs }: RecentBugsProps) {
           </CardDescription>
         </div>
         <Button size="sm" asChild>
-          <Link to="/bugs/new" state={{ from: '/' }}>
+          <Link to={role ? `/${role}/bugs/new` : "/bugs/new"} state={{ from: '/' }}>
             <Plus className="mr-2 h-4 w-4" /> Report Bug
           </Link>
         </Button>
@@ -44,7 +47,7 @@ export function RecentBugs({ title, bugs }: RecentBugsProps) {
               Start by reporting a new bug.
             </p>
             <Button className="mt-4" asChild>
-              <Link to="/bugs/new" state={{ from: '/' }}>Report Bug</Link>
+              <Link to={role ? `/${role}/bugs/new` : "/bugs/new"} state={{ from: '/' }}>Report Bug</Link>
             </Button>
           </div>
         ) : (

@@ -185,11 +185,9 @@ const NewBug = () => {
 
         // Handle redirection immediately after successful submission and toast
         if (preSelectedProjectId) {
-          navigate(`/projects/${preSelectedProjectId}`);
-        } else if (redirectPath === "/") {
-          navigate("/");
+          navigate(currentUser?.role ? `/${currentUser.role}/projects/${preSelectedProjectId}` : `/projects/${preSelectedProjectId}`);
         } else {
-          navigate("/bugs");
+          navigate(currentUser?.role ? `/${currentUser.role}/bugs` : '/bugs');
         }
 
         // Send email notification asynchronously without blocking navigation

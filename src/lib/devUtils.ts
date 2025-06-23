@@ -19,6 +19,8 @@ export const devUtils = {
   enableServiceWorker: () => {
     localStorage.setItem('sw-force-enable', 'true');
     // console.log('[DevUtils] Service worker enabled for development');
+    // Reload the page - this maintains the current route structure
+    // In the future, this could be enhanced to preserve role-based routes
     window.location.reload();
   },
 
@@ -29,6 +31,8 @@ export const devUtils = {
     localStorage.removeItem('sw-force-enable');
     await serviceWorkerManager.unregister();
     // console.log('[DevUtils] Service worker disabled for development');
+    // Reload the page - this maintains the current route structure
+    // In the future, this could be enhanced to preserve role-based routes
     window.location.reload();
   },
 

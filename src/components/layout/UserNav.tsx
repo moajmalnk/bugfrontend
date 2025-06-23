@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 
 export function UserNav() {
   const { currentUser, logout } = useAuth();
+  const role = currentUser?.role;
 
   return (
     <DropdownMenu>
@@ -41,13 +42,13 @@ export function UserNav() {
         
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/profile" className="flex items-center">
+          <Link to={role ? `/${role}/profile` : '/profile'} className="flex items-center">
             <UserAvatar className="mr-2 h-4 w-4" />
             <span>Profile</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link to="/settings">
+          <Link to={role ? `/${role}/settings` : '/settings'}>
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
           </Link>

@@ -125,7 +125,7 @@ const NewUpdate = () => {
           created_at: new Date().toISOString(),
           created_by: currentUser?.username || "BugRicer"
         });
-        navigate("/updates");
+        navigate(currentUser?.role ? `/${currentUser.role}/updates` : "/updates");
       } else {
         let errorMsg = data.message || "Failed to create update";
         if (data.message && (data.message.includes("Unauthorized") || data.message.includes("not a member"))) {
