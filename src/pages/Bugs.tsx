@@ -212,9 +212,24 @@ const Bugs = () => {
 
   const canViewTabs = currentUser?.role === "admin" || currentUser?.role === "tester";
 
+  const isDeveloper = currentUser?.role === "developer";
+  const noBugs = !loading && filteredBugs.length === 0;
+
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
       <section className="max-w-6xl mx-auto space-y-4">
+        {/* Professional Header for Developers */}
+        {isDeveloper && noBugs && (
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-6 mb-4 flex flex-col items-center text-center">
+            <BugIcon className="h-8 w-8 text-blue-500 mb-2" />
+            <h2 className="text-xl font-bold mb-1 text-blue-900 dark:text-blue-100">No Bugs Assigned</h2>
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              Great job! You currently have no bugs assigned to you.<br />
+              Check back later or ask your project admin for new assignments.
+            </p>
+          </div>
+        )}
+
         {/* Header: Report Bug Button */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
           {skeletonLoading ? (
@@ -322,7 +337,18 @@ const Bugs = () => {
               ) : loading ? (
                 <BugCardGridSkeletonAnimated count={2} />
               ) : filteredBugs.length === 0 ? (
-                renderEmptyState()
+                <div className="text-center mb-8 mt-8">
+                  <div className="flex justify-center mb-2">
+                    <span className="inline-flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20 h-12 w-12">
+                      <BugIcon className="h-7 w-7 text-green-600 dark:text-green-400" />
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-bold text-foreground mb-1">No Bugs Assigned</h2>
+                  <p className="text-muted-foreground text-base">
+                    You're all caught up! There are currently no bugs assigned to you.<br />
+                    Check back later or help your team by reporting new issues.
+                  </p>
+                </div>
               ) : (
                 <div className="grid gap-4 mt-4 grid-cols-1" style={{ minHeight: 200 }} aria-label="Bug list">
                   {filteredBugs.map((bug) => (
