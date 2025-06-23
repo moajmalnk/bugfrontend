@@ -1,24 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-
-interface Announcement {
-  id: number;
-  title: string;
-  content: string;
-  is_active: number;
-  expiry_date: string | null;
-  created_at: string;
-}
-
-interface ApiResponse {
-    statusCode: number;
-    message: string;
-    data: Announcement | null;
-}
+import { announcementService, Announcement } from '@/services/announcementService';
 
 const AnnouncementPopup: React.FC = () => {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
@@ -27,11 +12,11 @@ const AnnouncementPopup: React.FC = () => {
   useEffect(() => {
     const fetchAnnouncement = async () => {
       try {
-        const response = await api.get<ApiResponse>('api/announcements/get_latest.php');
-        if (response.statusCode === 200 && response.data) {
-          const seen = localStorage.getItem(`seen_announcement_${response.data.id}`);
+        const data = await announcementService.getLatestActive();
+        if (data) {
+          const seen = localStorage.getItem(`seen_announcement_${data.id}`);
           if (!seen) {
-            setAnnouncement(response.data);
+            setAnnouncement(data);
             setIsVisible(true);
           }
         }

@@ -13,6 +13,7 @@ import { NotificationSettingsCard } from '@/components/settings/NotificationSett
 import { WhatsAppContactsManager } from '@/components/settings/WhatsAppContactsManager';
 import { useNotificationSettings } from "@/context/NotificationSettingsContext";
 import { ENV } from '@/lib/env';
+import { AnnouncementManager } from '@/components/settings/AnnouncementManager';
 
 const updateGlobalEmailSetting = async (enabled: boolean) => {
   const token = localStorage.getItem("token");
@@ -81,6 +82,7 @@ const Settings = () => {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+          <TabsTrigger value="announcements">Announcements</TabsTrigger>
         </TabsList>
         
         <TabsContent value="general">
@@ -138,6 +140,10 @@ const Settings = () => {
 
         <TabsContent value="whatsapp">
           <WhatsAppContactsManager />
+        </TabsContent>
+
+        <TabsContent value="announcements">
+          <AnnouncementManager />
         </TabsContent>
       </Tabs>
     </div>
