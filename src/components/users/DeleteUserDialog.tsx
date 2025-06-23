@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -8,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { User } from "@/types";
 import { useState } from "react";
 
@@ -72,6 +73,12 @@ export function DeleteUserDialog({
             }
           </DialogDescription>
         </DialogHeader>
+        <DialogClose asChild>
+            <Button variant="ghost" size="icon" className="absolute top-3 right-4">
+                <X className="h-5 w-5" />
+                <span className="sr-only">Close</span>
+            </Button>
+        </DialogClose>
         
         <div className="py-4">
           {showForceOption ? (
@@ -93,6 +100,7 @@ export function DeleteUserDialog({
                   <li>• Project ownership will be removed (projects remain)</li>
                   <li>• Bug authorship will be removed (bugs remain)</li>
                   <li>• Project memberships will be deleted</li>
+                  <li>• User updates will be deleted</li>
                   <li>• File uploads will be deleted</li>
                   <li>• Activity logs will be deleted</li>
                 </ul>
@@ -108,13 +116,6 @@ export function DeleteUserDialog({
         </div>
         
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => handleOpenChange(false)}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
           {showForceOption ? (
             <>
               <Button

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -14,7 +15,7 @@ import { toast } from "@/components/ui/use-toast";
 import { ENV } from "@/lib/env";
 import { User } from "@/types";
 import axios from "axios";
-import { KeyRound } from "lucide-react";
+import { KeyRound, X } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -98,6 +99,12 @@ export function ChangePasswordDialog({
             {isChangingOwnPassword ? "Set a new password for your account." : `Set a new password for ${user.name || 'this user'}'s account.`}
           </DialogDescription>
         </DialogHeader>
+        <DialogClose asChild>
+            <Button variant="ghost" size="icon" className="absolute top-3 right-4">
+                <X className="h-5 w-5" />
+                <span className="sr-only">Close</span>
+            </Button>
+        </DialogClose>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-2">
             {showCurrentPasswordField && (

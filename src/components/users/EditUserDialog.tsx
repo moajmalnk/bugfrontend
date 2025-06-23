@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -28,7 +29,7 @@ import { toast } from "@/components/ui/use-toast";
 import { userService } from "@/services/userService";
 import { User } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Pencil } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -155,6 +156,12 @@ export function EditUserDialog({
             Make changes to the user's information below.
           </DialogDescription>
         </DialogHeader>
+        <DialogClose asChild>
+          <Button variant="ghost" size="icon" className="absolute top-3 right-4">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </Button>
+        </DialogClose>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -210,13 +217,6 @@ export function EditUserDialog({
               )}
             />
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-              >
-                Cancel
-              </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>

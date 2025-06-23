@@ -19,6 +19,8 @@ import { DeleteUserDialog } from "./DeleteUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
 import { userService } from "@/services/userService";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -69,7 +71,6 @@ async function handlePasswordChange(
   }
 }
 
-
 export function UserDetailDialog({
   user,
   open,
@@ -83,6 +84,7 @@ export function UserDetailDialog({
   onUserDelete: (userId: string, force?: boolean) => Promise<void>;
   onPasswordChange: (userId: string, newPassword: string) => Promise<void>;
 }) {
+  const { currentUser } = useAuth();
   const [stats, setStats] = useState<UserStats>({
     total_projects: 0,
     total_bugs: 0,
@@ -91,9 +93,10 @@ export function UserDetailDialog({
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
-  useEffect(() => {
-    const fetchUserStats = async () => {
-      if (!open) return;
+  useQuery({
+    queryKey: ["userStats", user.id],
+    queryFn: async () => {
+      if (!open) return null;
 
       setIsLoading(true);
       try {
@@ -112,18 +115,20 @@ export function UserDetailDialog({
             total_bugs: 0,
             recent_activity: [],
           });
-          return;
+          return null;
         }
 
         const data = await response.json();
         if (data.success) {
           setStats(data.data);
+          return data.data;
         } else {
           setStats({
             total_projects: 0,
             total_bugs: 0,
             recent_activity: [],
           });
+          return null;
         }
       } catch (error) {
         setStats({
@@ -131,13 +136,13 @@ export function UserDetailDialog({
           total_bugs: 0,
           recent_activity: [],
         });
+        return null;
       } finally {
         setIsLoading(false);
       }
-    };
-
-    fetchUserStats();
-  }, [user.id, open]);
+    },
+    enabled: !!user.id,
+  });
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -264,7 +269,7 @@ export function UserDetailDialog({
                 </DialogTrigger>
               }
             />
-            {loggedInUserRole === 'admin' && (
+            {loggedInUserRole === 'admin' && currentUser?.id !== user.id && (
                 <Button
                   variant="outline"
                   className="w-full flex items-center justify-center gap-2"

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -28,7 +29,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, UserPlus } from "lucide-react";
+import { Eye, EyeOff, UserPlus, X } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -142,6 +143,12 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
             below.
           </DialogDescription>
         </DialogHeader>
+        <DialogClose asChild>
+          <Button variant="ghost" size="icon" className="absolute top-3 right-4">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </Button>
+        </DialogClose>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
