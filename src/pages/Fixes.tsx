@@ -107,11 +107,11 @@ const BugCard = ({ bug }: { bug: BugType }) => (
             <div className="space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                     <User className="h-4 w-4 shrink-0" />
-                    <span>Reported by: <span className="font-medium text-foreground">{bug.reporter_name || 'N/A'}</span></span>
+                    <span>Reported by: <span className="font-medium text-foreground">{bug.reporter_name || 'BugRicer'}</span></span>
                 </div>
                 <div className="flex items-center gap-2">
                     <UserCheck className="h-4 w-4 shrink-0" />
-                    <span>Fixed by: <span className="font-medium text-foreground">{bug.updated_by_name || 'N/A'}</span></span>
+                    <span>Fixed by: <span className="font-medium text-foreground">{bug.updated_by_name || 'BugRicer'}</span></span>
                 </div>
                 <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 shrink-0" />
@@ -266,8 +266,8 @@ const Fixes = () => {
               <TableCell>
                     <Badge variant={getPriorityBadgeVariant(bug.priority)} className="capitalize">{bug.priority}</Badge>
               </TableCell>
-                  <TableCell>{bug.reporter_name || 'N/A'}</TableCell>
-                  <TableCell>{bug.updated_by_name || 'N/A'}</TableCell>
+                  <TableCell>{bug.reporter_name || 'BugRicer'}</TableCell>
+                  <TableCell>{bug.updated_by_name || 'BugRicer'}</TableCell>
               <TableCell>{formatDate(bug.updated_at)}</TableCell>
               <TableCell className="text-right">
                 <Button variant="outline" size="sm" asChild>

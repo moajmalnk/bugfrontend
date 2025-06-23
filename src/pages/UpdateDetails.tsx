@@ -212,11 +212,11 @@ const UpdateDetails = () => {
             </CardContent>
           </Card>
             {currentUser?.role === "admin" && update?.status === "pending" && (
-                <Card className="border-yellow-300 bg-yellow-50">
+                <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
                     <CardHeader className="flex-row items-center justify-between">
                         <div>
-                            <CardTitle>Admin Action Required</CardTitle>
-                            <CardDescription>This update is awaiting your approval.</CardDescription>
+                            <CardTitle className="text-yellow-900 dark:text-yellow-100">Admin Action Required</CardTitle>
+                            <CardDescription className="text-yellow-700 dark:text-yellow-400">This update is awaiting your approval.</CardDescription>
                         </div>
                     </CardHeader>
                     <CardContent className="flex gap-4">
@@ -244,7 +244,7 @@ const UpdateDetails = () => {
               <div className="flex items-center gap-2 text-sm">
                 <Bell className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Project:</span>
-                <span className="font-medium">{update.project_name || "N/A"}</span>
+                <span className="font-medium">{update.project_name || "BugRicer"}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <User className="h-4 w-4 text-muted-foreground" />

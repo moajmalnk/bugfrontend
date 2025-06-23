@@ -64,6 +64,20 @@ class WhatsAppService {
     }
   }
 
+  // PRIVATE: Get formatted message based on type
+  private getMessageForType(data: WhatsAppMessageData, type: 'new_bug' | 'status_update' | 'update_details'): string {
+    switch (type) {
+      case 'new_bug':
+        return this.formatNewBugMessage(data);
+      case 'status_update':
+        return this.formatStatusUpdateMessage(data);
+      case 'update_details':
+        return this.formatUpdateDetailsMessage(data);
+      default:
+        return '';
+    }
+  }
+
   // Generate WhatsApp deep link for new bug notification
   generateNewBugLink(data: WhatsAppMessageData, phoneNumber?: string): string {
     const message = this.formatNewBugMessage(data);
@@ -175,7 +189,7 @@ class WhatsAppService {
     return message;
   }
 
-  // Create WhatsApp deep link
+  // Create WhatsApp deep link for app
   private createWhatsAppLink(message: string, phoneNumber?: string): string {
     const encodedMessage = encodeURIComponent(message);
     
@@ -185,8 +199,22 @@ class WhatsAppService {
       return `${this.WA_BASE_URL}/${cleanPhone}?text=${encodedMessage}`;
     } else {
       // Open WhatsApp without specific contact (user can choose)
-      return `${this.WA_BASE_URL}?text=${encodedMessage}`;
+      return `${this.WA_BASE_URL}/?text=${encodedMessage}`;
     }
+  }
+
+  // Create WhatsApp deep link for web
+  private createWhatsAppWebLink(message: string, phoneNumber?: string): string {
+    const encodedMessage = encodeURIComponent(message);
+    let url = 'https://web.whatsapp.com/send';
+
+    if (phoneNumber) {
+        const cleanPhone = phoneNumber.replace(/\D/g, '');
+        url += `?phone=${cleanPhone}&text=${encodedMessage}`;
+    } else {
+        url += `?text=${encodedMessage}`;
+    }
+    return url;
   }
 
   // Get emoji for bug priority
@@ -223,24 +251,24 @@ class WhatsAppService {
 
   // Open WhatsApp with pre-filled message
   openWhatsApp(link: string): void {
-    window.open(link, '_blank');
+    window.open(link, '_blank', 'noopener,noreferrer');
   }
 
   // Share new bug via WhatsApp
   shareNewBug(data: WhatsAppMessageData, phoneNumber?: string): void {
-    const link = this.generateNewBugLink(data, phoneNumber);
+    const link = this.getShareableLink(data, 'new_bug', phoneNumber);
     this.openWhatsApp(link);
   }
 
   // Share status update via WhatsApp
   shareStatusUpdate(data: WhatsAppMessageData, phoneNumber?: string): void {
-    const link = this.generateStatusUpdateLink(data, phoneNumber);
+    const link = this.getShareableLink(data, 'status_update', phoneNumber);
     this.openWhatsApp(link);
   }
-
+  
   // Share update details via WhatsApp
   shareUpdateDetails(data: WhatsAppMessageData, phoneNumber?: string): void {
-    const link = this.generateUpdateDetailsLink(data, phoneNumber);
+    const link = this.getShareableLink(data, 'update_details', phoneNumber);
     this.openWhatsApp(link);
   }
 
@@ -262,19 +290,20 @@ class WhatsAppService {
     return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(link)}`;
   }
 
-  // Get shareable link (for copying to clipboard)
+  // Get shareable link (for app or copying)
   getShareableLink(data: WhatsAppMessageData, type: 'new_bug' | 'status_update' | 'update_details', phoneNumber?: string): string {
-    if (type === 'new_bug') {
-      return this.generateNewBugLink(data, phoneNumber);
-    } else if (type === 'status_update') {
-      return this.generateStatusUpdateLink(data, phoneNumber);
-    } else {
-      return this.generateUpdateDetailsLink(data, phoneNumber);
-    }
+    const message = this.getMessageForType(data, type);
+    return this.createWhatsAppLink(message, phoneNumber);
+  }
+
+  // Get shareable web link (for opening in browser)
+  getWebShareableLink(data: WhatsAppMessageData, type: 'new_bug' | 'status_update' | 'update_details', phoneNumber?: string): string {
+    const message = this.getMessageForType(data, type);
+    return this.createWhatsAppWebLink(message, phoneNumber);
   }
 
   // Auto-schedule sharing (opens links at specified intervals)
-  scheduleAutoShare(data: WhatsAppMessageData, type: 'new_bug' | 'status_update', contacts: WhatsAppContact[], intervalMs: number = 2000): void {
+  scheduleAutoShare(data: WhatsAppMessageData, type: 'new_bug' | 'status_update' | 'update_details', contacts: WhatsAppContact[], intervalMs: number = 2000): void {
     contacts.forEach((contact, index) => {
       setTimeout(() => {
         const link = this.getShareableLink(data, type, contact.phone);
