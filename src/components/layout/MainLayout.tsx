@@ -14,6 +14,7 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { NotificationPopover } from '@/components/notifications/NotificationPopover';
+import AnnouncementPopup from '../ui/AnnouncementPopup';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -89,6 +90,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 custom-scrollbar">{children}</main>
         </div>
       </div>
+      <AnnouncementPopup />
     </NotificationProvider>
   );
 };
