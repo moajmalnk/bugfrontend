@@ -15,6 +15,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { NotificationPopover } from '@/components/notifications/NotificationPopover';
 import AnnouncementPopup from '../ui/AnnouncementPopup';
+import FirebaseListener from '../messaging/FirebaseListener';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -91,6 +92,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         </div>
       </div>
       <AnnouncementPopup />
+      <FirebaseListener />
     </NotificationProvider>
   );
 };
