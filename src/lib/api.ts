@@ -1,4 +1,3 @@
-
 import { ENV } from './env';
 
 // Types for HTTP methods
@@ -26,7 +25,7 @@ class ApiClient {
   // Get stored token
   getToken(): string | null {
     if (!this.token) {
-      this.token = localStorage.getItem('auth_token');
+      this.token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     }
     return this.token;
   }

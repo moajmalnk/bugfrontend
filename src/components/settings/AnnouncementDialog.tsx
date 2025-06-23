@@ -24,14 +24,6 @@ import { format, parseISO } from 'date-fns';
 import { toast } from '../ui/use-toast';
 import { announcementService, Announcement, AnnouncementPayload } from '@/services/announcementService';
 
-interface Announcement {
-  id: number;
-  title: string;
-  content: string;
-  is_active: number;
-  expiry_date: string | null;
-}
-
 interface AnnouncementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -78,7 +70,8 @@ export const AnnouncementDialog = ({ open, onOpenChange, announcement, onSave }:
   const onSubmit = async (values: z.infer<typeof announcementSchema>) => {
     try {
       const payload: AnnouncementPayload = {
-        ...values,
+        title: values.title,
+        content: values.content,
         is_active: values.is_active ? 1 : 0,
         expiry_date: values.expiry_date ? format(values.expiry_date, 'yyyy-MM-dd HH:mm:ss') : null
       };
