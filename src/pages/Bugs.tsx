@@ -47,10 +47,10 @@ const Bugs = () => {
       setLoading(true);
       setSkeletonLoading(true);
       setAccessError(null);
-      
+
       const data = await bugService.getBugs();
       setBugs(data);
-      
+
       setSkeletonLoading(false);
     } catch (error: any) {
       // // console.error("Error fetching bugs:", error);
@@ -142,7 +142,7 @@ const Bugs = () => {
   const getTabCount = (tabType: string) => {
     // Filter out fixed bugs from all counts since they belong on Fixes page
     const nonFixedBugs = bugs.filter(bug => bug.status !== "fixed");
-    
+
     switch (tabType) {
       case "all-bugs":
         return nonFixedBugs.length;
@@ -222,7 +222,7 @@ const Bugs = () => {
                   </Link>
                 </Button>
               )}
-              
+
               {!loading && bugs.length > 0 && (() => {
                 const pendingBugs = bugs.filter(bug => bug.status === "pending" || bug.status === "in_progress");
                 return pendingBugs.length > 0 && (
