@@ -170,44 +170,6 @@ const Bugs = () => {
         </div>
       );
     }
-
-    const getEmptyMessage = () => {
-      if (currentUser?.role === "admin") {
-        switch (activeTab) {
-          case "my-bugs":
-            return "You haven't reported any bugs yet.";
-          default:
-            return "No bugs found.";
-        }
-      }
-      return "No bugs match your current filter criteria.";
-    };
-
-    return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-background/50 p-6 sm:p-8 text-center mt-8">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
-          <BugIcon className="h-6 w-6 text-muted-foreground" />
-        </div>
-        <h3 className="mt-4 text-base sm:text-lg font-semibold">
-          No bugs found
-        </h3>
-        <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-[300px]">
-          {getEmptyMessage()}
-        </p>
-        {(currentUser?.role === "admin" ||
-          currentUser?.role === "tester") && (
-          <Button
-            className="mt-5 h-9 text-xs sm:text-sm"
-            asChild
-            aria-label="Report a new bug"
-          >
-            <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new` : "/bugs/new"} state={{ from: currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs" }}>
-              Report Bug
-            </Link>
-          </Button>
-        )}
-      </div>
-    );
   };
 
   const canViewTabs = currentUser?.role === "admin" || currentUser?.role === "tester";
@@ -218,6 +180,11 @@ const Bugs = () => {
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
       <section className="max-w-6xl mx-auto space-y-4">
+        {/* Page Header and Description */}
+        <div className="mb-4">
+          <h1 className="text-3xl font-bold tracking-tight">Bugs</h1>
+          <p className="text-muted-foreground">Fix your bugs and track pending bugs</p>
+        </div>
         {/* Professional Header for Developers */}
         {isDeveloper && noBugs && (
           <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-6 mb-4 flex flex-col items-center text-center">
