@@ -43,6 +43,7 @@ import React, {
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom"; // Added useParams
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
+import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 
 interface FileWithPreview extends File {
     preview?: string;
@@ -165,6 +166,16 @@ const FixBug = () => { // Changed component name
                         status: "fixed",
                         updated_by_name: currentUser?.name || "Bug Ricer"
                     });
+                }
+
+                // Broadcast notification for status change
+                if (status && bug) {
+                    await broadcastNotificationService.broadcastStatusChange(
+                        bug.title,
+                        bug.id,
+                        status,
+                        currentUser?.name || "Bug Ricer"
+                    );
                 }
 
                 toast({

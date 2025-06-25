@@ -36,6 +36,7 @@ import * as z from "zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { sendNewUpdateNotification } from "@/services/emailService";
 import { Skeleton } from '@/components/ui/skeleton';
+import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 
 const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
@@ -124,6 +125,14 @@ const NewUpdate = () => {
           id: data.data?.id,
           created_at: new Date().toISOString(),
           created_by: currentUser?.username || "BugRicer"
+        });
+        await broadcastNotificationService.broadcastNotification({
+          type: "new_update",
+          title: "New Update Posted",
+          message: `A new update has been posted: ${values.title}`,
+          bugId: data.data?.id || "0",
+          bugTitle: values.title,
+          createdBy: currentUser?.name || "BugRicer"
         });
         navigate(currentUser?.role ? `/${currentUser.role}/updates` : "/updates");
       } else {
