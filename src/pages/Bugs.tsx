@@ -37,19 +37,31 @@ const Bugs = () => {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all-bugs");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalBugs, setTotalBugs] = useState(0);
+  const [pageSize, setPageSize] = useState(10); // Optional: allow user to change page size
 
   useEffect(() => {
     fetchBugs();
   }, []);
 
-  const fetchBugs = async () => {
+  useEffect(() => {
+    fetchBugs(currentPage, pageSize);
+    // eslint-disable-next-line
+  }, [currentPage, pageSize]);
+
+  const fetchBugs = async (page = 1, limit = pageSize) => {
     try {
       setLoading(true);
       setSkeletonLoading(true);
       setAccessError(null);
 
-      const data = await bugService.getBugs();
-      setBugs(data);
+      const data = await bugService.getBugs(undefined, page, limit);
+      setBugs(data.bugs);
+      setCurrentPage(data.pagination.currentPage);
+      setTotalPages(data.pagination.totalPages);
+      setTotalBugs(data.pagination.totalBugs);
 
       setSkeletonLoading(false);
     } catch (error: any) {
@@ -140,14 +152,12 @@ const Bugs = () => {
 
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
-    // Filter out fixed bugs from all counts since they belong on Fixes page
-    const nonFixedBugs = bugs.filter(bug => bug.status !== "fixed");
-
     switch (tabType) {
       case "all-bugs":
-        return nonFixedBugs.length;
+        return totalBugs;
       case "my-bugs":
-        return nonFixedBugs.filter(bug => bug.reported_by === currentUser?.id).length;
+        // You may need a separate API call for "my bugs" count if dataset is large.
+        return bugs.filter(bug => bug.reported_by === currentUser?.id && bug.status !== "fixed").length;
       default:
         return 0;
     }
@@ -323,6 +333,26 @@ const Bugs = () => {
                   ))}
                 </div>
               )}
+
+              <div className="flex justify-center mt-4 gap-2">
+                <Button
+                  variant="outline"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="px-2 py-1 text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
             </TabsContent>
           </Tabs>
         ) : (
