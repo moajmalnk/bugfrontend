@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { BugIcon } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -15,10 +15,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      storeIntendedDestination(location.pathname);
+      storeIntendedDestination(location.pathname + location.search);
       navigate('/login');
     }
-  }, [isLoading, isAuthenticated, navigate, location.pathname, storeIntendedDestination]);
+  }, [isLoading, isAuthenticated, navigate, location.pathname, location.search, storeIntendedDestination]);
 
   if (isLoading) {
     return (
@@ -32,7 +32,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   if (!isAuthenticated) {
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   return <MainLayout>{children}</MainLayout>;

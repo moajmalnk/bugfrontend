@@ -34,9 +34,9 @@ const NotFound = () => {
         {/* Action Buttons */}
         <div className="space-y-4">
           <Button asChild className="w-full">
-            <Link to={currentUser?.role ? `/${currentUser.role}/projects` : "/"}>
+            <Link to={`/login`}>
               <HomeIcon className="mr-2 h-4 w-4" />
-              Return to Projects
+              Return to Login
             </Link>
           </Button>
           

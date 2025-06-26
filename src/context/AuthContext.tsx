@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const storeIntendedDestination = (path: string) => {
-    if (path !== '/login') {
+    if (path && path !== '/login') {
       localStorage.setItem('intendedDestination', path);
     }
   };
