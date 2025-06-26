@@ -58,12 +58,18 @@ const Bugs = () => {
       setSkeletonLoading(true);
       setAccessError(null);
 
-      const data = await bugService.getBugs(undefined, page, limit);
+      // Fetch ALL bugs if you want a true count
+      const data = await bugService.getBugs(undefined, 1, 1000); // or a higher limit if needed
       setBugs(data.bugs);
       setCurrentPage(data.pagination.currentPage);
       setTotalPages(data.pagination.totalPages);
       setTotalBugs(data.pagination.totalBugs);
-      setPendingBugsCount(data.pagination.pendingBugsCount ?? 0);
+
+      // Calculate pending bugs from all fetched bugs
+      const pendingCount = data.bugs.filter(
+        bug => bug.status === "pending" // or include "in_progress"
+      ).length;
+      setPendingBugsCount(pendingCount);
 
       setSkeletonLoading(false);
     } catch (error: any) {
