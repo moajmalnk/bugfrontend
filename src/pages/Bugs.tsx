@@ -193,9 +193,35 @@ const Bugs = () => {
     <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
       <section className="max-w-6xl mx-auto space-y-4">
         {/* Page Header and Description */}
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold tracking-tight">Bugs</h1>
-          <p className="text-muted-foreground">Fix your bugs and track pending bugs</p>
+        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Bugs</h1>
+            <p className="text-muted-foreground">Fix your bugs and track pending bugs</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
+              <Button
+                variant="default"
+                asChild
+                className="w-full md:w-auto"
+                aria-label="Report a new bug"
+              >
+                <Link
+                  to={currentUser?.role ? `/${currentUser.role}/bugs/new` : "/bugs/new"}
+                  state={{ from: currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs" }}
+                  className="flex items-center justify-center"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Report Bug
+                </Link>
+              </Button>
+            )}
+            <div className="hidden sm:flex items-center border rounded-md px-3 py-2 bg-orange-50">
+              <BugIcon className="h-4 w-4 text-orange-500 mr-2" />
+              <span className="text-sm font-medium text-orange-700">
+                {pendingBugsCount} <span className="hidden lg:inline">Bugs Pending</span>
+              </span>
+            </div>
+          </div>
         </div>
         {/* Professional Header for Developers */}
         {isDeveloper && noBugs && (
@@ -208,44 +234,6 @@ const Bugs = () => {
             </p>
           </div>
         )}
-
-        {/* Header: Report Bug Button */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
-          {skeletonLoading ? (
-            <>
-              <Skeleton className="h-9 sm:h-10 w-full sm:w-32 rounded-md" />
-              <Skeleton className="h-7 sm:h-8 w-full sm:w-36 rounded-md" />
-            </>
-          ) : (
-            <>
-              {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
-                <Button
-                  variant="default"
-                  asChild
-                  className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base"
-                  aria-label="Report a new bug"
-                >
-                  <Link
-                    to={currentUser?.role ? `/${currentUser.role}/bugs/new` : "/bugs/new"}
-                    state={{ from: currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs" }}
-                    className="flex items-center justify-center"
-                  >
-                    <Plus className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Report Bug
-                  </Link>
-                </Button>
-              )}
-
-              {!loading && pendingBugsCount > 0 && (
-                <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-orange-50">
-                  <BugIcon className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 mr-2" />
-                  <span className="text-xs sm:text-sm font-medium text-orange-700">
-                    {pendingBugsCount} Bugs Pending
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-        </div>
 
         {/* Admin Tabs or Regular Content */}
         {canViewTabs ? (
