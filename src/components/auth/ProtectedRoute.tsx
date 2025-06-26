@@ -15,6 +15,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
+      console.log('Saving intended destination:', location.pathname + location.search);
       storeIntendedDestination(location.pathname + location.search);
       navigate('/login');
     }

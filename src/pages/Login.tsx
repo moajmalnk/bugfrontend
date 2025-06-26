@@ -21,7 +21,10 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      navigate(`/${currentUser.role}/projects`, { replace: true });
+      const intendedDestination = localStorage.getItem('intendedDestination') || `/${currentUser.role}/projects`;
+      console.log('Redirecting to:', intendedDestination);
+      localStorage.removeItem('intendedDestination');
+      navigate(intendedDestination, { replace: true });
     }
   }, [isAuthenticated, currentUser, navigate]);
 
