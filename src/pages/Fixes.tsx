@@ -138,10 +138,13 @@ const Fixes = () => {
   const [activeTab, setActiveTab] = useState("all-fixes");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
-  const { data: bugs = [], isLoading, error } = useQuery<BugType[]>({
+  const { data, isLoading, error } = useQuery<{ bugs: BugType[], pagination: any }>({
     queryKey: ["bugs"],
     queryFn: () => bugService.getBugs(),
   });
+
+  const bugs = data?.bugs ?? [];
+  const pagination = data?.pagination;
 
   const filteredBugs = useMemo(() => {
   const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
