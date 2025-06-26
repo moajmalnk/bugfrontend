@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Get the intended destination or default to the user's role-specific projects page
         const intendedDestination = localStorage.getItem('intendedDestination') || `/${user.role}/projects`;
-        localStorage.removeItem('intendedDestination'); // Clear the stored destination
+        localStorage.removeItem('intendedDestination');
         navigate(intendedDestination, { replace: true });
         return true;
       }
@@ -205,7 +205,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("token");
-    sessionStorage.removeItem("token"); // Also clear from session storage
+    sessionStorage.removeItem("token");
+    localStorage.removeItem("intendedDestination");
     setCurrentUser(null);
     navigate("/login", { replace: true });
   };

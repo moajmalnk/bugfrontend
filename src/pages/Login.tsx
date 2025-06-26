@@ -16,14 +16,14 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [role, setRole] = useState('tester');
-  const { login, register, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { login, register, isAuthenticated, isLoading: isAuthLoading, currentUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated && !isAuthLoading) {
-      return;
+    if (isAuthenticated && currentUser) {
+      navigate(`/${currentUser.role}/projects`, { replace: true });
     }
-  }, [isAuthenticated, isAuthLoading]);
+  }, [isAuthenticated, currentUser, navigate]);
 
   if (isAuthLoading) {
     return (

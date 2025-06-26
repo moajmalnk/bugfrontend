@@ -34,12 +34,6 @@ const NotFound = () => {
               Return to Login
             </Link>
           </Button>
-          <Button variant="outline" asChild className="flex-1 text-base py-6">
-            <Link to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}>
-              <ArrowLeftIcon className="mr-2 h-5 w-5" />
-              Go to Bugs
-            </Link>
-          </Button>
         </div>
 
         {/* Helpful Links */}
@@ -48,30 +42,41 @@ const NotFound = () => {
             Quick links:
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link 
-              to={currentUser?.role ? `/${currentUser.role}/projects` : "/projects"}
-              className="text-sm px-4 py-2 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800 transition"
-            >
-              Projects
-            </Link>
-            <Link 
-              to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}
-              className="text-sm px-4 py-2 rounded-md bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800 transition"
-            >
-              Bugs
-            </Link>
-            <Link 
-              to={currentUser?.role ? `/${currentUser.role}/fixes` : "/fixes"}
-              className="text-sm px-4 py-2 rounded-md bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-800 transition"
-            >
-              Fixes
-            </Link>
-            <Link 
-              to={currentUser?.role ? `/${currentUser.role}/updates` : "/updates"}
-              className="text-sm px-4 py-2 rounded-md bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-800 transition"
-            >
-              Updates
-            </Link>
+            {currentUser ? (
+              <>
+                <Link 
+                  to={`/${currentUser.role}/projects`}
+                  className="text-sm px-4 py-2 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800 transition"
+                >
+                  Projects
+                </Link>
+                <Link 
+                  to={`/${currentUser.role}/bugs`}
+                  className="text-sm px-4 py-2 rounded-md bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800 transition"
+                >
+                  Bugs
+                </Link>
+                <Link 
+                  to={`/${currentUser.role}/fixes`}
+                  className="text-sm px-4 py-2 rounded-md bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-800 transition"
+                >
+                  Fixes
+                </Link>
+                <Link 
+                  to={`/${currentUser.role}/updates`}
+                  className="text-sm px-4 py-2 rounded-md bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-800 transition"
+                >
+                  Updates
+                </Link>
+              </>
+            ) : (
+              <Link 
+                to="/login"
+                className="text-sm px-4 py-2 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800 transition"
+              >
+                Login
+              </Link>
+            )}
           </div>
         </div>
       </div>
