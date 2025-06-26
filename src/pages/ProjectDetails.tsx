@@ -272,8 +272,8 @@ const ProjectDetails = () => {
 
   const fetchProjectBugs = async () => {
     try {
-      const bugs = await bugService.getBugs(projectId);
-      setBugs(bugs);
+      const data = await bugService.getBugs(projectId);
+      setBugs(data.bugs);
     } catch (error) {
       toast({
         title: "Error",
