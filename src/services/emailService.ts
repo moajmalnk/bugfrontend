@@ -2,9 +2,18 @@ import { ENV } from "@/lib/env";
 import { notificationService } from "./notificationService";
 
 // Helper function to get role-based URL
-const getRoleBasedUrl = (path: string): string => {
-  // Always return a role-neutral URL for emails
+const getRoleBasedUrl = (path: string, role?: string): string => {
+  // If role is provided, include it in the URL
+  if (role) {
+    return `${window.location.origin}/${role}${path}`;
+  }
+  // Fallback to role-neutral URL
   return `${window.location.origin}${path}`;
+};
+
+// Helper function to generate personalized email content for each recipient
+const generatePersonalizedEmailContent = (template: string, recipientRole: string, bugLink: string): string => {
+  return template.replace(/\${bugLink}/g, bugLink);
 };
 
 export const sendEmailNotification = async (
@@ -66,10 +75,9 @@ export const sendEmailNotification = async (
 //   data.attachments || []
 // );
 
-// Add this function to get all notification recipients
-export const getNotificationRecipients = async (projectId: string): Promise<string[]> => {
+// Add this function to get all notification recipients with role information
+export const getNotificationRecipients = async (projectId: string): Promise<Array<{email: string, role: string}>> => {
   if (!projectId) {
-    //.error("No project ID provided for fetching notification recipients.");
     return [];
   }
   try {
@@ -95,14 +103,12 @@ export const getNotificationRecipients = async (projectId: string): Promise<stri
     
     const data = await res.json();
 
-    if (data.success && Array.isArray(data.emails)) {
-        return data.emails;
+    if (data.success && Array.isArray(data.recipients)) {
+        return data.recipients;
     }
 
-    //.error("Failed to parse recipients from API response:", data.message || 'Unknown error');
     return [];
   } catch (error) {
-    //.error("Error fetching project notification recipients:", error);
     return [];
   }
 };
@@ -124,13 +130,13 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
       const recipients = await getNotificationRecipients(bug.project_id);
 
       if (recipients.length > 0) {
-        const recipientRole = recipients[0].split('/')[0]; // Extract role from the first recipient
-        const bugLink = getRoleBasedUrl(`/bugs/${bug.id}`);
-
-        emailResult = await sendEmailNotification(
-          recipients,
-          `Bug Fixed: ${bug.title}`,
-          `
+        // Extract just the emails for the API call
+        const recipientEmails = recipients.map(r => r.email);
+        
+        // Generate personalized content for each recipient
+        const personalizedBodies = recipients.map(recipient => {
+          const bugLink = getRoleBasedUrl(`/bugs/${bug.id}`, recipient.role);
+          return generatePersonalizedEmailContent(`
           <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f7f6; padding: 20px;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
               
@@ -164,7 +170,15 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
               
             </div>
           </div>
-          `
+          `, recipient.role, bugLink);
+        });
+
+        // Use the first personalized body for the email (since we can't send different bodies to different recipients in one call)
+        // In a more sophisticated system, you might want to send individual emails
+        emailResult = await sendEmailNotification(
+          recipientEmails,
+          `Bug Fixed: ${bug.title}`,
+          personalizedBodies[0]
         );
       } else {
         emailResult = { success: false, message: "No recipients found" };
@@ -183,7 +197,6 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
       browserNotificationSent: browserResult
     };
   } catch (error) {
-    // //.error("Error sending bug status update notification:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
@@ -220,13 +233,13 @@ export const sendNewBugNotification = async (bug: any) => {
       const recipients = await getNotificationRecipients(bug.project_id);
 
       if (recipients.length > 0) {
-        const recipientRole = recipients[0].split('/')[0]; // Extract role from the first recipient
-        const bugLink = getRoleBasedUrl(`/bugs/${bug.id}`);
-
-        emailResult = await sendEmailNotification(
-          recipients,
-          `New Bug Reported: ${bug.title}`,
-          `
+        // Extract just the emails for the API call
+        const recipientEmails = recipients.map(r => r.email);
+        
+        // Generate personalized content for each recipient
+        const personalizedBodies = recipients.map(recipient => {
+          const bugLink = getRoleBasedUrl(`/bugs/${bug.id}`, recipient.role);
+          return generatePersonalizedEmailContent(`
           <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f7f6; padding: 20px;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
               
@@ -259,7 +272,13 @@ export const sendNewBugNotification = async (bug: any) => {
               
             </div>
           </div>
-          `,
+          `, recipient.role, bugLink);
+        });
+
+        emailResult = await sendEmailNotification(
+          recipientEmails,
+          `New Bug Reported: ${bug.title}`,
+          personalizedBodies[0],
           bug.attachments || []
         );
       } else {
@@ -279,7 +298,6 @@ export const sendNewBugNotification = async (bug: any) => {
       browserNotificationSent: browserResult
     };
   } catch (error) {
-    //.error("Error sending new bug notification:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
@@ -301,7 +319,9 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
       const recipients = await getNotificationRecipients(bug.project_id);
 
       if (recipients.length > 0) {
-        const recipientRole = recipients[0].split('/')[0]; // Extract role from the first recipient
+        // Extract just the emails for the API call
+        const recipientEmails = recipients.map(r => r.email);
+        
         const statusChangeContent = statusChange ? `
           <p style="font-size: 14px; margin-bottom: 5px;"><strong>Previous Status:</strong> <span style="font-weight: normal; text-transform: capitalize;">${statusChange.from}</span></p>
           <p style="font-size: 14px; margin-bottom: 5px;"><strong>New Status:</strong> <span style="font-weight: normal; text-transform: capitalize;">${statusChange.to}</span></p>
@@ -309,12 +329,10 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
           <p style="font-size: 14px; margin-bottom: 5px;"><strong>Status:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.status}</span></p>
         `;
 
-        const bugLink = getRoleBasedUrl(`/bugs/${bug.id}`);
-
-        emailResult = await sendEmailNotification(
-          recipients,
-          subject,
-          `
+        // Generate personalized content for each recipient
+        const personalizedBodies = recipients.map(recipient => {
+          const bugLink = getRoleBasedUrl(`/bugs/${bug.id}`, recipient.role);
+          return generatePersonalizedEmailContent(`
           <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f7f6; padding: 20px;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
               
@@ -346,7 +364,13 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
               
             </div>
           </div>
-          `
+          `, recipient.role, bugLink);
+        });
+
+        emailResult = await sendEmailNotification(
+          recipientEmails,
+          subject,
+          personalizedBodies[0]
         );
       } else {
         emailResult = { success: false, message: "No recipients found" };
@@ -366,7 +390,6 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
       browserNotificationSent: browserResult
     };
   } catch (error) {
-    //.error("Error sending bug notification:", error);
     return { success: false, message: error instanceof Error ? error.message : 'Failed to send notification' };
   }
 };
@@ -387,10 +410,13 @@ export const sendNewUpdateNotification = async (update: any) => {
       const recipients = await getNotificationRecipients(update.project_id);
 
       if (recipients.length > 0) {
-        emailResult = await sendEmailNotification(
-          recipients,
-          `New Update: ${update.title}`,
-          `
+        // Extract just the emails for the API call
+        const recipientEmails = recipients.map(r => r.email);
+        
+        // Generate personalized content for each recipient
+        const personalizedBodies = recipients.map(recipient => {
+          const updateLink = getRoleBasedUrl(`/updates/${update.id}`, recipient.role);
+          return generatePersonalizedEmailContent(`
           <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f7f6; padding: 20px;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
               <div style="background-color: #2563eb; color: #ffffff; padding: 20px; text-align: center;">
@@ -404,7 +430,7 @@ export const sendNewUpdateNotification = async (update: any) => {
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Created On:</strong> <span style="font-weight: normal;">${new Date(update.created_at).toLocaleString()}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Created By:</strong> <span style="font-weight: normal;">${update.created_by || 'Bug Ricer User'}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Project:</strong> <span style="font-weight: normal;">${update.project_name || 'BugRicer Project'}</span></p>
-                <p style="font-size: 14px; margin-top: 10px;"><strong>Update Link:</strong> <a href="${getRoleBasedUrl(`/updates/${update.id}`)}" style="color: #2563eb; text-decoration: none;">View Update Details</a></p>
+                <p style="font-size: 14px; margin-top: 10px;"><strong>Update Link:</strong> <a href="${updateLink}" style="color: #2563eb; text-decoration: none;">View Update Details</a></p>
               </div>
               <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
                 <p style="margin: 0;">This is an automated notification from Bug Ricer. Please do not reply to this email.</p>
@@ -412,7 +438,13 @@ export const sendNewUpdateNotification = async (update: any) => {
               </div>
             </div>
           </div>
-          `
+          `, recipient.role, updateLink);
+        });
+
+        emailResult = await sendEmailNotification(
+          recipientEmails,
+          `New Update: ${update.title}`,
+          personalizedBodies[0]
         );
       } else {
         emailResult = { success: false, message: "No recipients found" };
