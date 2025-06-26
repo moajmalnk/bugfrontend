@@ -26,6 +26,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { bugService } from "@/services/bugService";
 import { Project, projectService } from "@/services/projectService";
+import { Bug } from "@/types";
 import { 
   AlertCircle, 
   CheckCircle2, 
@@ -291,26 +292,22 @@ const Projects = () => {
 
   const fetchAndCountBugs = async () => {
     try {
-      const bugs = await bugService.getBugs();
       const totalCounts: Record<string, number> = {};
       const openCounts: Record<string, number> = {};
       const fixedCounts: Record<string, number> = {};
 
-      bugs.forEach((bug: any) => {
-        if (bug.project_id) {
-          const pid = String(bug.project_id);
-          // Total bugs
-          totalCounts[pid] = (totalCounts[pid] || 0) + 1;
-          // Open bugs (pending or in_progress)
-          if (bug.status === "pending" || bug.status === "in_progress") {
-            openCounts[pid] = (openCounts[pid] || 0) + 1;
-          }
-          // Fixed bugs
-          if (bug.status === "fixed") {
-            fixedCounts[pid] = (fixedCounts[pid] || 0) + 1;
-          }
-        }
-      });
+      for (const project of projects) {
+        const { bugs } = await bugService.getBugs(project.id, 1, 1000);
+        const totalBugs = bugs.length;
+
+        totalCounts[project.id] = totalBugs;
+
+        const openBugs = bugs.filter(bug => bug.status === "pending" || bug.status === "in_progress");
+        openCounts[project.id] = openBugs.length;
+
+        const fixedBugs = bugs.filter(bug => bug.status === "fixed");
+        fixedCounts[project.id] = fixedBugs.length;
+      }
 
       setProjectBugsCount(totalCounts);
       setProjectOpenBugsCount(openCounts);
