@@ -159,7 +159,9 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString()}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated By:</strong> <span style="font-weight: normal;">${bug.updated_by_name || 'Bug Ricer User'}</span></p>
-                <p style="font-size: 14px; margin-top: 10px;"><strong>Bug Link:</strong> <a href="${bugLink}" style="color: #2563eb; text-decoration: none;">View Bug Details</a></p>
+                <p style="margin-top: 18px; text-align: center;">
+                  <a href="${bugLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 500; font-size: 16px;">View Bug Details</a>
+                </p>
               </div>
               
               <!-- Footer -->
@@ -261,7 +263,9 @@ export const sendNewBugNotification = async (bug: any) => {
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Reported On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString()}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Reported By:</strong> <span style="font-weight: normal;">${bug.reported_by_name || 'Bug Ricer User'}</span></p>
-                <p style="font-size: 14px; margin-top: 10px;"><strong>Bug Link:</strong> <a href="${bugLink}" style="color: #2563eb; text-decoration: none;">View Bug Details</a></p>
+                <p style="margin-top: 18px; text-align: center;">
+                  <a href="${bugLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 500; font-size: 16px;">View Bug Details</a>
+                </p>
               </div>
               
               <!-- Footer -->
@@ -354,6 +358,9 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString()}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated By:</strong> <span style="font-weight: normal;">${bug.updated_by_name || 'Bug Ricer User'}</span></p>
+                <p style="margin-top: 18px; text-align: center;">
+                  <a href="${bugLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 500; font-size: 16px;">View Bug Details</a>
+                </p>
               </div>
               
               <!-- Footer -->
@@ -430,7 +437,9 @@ export const sendNewUpdateNotification = async (update: any) => {
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Created On:</strong> <span style="font-weight: normal;">${new Date(update.created_at).toLocaleString()}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Created By:</strong> <span style="font-weight: normal;">${update.created_by || 'Bug Ricer User'}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Project:</strong> <span style="font-weight: normal;">${update.project_name || 'BugRicer Project'}</span></p>
-                <p style="font-size: 14px; margin-top: 10px;"><strong>Update Link:</strong> <a href="${updateLink}" style="color: #2563eb; text-decoration: none;">View Update Details</a></p>
+                <p style="margin-top: 18px; text-align: center;">
+                  <a href="${updateLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 500; font-size: 16px;">View Update Details</a>
+                </p>
               </div>
               <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
                 <p style="margin: 0;">This is an automated notification from Bug Ricer. Please do not reply to this email.</p>
