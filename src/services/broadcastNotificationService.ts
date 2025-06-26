@@ -3,7 +3,7 @@ import { notificationService } from "./notificationService";
 
 interface BroadcastNotification {
   id: string;
-  type: 'new_bug' | 'status_change';
+  type: 'new_bug' | 'status_change' | 'new_update';
   title: string;
   message: string;
   bugId: string;
