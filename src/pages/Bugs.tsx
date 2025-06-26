@@ -41,6 +41,7 @@ const Bugs = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalBugs, setTotalBugs] = useState(0);
   const [pageSize, setPageSize] = useState(10); // Optional: allow user to change page size
+  const [pendingBugsCount, setPendingBugsCount] = useState(0);
 
   useEffect(() => {
     fetchBugs();
@@ -62,6 +63,7 @@ const Bugs = () => {
       setCurrentPage(data.pagination.currentPage);
       setTotalPages(data.pagination.totalPages);
       setTotalBugs(data.pagination.totalBugs);
+      setPendingBugsCount(data.pagination.pendingBugsCount ?? 0);
 
       setSkeletonLoading(false);
     } catch (error: any) {
@@ -233,17 +235,14 @@ const Bugs = () => {
                 </Button>
               )}
 
-              {!loading && bugs.length > 0 && (() => {
-                const pendingBugs = bugs.filter(bug => bug.status === "pending" || bug.status === "in_progress");
-                return pendingBugs.length > 0 && (
-                  <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-orange-50">
-                    <BugIcon className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 mr-2" />
-                    <span className="text-xs sm:text-sm font-medium text-orange-700">
-                      {pendingBugs.length} Bugs Pending
-                    </span>
-                  </div>
-                );
-              })()}
+              {!loading && pendingBugsCount > 0 && (
+                <div className="flex items-center border rounded-md px-3 sm:px-4 py-1.5 sm:py-2 bg-orange-50">
+                  <BugIcon className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 mr-2" />
+                  <span className="text-xs sm:text-sm font-medium text-orange-700">
+                    {pendingBugsCount} Bugs Pending
+                  </span>
+                </div>
+              )}
             </>
           )}
         </div>
