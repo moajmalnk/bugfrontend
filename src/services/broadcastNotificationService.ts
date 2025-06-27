@@ -19,20 +19,10 @@ class BroadcastNotificationService {
   private isPolling: boolean = false;
   private intervalId: NodeJS.Timeout | null = null;
 
-  // Helper method to get role-based URL
+  // Helper method to get role-neutral URL for sharing
   private getRoleBasedUrl(path: string): string {
-    try {
-      // Get user role from localStorage or sessionStorage
-      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        const role = user.role || 'tester'; // Default to tester if no role
-        return `/${role}${path}`;
-      }
-    } catch (error) {
-      // console.error('Error parsing user data:', error);
-    }
-    // Fallback to original URL structure
+    // For sharing, we want role-neutral URLs that work for all users
+    // The route handler will redirect to the appropriate role-based URL
     return path;
   }
 

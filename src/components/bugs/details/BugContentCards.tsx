@@ -11,6 +11,7 @@ import { RotateCw, X, ZoomIn, ZoomOut, ArrowLeft, ArrowRight, Download, Copy, Sh
 import { useState } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { generateShareableUrl } from "@/lib/utils";
 
 interface BugContentCardsProps {
   bug: Bug;
@@ -266,8 +267,9 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
   };
 
   const handleShare = async () => {
-    const shareUrl = window.location.href;
-    const shareText = `Check out this bug: ${bug.title}\n${shareUrl}`;
+    // Generate a role-neutral URL that works for all users
+    const roleNeutralUrl = generateRoleNeutralUrl();
+    const shareText = `Check out this bug: ${bug.title}\n${roleNeutralUrl}`;
 
     // 1. Try Web Share API (native share sheet)
     if (navigator.share) {
@@ -275,7 +277,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         await navigator.share({
           title: bug.title,
           text: shareText,
-          url: shareUrl,
+          url: roleNeutralUrl,
         });
         toast({ title: "Shared!", description: "Shared via your device's share sheet." });
         return;
@@ -285,18 +287,16 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     }
 
     // 2. Fallback: Show custom modal with share options
-    // (You can use a Dialog/modal here)
-    // Example: WhatsApp, WhatsApp Business, Copy Link
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
     const whatsappBusinessUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
 
-    // Show a modal or toast with these options:
-    // - WhatsApp
-    // - WhatsApp Business
-    // - Copy Link
-
     // For demo, just open WhatsApp Web:
     window.open(whatsappUrl, "_blank");
+  };
+
+  // Generate a role-neutral URL that works for all users
+  const generateRoleNeutralUrl = () => {
+    return generateShareableUrl('bugs', bug.id);
   };
 
   const handleCopyDescription = async () => {

@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import { lazy, Suspense } from "react";
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 
 // Professional Skeleton Loading Component
 const SkeletonFallback = () => (
@@ -72,6 +72,45 @@ const UpdateDetails = lazy(() => import("@/pages/UpdateDetails"));
 const EditUpdate = lazy(() => import("@/pages/EditUpdate"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 
+// Component to handle role-neutral bug redirects
+const BugRedirect = () => {
+  const { bugId } = useParams();
+  const { isAuthenticated, currentUser } = useAuth();
+  const role = currentUser?.role;
+
+  if (!isAuthenticated || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={`/${role}/bugs/${bugId}`} replace />;
+};
+
+// Component to handle role-neutral update redirects
+const UpdateRedirect = () => {
+  const { updateId } = useParams();
+  const { isAuthenticated, currentUser } = useAuth();
+  const role = currentUser?.role;
+
+  if (!isAuthenticated || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={`/${role}/updates/${updateId}`} replace />;
+};
+
+// Component to handle role-neutral project redirects
+const ProjectRedirect = () => {
+  const { projectId } = useParams();
+  const { isAuthenticated, currentUser } = useAuth();
+  const role = currentUser?.role;
+
+  if (!isAuthenticated || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={`/${role}/projects/${projectId}`} replace />;
+};
+
 const RouteConfig = () => {
   const { isLoading, isAuthenticated, currentUser } = useAuth();
   const role = currentUser?.role;
@@ -93,6 +132,15 @@ const RouteConfig = () => {
           </Suspense>
         }
       />
+
+      {/* Role-neutral bug routes - redirect to role-based URLs */}
+      <Route path="/bugs/:bugId" element={<BugRedirect />} />
+
+      {/* Role-neutral update routes - redirect to role-based URLs */}
+      <Route path="/updates/:updateId" element={<UpdateRedirect />} />
+
+      {/* Role-neutral project routes - redirect to role-based URLs */}
+      <Route path="/projects/:projectId" element={<ProjectRedirect />} />
 
       {/* Protected Routes with role prefix */}
       {isAuthenticated && role && (

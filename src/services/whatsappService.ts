@@ -27,20 +27,10 @@ class WhatsAppService {
   private readonly WA_BASE_URL = 'https://wa.me';
   private readonly CONTACTS_STORAGE_KEY = 'whatsapp_contacts';
 
-  // Helper method to get role-based URL
+  // Helper method to get role-neutral URL for sharing
   private getRoleBasedUrl(path: string): string {
-    try {
-      // Get user role from localStorage or sessionStorage
-      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        const role = user.role || 'tester'; // Default to tester if no role
-        return `${window.location.origin}/${role}${path}`;
-      }
-    } catch (error) {
-      // console.error('Error parsing user data:', error);
-    }
-    // Fallback to original URL structure
+    // For sharing, we want role-neutral URLs that work for all users
+    // The route handler will redirect to the appropriate role-based URL
     return `${window.location.origin}${path}`;
   }
 

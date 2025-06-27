@@ -1,13 +1,10 @@
 import { ENV } from "@/lib/env";
 import { notificationService } from "./notificationService";
 
-// Helper function to get role-based URL
+// Helper function to get role-neutral URL for sharing
 const getRoleBasedUrl = (path: string, role?: string): string => {
-  // If role is provided, include it in the URL
-  if (role) {
-    return `${window.location.origin}/${role}${path}`;
-  }
-  // Fallback to role-neutral URL
+  // For sharing, we want role-neutral URLs that work for all users
+  // The route handler will redirect to the appropriate role-based URL
   return `${window.location.origin}${path}`;
 };
 
