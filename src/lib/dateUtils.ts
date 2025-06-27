@@ -15,20 +15,12 @@ export interface DateDisplayOptions {
  * Safely parse a date string and convert to local timezone
  */
 export function safeParseDate(dateString: string | Date): Date {
-  if (dateString instanceof Date) {
-    return dateString;
-  }
-  
-  if (!dateString) {
-    return new Date();
-  }
-
+  if (dateString instanceof Date) return dateString;
+  if (!dateString) return new Date();
   try {
-    // Handle ISO strings and various formats
     const parsed = parseISO(dateString);
     return isValid(parsed) ? parsed : new Date(dateString);
   } catch {
-    //console.warn('Invalid date string:', dateString);
     return new Date();
   }
 }
