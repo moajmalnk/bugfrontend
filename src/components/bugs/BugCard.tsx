@@ -15,7 +15,11 @@ interface Bug {
   project_id: string;
   project_name?: string;
   reported_by: string;
+  reporter_name?: string;
+  updated_by?: string;
+  updated_by_name?: string;
   created_at: string;
+  updated_at?: string;
 }
 
 interface BugCardProps {
@@ -36,6 +40,14 @@ const statusColors = {
   declined: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
   rejected: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
 };
+
+function formatDateTime(dateStr: string) {
+  const date = new Date(dateStr);
+  return date.toLocaleString(undefined, {
+    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
 
 export function BugCard({ bug, onDelete }: BugCardProps) {
   const location = useLocation();
@@ -69,7 +81,18 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
               Project: {bug.project_name}
             </p>
           )}
-          <BugCreatedDate date={bug.created_at} />
+          <p className="text-xs text-muted-foreground">
+            <span>Created by: <b>{bug.reporter_name || bug.reported_by}</b></span>
+            <br />
+            <span>Created: {formatDateTime(bug.created_at)}</span>
+          </p>
+          {bug.updated_by_name && bug.updated_at && (
+            <p className="text-xs text-muted-foreground">
+              <span>Updated by: <b>{bug.updated_by_name}</b></span>
+              <br />
+              <span>Updated: {formatDateTime(bug.updated_at)}</span>
+            </p>
+          )}
         </div>
       </div>
 
