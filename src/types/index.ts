@@ -10,6 +10,7 @@ export type Bug = {
   title: string;
   description: string;
   project_id: string;
+  project_name?: string;
   reported_by: string;
   reporter_name?: string;
   updated_by?: string;

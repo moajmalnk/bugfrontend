@@ -76,13 +76,13 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       });
       return;
     }
-    
+
     try {
       let blob: Blob;
       let success = false;
-      
+
       // Try multiple approaches to get the image
-      
+
       // Approach 1: Direct fetch with CORS
       try {
         const response = await fetch(selectedImage, {
@@ -99,7 +99,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       } catch (fetchError) {
         //.log('CORS fetch failed:', fetchError);
       }
-      
+
       // Approach 2: Try with no-cors mode if CORS failed
       if (!success) {
         try {
@@ -113,19 +113,19 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           //.log('No-CORS fetch also failed:', noCorsError);
         }
       }
-      
+
       // Approach 3: Canvas approach (fallback)
       if (!success) {
         //.log('Trying canvas approach...');
         const img = document.createElement("img");
         img.crossOrigin = "anonymous";
-        
+
         const imgLoad = new Promise((resolve, reject) => {
           img.onload = resolve;
           img.onerror = reject;
           setTimeout(() => reject(new Error('Timeout')), 10000); // 10 second timeout
         });
-        
+
         img.src = selectedImage;
         await imgLoad;
 
@@ -170,13 +170,13 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
               resolve(blob!);
             }, "image/png", 0.9);
           });
-          
+
           URL.revokeObjectURL(img.src);
         }
 
         await navigator.clipboard.write([new window.ClipboardItem({ "image/png": finalBlob })]);
-        toast({ 
-          title: "Success", 
+        toast({
+          title: "Success",
           description: scaleFactor < 1 ? `Image copied to clipboard (${Math.round(scaleFactor * 100)}% size)` : "Image copied to clipboard"
         });
       } else {
@@ -327,11 +327,11 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
 
   const handlePrintImage = async () => {
     if (!selectedImage) return;
-    
+
     try {
       let imageUrl = selectedImage;
       let shouldCreateBlob = false;
-      
+
       // Check if we need to convert to blob for printing
       try {
         const response = await fetch(selectedImage, { mode: 'cors', credentials: 'omit' });
@@ -346,19 +346,19 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       } catch (fetchError) {
         shouldCreateBlob = true;
       }
-      
+
       // If we need to create a blob (CORS issues), use canvas approach
       if (shouldCreateBlob) {
         try {
           const img = document.createElement("img");
           img.crossOrigin = "anonymous";
-          
+
           const imgLoad = new Promise((resolve, reject) => {
             img.onload = resolve;
             img.onerror = reject;
             setTimeout(() => reject(new Error('Timeout')), 10000);
           });
-          
+
           img.src = selectedImage;
           await imgLoad;
 
@@ -373,7 +373,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
               resolve(blob!);
             }, "image/png", 1.0);
           });
-          
+
           imageUrl = URL.createObjectURL(blob);
         } catch (canvasError) {
           //.log('Canvas approach failed for printing:', canvasError);
@@ -385,10 +385,10 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           return;
         }
       }
-      
+
       // Create print window
       const printWindow = window.open('', '_blank', 'width=800,height=600');
-      
+
       if (!printWindow) {
         toast({
           title: "Print Error",
@@ -397,7 +397,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         });
         return;
       }
-      
+
       // Create simple print HTML
       const printHtml = `
         <!DOCTYPE html>
@@ -423,21 +423,21 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           </body>
         </html>
       `;
-      
+
       printWindow.document.write(printHtml);
       printWindow.document.close();
-      
+
       // Clean up blob URL if we created one
       if (shouldCreateBlob && imageUrl.startsWith('blob:')) {
         setTimeout(() => URL.revokeObjectURL(imageUrl), 30000);
       }
-      
+
       toast({
         title: "Print Window Opened",
         description: "Print dialog should open shortly.",
         variant: "default",
       });
-      
+
     } catch (error) {
       //.error("Print error:", error);
       toast({
@@ -495,16 +495,16 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base sm:text-lg">Description</CardTitle>
           {/* Single Copy Button: copies image+description if image selected, else just description */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
             onClick={handleCopyImageWithDescription}
             aria-label="Copy image and description"
             title="Copy image and description"
-            >
-              <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            </Button>
+          >
+            <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="max-w-full overflow-x-auto">
@@ -676,16 +676,16 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                 )}
 
                 {/* Only one Copy Button: image+description if image selected, else just description */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                   onClick={handleCopyImageWithDescription}
                   aria-label="Copy image and description"
                   title="Copy image and description"
-                  >
-                    <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  </Button>
+                >
+                  <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button>
 
                 {selectedImage && (
                   <Button
@@ -723,7 +723,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                     aria-label="Delete image"
                     title="Delete image"
                   >
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z" /></svg>
                   </Button>
                 )}
 
@@ -774,7 +774,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                 </button>
                 <h2 className="text-lg font-semibold mb-2">Delete Image?</h2>
                 <p>Are you sure you want to delete this image? This action cannot be undone.</p>
-                <div className="flex gap-2 mt-4">
+                <div className="flex gap-2 mt-4 justify-end">
                   <Button variant="destructive" onClick={handleDeleteImage} disabled={deletingImage}>
                     {deletingImage ? "Deleting..." : "Delete"}
                   </Button>
