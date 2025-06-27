@@ -10,6 +10,7 @@ import { Bug } from "@/types";
 import { RotateCw, X, ZoomIn, ZoomOut, ArrowLeft, ArrowRight, Download, Copy, Share2, Printer } from "lucide-react";
 import { useState } from "react";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 interface BugContentCardsProps {
   bug: Bug;
@@ -19,12 +20,24 @@ function isMobileOrTablet() {
   return /android|iphone|ipad|mobile/i.test(navigator.userAgent);
 }
 
+function getRelativeImagePath(fullPath: string) {
+  const match = fullPath.match(/[?&]path=([^&]+)/);
+  if (match) return decodeURIComponent(match[1]);
+  if (fullPath.startsWith('uploads/')) return fullPath;
+  const idx = fullPath.indexOf('uploads/');
+  if (idx !== -1) return fullPath.substring(idx);
+  return fullPath;
+}
+
 export const BugContentCards = ({ bug }: BugContentCardsProps) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const { currentUser } = useAuth();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingImage, setDeletingImage] = useState(false);
 
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.25, 3));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));
@@ -435,22 +448,63 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     }
   };
 
+  // Check if current user can delete images
+  const canDeleteImage = currentUser && (currentUser.role === "admin" || currentUser.id === bug.reported_by);
+
+  // Handler to delete image (API call to backend)
+  const handleDeleteImage = async () => {
+    if (!selectedImage) return;
+    const screenshot = bug.screenshots[currentImageIndex];
+    setDeletingImage(true);
+    try {
+      const apiUrl = "http://localhost/Bugricer/backend/api";
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${apiUrl}/bugs/delete_image.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ bug_id: bug.id, attachment_id: screenshot.id }),
+      });
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        throw new Error('Invalid JSON response from server');
+      }
+      if (!data.success) throw new Error(data.message);
+
+      // Remove from UI
+      if (Array.isArray(bug.screenshots)) {
+        bug.screenshots = bug.screenshots.filter((img) => getRelativeImagePath(img.path) !== getRelativeImagePath(selectedImage));
+      }
+      setSelectedImage(null);
+      setShowDeleteConfirm(false);
+      toast({ title: "Deleted", description: "Image deleted successfully." });
+    } catch (error) {
+      toast({ title: "Error", description: error.message || "Failed to delete image.", variant: "destructive" });
+    } finally {
+      setDeletingImage(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card className="overflow-hidden">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base sm:text-lg">Description</CardTitle>
           {/* Single Copy Button: copies image+description if image selected, else just description */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
             onClick={handleCopyImageWithDescription}
             aria-label="Copy image and description"
             title="Copy image and description"
-          >
-            <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          </Button>
+            >
+              <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </Button>
         </CardHeader>
         <CardContent>
           <div className="max-w-full overflow-x-auto">
@@ -622,16 +676,16 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                 )}
 
                 {/* Only one Copy Button: image+description if image selected, else just description */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
                   onClick={handleCopyImageWithDescription}
                   aria-label="Copy image and description"
                   title="Copy image and description"
-                >
-                  <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </Button>
+                  >
+                    <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </Button>
 
                 {selectedImage && (
                   <Button
@@ -646,7 +700,8 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                   </Button>
                 )}
 
-                {selectedImage && (
+                {/* Only show Print button on desktop (not mobile/tablet) */}
+                {!isMobileOrTablet() && selectedImage && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -655,6 +710,20 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                     aria-label="Print image"
                   >
                     <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </Button>
+                )}
+
+                {/* Only show Delete Image button for admins or bug reporter */}
+                {canDeleteImage && selectedImage && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    aria-label="Delete image"
+                    title="Delete image"
+                  >
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
                   </Button>
                 )}
 
@@ -677,7 +746,7 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
             </div>
           </DialogHeader>
           {selectedImage && bug.screenshots && bug.screenshots.length > 0 && (
-            <div className="relative flex-1 overflow-auto p-2 sm:p-3 md:p-4">
+            <div className="relative flex-1 overflow-auto p-2 sm:p-3 md:p-4 custom-scrollbar">
               <div className="min-h-full flex items-center justify-center">
                 <img
                   src={bug.screenshots[currentImageIndex].path}
@@ -688,6 +757,31 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                     transformOrigin: "center center",
                   }}
                 />
+              </div>
+            </div>
+          )}
+
+          {showDeleteConfirm && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 pointer-events-auto">
+              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-lg flex flex-col gap-4 min-w-[250px] z-[10000] relative focus:outline-none" tabIndex={0}>
+                {/* Close (X) button */}
+                <button
+                  className="absolute top-2 right-2 text-lg text-muted-foreground hover:text-destructive focus:outline-none"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  aria-label="Close"
+                >
+                  <X />
+                </button>
+                <h2 className="text-lg font-semibold mb-2">Delete Image?</h2>
+                <p>Are you sure you want to delete this image? This action cannot be undone.</p>
+                <div className="flex gap-2 mt-4">
+                  <Button variant="destructive" onClick={handleDeleteImage} disabled={deletingImage}>
+                    {deletingImage ? "Deleting..." : "Delete"}
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deletingImage}>
+                    Cancel
+                  </Button>
+                </div>
               </div>
             </div>
           )}
