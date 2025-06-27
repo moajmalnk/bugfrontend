@@ -30,6 +30,8 @@ export type Bug = {
     path: string;
     type: string;
   }>;
+  fixed_by?: string | null;
+  fixed_by_name?: string | null;
 };
 
 export type BugPriority = 'low' | 'medium' | 'high';

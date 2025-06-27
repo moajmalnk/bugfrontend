@@ -15,9 +15,10 @@ import { notificationService } from "@/services/notificationService";
 import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { Lock } from "lucide-react";
+import { Lock, ArrowLeft, ArrowRight } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from 'react';
+import { bugService } from "@/services/bugService";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -124,10 +125,13 @@ const AccessError = () => (
 );
 
 const BugDetails = () => {
+  // All hooks at the top!
   const { bugId } = useParams();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
+  const [bugList, setBugList] = useState<Bug[]>([]);
+  const [bugListLoading, setBugListLoading] = useState(true);
 
   const {
     data: bug,
@@ -163,6 +167,19 @@ const BugDetails = () => {
       refetch();
     }
   }, [bugId, refetch, bug, isStale]);
+
+  // Fetch all bugs for navigation
+  useEffect(() => {
+    let isMounted = true;
+    setBugListLoading(true);
+    bugService.getBugs(undefined, 1, 1000).then((res) => {
+      if (isMounted) {
+        setBugList(res.bugs);
+        setBugListLoading(false);
+      }
+    }).catch(() => setBugListLoading(false));
+    return () => { isMounted = false; };
+  }, []);
 
   // Check if this is an access error
   const isAccessError = error && (
@@ -205,21 +222,10 @@ const BugDetails = () => {
     </main>
   );
 
-  if (shouldShowSkeleton) {
-    return renderSkeleton();
-  }
-
-  if (isAccessError) {
-    return <AccessError />;
-  }
-
-  if (error || !bug) {
-    return (
-      <main>
-        <BugNotFound />
-      </main>
-    );
-  }
+  // Now you can do your early returns
+  if (shouldShowSkeleton) return renderSkeleton();
+  if (isAccessError) return <AccessError />;
+  if (error || !bug) return <main><BugNotFound /></main>;
 
   const formattedCreatedDate = formatDetailedDate(bug.created_at);
   const formattedUpdatedDate = formatDetailedDate(bug.updated_at);
@@ -301,8 +307,16 @@ const BugDetails = () => {
     }
   };
 
+  // Find current bug index
+  const currentIndex = bugList.findIndex((b) => b.id === bugId);
+  const prevBugId = currentIndex > 0 ? bugList[currentIndex - 1]?.id : null;
+  const nextBugId = currentIndex >= 0 && currentIndex < bugList.length - 1 ? bugList[currentIndex + 1]?.id : null;
+  const totalBugs = bugList.length;
+
+  const role = currentUser?.role || "admin";
+
   return (
-    <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8">
+    <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8 flex flex-col">
       {/* Background refetch indicator */}
       {isFetching && bug && (
         <div className="fixed top-4 right-4 z-50">
@@ -311,8 +325,8 @@ const BugDetails = () => {
           </div>
         </div>
       )}
-      
-      <section className="max-w-7xl mx-auto space-y-8">
+      {/* Main content */}
+      <section className="max-w-7xl mx-auto space-y-8 flex-1 w-full">
         <header>
           <BugHeader
             bug={bug}
@@ -321,13 +335,11 @@ const BugDetails = () => {
             currentUser={currentUser}
           />
         </header>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content - Description and Screenshots */}
           <section className="lg:col-span-2 space-y-8">
             <BugContentCards bug={bug} />
           </section>
-
           {/* Sidebar - Bug Details */}
           <aside className="space-y-8">
             <BugDetailsCard
@@ -339,6 +351,28 @@ const BugDetails = () => {
           </aside>
         </div>
       </section>
+      {/* Professional navigation bar at the bottom */}
+      <nav className="w-full flex justify-center items-center gap-6 py-6 bg-background border-t border-border mt-8">
+        <button
+          className="flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors"
+          onClick={() => prevBugId && navigate(`/${role}/bugs/${prevBugId}`)}
+          disabled={!prevBugId || bugListLoading}
+          aria-label="Previous Bug"
+        >
+          <ArrowLeft className="mr-2 h-5 w-5" /> Previous
+        </button>
+        <span className="text-sm font-medium text-muted-foreground select-none">
+          {totalBugs > 0 ? `Bug ${currentIndex + 1} of ${totalBugs}` : "No bugs"}
+        </span>
+        <button
+          className="flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors"
+          onClick={() => nextBugId && navigate(`/${role}/bugs/${nextBugId}`)}
+          disabled={!nextBugId || bugListLoading}
+          aria-label="Next Bug"
+        >
+          Next <ArrowRight className="ml-2 h-5 w-5" />
+        </button>
+      </nav>
     </main>
   );
 };

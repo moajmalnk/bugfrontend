@@ -141,14 +141,11 @@ const Projects = () => {
 
   useEffect(() => {
     if (projects.length > 0) {
-      // Once projects are loaded, fetch bug counts and member info
-      fetchAndCountBugs();
-      fetchProjectMembers();
-      // Check user membership for all projects
-      checkUserMembership();
-      
-      // Keep skeleton loading on until membership data is properly loaded
-      // We'll turn it off after membership filtering is complete
+      // Check user membership first, then fetch bugs
+      checkUserMembership().then(() => {
+        fetchAndCountBugs();
+        fetchProjectMembers();
+      });
     }
   }, [projects]);
   
@@ -297,6 +294,7 @@ const Projects = () => {
       const fixedCounts: Record<string, number> = {};
 
       for (const project of projects) {
+        if (!userProjectMemberships[project.id]) continue;
         const { bugs } = await bugService.getBugs(project.id, 1, 1000);
         const totalBugs = bugs.length;
 
@@ -423,6 +421,13 @@ const Projects = () => {
   const handleTabChange = (tab) => {
     setSearchParams({ tab });
   };
+
+  useEffect(() => {
+    if (projects.length > 0 && Object.keys(userProjectMemberships).length > 0) {
+      fetchAndCountBugs();
+      fetchProjectMembers();
+    }
+  }, [projects, userProjectMemberships]);
 
   return (
     <div className="space-y-6 px-2 sm:px-4 md:px-8 py-4 sm:py-6 w-full max-w-[1800px] mx-auto">

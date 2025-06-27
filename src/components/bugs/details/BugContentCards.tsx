@@ -15,11 +15,16 @@ interface BugContentCardsProps {
   bug: Bug;
 }
 
+function isMobileOrTablet() {
+  return /android|iphone|ipad|mobile/i.test(navigator.userAgent);
+}
+
 export const BugContentCards = ({ bug }: BugContentCardsProps) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  const [showShareDialog, setShowShareDialog] = useState(false);
 
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.25, 3));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));
@@ -174,183 +179,111 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
     }
   };
 
-  const handleShareImage = async () => {
-    if (!selectedImage) return;
-    
-    // Check for Web Share API support
-    if (!('share' in navigator)) {
-      toast({
-        title: "Share Not Supported",
-        description: "Your browser doesn't support sharing. Opening image in new tab.",
-        variant: "default",
-      });
-      window.open(selectedImage, '_blank');
-      return;
-    }
-    
-    try {
-      let blob: Blob | null = null;
-      let fileName = "bug-screenshot.png";
-      
-      // Prepare share content with bug details
-      const shareTitle = `Bug Screenshot: ${bug.title || 'Untitled Bug'}`;
-      let shareText = '';
-      
-      if (bug.description) {
-        if (bug.description.length <= 200) {
-          shareText = `Bug Description:\n${bug.description}`;
-        } else {
-          shareText = `Bug Description:\n${bug.description.substring(0, 197)}...`;
-        }
-      }
-      
-      if (bug.priority) {
-        shareText += `\n\nPriority: ${bug.priority}`;
-      }
-      if (bug.status) {
-        shareText += `\nStatus: ${bug.status}`;
-      }
-      if (bug.project_id) {
-        shareText += `\nProject: ${bug.project_id}`;
-      }
-      
-      // Try to get the image as blob first (for all devices)
+  const handleCopyImageWithDescription = async () => {
+    // If an image is selected, copy both image and description as HTML
+    if (selectedImage) {
       try {
-        const response = await fetch(selectedImage, {
-          mode: 'cors',
-          credentials: 'omit',
-        });
-        if (response.ok) {
-          const fetchedBlob = await response.blob();
-          if (fetchedBlob.type && fetchedBlob.type.startsWith('image/')) {
-            blob = fetchedBlob;
-            
-            // Get filename from URL
-            const urlParts = selectedImage.split('/');
-            const lastPart = urlParts[urlParts.length - 1];
-            if (lastPart && lastPart.includes('.')) {
-              const cleanFileName = lastPart.split('?')[0];
-              if (cleanFileName.includes('.')) {
-                fileName = cleanFileName;
-              }
-            }
-          }
-        }
-      } catch (fetchError) {
-        //.log('Could not fetch image for sharing:', fetchError);
-        
-        // Fallback: Try canvas approach
-        try {
-          const img = document.createElement("img");
-          img.crossOrigin = "anonymous";
-          
-          const imgLoad = new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            setTimeout(() => reject(new Error('Timeout')), 10000);
-          });
-          
-          img.src = selectedImage;
-          await imgLoad;
+        const response = await fetch(selectedImage, { mode: 'cors' });
+        const blob = await response.blob();
+        const reader = new FileReader();
 
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0);
-
-          blob = await new Promise<Blob>((resolve) => {
-            canvas.toBlob((blob) => {
-              resolve(blob!);
-            }, "image/png", 0.9);
-          });
-          fileName = "bug-screenshot.png";
-        } catch (canvasError) {
-          //.log('Canvas approach also failed:', canvasError);
-        }
-      }
-      
-      // First Priority: Share image file (all devices)
-      if (blob && 'canShare' in navigator) {
-        try {
-          const file = new File([blob], fileName, { type: blob.type });
-          
-          if (navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: shareTitle,
-              text: shareText,
-            });
-            
+        reader.onload = async function () {
+          const base64 = reader.result;
+          const html = `
+            <div>
+              <img src="${base64}" alt="Bug Screenshot" style="max-width: 400px; display: block; margin-bottom: 8px;" />
+              <div style="font-family: sans-serif; font-size: 14px;">
+                <strong>Description:</strong> ${bug.description ? bug.description.replace(/\n/g, "<br/>") : ""}
+              </div>
+            </div>
+          `;
+          try {
+            await navigator.clipboard.write([
+              new window.ClipboardItem({
+                "text/html": new Blob([html], { type: "text/html" }),
+                "text/plain": new Blob([bug.description || ""], { type: "text/plain" }),
+              }),
+            ]);
             toast({
-              title: "Shared Successfully",
-              description: "Image and bug details shared!",
-              variant: "default",
+              title: "Copied!",
+              description: "Image and description copied to clipboard as rich content.",
             });
-            return;
+          } catch (err) {
+            // Fallback: just copy description
+            await navigator.clipboard.writeText(bug.description || "");
+            toast({
+              title: "Copied Description",
+              description: "Only the description was copied (image copy failed).",
+            });
           }
-        } catch (fileShareError) {
-          //.log('File sharing failed:', fileShareError);
-        }
-      }
-      
-      // Second Priority: Share text with URL (fallback)
-      try {
-        const textWithUrl = shareText + `\n\nView bug: ${window.location.href}`;
-        
-        if (navigator.canShare({ title: shareTitle, text: textWithUrl, url: window.location.href })) {
-          await navigator.share({
-            title: shareTitle,
-            text: textWithUrl,
-            url: window.location.href,
-          });
-          
+        };
+        reader.readAsDataURL(blob);
+      } catch (error) {
+        // Fallback: just copy description
+        try {
+          await navigator.clipboard.writeText(bug.description || "");
           toast({
-            title: "Shared Successfully", 
-            description: "Bug details shared with image link!",
-            variant: "default",
+            title: "Copied Description",
+            description: "Only the description was copied (image copy failed).",
           });
-          return;
+        } catch {
+          toast({
+            title: "Error",
+            description: "Failed to copy image and description.",
+            variant: "destructive",
+          });
         }
-      } catch (textShareError) {
-        //.log('Text sharing with URL failed:', textShareError);
       }
-      
-      // Third Priority: Basic text sharing
+    } else {
+      // No image selected, just copy description
+      try {
+        await navigator.clipboard.writeText(bug.description || "");
+        toast({
+          title: "Copied Description",
+          description: "Description copied to clipboard.",
+        });
+      } catch {
+        toast({
+          title: "Error",
+          description: "Failed to copy description.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    const shareText = `Check out this bug: ${bug.title}\n${shareUrl}`;
+
+    // 1. Try Web Share API (native share sheet)
+    if (navigator.share) {
       try {
         await navigator.share({
-          title: shareTitle,
+          title: bug.title,
           text: shareText,
+          url: shareUrl,
         });
-        
-        toast({
-          title: "Shared Successfully",
-          description: "Bug details shared!",
-          variant: "default",
-        });
+        toast({ title: "Shared!", description: "Shared via your device's share sheet." });
         return;
-      } catch (basicShareError) {
-        //.log('Basic sharing failed:', basicShareError);
+      } catch (err) {
+        // User cancelled or error
       }
-      
-      // Last resort: Open image in new tab
-      toast({
-        title: "Share Failed",
-        description: "Could not share directly. Opening image in new tab for manual sharing.",
-        variant: "default",
-      });
-      window.open(selectedImage, '_blank');
-      
-    } catch (error) {
-      //.error("Share error:", error);
-      
-      toast({
-        title: "Share Error",
-        description: "Sharing failed. Opening image in new tab.",
-        variant: "default",
-      });
-      window.open(selectedImage, '_blank');
     }
+
+    // 2. Fallback: Show custom modal with share options
+    // (You can use a Dialog/modal here)
+    // Example: WhatsApp, WhatsApp Business, Copy Link
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+    const whatsappBusinessUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+
+    // Show a modal or toast with these options:
+    // - WhatsApp
+    // - WhatsApp Business
+    // - Copy Link
+
+    // For demo, just open WhatsApp Web:
+    window.open(whatsappUrl, "_blank");
   };
 
   const handleCopyDescription = async () => {
@@ -507,18 +440,17 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
       <Card className="overflow-hidden">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base sm:text-lg">Description</CardTitle>
-          {/* Responsive Copy Description Button */}
-          {bug?.description && navigator.clipboard && navigator.clipboard.writeText && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
-              onClick={handleCopyDescription}
-              aria-label="Copy description to clipboard"
-            >
-              <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            </Button>
-          )}
+          {/* Single Copy Button: copies image+description if image selected, else just description */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
+            onClick={handleCopyImageWithDescription}
+            aria-label="Copy image and description"
+            title="Copy image and description"
+          >
+            <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="max-w-full overflow-x-auto">
@@ -680,34 +612,35 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
                     asChild
                     aria-label="Download image"
                   >
-                    <a href={selectedImage} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={`${selectedImage}${selectedImage.includes('?') ? '&' : '?'}download=1`}
+                      download={selectedImage ? selectedImage.split('/').pop() : 'bug-screenshot.jpg'}
+                    >
                       <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </a>
                   </Button>
                 )}
 
-                {/* Responsive Copy Image Button */}
-                {navigator.clipboard && navigator.clipboard.write && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
-                    onClick={() => handleCopyImage(1)}
-                    aria-label="Copy image to clipboard"
-                  >
-                    <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  </Button>
-                )}
+                {/* Only one Copy Button: image+description if image selected, else just description */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
+                  onClick={handleCopyImageWithDescription}
+                  aria-label="Copy image and description"
+                  title="Copy image and description"
+                >
+                  <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button>
 
-                {/* Responsive Share Button */}
                 {selectedImage && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-8 w-8 sm:h-9 sm:w-9 p-1 sm:p-1.5 flex-shrink-0"
-                    onClick={handleShareImage}
-                    aria-label="Share or download image"
-                    title="Share image or download if sharing not supported"
+                    onClick={handleShare}
+                    aria-label="Share image"
+                    title="Share image"
                   >
                     <Share2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
@@ -760,6 +693,28 @@ export const BugContentCards = ({ bug }: BugContentCardsProps) => {
           )}
         </DialogContent>
       </Dialog>
+
+      {showShareDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-lg flex flex-col gap-4 min-w-[250px]">
+            <h2 className="text-lg font-semibold mb-2">Share Image</h2>
+            {isMobileOrTablet() ? (
+              <div className="flex flex-col gap-2">
+                <Button onClick={() => handleShare()}>WhatsApp</Button>
+                <Button onClick={() => handleShare()}>WhatsApp Business</Button>
+                <Button onClick={() => handleShare()}>Copy Link</Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <Button onClick={() => handleShare()}>Email</Button>
+                <Button onClick={() => handleShare()}>Outlook</Button>
+                <Button onClick={() => handleShare()}>Copy Link</Button>
+              </div>
+            )}
+            <Button variant="ghost" onClick={() => setShowShareDialog(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
