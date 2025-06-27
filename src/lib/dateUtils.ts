@@ -306,4 +306,7 @@ export function formatCompactTime(dateString: string): string {
   }
   
   return format(date, 'MMM d');
-} 
+}
+
+const date = parseISO('2024-06-27T12:56:00Z');
+console.log(format(date, 'PPpp')); // Local time 
