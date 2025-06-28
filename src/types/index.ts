@@ -49,3 +49,67 @@ export interface User {
   avatar?: string;
   created_at?: string;
 }
+
+// Messaging System Types
+export type MessageType = 'text' | 'voice' | 'reply';
+
+export interface ChatGroup {
+  id: string;
+  name: string;
+  description: string;
+  project_id: string;
+  created_by: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  member_count: number;
+  last_message_at?: string;
+  is_member: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  message_type: MessageType;
+  content?: string;
+  voice_file_path?: string;
+  voice_duration?: number;
+  reply_to_message_id?: string;
+  is_deleted: boolean;
+  deleted_at?: string;
+  created_at: string;
+  updated_at: string;
+  sender_name: string;
+  sender_email: string;
+  sender_role: string;
+  reply_content?: string;
+  reply_type?: MessageType;
+  reply_sender_name?: string;
+}
+
+export interface ChatGroupMember {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  joined_at: string;
+  last_read_at?: string;
+}
+
+export interface TypingIndicator {
+  user_id: string;
+  user_name: string;
+}
+
+export interface MessagePagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+export interface MessageResponse {
+  messages: ChatMessage[];
+  pagination: MessagePagination;
+}
