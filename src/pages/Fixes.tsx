@@ -33,6 +33,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -137,10 +145,12 @@ const Fixes = () => {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("all-fixes");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { data, isLoading, error } = useQuery<{ bugs: BugType[], pagination: any }>({
     queryKey: ["bugs"],
-    queryFn: () => bugService.getBugs(),
+    queryFn: () => bugService.getBugs({ page: 1, limit: 1000, status: "fixed", userId: currentUser?.id }),
   });
 
   const bugs = data?.bugs ?? [];
@@ -266,8 +276,65 @@ const Fixes = () => {
       );
     }
 
+    const totalFiltered = filteredBugs.length;
+    const paginatedBugs = filteredBugs.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+    const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+
     return (
       <>
+        {/* Pagination Controls at the top */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
+          <div>
+            <span className="text-sm text-muted-foreground font-medium">
+              Showing {(currentPage - 1) * itemsPerPage + 1}
+              -
+              {Math.min(currentPage * itemsPerPage, totalFiltered)}
+              {" "}of {totalFiltered} fixes
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+            <select
+              value={itemsPerPage}
+              onChange={e => setItemsPerPage(Number(e.target.value))}
+              className="border border-border rounded-md px-3 py-2 text-sm w-full sm:w-auto bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-label="Items per page"
+            >
+              {[10, 25, 50].map(n => (
+                <option key={n} value={n}>{n} / page</option>
+              ))}
+            </select>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    aria-disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      isActive={currentPage === i + 1}
+                      onClick={() => setCurrentPage(i + 1)}
+                    >
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    aria-disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        </div>
+
         {/* Desktop & Tablet View */}
         <div className="hidden md:block rounded-md border">
           <Table>
@@ -282,7 +349,7 @@ const Fixes = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBugs.map((bug) => (
+              {paginatedBugs.map((bug) => (
                 <TableRow key={bug.id}>
                   <TableCell className="font-medium max-w-[300px] truncate">{bug.title}</TableCell>
                   <TableCell>
@@ -290,8 +357,8 @@ const Fixes = () => {
                       {bug.priority}
                     </Badge>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">{bug.reporter_name || 'N/A'}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{bug.updated_by_name || 'N/A'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{bug.reporter_name || 'BugRicer'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{bug.updated_by_name || 'BugRicer'}</TableCell>
                   <TableCell className="hidden lg:table-cell">{formatDate(bug.updated_at)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm" asChild>
@@ -306,7 +373,7 @@ const Fixes = () => {
 
         {/* Mobile View */}
         <div className="grid md:hidden grid-cols-1 sm:grid-cols-2 gap-4">
-            {filteredBugs.map((bug) => (
+            {paginatedBugs.map((bug) => (
                 <BugCard key={bug.id} bug={bug} />
             ))}
         </div>
@@ -358,7 +425,7 @@ const Fixes = () => {
             </TabsList>
             <TabsContent value="all-fixes" className="mt-4">
               <div className="space-y-4">
-                <div className="hidden md:flex"><FilterControls /></div>
+                <FilterControls />
                 {/* Mobile Filter Sheet Trigger */}
                 <div className="md:hidden">
                     <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
@@ -376,7 +443,7 @@ const Fixes = () => {
             </TabsContent>
             <TabsContent value="my-fixes" className="mt-4">
               <div className="space-y-4">
-                <div className="hidden md:flex"><FilterControls /></div>
+                <FilterControls />
                 <div className="md:hidden">
                   <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
                     <SheetTrigger asChild>
@@ -394,7 +461,7 @@ const Fixes = () => {
           </Tabs>
         ) : (
           <div className="space-y-4">
-            <div className="hidden md:flex"><FilterControls /></div>
+            <FilterControls />
             <div className="md:hidden">
                 <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
                   <SheetTrigger asChild>

@@ -209,7 +209,7 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
           <div className="space-y-1">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words">{bug.title}</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Project Name: {bug.project_name} •
+              Project Name: {bug.project_name}
             </p>
             <p className="text-xs sm:text-sm text-muted-foreground">
               Bug ID: {bug.id} • Reported on {formattedCreatedDate}

@@ -295,7 +295,7 @@ const Projects = () => {
 
       for (const project of projects) {
         if (!userProjectMemberships[project.id]) continue;
-        const { bugs } = await bugService.getBugs(project.id, 1, 1000);
+        const { bugs } = await bugService.getBugs({ projectId: project.id, page: 1, limit: 1000, status: "pending", userId: currentUser?.id });
         const totalBugs = bugs.length;
 
         totalCounts[project.id] = totalBugs;

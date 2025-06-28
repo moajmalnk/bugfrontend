@@ -172,7 +172,7 @@ const BugDetails = () => {
   useEffect(() => {
     let isMounted = true;
     setBugListLoading(true);
-    bugService.getBugs(undefined, 1, 1000).then((res) => {
+    bugService.getBugs({ page: 1, limit: 1000, status: "fixed", userId: currentUser?.id }).then((res) => {
       if (isMounted) {
         setBugList(res.bugs);
         setBugListLoading(false);
@@ -252,6 +252,13 @@ const BugDetails = () => {
         }
       );
 
+      // Update local bugList state immediately
+      setBugList((prevList) =>
+        prevList.map((b) =>
+          b.id === bug.id ? { ...b, status: newStatus, updated_by: currentUser?.id, updated_by_name: currentUser?.name } : b
+        )
+      );
+
       // Send notification if new status is "fixed"
       if (newStatus === "fixed" && bug.status !== "fixed") {
         try {
@@ -308,10 +315,15 @@ const BugDetails = () => {
   };
 
   // Find current bug index
-  const currentIndex = bugList.findIndex((b) => b.id === bugId);
-  const prevBugId = currentIndex > 0 ? bugList[currentIndex - 1]?.id : null;
-  const nextBugId = currentIndex >= 0 && currentIndex < bugList.length - 1 ? bugList[currentIndex + 1]?.id : null;
-  const totalBugs = bugList.length;
+  const filteredBugList = bugList.filter(
+    (b) =>
+      ["pending", "in_progress", "declined", "rejected"].includes(b.status) ||
+      b.id === bugId // Always include the current bug
+  );
+  const currentIndex = filteredBugList.findIndex((b) => b.id === bugId);
+  const prevBugId = currentIndex > 0 ? filteredBugList[currentIndex - 1]?.id : null;
+  const nextBugId = currentIndex >= 0 && currentIndex < filteredBugList.length - 1 ? filteredBugList[currentIndex + 1]?.id : null;
+  const totalBugs = filteredBugList.length;
 
   const role = currentUser?.role || "admin";
 

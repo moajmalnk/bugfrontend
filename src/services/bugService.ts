@@ -6,10 +6,11 @@ export type { Bug };
 const API_ENDPOINT = '/bugs';
 
 export const bugService = {
-  async getBugs(projectId?: string, page: number = 1, limit: number = 10): Promise<{ bugs: Bug[], pagination: any }> {
-    let url = projectId
-      ? `${API_ENDPOINT}/getAll.php?project_id=${projectId}&page=${page}&limit=${limit}`
-      : `${API_ENDPOINT}/getAll.php?page=${page}&limit=${limit}`;
+  async getBugs({ projectId, page = 1, limit = 10, status, userId }: { projectId?: any; page?: number; limit?: number; status?: any; userId?: any; } = {}): Promise<{ bugs: Bug[], pagination: any }> {
+    let url = `/bugs/getAll.php?page=${page}&limit=${limit}`;
+    if (projectId) url += `&project_id=${projectId}`;
+    if (status) url += `&status=${status}`;
+    if (userId) url += `&user_id=${userId}`;
     const response = await apiClient.get<{ success: boolean, data: { bugs: Bug[], pagination: any } }>(url);
     if (response.data.success && response.data.data?.bugs) {
       return {

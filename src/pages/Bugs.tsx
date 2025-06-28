@@ -25,6 +25,14 @@ import { Bug } from "@/types";
 import { Bug as BugIcon, Filter, Lock, Plus, Code, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
 
 const Bugs = () => {
   const { currentUser } = useAuth();
@@ -38,31 +46,29 @@ const Bugs = () => {
   const [accessError, setAccessError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all-bugs");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalBugs, setTotalBugs] = useState(0);
-  const [pageSize, setPageSize] = useState(10); // Optional: allow user to change page size
   const [pendingBugsCount, setPendingBugsCount] = useState(0);
+
 
   useEffect(() => {
     fetchBugs();
   }, []);
 
   useEffect(() => {
-    fetchBugs(currentPage, pageSize);
-    // eslint-disable-next-line
-  }, [currentPage, pageSize]);
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, priorityFilter, statusFilter, bugs.length]);
 
-  const fetchBugs = async (page = 1, limit = pageSize) => {
+  const fetchBugs = async (page = 1, limit = itemsPerPage) => {
     try {
       setLoading(true);
       setSkeletonLoading(true);
       setAccessError(null);
 
       // Fetch ALL bugs if you want a true count
-      const data = await bugService.getBugs(undefined, 1, 1000); // or a higher limit if needed
+      const data = await bugService.getBugs({ page: 1, limit: 1000, status: "pending", userId: currentUser?.id }); // or a higher limit if needed
       setBugs(data.bugs);
       setCurrentPage(data.pagination.currentPage);
-      setTotalPages(data.pagination.totalPages);
       setTotalBugs(data.pagination.totalBugs);
 
       // Calculate pending bugs from all fetched bugs
@@ -130,11 +136,26 @@ const Bugs = () => {
 
   const filteredBugs = getFilteredBugs();
 
+  const totalFiltered = filteredBugs.length;
+  const paginatedBugs = filteredBugs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+
   const FilterControls = () => (
-    <div className="flex flex-col sm:flex-row gap-3 w-full">
+    <div className="flex flex-col sm:flex-row gap-2 w-full">
+      <Input
+        placeholder={`Search ${activeTab.replace('-', ' ')}...`}
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="flex-1 min-w-0 bg-background/50 h-9 text-xs sm:text-sm"
+        aria-label={`Search ${activeTab.replace('-', ' ')}`}
+        disabled={(bugs.length === 0 && !loading) || skeletonLoading}
+      />
       <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-        <SelectTrigger className="w-full min-w-[120px] max-w-[160px] bg-background/50 h-9 text-xs sm:text-sm">
-          <SelectValue placeholder="Priority" />
+        <SelectTrigger className="w-full sm:w-[180px] bg-background/50 h-9 text-xs sm:text-sm">
+          <SelectValue placeholder="All Priorities" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Priorities</SelectItem>
@@ -144,8 +165,8 @@ const Bugs = () => {
         </SelectContent>
       </Select>
       <Select value={statusFilter} onValueChange={setStatusFilter}>
-        <SelectTrigger className="w-full min-w-[120px] max-w-[160px] bg-background/50 h-9 text-xs sm:text-sm">
-          <SelectValue placeholder="Status" />
+        <SelectTrigger className="w-full sm:w-[180px] bg-background/50 h-9 text-xs sm:text-sm">
+          <SelectValue placeholder="All Statuses" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Statuses</SelectItem>
@@ -160,12 +181,12 @@ const Bugs = () => {
 
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
+    const validStatuses = ["pending", "in_progress", "declined", "rejected"];
     switch (tabType) {
       case "all-bugs":
-        return totalBugs;
+        return bugs.filter(bug => validStatuses.includes(bug.status)).length;
       case "my-bugs":
-        // You may need a separate API call for "my bugs" count if dataset is large.
-        return bugs.filter(bug => bug.reported_by === currentUser?.id && bug.status !== "fixed").length;
+        return bugs.filter(bug => bug.reported_by === currentUser?.id && validStatuses.includes(bug.status)).length;
       default:
         return 0;
     }
@@ -257,47 +278,57 @@ const Bugs = () => {
 
             <TabsContent value={activeTab} className="space-y-4">
               {/* Search and Filters */}
-              <div className="space-y-3">
-                <Input
-                  placeholder={`Search ${activeTab.replace('-', ' ')}...`}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-background/50 h-9 text-xs sm:text-sm"
-                  aria-label={`Search ${activeTab.replace('-', ' ')}`}
-                  disabled={(bugs.length === 0 && !loading) || skeletonLoading}
-                />
-
-                {/* Mobile Filter Button */}
-                <div className="block sm:hidden">
-                  <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-                    <SheetTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full h-9 text-xs bg-background/50"
-                        aria-label="Open filters"
-                        disabled={(bugs.length === 0 && !loading) || skeletonLoading}
-                      >
-                        <Filter className="h-3.5 w-3.5 mr-2" />
-                        Filters
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="bottom" className="h-[45vh] px-4 py-6">
-                      <SheetHeader className="mb-4">
-                        <SheetTitle className="text-base">Filters</SheetTitle>
-                        <SheetDescription className="text-xs">
-                          Apply filters to find specific bugs
-                        </SheetDescription>
-                      </SheetHeader>
                       <div className="space-y-3">
                         <FilterControls />
                       </div>
-                    </SheetContent>
-                  </Sheet>
-                </div>
 
-                {/* Desktop Filters */}
-                <div className="hidden sm:flex gap-3">
-                  <FilterControls />
+              {/* Pagination */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
+                <div>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    Showing {(currentPage - 1) * itemsPerPage + 1}
+                    -
+                    {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                    {" "}of {totalFiltered} bugs
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                  <select
+                    value={itemsPerPage}
+                    onChange={e => setItemsPerPage(Number(e.target.value))}
+                    className="border border-border rounded-md px-3 py-2 text-sm w-full sm:w-auto bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                    aria-label="Items per page"
+                  >
+                    {[10, 25, 50].map(n => (
+                      <option key={n} value={n}>{n} / page</option>
+                    ))}
+                  </select>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          aria-disabled={currentPage === 1}
+                        />
+                      </PaginationItem>
+                      {Array.from({ length: totalPages }, (_, i) => (
+                        <PaginationItem key={i}>
+                          <PaginationLink
+                            isActive={currentPage === i + 1}
+                            onClick={() => setCurrentPage(i + 1)}
+                          >
+                            {i + 1}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          aria-disabled={currentPage === totalPages}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </div>
               </div>
 
@@ -321,31 +352,9 @@ const Bugs = () => {
                 </div>
               ) : (
                 <div className="grid gap-4 mt-4 grid-cols-1" style={{ minHeight: 200 }} aria-label="Bug list">
-                  {filteredBugs.map((bug) => (
+                  {paginatedBugs.map(bug => (
                     <BugCard key={bug.id} bug={bug} />
                   ))}
-                </div>
-              )}
-
-              {totalPages > 1 && (
-                <div className="flex justify-center mt-4 gap-2">
-                  <Button
-                    variant="outline"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <span className="px-2 py-1 text-sm">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  >
-                    Next
-                  </Button>
                 </div>
               )}
             </TabsContent>
