@@ -19,7 +19,9 @@ import {
   MoreVertical,
   Users,
   Clock,
-  MessageCircle
+  MessageCircle,
+  Smile,
+  Paperclip
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -34,9 +36,10 @@ import { ChatGroup, ChatMessage, TypingIndicator } from '@/types';
 
 interface ChatInterfaceProps {
   selectedGroup: ChatGroup | null;
+  onBackToChatList?: () => void;
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) => {
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onBackToChatList }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -57,6 +60,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -83,6 +87,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [newMessage]);
 
   const loadMessages = async (page: number = 1, append: boolean = false) => {
     if (!selectedGroup) return;
@@ -142,6 +154,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
     const messageContent = newMessage.trim();
     setNewMessage('');
     setIsTyping(false);
+
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
 
     try {
       const messageData: any = {
@@ -346,9 +363,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-background rounded-lg shadow-md overflow-hidden">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-6 py-4 flex items-center justify-between">
+    <div className="flex flex-col h-full min-h-0 bg-background">
+      {/* Desktop Header - Only show on desktop */}
+      <div className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-6 py-4">
+        <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
             <CardTitle className="text-lg font-semibold">{selectedGroup.name}</CardTitle>
@@ -359,11 +377,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
               {typingUsers.map(u => u.user_name).join(', ')} typing...
             </div>
           )}
+          </div>
         </div>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 md:px-6 py-4 space-y-2 scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent">
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 md:px-4 py-2 space-y-1 bg-[#efeae2] dark:bg-[#0b141a]">
         {hasMoreMessages && (
           <div className="flex justify-center mb-2">
             <Button
@@ -371,6 +390,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
               size="sm"
               onClick={() => loadMessages(currentPage + 1, true)}
               disabled={isLoading}
+              className="text-xs"
             >
               Load More Messages
             </Button>
@@ -382,28 +402,28 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
           return (
             <div
               key={message.id}
-              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} w-full`}
+              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} w-full px-1`}
             >
-              <div className={`flex items-end max-w-[85vw] md:max-w-[70%] ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className={`flex items-end max-w-[85%] sm:max-w-[70%] ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}>
                 {!isOwnMessage && (
-                  <Avatar className="h-8 w-8 mr-2">
-                    <AvatarFallback>
+                  <Avatar className="h-8 w-8 mr-2 flex-shrink-0">
+                    <AvatarFallback className="text-xs">
                       {message.sender_name.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 )}
                 <div className={`space-y-1 ${isOwnMessage ? 'mr-2 items-end' : 'ml-2 items-start'} flex flex-col w-full`}>
                   {!isOwnMessage && (
-                    <div className="text-xs text-muted-foreground font-medium">
+                    <div className="text-xs text-muted-foreground font-medium px-1">
                       {message.sender_name}
                     </div>
                   )}
                   <div
-                    className={`rounded-2xl px-4 py-2 shadow-sm transition-colors break-words whitespace-pre-wrap ${
+                    className={`rounded-2xl px-3 py-2 shadow-sm transition-colors break-words whitespace-pre-wrap max-w-full ${
                       isOwnMessage
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    } ${isDeleted ? 'opacity-60 italic' : 'hover:ring-2 hover:ring-primary/20 focus-within:ring-2 focus-within:ring-primary/30'}`}
+                        ? 'bg-[#dcf8c6] dark:bg-[#005c4b] text-foreground'
+                        : 'bg-white dark:bg-[#202c33] text-foreground'
+                    } ${isDeleted ? 'opacity-60 italic' : 'hover:ring-1 hover:ring-primary/20'}`}
                   >
                     {isDeleted ? (
                       <div className="text-muted-foreground italic">This message was deleted</div>
@@ -420,12 +440,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
                         )}
                         {/* Message content */}
                         {message.message_type === 'voice' ? (
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 min-w-[120px]">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => playVoiceMessage(message)}
-                              className="h-8 w-8 p-0"
+                              className="h-8 w-8 p-0 bg-primary/10 hover:bg-primary/20"
                             >
                               {isPlaying === message.id ? (
                                 <Pause className="h-4 w-4" />
@@ -433,32 +453,32 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
                                 <Play className="h-4 w-4" />
                               )}
                             </Button>
-                            <div className="text-sm">
+                            <div className="text-sm flex-1">
                               {message.voice_duration && MessagingService.formatVoiceDuration(message.voice_duration)}
                             </div>
                           </div>
                         ) : (
-                          <div>{message.content}</div>
+                          <div className="text-sm leading-relaxed">{message.content}</div>
                         )}
                       </>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 px-1">
                     <span>{MessagingService.formatMessageTime(message.created_at)}</span>
                     {!isDeleted && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => setReplyToMessage(message)}
-                          className="h-6 w-6 p-0"
+                          className="h-6 w-6 p-0 hover:bg-primary/10"
                           title="Reply"
                         >
                           <Reply className="h-3 w-3" />
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-primary/10">
                               <MoreVertical className="h-3 w-3" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -491,8 +511,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
 
       {/* Reply Preview */}
       {replyToMessage && (
-        <div className="sticky bottom-20 z-10 p-3 bg-muted/70 border-b flex items-center justify-between">
-          <div className="text-sm">
+        <div className="sticky bottom-16 z-10 p-3 bg-muted/70 border-b flex items-center justify-between">
+          <div className="text-sm flex-1 min-w-0">
             <span className="font-medium">Replying to {replyToMessage.sender_name}</span>
             <div className="text-muted-foreground truncate">
               {replyToMessage.message_type === 'voice' 
@@ -505,6 +525,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
             variant="ghost"
             size="sm"
             onClick={() => setReplyToMessage(null)}
+            className="h-6 w-6 p-0 flex-shrink-0"
           >
             ×
           </Button>
@@ -512,33 +533,44 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup }) =
       )}
 
       {/* Input Area */}
-      <div className="sticky bottom-0 z-20 bg-background/95 backdrop-blur border-t px-4 py-3">
+      <div className="sticky bottom-0 z-20 bg-background/95 backdrop-blur border-t px-3 py-3">
         <div className="flex items-end gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 flex-shrink-0"
+            title="Attach file"
+          >
+            <Paperclip className="h-5 w-5" />
+          </Button>
+          <div className="flex-1 min-w-0">
           <Textarea
+              ref={textareaRef}
             value={newMessage}
             onChange={(e) => handleTyping(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type a message..."
-            className="min-h-[44px] max-h-[120px] resize-none flex-1 rounded-2xl px-4 py-2 shadow-sm"
+              className="min-h-[44px] max-h-[120px] resize-none rounded-2xl px-4 py-2 shadow-sm border-0 bg-muted/50 focus:bg-background transition-colors"
             rows={1}
           />
+          </div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
             onClick={isRecording ? stopRecording : startRecording}
-            className={isRecording ? 'bg-red-500 text-white hover:bg-red-600' : ''}
+            className={`h-10 w-10 flex-shrink-0 ${isRecording ? 'bg-red-500 text-white hover:bg-red-600' : ''}`}
             title={isRecording ? 'Stop recording' : 'Record voice message'}
           >
-            {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
           </Button>
           <Button
             onClick={handleSendMessage}
             disabled={!newMessage.trim() || isLoading}
             size="icon"
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="h-10 w-10 bg-primary text-primary-foreground hover:bg-primary/90 flex-shrink-0"
             title="Send"
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-5 w-5" />
           </Button>
         </div>
       </div>

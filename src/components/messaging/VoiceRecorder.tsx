@@ -1,58 +1,83 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Mic, MicOff, Square, RotateCcw } from 'lucide-react';
+import { Mic, MicOff, Square, RotateCcw, Send, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface VoiceRecorderProps {
   onRecordingComplete: (blob: Blob) => void;
   onCancel: () => void;
   maxDuration?: number; // in seconds
+  isMobile?: boolean;
 }
 
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   onRecordingComplete,
   onCancel,
-  maxDuration = 300 // 5 minutes default
+  maxDuration = 300, // 5 minutes default
+  isMobile = false
 }) => {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      cleanup();
     };
   }, []);
 
+  const cleanup = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      streamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const recorder = new MediaRecorder(stream, { mimeType });
       audioChunksRef.current = [];
+      
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
+      
       recorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        onRecordingComplete(blob);
-        stream.getTracks().forEach((track) => track.stop());
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        setRecordingBlob(blob);
+        setIsRecording(false);
+        setIsPaused(false);
+        setRecordingTime(0);
+        cleanup();
       };
+
       mediaRecorderRef.current = recorder;
       recorder.start();
       setIsRecording(true);
       setRecordingTime(0);
+      setRecordingBlob(null);
       
       // Start timer
       timerRef.current = setInterval(() => {
@@ -78,16 +103,17 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
+    }
+  };
+
+  const pauseRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      if (isPaused) {
+        mediaRecorderRef.current.resume();
+        setIsPaused(false);
+      } else {
+        mediaRecorderRef.current.pause();
+        setIsPaused(true);
       }
     }
   };
@@ -96,20 +122,19 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      setIsPaused(false);
       setRecordingTime(0);
+      setRecordingBlob(null);
       audioChunksRef.current = [];
-      
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
+      cleanup();
     }
     onCancel();
+  };
+
+  const sendRecording = () => {
+    if (recordingBlob) {
+      onRecordingComplete(recordingBlob);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -120,6 +145,170 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
 
   const progressPercentage = (recordingTime / maxDuration) * 100;
 
+  // Mobile-optimized component
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-semibold text-lg">Voice Message</h3>
+          <Button variant="ghost" size="icon" onClick={onCancel}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 space-y-8">
+          {/* Recording Status */}
+          <div className="text-center space-y-2">
+            {isRecording ? (
+              <>
+                <div className="relative">
+                  <div className={cn(
+                    "w-32 h-32 rounded-full border-4 border-primary/20 flex items-center justify-center",
+                    "animate-pulse bg-primary/10"
+                  )}>
+                    <div className="w-20 h-20 rounded-full bg-red-500 flex items-center justify-center animate-pulse">
+                      <MicOff className="h-8 w-8 text-white" />
+                    </div>
+                  </div>
+                  {isPaused && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="bg-background/90 rounded-full p-2">
+                        <span className="text-xs font-medium">PAUSED</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold">
+                    {isPaused ? 'Recording Paused' : 'Recording...'}
+                  </p>
+                  <p className="text-2xl font-mono text-primary">
+                    {formatTime(recordingTime)}
+                  </p>
+                </div>
+              </>
+            ) : recordingBlob ? (
+              <>
+                <div className="w-32 h-32 rounded-full border-4 border-primary/20 flex items-center justify-center bg-primary/10">
+                  <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center">
+                    <Send className="h-8 w-8 text-primary-foreground" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold">Recording Complete</p>
+                  <p className="text-sm text-muted-foreground">
+                    Duration: {formatTime(recordingTime)}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-32 h-32 rounded-full border-4 border-primary/20 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center">
+                    <Mic className="h-8 w-8 text-primary-foreground" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold">Ready to Record</p>
+                  <p className="text-sm text-muted-foreground">
+                    Tap the button below to start
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Progress Bar */}
+          {isRecording && (
+            <div className="w-full space-y-2">
+              <Progress 
+                value={progressPercentage} 
+                className="w-full h-3 rounded-full bg-muted" 
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0:00</span>
+                <span>Max: {formatTime(maxDuration)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Controls */}
+          <div className="flex items-center justify-center gap-4 w-full">
+            {!isRecording && !recordingBlob ? (
+              <Button
+                onClick={startRecording}
+                size="lg"
+                className="h-16 w-16 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform"
+                title="Start recording"
+              >
+                <Mic className="h-8 w-8" />
+              </Button>
+            ) : isRecording ? (
+              <>
+                <Button
+                  onClick={pauseRecording}
+                  variant="outline"
+                  size="lg"
+                  className="h-14 w-14 rounded-full border-2"
+                  title={isPaused ? "Resume recording" : "Pause recording"}
+                >
+                  {isPaused ? (
+                    <Mic className="h-6 w-6" />
+                  ) : (
+                    <Square className="h-6 w-6" />
+                  )}
+                </Button>
+                <Button
+                  onClick={stopRecording}
+                  size="lg"
+                  className="h-16 w-16 rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600 hover:scale-105 transition-transform"
+                  title="Stop recording"
+                >
+                  <Square className="h-8 w-8" />
+                </Button>
+                <Button
+                  onClick={cancelRecording}
+                  variant="outline"
+                  size="lg"
+                  className="h-14 w-14 rounded-full border-2 border-destructive/30 text-destructive hover:border-destructive"
+                  title="Cancel recording"
+                >
+                  <RotateCcw className="h-6 w-6" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  onClick={() => {
+                    setRecordingBlob(null);
+                    setRecordingTime(0);
+                  }}
+                  variant="outline"
+                  size="lg"
+                  className="h-14 w-14 rounded-full border-2"
+                  title="Record again"
+                >
+                  <RotateCcw className="h-6 w-6" />
+                </Button>
+                <Button
+                  onClick={sendRecording}
+                  size="lg"
+                  className="h-16 w-16 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform"
+                  title="Send recording"
+                >
+                  <Send className="h-8 w-8" />
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop component (original design with improvements)
   return (
     <div
       className={`flex flex-col items-center justify-center w-full max-w-md mx-auto p-6 rounded-2xl shadow-lg bg-background/90 border transition-all
@@ -190,4 +379,4 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       )}
     </div>
   );
-};
+}; 
