@@ -4,7 +4,11 @@ import {
   ChatMessage, 
   ChatGroupMember, 
   TypingIndicator, 
-  MessageResponse 
+  MessageResponse,
+  MessageReaction,
+  EmojiReaction,
+  PinnedMessage,
+  GroupSettings
 } from '@/types';
 
 const MESSAGING_API_BASE = '/messaging';
@@ -104,6 +108,62 @@ export class MessagingService {
     });
   }
 
+  // Enhanced Features - Reactions
+  static async addReaction(messageId: string, emoji: string): Promise<MessageReaction> {
+    const response = await axiosInstance.post<{ data: MessageReaction }>(`${MESSAGING_API_BASE}/add_reaction.php`, {
+      message_id: messageId,
+      emoji
+    });
+    return response.data.data;
+  }
+
+  static async removeReaction(messageId: string, emoji: string): Promise<void> {
+    await axiosInstance.delete(`${MESSAGING_API_BASE}/remove_reaction.php`, {
+      params: { message_id: messageId, emoji }
+    });
+  }
+
+  static async getReactions(messageId: string): Promise<EmojiReaction[]> {
+    const response = await axiosInstance.get<{ data: EmojiReaction[] }>(`${MESSAGING_API_BASE}/get_reactions.php`, {
+      params: { message_id: messageId }
+    });
+    return response.data.data;
+  }
+
+  // Enhanced Features - Pinned Messages
+  static async pinMessage(messageId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/pin_message.php`, null, {
+      params: { message_id: messageId }
+    });
+  }
+
+  static async unpinMessage(messageId: string): Promise<void> {
+    await axiosInstance.delete(`${MESSAGING_API_BASE}/unpin_message.php`, {
+      params: { message_id: messageId }
+    });
+  }
+
+  static async getPinnedMessages(groupId: string): Promise<PinnedMessage[]> {
+    const response = await axiosInstance.get<{ data: PinnedMessage[] }>(`${MESSAGING_API_BASE}/get_pinned_messages.php`, {
+      params: { group_id: groupId }
+    });
+    return response.data.data;
+  }
+
+  // Enhanced Features - Group Settings
+  static async updateGroupSettings(groupId: string, settings: Partial<GroupSettings>): Promise<void> {
+    await axiosInstance.put(`${MESSAGING_API_BASE}/update_group_settings.php`, settings, {
+      params: { group_id: groupId }
+    });
+  }
+
+  static async getGroupSettings(groupId: string): Promise<GroupSettings> {
+    const response = await axiosInstance.get<{ data: GroupSettings }>(`${MESSAGING_API_BASE}/get_group_settings.php`, {
+      params: { group_id: groupId }
+    });
+    return response.data.data;
+  }
+
   // Typing Indicators
   static async updateTyping(groupId: string, isTyping: boolean): Promise<void> {
     await axiosInstance.post(`${MESSAGING_API_BASE}/update_typing.php`, {
@@ -198,5 +258,14 @@ export class MessagingService {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
+  // Emoji utilities
+  static getCommonEmojis(): string[] {
+    return ['👍', '❤️', '😂', '😮', '😢', '😡', '👏', '🙏', '🔥', '💯'];
+  }
+
+  static isValidEmoji(emoji: string): boolean {
+    return emoji.length <= 10 && /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(emoji);
   }
 } 

@@ -65,6 +65,7 @@ export interface ChatGroup {
   member_count: number;
   last_message_at?: string;
   is_member: boolean;
+  projectName?: string;
 }
 
 export interface ChatMessage {
@@ -78,6 +79,10 @@ export interface ChatMessage {
   reply_to_message_id?: string;
   is_deleted: boolean;
   deleted_at?: string;
+  is_pinned: boolean;
+  pinned_at?: string;
+  pinned_by?: string;
+  pinned_by_name?: string;
   created_at: string;
   updated_at: string;
   sender_name: string;
@@ -86,6 +91,9 @@ export interface ChatMessage {
   reply_content?: string;
   reply_type?: MessageType;
   reply_sender_name?: string;
+  reactions?: MessageReaction[];
+  mentions?: MessageMention[];
+  read_status?: MessageReadStatus[];
 }
 
 export interface ChatGroupMember {
@@ -95,6 +103,9 @@ export interface ChatGroupMember {
   role: string;
   joined_at: string;
   last_read_at?: string;
+  is_muted: boolean;
+  muted_until?: string;
+  show_read_receipts: boolean;
 }
 
 export interface TypingIndicator {
@@ -112,4 +123,50 @@ export interface MessagePagination {
 export interface MessageResponse {
   messages: ChatMessage[];
   pagination: MessagePagination;
+}
+
+// New Enhanced Messaging Types
+export interface MessageReaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  user_name: string;
+  emoji: string;
+  created_at: string;
+}
+
+export interface MessageMention {
+  id: string;
+  message_id: string;
+  mentioned_user_id: string;
+  mentioned_user_name: string;
+  created_at: string;
+}
+
+export interface MessageReadStatus {
+  message_id: string;
+  user_id: string;
+  user_name: string;
+  read_at: string;
+}
+
+export interface EmojiReaction {
+  emoji: string;
+  count: number;
+  users: string[];
+}
+
+export interface GroupSettings {
+  is_muted: boolean;
+  muted_until?: string;
+  show_read_receipts: boolean;
+}
+
+export interface PinnedMessage {
+  id: string;
+  content: string;
+  message_type: MessageType;
+  sender_name: string;
+  pinned_at: string;
+  pinned_by_name: string;
 }

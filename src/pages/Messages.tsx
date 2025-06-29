@@ -24,7 +24,7 @@ const Messages = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen max-h-[100dvh] bg-gradient-to-br from-background to-muted/60">
+    <div className="flex flex-col h-screen max-h-[100dvh] w-full max-w-full overflow-hidden bg-gradient-to-br from-background to-muted/60">
       {/* Mobile Header - Only show when chat is selected */}
       {selectedGroup && (
         <header className="md:hidden sticky top-0 z-30 px-4 py-3 bg-background/95 backdrop-blur border-b shadow-sm">
@@ -48,17 +48,11 @@ const Messages = () => {
       )}
 
       {/* Desktop Header - Only show on desktop */}
-      <header className="hidden md:block sticky top-0 z-30 px-6 pt-6 pb-3 bg-background/90 backdrop-blur border-b shadow-sm">
-        <h1 className="text-3xl font-bold tracking-tight">Messages</h1>
-        <p className="text-muted-foreground text-base mt-1">
-          Chat with your team members and collaborate on bug fixes.
-        </p>
-      </header>
 
-      <main className="flex-1 flex min-h-0 overflow-hidden">
+      <main className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         {/* Chat Group Selector - Hidden on mobile when chat is selected */}
         <aside className={cn(
-          "border-r bg-background/95 flex flex-col min-h-0 transition-all duration-200",
+          "border-r bg-background/95 flex flex-col min-h-0 min-w-0 transition-all duration-200 overflow-hidden",
           "w-full max-w-xs",
           // Mobile: show only when no chat is selected or explicitly showing chat list
           "md:block",
@@ -67,12 +61,14 @@ const Messages = () => {
           <ChatGroupSelector
             selectedGroup={selectedGroup}
             onGroupSelect={handleGroupSelect}
+            showAllProjects={true}
+            onCreateGroupClick={() => {/* open dialog logic here */}}
           />
         </aside>
 
         {/* Chat Interface - Hidden on mobile when showing chat list */}
         <section className={cn(
-          "flex-1 flex flex-col min-w-0 bg-background/80",
+          "flex-1 flex flex-col min-w-0 min-h-0 bg-background/80 overflow-hidden",
           // Mobile: hide when showing chat list
           "md:block",
           !selectedGroup || showChatList ? "hidden md:block" : "block"

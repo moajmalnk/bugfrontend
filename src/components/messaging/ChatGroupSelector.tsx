@@ -18,65 +18,45 @@ import { ChatGroup, Project } from '@/types';
 interface ChatGroupSelectorProps {
   selectedGroup: ChatGroup | null;
   onGroupSelect: (group: ChatGroup) => void;
-  projectId?: string;
+  showAllProjects?: boolean;
+  onCreateGroupClick?: () => void;
 }
 
 export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   selectedGroup,
   onGroupSelect,
-  projectId
+  showAllProjects = false,
+  onCreateGroupClick
 }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId || '');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [createForm, setCreateForm] = useState({
     name: '',
-    description: ''
+    description: '',
+    projectId: ''
   });
 
   const isAdmin = currentUser?.role === 'admin';
 
   useEffect(() => {
-    if (selectedProjectId) {
-      loadGroups();
-    }
-  }, [selectedProjectId]);
-
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  const loadProjects = async () => {
-    try {
-      const projectsData = await projectService.getProjects();
-      setProjects(projectsData as unknown as Project[]);
-      if (!selectedProjectId && projectsData.length > 0) {
-        setSelectedProjectId(projectsData[0].id);
-      }
-    } catch (error) {
-      console.error('Error loading projects:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load projects",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const loadGroups = async () => {
-    if (!selectedProjectId) return;
-    
+    // Always load all projects and all groups
+    (async () => {
     setIsLoading(true);
     try {
-      const groupsData = await MessagingService.getGroupsByProject(selectedProjectId);
-      setGroups(groupsData);
+        const allProjects = await projectService.getProjects();
+        setProjects(allProjects as unknown as Project[]);
+        let allGroups: ChatGroup[] = [];
+        for (const project of allProjects) {
+          const groups = await MessagingService.getGroupsByProject(project.id);
+          allGroups = allGroups.concat(groups.map(g => ({ ...g, projectName: project.name, projectId: project.id })));
+        }
+        setGroups(allGroups);
     } catch (error) {
-      console.error('Error loading groups:', error);
       toast({
         title: "Error",
         description: "Failed to load chat groups",
@@ -85,10 +65,11 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+    })();
+  }, []);
 
   const handleCreateGroup = async () => {
-    if (!selectedProjectId || !createForm.name.trim()) {
+    if (!createForm.projectId || !createForm.name.trim()) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -96,19 +77,19 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       });
       return;
     }
-
     setIsLoading(true);
     try {
       const newGroup = await MessagingService.createGroup({
         name: createForm.name.trim(),
         description: createForm.description.trim(),
-        project_id: selectedProjectId
+        project_id: createForm.projectId
       });
-
-      setGroups(prev => [newGroup, ...prev]);
-      setCreateForm({ name: '', description: '' });
+      setGroups(prev => [
+        { ...newGroup, projectName: projects.find(p => p.id === createForm.projectId)?.name, projectId: createForm.projectId },
+        ...prev
+      ]);
+      setCreateForm({ name: '', description: '', projectId: '' });
       setIsCreateDialogOpen(false);
-      
       toast({
         title: "Success",
         description: "Chat group created successfully"
@@ -164,76 +145,16 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   );
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-background">
-      {/* Mobile Header - Only show on mobile */}
-      <div className="md:hidden sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-4 py-3">
-        <h1 className="text-xl font-bold">Chats</h1>
-      </div>
-
-      {/* Desktop Header - Only show on desktop */}
-      <div className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-4 pt-4 pb-2">
-        <h2 className="text-lg font-semibold mb-3">Chat Groups</h2>
-        <div className="space-y-2">
-          <Label htmlFor="project-select" className="text-sm">Select Project</Label>
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Choose a project" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {isAdmin && selectedProjectId && (
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full mt-3" disabled={isLoading}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create New Group
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Chat Group</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="group-name">Group Name *</Label>
-                  <Input
-                    id="group-name"
-                    value={createForm.name}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter group name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="group-description">Description</Label>
-                  <Textarea
-                    id="group-description"
-                    value={createForm.description}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Enter group description (optional)"
-                    rows={3}
-                  />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
+    <div className="flex flex-col h-full min-h-0 bg-background overflow-hidden">
+      {/* Header with plus button */}
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 sticky top-0 z-10">
+        <h2 className="text-lg font-semibold">Chat Groups</h2>
+        {isAdmin && (
+          <Button size="icon" variant="default" onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-5 w-5" />
                   </Button>
-                  <Button onClick={handleCreateGroup} disabled={isLoading || !createForm.name.trim()}>
-                    Create Group
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
         )}
       </div>
-
       {/* Search Bar - Mobile */}
       <div className="md:hidden sticky top-16 z-10 bg-background/95 backdrop-blur border-b px-4 py-2">
         <div className="relative">
@@ -246,69 +167,8 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
           />
         </div>
       </div>
-
-      {/* Project Selector - Mobile */}
-      <div className="md:hidden sticky top-28 z-10 bg-background/95 backdrop-blur border-b px-4 py-2">
-        <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-          <SelectTrigger className="bg-muted/50 border-0">
-            <SelectValue placeholder="Choose a project" />
-          </SelectTrigger>
-          <SelectContent>
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {isAdmin && selectedProjectId && (
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full mt-2" size="sm" disabled={isLoading}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Group
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Chat Group</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="group-name">Group Name *</Label>
-                  <Input
-                    id="group-name"
-                    value={createForm.name}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter group name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="group-description">Description</Label>
-                  <Textarea
-                    id="group-description"
-                    value={createForm.description}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Enter group description (optional)"
-                    rows={3}
-                  />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateGroup} disabled={isLoading || !createForm.name.trim()}>
-                    Create Group
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-
       {/* Scrollable Groups List */}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-0 bg-background">
+      <div className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden space-y-0 bg-background hide-scrollbar">
         {isLoading ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground">
             <div className="text-center">
@@ -321,7 +181,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
             <div className="text-center">
               <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">
-                {searchQuery ? 'No groups found' : 'No chat groups found for this project'}
+                {searchQuery ? 'No groups found' : 'No chat groups found'}
               </p>
             </div>
           </div>
@@ -344,22 +204,19 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                     {group.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-
                 {/* Group Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <h4 className="font-medium truncate text-sm">{group.name}</h4>
-                    <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
-                      {formatLastMessageTime(group.last_message_at)}
+                    <span className="text-xs text-primary font-semibold flex-shrink-0 ml-2">
+                      {group.projectName}
                     </span>
                   </div>
-                  
                   {group.description && (
                     <p className="text-xs text-muted-foreground mb-1 line-clamp-1">
                       {group.description}
                     </p>
                   )}
-                  
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
@@ -372,7 +229,6 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                     )}
                   </div>
                 </div>
-
                 {/* Admin Actions - Desktop only */}
                 {isAdmin && (
                   <div className="hidden md:flex items-center space-x-1 ml-2">
@@ -407,6 +263,63 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
           </div>
         )}
       </div>
+      {/* Create Group Dialog with project dropdown inside */}
+      {isAdmin && (
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Chat Group</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="group-name">Group Name *</Label>
+                <Input
+                  id="group-name"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Enter group name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="group-description">Description</Label>
+                <Textarea
+                  id="group-description"
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter group description (optional)"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <Label htmlFor="project-select">Select Project *</Label>
+                <Select
+                  value={createForm.projectId}
+                  onValueChange={val => setCreateForm(prev => ({ ...prev, projectId: val }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateGroup} disabled={isLoading || !createForm.name.trim() || !createForm.projectId}>
+                  Create Group
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }; 

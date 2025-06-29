@@ -21,7 +21,12 @@ import {
   Clock,
   MessageCircle,
   Smile,
-  Paperclip
+  Paperclip,
+  Pin,
+  PinOff,
+  AtSign,
+  Check,
+  CheckCheck
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -33,6 +38,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { MessagingService } from '@/services/messagingService';
 import { ChatGroup, ChatMessage, TypingIndicator } from '@/types';
+import { PinnedMessages } from './PinnedMessages';
+import { MessageReactions } from './MessageReactions';
 
 interface ChatInterfaceProps {
   selectedGroup: ChatGroup | null;
@@ -52,6 +59,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [showReadReceipts, setShowReadReceipts] = useState(true);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -215,20 +223,22 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      const audioChunks: Blob[] = [];
 
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
       };
 
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
         await sendVoiceMessage(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
 
-      mediaRecorderRef.current.start();
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = audioChunks;
+      mediaRecorder.start();
       setIsRecording(true);
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -251,14 +261,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
     if (!selectedGroup) return;
 
     try {
-      const file = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
-      const uploadResult = await MessagingService.uploadVoiceMessage(file);
+      // Convert Blob to File
+      const audioFile = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
+      const { file_url, duration } = await MessagingService.uploadVoiceMessage(audioFile);
       
       const messageData = {
         group_id: selectedGroup.id,
         message_type: 'voice' as const,
-        voice_file_path: uploadResult.file_url,
-        voice_duration: uploadResult.duration
+        voice_file_path: file_url,
+        voice_duration: duration
       };
 
       const sentMessage = await MessagingService.sendMessage(messageData);
@@ -284,15 +295,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
           audioRef.current.currentTime = 0;
         }
         setIsPlaying(null);
-      } else {
-        // Start playing
+        return;
+      }
+
+      // Stop any currently playing audio
         if (audioRef.current) {
           audioRef.current.pause();
         }
         
-        audioRef.current = new Audio(message.voice_file_path);
-        audioRef.current.onended = () => setIsPlaying(null);
-        audioRef.current.onerror = () => {
+      // Create new audio element
+      const audio = new Audio(message.voice_file_path);
+      
+      audio.onended = () => setIsPlaying(null);
+      audio.onerror = () => {
           setIsPlaying(null);
           toast({
             title: "Error",
@@ -301,11 +316,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
           });
         };
         
-        await audioRef.current.play();
+      audioRef.current = audio;
         setIsPlaying(message.id);
-      }
+      await audio.play();
     } catch (error) {
       console.error('Error playing voice message:', error);
+      setIsPlaying(null);
       toast({
         title: "Error",
         description: "Failed to play voice message",
@@ -332,10 +348,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
     }
   };
 
+  const handlePinMessage = async (message: ChatMessage) => {
+    try {
+      await MessagingService.pinMessage(message.id);
+      toast({
+        title: "Success",
+        description: "Message pinned successfully"
+      });
+    } catch (error) {
+      console.error('Error pinning message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to pin message",
+        variant: "destructive"
+      });
+    }
+  };
+
   const copyMessage = (content: string) => {
     navigator.clipboard.writeText(content);
     toast({
-      title: "Copied",
+      title: "Success",
       description: "Message copied to clipboard"
     });
   };
@@ -345,10 +378,37 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
     if (message.sender_id !== currentUser?.id) return false;
     
     const messageTime = new Date(message.created_at).getTime();
-    const currentTime = Date.now();
+    const currentTime = new Date().getTime();
     const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
     
     return (currentTime - messageTime) <= oneHour;
+  };
+
+  const formatMentions = (content: string) => {
+    return content.replace(/@(\w+)/g, '<span class="text-primary font-medium">@$1</span>');
+  };
+
+  const getReadReceipts = (message: ChatMessage) => {
+    if (!showReadReceipts || !message.read_status) return null;
+    
+    const readCount = message.read_status.length;
+    const totalMembers = selectedGroup?.member_count || 0;
+    
+    if (readCount === 0) return <Clock className="h-3 w-3 text-muted-foreground" />;
+    if (readCount === totalMembers - 1) return <CheckCheck className="h-3 w-3 text-blue-500" />;
+    return <Check className="h-3 w-3 text-muted-foreground" />;
+  };
+
+  const handleMessageClick = (messageId: string) => {
+    // Scroll to the specific message
+    const messageElement = document.getElementById(`message-${messageId}`);
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      messageElement.classList.add('ring-2', 'ring-primary/50');
+      setTimeout(() => {
+        messageElement.classList.remove('ring-2', 'ring-primary/50');
+      }, 2000);
+    }
   };
 
   if (!selectedGroup) {
@@ -378,11 +438,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
             </div>
           )}
           </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowReadReceipts(!showReadReceipts)}
+              className="text-xs"
+            >
+              {showReadReceipts ? 'Hide' : 'Show'} Read Receipts
+            </Button>
+          </div>
         </div>
       </div>
 
+      {/* Pinned Messages */}
+      <PinnedMessages 
+        groupId={selectedGroup.id} 
+        onMessageClick={handleMessageClick}
+      />
+
       {/* Messages Area */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 md:px-4 py-2 space-y-1 bg-[#efeae2] dark:bg-[#0b141a]">
+      <div className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden px-2 md:px-4 py-2 space-y-1 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar">
         {hasMoreMessages && (
           <div className="flex justify-center mb-2">
             <Button
@@ -402,7 +478,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
           return (
             <div
               key={message.id}
-              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} w-full px-1`}
+              id={`message-${message.id}`}
+              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} w-full px-1 group transition-all`}
             >
               <div className={`flex items-end max-w-[85%] sm:max-w-[70%] ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}>
                 {!isOwnMessage && (
@@ -423,12 +500,22 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
                       isOwnMessage
                         ? 'bg-[#dcf8c6] dark:bg-[#005c4b] text-foreground'
                         : 'bg-white dark:bg-[#202c33] text-foreground'
-                    } ${isDeleted ? 'opacity-60 italic' : 'hover:ring-1 hover:ring-primary/20'}`}
+                    } ${isDeleted ? 'opacity-60 italic' : 'hover:ring-1 hover:ring-primary/20'} ${
+                      message.is_pinned ? 'ring-2 ring-yellow-400/50' : ''
+                    }`}
                   >
                     {isDeleted ? (
                       <div className="text-muted-foreground italic">This message was deleted</div>
                     ) : (
                       <>
+                        {/* Pinned indicator */}
+                        {message.is_pinned && (
+                          <div className="flex items-center gap-1 mb-2 text-xs text-yellow-600 dark:text-yellow-400">
+                            <Pin className="h-3 w-3" />
+                            <span>Pinned by {message.pinned_by_name}</span>
+                          </div>
+                        )}
+                        
                         {/* Reply to message */}
                         {message.reply_to_message_id && (
                           <div className="mb-2 p-2 bg-background/60 rounded text-xs border-l-4 border-primary/30">
@@ -438,6 +525,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
                             </div>
                           </div>
                         )}
+                        
                         {/* Message content */}
                         {message.message_type === 'voice' ? (
                           <div className="flex items-center space-x-2 min-w-[120px]">
@@ -458,13 +546,35 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
                             </div>
                           </div>
                         ) : (
-                          <div className="text-sm leading-relaxed">{message.content}</div>
+                          <div 
+                            className="text-sm leading-relaxed"
+                            dangerouslySetInnerHTML={{ 
+                              __html: formatMentions(message.content || '') 
+                            }}
+                          />
                         )}
                       </>
                     )}
                   </div>
+                  
+                  {/* Message reactions */}
+                  {!isDeleted && message.reactions && message.reactions.length > 0 && (
+                    <MessageReactions
+                      messageId={message.id}
+                      reactions={message.reactions}
+                      onReactionUpdate={(updatedReactions) => {
+                        setMessages(prev => prev.map(m => 
+                          m.id === message.id 
+                            ? { ...m, reactions: updatedReactions }
+                            : m
+                        ));
+                      }}
+                    />
+                  )}
+                  
                   <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 px-1">
                     <span>{MessagingService.formatMessageTime(message.created_at)}</span>
+                    {getReadReceipts(message)}
                     {!isDeleted && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
@@ -487,6 +597,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
                               <Copy className="h-3 w-3 mr-2" />
                               Copy
                             </DropdownMenuItem>
+                            {isAdmin && !message.is_pinned && (
+                              <DropdownMenuItem onClick={() => handlePinMessage(message)}>
+                                <Pin className="h-3 w-3 mr-2" />
+                                Pin Message
+                              </DropdownMenuItem>
+                            )}
                             {canDeleteMessage(message) && (
                               <DropdownMenuItem
                                 onClick={() => handleDeleteMessage(message)}
@@ -535,21 +651,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ selectedGroup, onB
       {/* Input Area */}
       <div className="sticky bottom-0 z-20 bg-background/95 backdrop-blur border-t px-3 py-3">
         <div className="flex items-end gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 flex-shrink-0"
-            title="Attach file"
-          >
-            <Paperclip className="h-5 w-5" />
-          </Button>
           <div className="flex-1 min-w-0">
           <Textarea
               ref={textareaRef}
             value={newMessage}
             onChange={(e) => handleTyping(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Type a message..."
+              placeholder="Type a message... Use @username to mention someone"
               className="min-h-[44px] max-h-[120px] resize-none rounded-2xl px-4 py-2 shadow-sm border-0 bg-muted/50 focus:bg-background transition-colors"
             rows={1}
           />
