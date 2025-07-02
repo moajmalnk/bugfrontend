@@ -52,8 +52,8 @@ export const validateEnv = () => {
   return true;
 };
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (window.location.hostname === "localhost"
-    ? "http://localhost/Bugricer/backend/api/auth"
-    : "/api/auth");
+// Local: http://localhost/Bugricer/backend/api/auth
+// Production: https://bugsbackend.moajmalnk.in/api/auth
+export const API_BASE_URL = isLocalhost
+  ? "http://localhost/Bugricer/backend/api/auth"
+  : "https://bugsbackend.moajmalnk.in/api/auth";
