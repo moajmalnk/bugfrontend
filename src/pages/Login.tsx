@@ -246,7 +246,7 @@ const Login = () => {
       case 'email':
         return email.trim() && password.trim() && validateEmail(email);
       case 'otp':
-        return email.trim() && validateEmail(email) && (otpSent ? otp.trim() && validateOtp(otp) : true);
+        return email.trim() && validateEmail(email) && otpSent && otp.trim() && validateOtp(otp);
       default:
         return false;
     }
