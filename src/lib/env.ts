@@ -56,4 +56,4 @@ export const validateEnv = () => {
 // Production: https://bugsbackend.moajmalnk.in/api/auth
 export const API_BASE_URL = isLocalhost
   ? "http://localhost/Bugricer/backend/api/auth"
-  : "https://bugsbackend.moajmalnk.in/api/auth";
+  : "https://bugbackend.moajmalnk.in/api/auth";
