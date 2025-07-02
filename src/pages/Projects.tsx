@@ -50,6 +50,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Tabs } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Project Card Skeleton component for loading state
 const ProjectCardSkeleton = () => (
@@ -108,6 +109,8 @@ const Projects = () => {
   const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "overview";
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     // Fetch projects when component mounts
@@ -429,40 +432,84 @@ const Projects = () => {
     }
   }, [projects, userProjectMemberships]);
 
+  const totalFiltered = filteredProjects.length;
+  const paginatedProjects = filteredProjects.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+
   return (
     <div className="space-y-6 px-2 sm:px-4 md:px-8 py-4 sm:py-6 w-full max-w-[1800px] mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="w-full md:w-auto">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">
-            Projects
-          </h1>
-          <p className="text-muted-foreground mt-1 break-words max-w-xl">
-            Manage your projects and track bugs
-          </p>
+      {/* Header row with title, description, new project button, and badge */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">Projects</h1>
+          <p className="text-muted-foreground mt-1 break-words max-w-xl">Manage your projects and track bugs</p>
         </div>
-        {currentUser?.role === "admin" && (
-          <div className="w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+          {currentUser?.role === "admin" && (
             <NewProjectDialog onSubmit={handleCreateProject} />
+          )}
+          <div className="inline-flex items-center border rounded-md px-3 py-2 bg-blue-50 ml-0 sm:ml-2">
+            <FolderKanban className="h-4 w-4 text-blue-500 mr-2" />
+            <span className="text-sm font-medium text-blue-700">
+              {filteredProjects.length} <span className="hidden lg:inline">Projects</span>
+            </span>
           </div>
-        )}
-      </div>
-
-      {/* Search */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-        <div className="relative flex-1 max-w-full sm:max-w-md">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search projects..."
-            className="pl-8 w-full rounded-lg"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
         </div>
       </div>
-
+      {/* Summary and pagination controls */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
+        <div>
+          <span className="text-sm text-muted-foreground font-medium">
+            Showing {(currentPage - 1) * itemsPerPage + 1}
+            -
+            {Math.min(currentPage * itemsPerPage, totalFiltered)}
+            {" "}of {totalFiltered} projects
+          </span>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+          <Select value={String(itemsPerPage)} onValueChange={v => setItemsPerPage(Number(v))}>
+            <SelectTrigger className="w-full sm:w-auto bg-background/50 h-9 text-xs sm:text-sm">
+              <SelectValue>{itemsPerPage} / page</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 / page</SelectItem>
+              <SelectItem value="25">25 / page</SelectItem>
+              <SelectItem value="50">50 / page</SelectItem>
+            </SelectContent>
+          </Select>
+          {/* Pagination controls */}
+          <div className="flex items-center gap-1">
+            <button
+              className="px-2 py-1 rounded border text-sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                className={`px-2 py-1 rounded border text-sm ${currentPage === i + 1 ? 'bg-primary text-white' : ''}`}
+                onClick={() => setCurrentPage(i + 1)}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              className="px-2 py-1 rounded border text-sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
       {/* Projects Grid with Loading Skeletons */}
-      {skeletonLoading || isLoading || filteredProjects.length === 0 && projects.length > 0 && Object.keys(userProjectMemberships).length === 0 ? (
+      {skeletonLoading || isLoading || totalFiltered === 0 && projects.length > 0 && Object.keys(userProjectMemberships).length === 0 ? (
         <div
           className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
           aria-busy="true"
@@ -474,7 +521,7 @@ const Projects = () => {
               <ProjectCardSkeleton key={index} />
             ))}
         </div>
-      ) : filteredProjects.length === 0 ? (
+      ) : totalFiltered === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center bg-background/80">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <FolderKanban className="h-6 w-6 text-muted-foreground" />
@@ -506,7 +553,7 @@ const Projects = () => {
           className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
           aria-label="Project list"
         >
-          {filteredProjects.map((project, index) => (
+          {paginatedProjects.map((project, index) => (
             <motion.div
               key={project.id}
               initial={{ opacity: 0, y: 20 }}

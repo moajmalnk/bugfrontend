@@ -14,8 +14,17 @@ import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
-import { Bug, Code2, Shield } from "lucide-react";
+import { Bug, Code2, Shield, User as UserIcon, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // User Card Skeleton component for loading state
 const UserCardSkeleton = () => (
@@ -51,6 +60,9 @@ const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchUsers = async () => {
     try {
@@ -204,6 +216,17 @@ const Users = () => {
     }
   };
 
+  const filteredUsers = users.filter(user =>
+    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const totalFiltered = filteredUsers.length;
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+
   // Only admin should access this page
   if (currentUser?.role !== "admin") {
     return (
@@ -218,77 +241,148 @@ const Users = () => {
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-6 max-w-7xl">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      {/* Header row with title, description, add user button, and badge */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight break-words">
-            User Management
-          </h1>
-          <p className="text-muted-foreground mt-1 break-words max-w-xl">
-            Manage your team members and their access levels
-          </p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">User Management</h1>
+          <p className="text-muted-foreground mt-1 break-words max-w-xl">Manage your team members and their access levels</p>
         </div>
-        <div className="w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           <AddUserDialog onUserAdd={handleAddUser} />
+          <div className="inline-flex items-center border rounded-md px-3 py-2 bg-blue-50 ml-0 sm:ml-2">
+            <UserRound className="h-4 w-4 text-blue-500 mr-2" />
+            <span className="text-sm font-medium text-blue-700">
+              {users.length} <span className="hidden lg:inline">Users</span>
+            </span>
+          </div>
         </div>
       </div>
-
+      {/* Summary and pagination controls */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
+        <div>
+          <span className="text-sm text-muted-foreground font-medium">
+            Showing {(currentPage - 1) * itemsPerPage + 1}
+            -
+            {Math.min(currentPage * itemsPerPage, totalFiltered)}
+            {" "}of {totalFiltered} users
+          </span>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+          <Select value={String(itemsPerPage)} onValueChange={v => setItemsPerPage(Number(v))}>
+            <SelectTrigger className="w-full sm:w-auto bg-background/50 h-9 text-xs sm:text-sm">
+              <SelectValue>{itemsPerPage} / page</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 / page</SelectItem>
+              <SelectItem value="25">25 / page</SelectItem>
+              <SelectItem value="50">50 / page</SelectItem>
+            </SelectContent>
+          </Select>
+          {/* Pagination controls */}
+          <div className="flex items-center gap-1">
+            <button
+              className="px-2 py-1 rounded border text-sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                className={`px-2 py-1 rounded border text-sm ${currentPage === i + 1 ? 'bg-primary text-white' : ''}`}
+                onClick={() => setCurrentPage(i + 1)}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              className="px-2 py-1 rounded border text-sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+      {/* User list */}
       <Card>
-        <CardHeader>
-          <CardTitle className="break-words">BugRacer Users</CardTitle>
-          {isLoading ? (
-            <Skeleton className="h-5 w-24 inline-block mt-1" />
-          ) : (
-            <p className="text-muted-foreground mt-1 text-sm">
-              Total users: {users.length}
-            </p>
-          )}
-        </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-20rem)]">
-            <div className="space-y-4">
-              {isLoading
-                ? // Show multiple skeleton cards while loading
-                  Array(5)
-                    .fill(0)
-                    .map((_, index) => <UserCardSkeleton key={index} />)
-                : users.map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors gap-4 cursor-pointer"
-                      onClick={() => setSelectedUser(user)}
-                    >
-                      <div className="flex items-center gap-4 min-w-0">
-                        <img
-                          src={user.avatar}
-                          alt={`${user.username}'s avatar`}
-                          className="h-10 w-10 rounded-full shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">
-                            {user.username}
-                          </p>
-                          <div className="flex flex-col sm:flex-row text-sm text-muted-foreground sm:space-x-2">
-                            <p className="font-medium truncate">
-                              @{user.username}
-                            </p>
-                            <span className="hidden sm:inline">•</span>
-                            <p className="truncate">{user.email}</p>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block w-full overflow-x-auto">
+            <Table className="w-full min-w-[600px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[200px]">Username</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading
+                  ? Array(5).fill(0).map((_, index) => (
+                      <TableRow key={index}>
+                        <TableCell colSpan={4}><UserCardSkeleton /></TableCell>
+                      </TableRow>
+                    ))
+                  : paginatedUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium max-w-[200px] truncate">{user.username}</TableCell>
+                        <TableCell className="truncate">{user.email}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getRoleIcon(user.role)}
+                            <span className="capitalize text-sm">{user.role}</span>
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
-                        <div className="flex items-center bg-accent/50 px-3 py-1 rounded-full shrink-0">
-                          {getRoleIcon(user.role)}
-                          <span className="ml-2 text-sm capitalize">
-                            {user.role}
-                          </span>
-                        </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <button
+                            className="px-3 py-1 rounded border text-sm bg-background hover:bg-accent transition-colors"
+                            onClick={() => setSelectedUser(user)}
+                          >
+                            View Details
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+              </TableBody>
+            </Table>
+          </div>
+          {/* Mobile Card View */}
+          <div className="grid grid-cols-1 gap-4 w-full lg:hidden">
+            {isLoading
+              ? Array(5).fill(0).map((_, index) => <UserCardSkeleton key={index} />)
+              : paginatedUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="rounded-lg bg-card text-card-foreground shadow p-4 flex flex-col gap-2 w-full"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <img
+                        src={user.avatar}
+                        alt={`${user.username}'s avatar`}
+                        className="h-10 w-10 rounded-full shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{user.username}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       </div>
                     </div>
-                  ))}
-            </div>
-          </ScrollArea>
+                    <div className="flex items-center gap-2 mb-2">
+                      {getRoleIcon(user.role)}
+                      <span className="capitalize text-sm">{user.role}</span>
+                    </div>
+                    <button
+                      className="w-full px-3 py-2 rounded border text-sm bg-background hover:bg-accent transition-colors"
+                      onClick={() => setSelectedUser(user)}
+                    >
+                      View Details
+                    </button>
+                  </div>
+                ))}
+          </div>
         </CardContent>
       </Card>
 

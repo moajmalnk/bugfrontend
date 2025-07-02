@@ -385,15 +385,15 @@ const Fixes = () => {
   const allFixesCount = useMemo(() => bugs.filter(b => b.status === 'fixed').length, [bugs]);
 
   return (
-    <main className="min-h-screen bg-muted/20 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
+      <section className="max-w-6xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Fixed Bugs</h1>
-            <p className="text-muted-foreground">Review all completed and resolved issues.</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Fixed Bugs</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Review all completed and resolved issues.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
             {showTabs && (
                 <Link to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"} className="w-full md:w-auto">
                     <Button variant="default" className="w-full md:w-auto">
@@ -413,7 +413,7 @@ const Fixes = () => {
 
         {showTabs ? (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="all-fixes">
                 <Code className="h-4 w-4 mr-2" />
                 All Fixes ({allFixesCount})
@@ -476,7 +476,7 @@ const Fixes = () => {
             {renderContent()}
           </div>
         )}
-      </div>
+      </section>
     </main>
   );
 };

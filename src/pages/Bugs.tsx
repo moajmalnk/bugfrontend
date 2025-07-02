@@ -149,9 +149,9 @@ const Bugs = () => {
         placeholder={`Search ${activeTab.replace('-', ' ')}...`}
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        className="flex-1 min-w-0 bg-background/50 h-9 text-xs sm:text-sm"
+        className="w-full sm:w-auto bg-background/50 h-9 text-xs sm:text-sm"
         aria-label={`Search ${activeTab.replace('-', ' ')}`}
-        disabled={(bugs.length === 0 && !loading) || skeletonLoading}
+        disabled={loading || skeletonLoading}
       />
       <Select value={priorityFilter} onValueChange={setPriorityFilter}>
         <SelectTrigger className="w-full sm:w-[180px] bg-background/50 h-9 text-xs sm:text-sm">
@@ -222,15 +222,15 @@ const Bugs = () => {
         {/* Page Header and Description */}
         <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Bugs</h1>
-            <p className="text-muted-foreground">Fix your bugs and track pending bugs</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Bugs</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Fix your bugs and track pending bugs</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
             {(currentUser?.role === "admin" || currentUser?.role === "tester") && (
               <Button
                 variant="default"
                 asChild
-                className="w-full md:w-auto"
+                className="w-full sm:w-auto"
                 aria-label="Report a new bug"
               >
                 <Link
@@ -283,7 +283,7 @@ const Bugs = () => {
                       </div>
 
               {/* Pagination */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
                 <div>
                   <span className="text-sm text-muted-foreground font-medium">
                     Showing {(currentPage - 1) * itemsPerPage + 1}

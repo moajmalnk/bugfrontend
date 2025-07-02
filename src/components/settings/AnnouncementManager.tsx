@@ -102,85 +102,87 @@ export const AnnouncementManager = () => {
 
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Manage Announcements</CardTitle>
-            <CardDescription>
+    <Card className="w-full max-w-full">
+      <CardHeader className="px-1 py-2 sm:px-6 sm:py-4">
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-1 sm:gap-2 w-full">
+          <div className="min-w-0">
+            <CardTitle className="text-xs sm:text-lg">Manage Announcements</CardTitle>
+            <CardDescription className="text-xs sm:text-base">
               Create, edit, and manage pop-up announcements for users.
             </CardDescription>
           </div>
-          <Button onClick={handleAddNew}>
+          <Button onClick={handleAddNew} className="w-full sm:w-auto mt-2 sm:mt-0">
             <PlusCircle className="mr-2 h-4 w-4" />
             Add New
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created At</TableHead>
-              <TableHead>Expires At</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+      <CardContent className="p-1 sm:p-6">
+        <div className="w-full min-w-0 overflow-x-auto custom-scrollbar">
+          <Table className="w-full min-w-[400px] sm:min-w-[700px] text-xs sm:text-sm">
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-center">Loading...</TableCell>
+                <TableHead>Title</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created At</TableHead>
+                <TableHead>Expires At</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : announcements.length === 0 ? (
-               <TableRow>
-                <TableCell colSpan={5} className="text-center">No announcements found.</TableCell>
-              </TableRow>
-            ) : (
-              announcements.map(announcement => (
-                <TableRow key={announcement.id}>
-                  <TableCell className="font-medium">{announcement.title}</TableCell>
-                  <TableCell>
-                    <Badge variant={announcement.is_active ? 'default' : 'secondary'}>
-                      {announcement.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {format(new Date(announcement.created_at), 'PPP')}
-                  </TableCell>
-                  <TableCell>
-                    {announcement.expiry_date ? format(new Date(announcement.expiry_date), 'PPP') : 'Never'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleBroadcast(announcement)}>
-                          <BellRing className="mr-2 h-4 w-4" />
-                          Notify
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(announcement)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(announcement)} className="text-red-600">
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">Loading...</TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : announcements.length === 0 ? (
+                 <TableRow>
+                  <TableCell colSpan={5} className="text-center">No announcements found.</TableCell>
+                </TableRow>
+              ) : (
+                announcements.map(announcement => (
+                  <TableRow key={announcement.id}>
+                    <TableCell className="font-medium truncate max-w-[100px] sm:max-w-none">{announcement.title}</TableCell>
+                    <TableCell>
+                      <Badge variant={announcement.is_active ? 'default' : 'secondary'}>
+                        {announcement.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(announcement.created_at), 'PPP')}
+                    </TableCell>
+                    <TableCell>
+                      {announcement.expiry_date ? format(new Date(announcement.expiry_date), 'PPP') : 'Never'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleBroadcast(announcement)}>
+                            <BellRing className="mr-2 h-4 w-4" />
+                            Notify
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(announcement)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(announcement)} className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
       <AnnouncementDialog 
         open={dialogOpen}

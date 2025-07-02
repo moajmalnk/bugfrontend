@@ -6,18 +6,46 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { BugIcon, Info, AlertCircle } from 'lucide-react';
+import { BugIcon, Info, AlertCircle, Mail, User, Key } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import axios from 'axios';
+import { API_BASE_URL } from '@/lib/env';
+
+type LoginMethod = 'username' | 'email' | 'otp';
+
+type ApiResponse = { success: boolean; message?: string; user?: any };
 
 const Login = () => {
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('username');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [role, setRole] = useState('tester');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
   const { login, register, isAuthenticated, isLoading: isAuthLoading, currentUser } = useAuth();
   const navigate = useNavigate();
+
+  // OTP countdown timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (otpCountdown > 0) {
+      interval = setInterval(() => {
+        setOtpCountdown((prev) => {
+          if (prev <= 1) {
+            setOtpSent(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [otpCountdown]);
 
   useEffect(() => {
     if (isAuthenticated && currentUser) {
@@ -43,23 +71,148 @@ const Login = () => {
     return null;
   }
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateOtp = (otp: string) => {
+    return /^\d{6}$/.test(otp);
+  };
+
+  const handleSendOtp = async () => {
+    if (!email || !validateEmail(email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const response = await axios.post<ApiResponse>(`${API_BASE_URL}/send_otp.php`, { email });
+      const data = response.data as any;
+      if (data.success) {
+        setOtpSent(true);
+        setOtpCountdown(60);
+        toast({
+          title: "OTP Sent",
+          description: "A one-time password has been sent to your email",
+          variant: "default",
+        });
+      } else {
+        throw new Error(data.message || "Failed to send OTP");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || error.message || "Failed to send OTP. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const success = await login(username, password);
-      if (!success) {
-        toast({
-          title: "Login failed",
-          description: "Invalid username or password",
-          variant: "destructive",
-        });
+      let success = false;
+      let user = null;
+
+      switch (loginMethod) {
+        case 'username':
+        case 'email': {
+          const identifier = loginMethod === 'username' ? username : email;
+          if (!identifier || !password) {
+            toast({
+              title: "Validation Error",
+              description: `${loginMethod === 'username' ? 'Username' : 'Email'} and password are required`,
+              variant: "destructive",
+            });
+            return;
+          }
+          if (loginMethod === 'email' && !validateEmail(email)) {
+            toast({
+              title: "Invalid Email",
+              description: "Please enter a valid email address",
+              variant: "destructive",
+            });
+            return;
+          }
+          const response = await axios.post<ApiResponse>(`${API_BASE_URL}/login.php`, { identifier, password });
+          const data = response.data as any;
+          if (data.success) {
+            success = true;
+            user = data.user;
+            if (data.token) {
+              localStorage.setItem("token", data.token);
+            }
+          } else {
+            toast({
+              title: "Login failed",
+              description: data.message || "Invalid credentials",
+              variant: "destructive",
+            });
+          }
+          break;
+        }
+        case 'otp': {
+          if (!email || !otp) {
+            toast({
+              title: "Validation Error",
+              description: "Email and OTP are required",
+              variant: "destructive",
+            });
+            return;
+          }
+          if (!validateEmail(email)) {
+            toast({
+              title: "Invalid Email",
+              description: "Please enter a valid email address",
+              variant: "destructive",
+            });
+            return;
+          }
+          if (!validateOtp(otp)) {
+            toast({
+              title: "Invalid OTP",
+              description: "Please enter a valid 6-digit OTP",
+              variant: "destructive",
+            });
+            return;
+          }
+          const response = await axios.post<ApiResponse>(`${API_BASE_URL}/verify_otp.php`, { email, otp });
+          const data = response.data as any;
+          if (data.success) {
+            success = true;
+            user = data.user;
+            if (data.token) {
+              localStorage.setItem("token", data.token);
+            }
+          } else {
+            toast({
+              title: "OTP Login failed",
+              description: data.message || "Invalid or expired OTP",
+              variant: "destructive",
+            });
+          }
+          break;
+        }
       }
-    } catch (error) {
+
+      if (success && user) {
+        window.location.reload();
+        // navigate(`/${user.role}/projects`);
+      }
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "An error occurred during login",
+        description: error?.response?.data?.message || error.message || "An error occurred during login",
         variant: "destructive",
       });
     } finally {
@@ -74,6 +227,29 @@ const Login = () => {
       description: "This platform will allow external users within a few days. It is currently for testing purposes only.",
       variant: "default",
     });
+  };
+
+  const handleMethodChange = (method: LoginMethod) => {
+    setLoginMethod(method);
+    setUsername('');
+    setEmail('');
+    setPassword('');
+    setOtp('');
+    setOtpSent(false);
+    setOtpCountdown(0);
+  };
+
+  const isFormValid = () => {
+    switch (loginMethod) {
+      case 'username':
+        return username.trim() && password.trim();
+      case 'email':
+        return email.trim() && password.trim() && validateEmail(email);
+      case 'otp':
+        return email.trim() && validateEmail(email) && (otpSent ? otp.trim() && validateOtp(otp) : true);
+      default:
+        return false;
+    }
   };
 
   return (
@@ -93,41 +269,158 @@ const Login = () => {
             <CardDescription className="text-xs sm:text-sm">
               {isSignUp 
                 ? "Fill in your details to create a new account" 
-                : "Enter your credentials to access your account"
+                : "Choose your preferred login method"
               }
             </CardDescription>
           </CardHeader>
           <form onSubmit={isSignUp ? handleSignUp : handleLogin}>
             <CardContent className="space-y-3 sm:space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="username" className="text-sm">Username</Label>
-                <Input 
-                  id="username"
-                  type="text" 
-                  placeholder="Enter Your Username" 
-                  value={username} 
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  className="h-9 text-sm"
-                />
-              </div>
-              
+              {/* Login Method Selection */}
+              {!isSignUp && (
+                <div className="space-y-2">
+                  <Label className="text-sm">Login Method</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleMethodChange('username')}
+                      className={`flex items-center justify-center gap-2 p-2 rounded-md border text-xs transition-colors ${
+                        loginMethod === 'username'
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background border-input hover:bg-muted/50'
+                      }`}
+                    >
+                      <User className="h-3 w-3" />
+                      Username
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMethodChange('email')}
+                      className={`flex items-center justify-center gap-2 p-2 rounded-md border text-xs transition-colors ${
+                        loginMethod === 'email'
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background border-input hover:bg-muted/50'
+                      }`}
+                    >
+                      <Mail className="h-3 w-3" />
+                      Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMethodChange('otp')}
+                      className={`flex items-center justify-center gap-2 p-2 rounded-md border text-xs transition-colors ${
+                        loginMethod === 'otp'
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background border-input hover:bg-muted/50'
+                      }`}
+                    >
+                      <Key className="h-3 w-3" />
+                      OTP
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Username Field */}
+              {loginMethod === 'username' && !isSignUp && (
+                <div className="space-y-1">
+                  <Label htmlFor="username" className="text-sm">Username</Label>
+                  <Input 
+                    id="username"
+                    type="text" 
+                    placeholder="Enter Your Username" 
+                    value={username} 
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                    className="h-9 text-sm"
+                  />
+                </div>
+              )}
+
+              {/* Email Field */}
+              {(loginMethod === 'email' || loginMethod === 'otp' || isSignUp) && (
+                <div className="space-y-1">
+                  <Label htmlFor="email" className="text-sm">Email</Label>
+                  <Input 
+                    id="email"
+                    type="email" 
+                    placeholder="Enter Your Email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isSignUp}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              )}
+
+              {/* Password Field */}
+              {(loginMethod === 'username' || loginMethod === 'email' || isSignUp) && (
+                <div className="space-y-1">
+                  <Label htmlFor="password" className="text-sm">Password</Label>
+                  <Input 
+                    id="password"
+                    type="password" 
+                    placeholder="••••••••" 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="h-9 text-sm"
+                  />
+                </div>
+              )}
+
+              {/* OTP Section */}
+              {loginMethod === 'otp' && !isSignUp && (
+                <div className="space-y-3">
+                  {!otpSent ? (
+                    <Button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={!email || !validateEmail(email) || isSendingOtp}
+                      className="w-full h-9 text-sm"
+                      variant="outline"
+                    >
+                      {isSendingOtp ? "Sending..." : "Send OTP"}
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="otp" className="text-sm">One-Time Password</Label>
+                        {otpCountdown > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            Expires in {otpCountdown}s
+                          </span>
+                        )}
+                      </div>
+                      <Input 
+                        id="otp"
+                        type="text" 
+                        placeholder="Enter 6-digit OTP" 
+                        value={otp} 
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        required
+                        maxLength={6}
+                        className="h-9 text-sm"
+                      />
+                      {otpCountdown === 0 && otpSent && (
+                        <Button
+                          type="button"
+                          onClick={handleSendOtp}
+                          disabled={!email || !validateEmail(email) || isSendingOtp}
+                          className="w-full h-9 text-sm"
+                          variant="outline"
+                        >
+                          {isSendingOtp ? "Sending..." : "Resend OTP"}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sign Up Fields */}
               {isSignUp && (
                 <>
-                  <div className="space-y-1">
-                    <Label htmlFor="email" className="text-sm">Email</Label>
-                    <Input 
-                      id="email"
-                      type="email" 
-                      placeholder="Enter Your Email" 
-                      value={email} 
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled
-                      className="h-9 text-sm"
-                    />
-                  </div>
-                  
                   <div className="space-y-1">
                     <Label htmlFor="role" className="text-sm">Role</Label>
                     <select
@@ -143,30 +436,15 @@ const Login = () => {
                       <option value="admin">Admin</option>
                     </select>
                   </div>
-                </>
-              )}
-              
-              <div className="space-y-1">
-                <Label htmlFor="password" className="text-sm">Password</Label>
-                <Input 
-                  id="password"
-                  type="password" 
-                  placeholder="••••••••" 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-9 text-sm"
-                />
-              </div>
 
-              {isSignUp && (
-                <Alert variant="default" className="bg-muted/50 text-foreground border-primary/20">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle className="text-xs font-medium">Registration Disabled</AlertTitle>
-                  <AlertDescription className="text-xs">
-                    This platform will allow external users within a few days. It is currently for testing purposes only.
-                  </AlertDescription>
-                </Alert>
+                  <Alert variant="default" className="bg-muted/50 text-foreground border-primary/20">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle className="text-xs font-medium">Registration Disabled</AlertTitle>
+                    <AlertDescription className="text-xs">
+                      This platform will allow external users within a few days. It is currently for testing purposes only.
+                    </AlertDescription>
+                  </Alert>
+                </>
               )}
             </CardContent>
 
@@ -174,7 +452,7 @@ const Login = () => {
               <Button 
                 className="w-full h-9 text-sm" 
                 type="submit" 
-                disabled={isLoading || (isSignUp)}
+                disabled={isLoading || isSignUp || !isFormValid()}
               >
                 {isLoading 
                   ? (isSignUp ? "Creating account..." : "Signing in...") 
@@ -182,7 +460,7 @@ const Login = () => {
                 }
               </Button>
               
-              <Button 
+              {/* <Button 
                 variant="link" 
                 type="button"
                 className="w-full h-8 text-xs sm:text-sm"
@@ -198,7 +476,7 @@ const Login = () => {
                   ? "Already have an account? Sign in" 
                   : "Don't have an account? Sign up"
                 }
-              </Button>
+              </Button> */}
             </CardFooter>
           </form>
         </Card>

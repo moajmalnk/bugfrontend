@@ -272,8 +272,7 @@ const ProjectDetails = () => {
 
   const fetchProjectBugs = async () => {
     try {
-      const { bugs } = await bugService.getBugs(projectId, 1, 1000);
-      const totalBugs = bugs.length;
+      const { bugs } = await bugService.getBugs({ projectId, page: 1, limit: 1000 });
       setBugs(bugs);
     } catch (error) {
       toast({
@@ -595,9 +594,6 @@ const ProjectDetails = () => {
           <TabsTrigger value="overview" className="flex-1 min-w-[100px]">
             Overview
           </TabsTrigger>
-          <TabsTrigger value="bugs" className="flex-1 min-w-[100px]">
-            Bugs
-          </TabsTrigger>
           <TabsTrigger value="members" className="flex-1 min-w-[100px]">
             Members
           </TabsTrigger>
@@ -625,12 +621,7 @@ const ProjectDetails = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {
-                    bugs.filter(
-                      (bug) =>
-                        bug.status === "pending" || bug.status === "in_progress"
-                    ).length
-                  }
+                  {bugs.filter((bug) => bug.status === "pending" || bug.status === "in_progress").length}
                 </div>
               </CardContent>
             </Card>
@@ -659,76 +650,6 @@ const ProjectDetails = () => {
               refreshInterval={30000}
             />
           </div>
-        </TabsContent>
-
-        <TabsContent value="bugs">
-          <Card>
-            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-              <div>
-                <CardTitle>Project Bugs</CardTitle>
-                <CardDescription>
-                  All bugs reported in this project
-                </CardDescription>
-              </div>
-              
-              {/* Role-based action buttons */}
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                {/* Report Bug button - for testers and admins */}
-                {(currentUser?.role === "tester" || currentUser?.role === "admin") && (
-              <Button
-                asChild
-                    className="w-full sm:w-auto"
-                size="sm"
-              >
-                <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new?projectId=${projectId}` : `/bugs/new?projectId=${projectId}`}>
-                  <Plus className="mr-2 h-4 w-4" /> Report Bug
-                </Link>
-              </Button>
-                )}
-                
-                {/* Fix Bug button - for developers and admins */}
-                {(currentUser?.role === "developer" || currentUser?.role === "admin") && (
-                  <Button
-                    asChild
-                    className="w-full sm:w-auto"
-                    size="sm"
-                    variant="outline"
-                  >
-                    <Link to={currentUser?.role ? `/${currentUser.role}/bugs?project_id=${projectId}&status=pending,in_progress` : `/bugs?project_id=${projectId}&status=pending,in_progress`}>
-                      <Wrench className="mr-2 h-4 w-4" /> Fix Bugs
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {bugs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-8 text-center border-2 border-dashed rounded-lg h-full">
-                  <Bug className="w-12 h-12 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">
-                    No Pending Bugs
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    This project is all clear for now!
-                  </p>
-                  <Button asChild className="mt-4">
-                    <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new?projectId=${projectId}` : `/bugs/new?projectId=${projectId}`}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Report a New Bug
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {bugs.map((bug) => (
-                    <div key={bug.id} className="w-full max-w-full">
-                      <BugCard bug={bug} onDelete={() => fetchProjectBugs()} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="members">

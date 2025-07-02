@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, X } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -94,15 +94,28 @@ export const AnnouncementDialog = ({ open, onOpenChange, announcement, onSave }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto custom-scrollbar">
         <DialogHeader>
-          <DialogTitle>{announcement ? 'Edit Announcement' : 'Create Announcement'}</DialogTitle>
-          <DialogDescription>
-            {announcement ? 'Make changes to your announcement.' : 'Create a new announcement for all users.'}
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-lg sm:text-xl">{announcement ? 'Edit Announcement' : 'Create Announcement'}</DialogTitle>
+              <DialogDescription className="text-sm mt-1">
+                {announcement ? 'Make changes to your announcement.' : 'Create a new announcement for all users.'}
+              </DialogDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 flex-shrink-0"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+          </div>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
             <FormField
               control={form.control}
               name="title"
@@ -123,7 +136,7 @@ export const AnnouncementDialog = ({ open, onOpenChange, announcement, onSave }:
                 <FormItem>
                   <FormLabel>Content</FormLabel>
                   <FormControl>
-                    <Textarea {...field} rows={5} />
+                    <Textarea {...field} rows={4} className="min-h-[100px] sm:min-h-[120px] custom-scrollbar" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -133,9 +146,9 @@ export const AnnouncementDialog = ({ open, onOpenChange, announcement, onSave }:
               control={form.control}
               name="is_active"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 sm:p-4 shadow-sm">
                   <div className="space-y-0.5">
-                    <FormLabel>Active</FormLabel>
+                    <FormLabel className="text-sm sm:text-base">Active</FormLabel>
                   </div>
                   <FormControl>
                     <Switch
@@ -184,8 +197,11 @@ export const AnnouncementDialog = ({ open, onOpenChange, announcement, onSave }:
                 </FormItem>
               )}
             />
-            <DialogFooter>
-              <Button type="submit">Save</Button>
+            <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">Save</Button>
             </DialogFooter>
           </form>
         </Form>

@@ -42,6 +42,14 @@ import {
 } from "@/components/ui/card";
 import { updateService } from "@/services/updateService";
 import { projectService } from "@/services/projectService";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -114,6 +122,8 @@ const Updates = () => {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all-updates");
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch updates from backend
   const {
@@ -181,9 +191,17 @@ const Updates = () => {
   };
 
   const FilterControls = () => (
-    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
+    <>
+      <Input
+        placeholder={`Search in ${activeTab.replace('-', ' ')}...`}
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="flex-1 min-w-0 bg-background/50 h-9 text-xs sm:text-sm"
+        aria-label={`Search ${activeTab.replace('-', ' ')}`}
+        disabled={isLoading}
+      />
       <Select value={typeFilter} onValueChange={setTypeFilter}>
-        <SelectTrigger className="w-full sm:min-w-[120px] sm:max-w-[160px] bg-background/50 h-9 text-xs sm:text-sm">
+        <SelectTrigger className="flex-1 min-w-0 bg-background/50 h-9 text-xs sm:text-sm">
           <SelectValue placeholder="Type" />
         </SelectTrigger>
         <SelectContent position="popper">
@@ -193,7 +211,20 @@ const Updates = () => {
           <SelectItem value="maintenance">Maintenance</SelectItem>
         </SelectContent>
       </Select>
-    </div>
+    </>
+  );
+
+  const ItemsPerPageSelect = () => (
+    <Select value={String(itemsPerPage)} onValueChange={v => setItemsPerPage(Number(v))}>
+      <SelectTrigger className="w-full sm:w-auto bg-background/50 h-9 text-xs sm:text-sm">
+        <SelectValue>{itemsPerPage} / page</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="10">10 / page</SelectItem>
+        <SelectItem value="25">25 / page</SelectItem>
+        <SelectItem value="50">50 / page</SelectItem>
+      </SelectContent>
+    </Select>
   );
 
   const renderEmptyState = () => {
@@ -214,6 +245,13 @@ const Updates = () => {
     );
   };
 
+  const totalFiltered = filteredUpdates.length;
+  const paginatedUpdates = filteredUpdates.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+
   // Updates Tabs Component
   const UpdatesTabs = () => (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -229,66 +267,49 @@ const Updates = () => {
       </TabsList>
 
       <TabsContent value={activeTab} className="space-y-4">
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          <div className="relative">
-            {isLoading ? (
-              <Skeleton className="w-full h-10 rounded-md" />
-            ) : (
-              <Input
-                placeholder={`Search in ${activeTab.replace('-', ' ')}...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-background/50 h-10 text-sm pl-10"
-                aria-label={`Search ${activeTab.replace('-', ' ')}`}
-                disabled={getTabCount(activeTab) === 0 && !isLoading}
-              />
-            )}
-            {!isLoading && (
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            )}
-          </div>
-
-          <div className="block lg:hidden">
-            {isLoading ? (
-              <Skeleton className="w-full h-9 rounded-md" />
-            ) : (
-              <Sheet
-                open={isFilterSheetOpen}
-                onOpenChange={setIsFilterSheetOpen}
-              >
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full h-9"
-                    aria-label="Open filters"
-                    disabled={getTabCount(activeTab) === 0 && !isLoading}
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filters
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="h-[50vh] px-4 py-6">
-                  <SheetHeader className="mb-6">
-                    <SheetTitle className="text-lg">Filters</SheetTitle>
-                    <SheetDescription className="text-sm">
-                      Apply filters to find specific updates
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="space-y-4">
+        {/* Search and Filters in one row */}
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
                     <FilterControls />
                   </div>
-                </SheetContent>
-              </Sheet>
-            )}
-          </div>
 
-          <div className="hidden lg:flex gap-4">
-            {isLoading ? (
-              <Skeleton className="h-9 w-44 rounded-md" />
-            ) : (
-              <FilterControls />
-            )}
+        {/* Pagination summary and controls */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
+          <div>
+            <span className="text-sm text-muted-foreground font-medium">
+              Showing {(currentPage - 1) * itemsPerPage + 1}
+              -
+              {Math.min(currentPage * itemsPerPage, totalFiltered)}
+              {" "}of {totalFiltered} updates
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+            <ItemsPerPageSelect />
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    aria-disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      isActive={currentPage === i + 1}
+                      onClick={() => setCurrentPage(i + 1)}
+                    >
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    aria-disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
         </div>
 
@@ -300,7 +321,6 @@ const Updates = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[120px]">Update ID</TableHead>
                     <TableHead className="w-[250px]">Title</TableHead>
                     <TableHead className="w-[100px]">Type</TableHead>
                     <TableHead className="w-[150px]">Project</TableHead>
@@ -328,7 +348,7 @@ const Updates = () => {
                 ))}
             </div>
           </>
-        ) : filteredUpdates.length === 0 ? (
+        ) : paginatedUpdates.length === 0 ? (
           renderEmptyState()
         ) : (
           <>
@@ -336,7 +356,6 @@ const Updates = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[120px]">Update ID</TableHead>
                     <TableHead className="w-[250px]">Title</TableHead>
                     <TableHead className="w-[100px]">Type</TableHead>
                     <TableHead className="w-[150px]">Project</TableHead>
@@ -346,14 +365,8 @@ const Updates = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUpdates.map((update) => (
+                  {paginatedUpdates.map((update) => (
                     <TableRow key={update.id}>
-                      <TableCell className="font-medium max-w-[120px] break-all">
-                        <div className="flex items-center space-x-2">
-                          <Bell className="h-4 w-4 text-muted-foreground" />
-                          <span>{update.id}</span>
-                        </div>
-                      </TableCell>
                       <TableCell className="max-w-[250px] break-words">
                         {update.title}
                       </TableCell>
@@ -377,11 +390,6 @@ const Updates = () => {
                           <Button variant="outline" size="sm" asChild>
                             <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}` : `/updates/${update.id}`}>View Details</Link>
                           </Button>
-                          {(currentUser?.role === "admin" || update.created_by === currentUser?.username) && (
-                            <Button variant="outline" size="sm" asChild>
-                              <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}/edit` : `/updates/${update.id}/edit`}>Edit</Link>
-                            </Button>
-                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -391,7 +399,7 @@ const Updates = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
-              {filteredUpdates.map((update) => (
+              {paginatedUpdates.map((update) => (
                 <Card
                   key={update.id}
                   className="flex flex-col justify-between"
@@ -413,9 +421,6 @@ const Updates = () => {
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
                      <div className="flex items-center text-muted-foreground">
-                        <Bell className="h-4 w-4 mr-2" /> ID: {update.id}
-                     </div>
-                     <div className="flex items-center text-muted-foreground">
                         <Lock className="h-4 w-4 mr-2" /> Project: {update.project_name}
                      </div>
                      <div className="flex items-center text-muted-foreground">
@@ -431,11 +436,6 @@ const Updates = () => {
                        <Button variant="outline" size="sm" asChild className="w-full">
                          <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}` : `/updates/${update.id}`}>View Details</Link>
                        </Button>
-                       {(currentUser?.role === "admin" || update.created_by === currentUser?.username) && (
-                         <Button variant="outline" size="sm" asChild className="w-full">
-                           <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}/edit` : `/updates/${update.id}/edit`}>Edit</Link>
-                         </Button>
-                       )}
                      </div>
                   </CardFooter>
                 </Card>
@@ -460,14 +460,22 @@ const Updates = () => {
                 A log of all features, fixes, and maintenance updates.
               </p>
             </div>
-            <div className="flex-shrink-0 w-full sm:w-auto">
+            <div className="flex-shrink-0 w-full sm:w-auto flex items-center gap-2 mt-2 sm:mt-0">
               {projects.length > 0 && (
+                <>
                 <Link to={currentUser?.role ? `/${currentUser.role}/new-update` : "/new-update"}>
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     New Update
                   </Button>
                 </Link>
+                  <div className="inline-flex items-center border rounded-md px-3 py-2 bg-blue-50 ml-2">
+                    <Bell className="h-4 w-4 text-blue-500 mr-2" />
+                    <span className="text-sm font-medium text-blue-700">
+                      {updates.length} <span className="hidden lg:inline">Updates</span>
+                    </span>
+                  </div>
+                </>
               )}
               {projects.length === 0 && !isLoading && (
                 <p className="text-xs text-muted-foreground mt-2 text-center sm:text-left">
