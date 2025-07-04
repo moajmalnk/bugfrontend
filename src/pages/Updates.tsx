@@ -1,6 +1,28 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -11,45 +33,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Plus, Search, Filter, Lock, Bell, User } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { format } from 'date-fns';
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { updateService } from "@/services/updateService";
 import { projectService } from "@/services/projectService";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationPrevious,
-  PaginationNext,
-} from "@/components/ui/pagination";
+import { updateService } from "@/services/updateService";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { AlertCircle, Bell, Lock, Plus, Search, User, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -118,12 +109,13 @@ const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
 const Updates = () => {
   const { currentUser } = useAuth();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all-updates");
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [createdByFilter, setCreatedByFilter] = useState("all");
 
   // Fetch updates from backend
   const {
@@ -135,35 +127,68 @@ const Updates = () => {
     queryFn: () => updateService.getUpdates(),
   });
 
+  // Reset current page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, updates.length, searchTerm, typeFilter, createdByFilter]);
+
   // Fetch projects to determine if user can create new update
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects", currentUser?.id],
     queryFn: () => projectService.getProjects(),
     enabled: !!currentUser,
   });
-  
+
   const isLoading = skeletonLoading || projectsLoading;
 
   // Filter updates based on active tab
-  const getFilteredUpdatesByTab = () => {
+  const filteredUpdates = useMemo(() => {
+    let filtered = updates;
+
+    // First filter by tab
     switch (activeTab) {
       case "all-updates":
-        return updates;
+        filtered = updates;
+        break;
       case "my-updates":
-        return updates.filter(update => update.created_by === currentUser?.username);
+        filtered = updates.filter(
+          (update) => update.created_by === currentUser?.username
+        );
+        break;
       default:
-        return updates;
+        filtered = updates;
     }
-  };
 
-  const tabFilteredUpdates = getFilteredUpdatesByTab();
+    // Then apply search and other filters
+    return filtered.filter((update) => {
+      const matchesSearch =
+        update.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        update.project_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (update.created_by &&
+          update.created_by.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const filteredUpdates = tabFilteredUpdates.filter(
-    (update) =>
-      (update.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      update.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (typeFilter === "all" || update.type === typeFilter)
+      const matchesType = typeFilter === "all" || update.type === typeFilter;
+      const matchesCreatedBy =
+        createdByFilter === "all" || update.created_by === createdByFilter;
+
+      return matchesSearch && matchesType && matchesCreatedBy;
+    });
+  }, [
+    updates,
+    activeTab,
+    currentUser?.username,
+    searchTerm,
+    typeFilter,
+    createdByFilter,
+  ]);
+
+  // Pagination calculations
+  const totalFiltered = filteredUpdates.length;
+  const paginatedUpdates = filteredUpdates.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
+  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
 
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
@@ -171,11 +196,22 @@ const Updates = () => {
       case "all-updates":
         return updates.length;
       case "my-updates":
-        return updates.filter(update => update.created_by === currentUser?.username).length;
+        return updates.filter(
+          (update) => update.created_by === currentUser?.username
+        ).length;
       default:
         return 0;
     }
   };
+
+  // Get unique creators for filter
+  const uniqueCreators = useMemo(() => {
+    const creators = updates
+      .map((update) => update.created_by)
+      .filter(Boolean)
+      .filter((creator, index, arr) => arr.indexOf(creator) === index);
+    return creators.sort();
+  }, [updates]);
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -189,43 +225,6 @@ const Updates = () => {
         return "";
     }
   };
-
-  const FilterControls = () => (
-    <>
-      <Input
-        placeholder={`Search in ${activeTab.replace('-', ' ')}...`}
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="flex-1 min-w-0 bg-background/50 h-9 text-xs sm:text-sm"
-        aria-label={`Search ${activeTab.replace('-', ' ')}`}
-        disabled={isLoading}
-      />
-      <Select value={typeFilter} onValueChange={setTypeFilter}>
-        <SelectTrigger className="flex-1 min-w-0 bg-background/50 h-9 text-xs sm:text-sm">
-          <SelectValue placeholder="Type" />
-        </SelectTrigger>
-        <SelectContent position="popper">
-          <SelectItem value="all">All Types</SelectItem>
-          <SelectItem value="feature">Feature</SelectItem>
-          <SelectItem value="fix">Fix</SelectItem>
-          <SelectItem value="maintenance">Maintenance</SelectItem>
-        </SelectContent>
-      </Select>
-    </>
-  );
-
-  const ItemsPerPageSelect = () => (
-    <Select value={String(itemsPerPage)} onValueChange={v => setItemsPerPage(Number(v))}>
-      <SelectTrigger className="w-full sm:w-auto bg-background/50 h-9 text-xs sm:text-sm">
-        <SelectValue>{itemsPerPage} / page</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="10">10 / page</SelectItem>
-        <SelectItem value="25">25 / page</SelectItem>
-        <SelectItem value="50">50 / page</SelectItem>
-      </SelectContent>
-    </Select>
-  );
 
   const renderEmptyState = () => {
     return (
@@ -245,13 +244,6 @@ const Updates = () => {
     );
   };
 
-  const totalFiltered = filteredUpdates.length;
-  const paginatedUpdates = filteredUpdates.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
-
   // Updates Tabs Component
   const UpdatesTabs = () => (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -267,51 +259,123 @@ const Updates = () => {
       </TabsList>
 
       <TabsContent value={activeTab} className="space-y-4">
-        {/* Search and Filters in one row */}
-        <div className="flex flex-col sm:flex-row gap-2 w-full">
-                    <FilterControls />
-                  </div>
+        {/* Search and Filter Controls */}
+        <div className="flex flex-col gap-4 p-4 bg-muted/30 rounded-lg border">
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search updates, projects, or creators..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
-        {/* Pagination summary and controls */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
-          <div>
-            <span className="text-sm text-muted-foreground font-medium">
-              Showing {(currentPage - 1) * itemsPerPage + 1}
-              -
-              {Math.min(currentPage * itemsPerPage, totalFiltered)}
-              {" "}of {totalFiltered} updates
-            </span>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-            <ItemsPerPageSelect />
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    aria-disabled={currentPage === 1}
-                  />
-                </PaginationItem>
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <PaginationItem key={i}>
-                    <PaginationLink
-                      isActive={currentPage === i + 1}
-                      onClick={() => setCurrentPage(i + 1)}
-                    >
-                      {i + 1}
-                    </PaginationLink>
-                  </PaginationItem>
+            {/* Type Filter */}
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="feature">Feature</SelectItem>
+                <SelectItem value="fix">Fix</SelectItem>
+                <SelectItem value="maintenance">Maintenance</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Created By Filter */}
+            <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+              <SelectTrigger className="w-full sm:w-[160px] text-sm">
+                <SelectValue placeholder="Created By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Creators</SelectItem>
+                {uniqueCreators.map((creator) => (
+                  <SelectItem key={creator} value={creator}>
+                    {creator}
+                  </SelectItem>
                 ))}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    aria-disabled={currentPage === totalPages}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+              </SelectContent>
+            </Select>
           </div>
+
+          {/* Clear Filters Button */}
+          {(searchTerm ||
+            typeFilter !== "all" ||
+            createdByFilter !== "all") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchTerm("");
+                setTypeFilter("all");
+                setCreatedByFilter("all");
+              }}
+              className="w-full sm:w-auto"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Clear Filters
+            </Button>
+          )}
         </div>
+
+        {/* Pagination Controls at the top - only show when there are updates */}
+        {filteredUpdates.length > 0 && (
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
+            <div>
+              <span className="text-sm text-muted-foreground font-medium">
+                Showing {(currentPage - 1) * itemsPerPage + 1}-
+                {Math.min(currentPage * itemsPerPage, totalFiltered)} of{" "}
+                {totalFiltered} updates
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+              <select
+                value={itemsPerPage}
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                className="border border-border rounded-md px-3 py-2 text-sm w-full sm:w-auto bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                aria-label="Items per page"
+              >
+                {[10, 25, 50].map((n) => (
+                  <option key={n} value={n}>
+                    {n} / page
+                  </option>
+                ))}
+              </select>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      aria-disabled={currentPage === 1}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <PaginationItem key={i}>
+                      <PaginationLink
+                        isActive={currentPage === i + 1}
+                        onClick={() => setCurrentPage(i + 1)}
+                      >
+                        {i + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      aria-disabled={currentPage === totalPages}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         {isLoading ? (
@@ -326,7 +390,9 @@ const Updates = () => {
                     <TableHead className="w-[150px]">Project</TableHead>
                     <TableHead className="w-[150px]">Created By</TableHead>
                     <TableHead className="w-[120px]">Date</TableHead>
-                    <TableHead className="w-[100px] text-right">Actions</TableHead>
+                    <TableHead className="w-[100px] text-right">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -348,7 +414,7 @@ const Updates = () => {
                 ))}
             </div>
           </>
-        ) : paginatedUpdates.length === 0 ? (
+        ) : filteredUpdates.length === 0 ? (
           renderEmptyState()
         ) : (
           <>
@@ -361,7 +427,9 @@ const Updates = () => {
                     <TableHead className="w-[150px]">Project</TableHead>
                     <TableHead className="w-[150px]">Created By</TableHead>
                     <TableHead className="w-[120px]">Date</TableHead>
-                    <TableHead className="w-[100px] text-right">Actions</TableHead>
+                    <TableHead className="w-[100px] text-right">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -382,13 +450,25 @@ const Updates = () => {
                         {update.project_name}
                       </TableCell>
                       <TableCell className="max-w-[150px] break-words">
-                        <span className="font-medium">{update.created_by || "Unknown"}</span>
+                        <span className="font-medium">
+                          {update.created_by || "Unknown"}
+                        </span>
                       </TableCell>
-                      <TableCell>{format(new Date(update.created_at), "PPPp")}</TableCell>
+                      <TableCell>
+                        {format(new Date(update.created_at), "PPPp")}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" size="sm" asChild>
-                            <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}` : `/updates/${update.id}`}>View Details</Link>
+                            <Link
+                              to={
+                                currentUser?.role
+                                  ? `/${currentUser.role}/updates/${update.id}`
+                                  : `/updates/${update.id}`
+                              }
+                            >
+                              View Details
+                            </Link>
                           </Button>
                         </div>
                       </TableCell>
@@ -400,43 +480,65 @@ const Updates = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
               {paginatedUpdates.map((update) => (
-                <Card
-                  key={update.id}
-                  className="flex flex-col justify-between"
-                >
+                <Card key={update.id} className="flex flex-col justify-between">
                   <CardHeader>
                     <div className="flex justify-between items-start gap-2">
                       <CardTitle className="text-base font-bold leading-tight break-all">
-                        <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}`: `/updates/${update.id}`} className="hover:underline">
+                        <Link
+                          to={
+                            currentUser?.role
+                              ? `/${currentUser.role}/updates/${update.id}`
+                              : `/updates/${update.id}`
+                          }
+                          className="hover:underline"
+                        >
                           {update.title}
                         </Link>
                       </CardTitle>
                       <Badge
                         variant="outline"
-                        className={`text-xs h-fit shrink-0 ${getTypeColor(update.type)}`}
+                        className={`text-xs h-fit shrink-0 ${getTypeColor(
+                          update.type
+                        )}`}
                       >
                         {update.type}
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
-                     <div className="flex items-center text-muted-foreground">
-                        <Lock className="h-4 w-4 mr-2" /> Project: {update.project_name}
-                     </div>
-                     <div className="flex items-center text-muted-foreground">
-                        <User className="h-4 w-4 mr-2" /> By:{" "}
-                        <span className="font-medium text-foreground">{update.created_by || "BugRicer"}</span>
-                     </div>
+                    <div className="flex items-center text-muted-foreground">
+                      <Lock className="h-4 w-4 mr-2" /> Project:{" "}
+                      {update.project_name}
+                    </div>
+                    <div className="flex items-center text-muted-foreground">
+                      <User className="h-4 w-4 mr-2" /> By:{" "}
+                      <span className="font-medium text-foreground">
+                        {update.created_by || "BugRicer"}
+                      </span>
+                    </div>
                   </CardContent>
                   <CardFooter className="flex-col items-start gap-2">
-                     <div className="text-xs text-muted-foreground">
-                        {format(new Date(update.created_at), "PPPp")}
-                     </div>
-                     <div className="flex justify-end w-full gap-2">
-                       <Button variant="outline" size="sm" asChild className="w-full">
-                         <Link to={currentUser?.role ? `/${currentUser.role}/updates/${update.id}` : `/updates/${update.id}`}>View Details</Link>
-                       </Button>
-                     </div>
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(update.created_at), "PPPp")}
+                    </div>
+                    <div className="flex justify-end w-full gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        className="w-full"
+                      >
+                        <Link
+                          to={
+                            currentUser?.role
+                              ? `/${currentUser.role}/updates/${update.id}`
+                              : `/updates/${update.id}`
+                          }
+                        >
+                          View Details
+                        </Link>
+                      </Button>
+                    </div>
                   </CardFooter>
                 </Card>
               ))}
@@ -455,7 +557,9 @@ const Updates = () => {
         ) : (
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Updates</h1>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                Updates
+              </h1>
               <p className="text-muted-foreground text-sm mt-1">
                 A log of all features, fixes, and maintenance updates.
               </p>
@@ -463,16 +567,23 @@ const Updates = () => {
             <div className="flex-shrink-0 w-full sm:w-auto flex items-center gap-2 mt-2 sm:mt-0">
               {projects.length > 0 && (
                 <>
-                <Link to={currentUser?.role ? `/${currentUser.role}/new-update` : "/new-update"}>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Update
-                  </Button>
-                </Link>
+                  <Link
+                    to={
+                      currentUser?.role
+                        ? `/${currentUser.role}/new-update`
+                        : "/new-update"
+                    }
+                  >
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      New Update
+                    </Button>
+                  </Link>
                   <div className="inline-flex items-center border rounded-md px-3 py-2 bg-blue-50 ml-2">
                     <Bell className="h-4 w-4 text-blue-500 mr-2" />
                     <span className="text-sm font-medium text-blue-700">
-                      {updates.length} <span className="hidden lg:inline">Updates</span>
+                      {updates.length}{" "}
+                      <span className="hidden lg:inline">Updates</span>
                     </span>
                   </div>
                 </>

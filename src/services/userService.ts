@@ -5,6 +5,7 @@ import axios from 'axios';
 interface NewUserData {
   username: string;
   email: string;
+  phone?: string;
   password: string;
   role: UserRole;
 }
@@ -12,6 +13,7 @@ interface NewUserData {
 interface UpdateUserData {
   username?: string;
   email?: string;
+  phone?: string;
   role?: UserRole;
 }
 
@@ -92,12 +94,12 @@ class UserService {
     if (!response.ok || !data.success) {
       throw new Error(data.message || "Failed to add user.");
     }
-    return { user: data.data, message: data.message };
+    return { user: { ...data.data, phone: data.data.phone }, message: data.message };
   }
 
   async updateUser(userId: string, userData: UpdateUserData): Promise<User> {
     const response = await fetch(`${ENV.API_URL}/users/update.php`, {
-      method: "POST", // Use POST, since your API expects POST
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -108,7 +110,7 @@ class UserService {
     if (!result.success) {
       throw new Error(result.message || "Failed to update user");
     }
-    return result.data; // Ensure your API returns the full updated user object including 'name'
+    return { ...result.data, phone: result.data?.phone };
   }
 
   async getUserStats(userId: string): Promise<UserStats> {

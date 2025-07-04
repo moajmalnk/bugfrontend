@@ -19,38 +19,39 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast, useToast } from "@/components/ui/use-toast";
-import { useAuth } from "@/context/AuthContext";
-import { ENV } from "@/lib/env";
-import { bugService } from "@/services/bugService";
-import { Project, projectService } from "@/services/projectService";
-import { Bug } from "@/types";
-import { 
-  AlertCircle, 
-  CheckCircle2, 
-  FolderKanban, 
-  Search, 
-  Clock, 
-  UserRound, 
-  Users, 
-  Shield,
-  Code,
-  TestTube,
-  Info
-} from "lucide-react";
+import { Tabs } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { toast, useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { ENV } from "@/lib/env";
+import { bugService } from "@/services/bugService";
+import { Project, projectService } from "@/services/projectService";
+import { motion } from "framer-motion";
+import {
+  AlertCircle,
+  Clock,
+  Code,
+  FolderKanban,
+  Shield,
+  TestTube,
+  Users,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Tabs } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Project Card Skeleton component for loading state
 const ProjectCardSkeleton = () => (
@@ -104,13 +105,15 @@ const Projects = () => {
   const [projectMemberCounts, setProjectMemberCounts] = useState<
     Record<string, ProjectMemberCounts>
   >({});
-  const [userProjectMemberships, setUserProjectMemberships] = useState<Record<string, boolean>>({});
+  const [userProjectMemberships, setUserProjectMemberships] = useState<
+    Record<string, boolean>
+  >({});
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "overview";
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     // Fetch projects when component mounts
@@ -121,10 +124,10 @@ const Projects = () => {
     try {
       setIsLoading(true);
       setSkeletonLoading(true); // Ensure skeleton is showing while fetching
-      
+
       const data = await projectService.getProjects();
       setProjects(data);
-      
+
       // Initialize filteredProjects with the fetched data to avoid showing "No projects found"
       // But we won't display them until membership is checked
       setFilteredProjects(data);
@@ -151,33 +154,38 @@ const Projects = () => {
       });
     }
   }, [projects]);
-  
+
   // Apply filtering whenever search query or memberships change
   useEffect(() => {
     if (projects.length > 0) {
       applyFilters();
     }
   }, [searchQuery, userProjectMemberships, projects]);
-  
+
+  // Reset current page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, userProjectMemberships, projects.length]);
+
   // Check if the current user is a member of each project
   const checkUserMembership = async () => {
     if (!currentUser) {
       setSkeletonLoading(false);
       return;
     }
-    
+
     try {
       const token = localStorage.getItem("token");
       if (!token) {
         setSkeletonLoading(false);
         return;
       }
-      
+
       const memberships: Record<string, boolean> = {};
-      
+
       // Admins have access to all projects
       if (currentUser.role === "admin") {
-        projects.forEach(project => {
+        projects.forEach((project) => {
           memberships[project.id] = true;
         });
         setUserProjectMemberships(memberships);
@@ -185,7 +193,7 @@ const Projects = () => {
         setSkeletonLoading(false);
         return;
       }
-      
+
       // For developers and testers, check each project
       for (const project of projects) {
         const response = await fetch(
@@ -198,22 +206,24 @@ const Projects = () => {
             },
           }
         );
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
             // Check if current user is in the members list
             const members = data.data?.members || [];
-            const isMember = members.some(member => String(member.id) === String(currentUser.id));
+            const isMember = members.some(
+              (member) => String(member.id) === String(currentUser.id)
+            );
             memberships[project.id] = isMember;
             //.log("API members for project", project.id, data.members);
           }
         }
       }
-      
+
       setUserProjectMemberships(memberships);
       //.log("Memberships:", memberships);
-      
+
       // Turn off skeleton loading only after membership check is complete
       setSkeletonLoading(false);
     } catch (error) {
@@ -221,10 +231,13 @@ const Projects = () => {
       setSkeletonLoading(false);
     }
   };
-  
+
   // Apply all filters (search and membership)
   const applyFilters = () => {
-    if (projects.length === 0 || Object.keys(userProjectMemberships).length === 0) {
+    if (
+      projects.length === 0 ||
+      Object.keys(userProjectMemberships).length === 0
+    ) {
       setFilteredProjects([]);
       return;
     }
@@ -234,7 +247,7 @@ const Projects = () => {
     // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(
-        project =>
+        (project) =>
           project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           project.description.toLowerCase().includes(searchQuery.toLowerCase())
       );
@@ -242,7 +255,9 @@ const Projects = () => {
 
     // Admins see all, others see only assigned projects
     if (currentUser?.role !== "admin") {
-      filtered = filtered.filter(project => userProjectMemberships[project.id]);
+      filtered = filtered.filter(
+        (project) => userProjectMemberships[project.id]
+      );
     }
 
     setFilteredProjects(filtered);
@@ -252,10 +267,10 @@ const Projects = () => {
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
-      
+
       // For each project, fetch its members
       const memberCounts: Record<string, ProjectMemberCounts> = {};
-      
+
       for (const project of projects) {
         const response = await fetch(
           `${ENV.API_URL}/projects/get_members.php?project_id=${project.id}`,
@@ -267,23 +282,27 @@ const Projects = () => {
             },
           }
         );
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
             const members = data.data?.members || [];
-            const devCount = members.filter(m => m.role === 'developer').length;
-            const testerCount = members.filter(m => m.role === 'tester').length;
-            
+            const devCount = members.filter(
+              (m) => m.role === "developer"
+            ).length;
+            const testerCount = members.filter(
+              (m) => m.role === "tester"
+            ).length;
+
             memberCounts[project.id] = {
               total: members.length,
               developers: devCount,
-              testers: testerCount
+              testers: testerCount,
             };
           }
         }
       }
-      
+
       setProjectMemberCounts(memberCounts);
     } catch (error) {
       // Silent fail
@@ -298,15 +317,23 @@ const Projects = () => {
 
       for (const project of projects) {
         if (!userProjectMemberships[project.id]) continue;
-        const { bugs } = await bugService.getBugs({ projectId: project.id, page: 1, limit: 1000, status: "pending", userId: currentUser?.id });
+        const { bugs } = await bugService.getBugs({
+          projectId: project.id,
+          page: 1,
+          limit: 1000,
+          status: "pending",
+          userId: currentUser?.id,
+        });
         const totalBugs = bugs.length;
 
         totalCounts[project.id] = totalBugs;
 
-        const openBugs = bugs.filter(bug => bug.status === "pending" || bug.status === "in_progress");
+        const openBugs = bugs.filter(
+          (bug) => bug.status === "pending" || bug.status === "in_progress"
+        );
         openCounts[project.id] = openBugs.length;
 
-        const fixedBugs = bugs.filter(bug => bug.status === "fixed");
+        const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
         fixedCounts[project.id] = fixedBugs.length;
       }
 
@@ -344,23 +371,23 @@ const Projects = () => {
 
   const handleDelete = async (projectId: string, force: boolean = false) => {
     if (!projectId) return;
-    
+
     // Close the delete dialog if it's open
     if (isDeleteDialogOpen) {
       setIsDeleteDialogOpen(false);
     }
-    
+
     // Close the error dialog if it's open and we're force deleting
     if (force && isErrorDialogOpen) {
       setIsErrorDialogOpen(false);
     }
-    
+
     try {
       // Use direct URL construction to match what works in Postman
       // Force parameter is only added if true
       const baseUrl = `${ENV.API_URL}/projects/delete.php?id=${projectId}`;
       const url = force ? `${baseUrl}&force_delete=true` : baseUrl;
-      
+
       const token = localStorage.getItem("token");
       if (!token) {
         toast({
@@ -370,38 +397,43 @@ const Projects = () => {
         });
         return;
       }
-      
+
       const response = await fetch(url, {
         method: "DELETE",
         headers: {
-          "Accept": "application/json",
+          Accept: "application/json",
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
+
       const data = await response.json();
 
       if (data.success) {
         // Update both project arrays
-        setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
-        setFilteredProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
-        
+        setProjects((prevProjects) =>
+          prevProjects.filter((p) => p.id !== projectId)
+        );
+        setFilteredProjects((prevProjects) =>
+          prevProjects.filter((p) => p.id !== projectId)
+        );
+
         // Clear the project to delete state
         setProjectToDelete(null);
-        
+
         toast({
           title: "Success",
-          description: force 
-            ? "Project and all related data deleted successfully" 
+          description: force
+            ? "Project and all related data deleted successfully"
             : "Project deleted successfully",
         });
       } else {
         // Check for constraint errors
-        if (data.message?.includes('team members') || 
-            data.message?.includes('bugs') || 
-            data.message?.includes('constraint')) {
-          
+        if (
+          data.message?.includes("team members") ||
+          data.message?.includes("bugs") ||
+          data.message?.includes("constraint")
+        ) {
           setDeleteErrorMessage(data.message);
           setIsErrorDialogOpen(true);
         } else {
@@ -444,8 +476,12 @@ const Projects = () => {
       {/* Header row with title, description, new project button, and badge */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">Projects</h1>
-          <p className="text-muted-foreground mt-1 break-words max-w-xl">Manage your projects and track bugs</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">
+            Projects
+          </h1>
+          <p className="text-muted-foreground mt-1 break-words max-w-xl">
+            Manage your projects and track bugs
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           {currentUser?.role === "admin" && (
@@ -454,62 +490,89 @@ const Projects = () => {
           <div className="inline-flex items-center border rounded-md px-3 py-2 bg-blue-50 ml-0 sm:ml-2">
             <FolderKanban className="h-4 w-4 text-blue-500 mr-2" />
             <span className="text-sm font-medium text-blue-700">
-              {filteredProjects.length} <span className="hidden lg:inline">Projects</span>
+              {filteredProjects.length}{" "}
+              <span className="hidden lg:inline">Projects</span>
             </span>
           </div>
         </div>
       </div>
-      {/* Summary and pagination controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
-        <div>
-          <span className="text-sm text-muted-foreground font-medium">
-            Showing {(currentPage - 1) * itemsPerPage + 1}
-            -
-            {Math.min(currentPage * itemsPerPage, totalFiltered)}
-            {" "}of {totalFiltered} projects
-          </span>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-          <Select value={String(itemsPerPage)} onValueChange={v => setItemsPerPage(Number(v))}>
-            <SelectTrigger className="w-full sm:w-auto bg-background/50 h-9 text-xs sm:text-sm">
-              <SelectValue>{itemsPerPage} / page</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10 / page</SelectItem>
-              <SelectItem value="25">25 / page</SelectItem>
-              <SelectItem value="50">50 / page</SelectItem>
-            </SelectContent>
-          </Select>
-          {/* Pagination controls */}
-          <div className="flex items-center gap-1">
-            <button
-              className="px-2 py-1 rounded border text-sm"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i}
-                className={`px-2 py-1 rounded border text-sm ${currentPage === i + 1 ? 'bg-primary text-white' : ''}`}
-                onClick={() => setCurrentPage(i + 1)}
-              >
-                {i + 1}
-              </button>
-            ))}
-            <button
-              className="px-2 py-1 rounded border text-sm"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </button>
+
+      {/* Search and Filter Controls */}
+      {!skeletonLoading && !isLoading && (
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+            />
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!skeletonLoading && !isLoading && totalFiltered > 0 && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
+          <div>
+            <span className="text-sm text-muted-foreground font-medium">
+              Showing {(currentPage - 1) * itemsPerPage + 1}-
+              {Math.min(currentPage * itemsPerPage, totalFiltered)} of{" "}
+              {totalFiltered} projects
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+            <select
+              value={itemsPerPage}
+              onChange={(e) => setItemsPerPage(Number(e.target.value))}
+              className="border border-border rounded-md px-3 py-2 text-sm w-full sm:w-auto bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-label="Items per page"
+            >
+              {[10, 25, 50].map((n) => (
+                <option key={n} value={n}>
+                  {n} / page
+                </option>
+              ))}
+            </select>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    aria-disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      isActive={currentPage === i + 1}
+                      onClick={() => setCurrentPage(i + 1)}
+                    >
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    aria-disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        </div>
+      )}
+
       {/* Projects Grid with Loading Skeletons */}
-      {skeletonLoading || isLoading || totalFiltered === 0 && projects.length > 0 && Object.keys(userProjectMemberships).length === 0 ? (
+      {skeletonLoading ||
+      isLoading ||
+      (totalFiltered === 0 &&
+        projects.length > 0 &&
+        Object.keys(userProjectMemberships).length === 0) ? (
         <div
           className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
           aria-busy="true"
@@ -528,10 +591,9 @@ const Projects = () => {
           </div>
           <h3 className="mt-4 text-lg font-semibold">No projects found</h3>
           <p className="mt-2 text-sm text-muted-foreground">
-            {searchQuery 
+            {searchQuery
               ? "We couldn't find any projects matching your search criteria."
-              : "You are not a member of any projects yet."
-            }
+              : "You are not a member of any projects yet."}
           </p>
           {currentUser?.role === "admin" && (
             <Button
@@ -560,16 +622,17 @@ const Projects = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <Card
-                className="flex flex-col h-full rounded-xl shadow-sm border border-border bg-background/90 transition-all duration-200 hover:shadow-md"
-              >
+              <Card className="flex flex-col h-full rounded-xl shadow-sm border border-border bg-background/90 transition-all duration-200 hover:shadow-md">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <Badge 
-                      variant={project.status === "active" ? "default" : "outline"} 
+                    <Badge
+                      variant={
+                        project.status === "active" ? "default" : "outline"
+                      }
                       className="text-xs px-2 py-0.5 mb-2"
                     >
-                      {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                      {project.status.charAt(0).toUpperCase() +
+                        project.status.slice(1)}
                     </Badge>
                     <div className="text-xs text-muted-foreground flex items-center">
                       <Clock className="h-3 w-3 mr-1" />
@@ -578,7 +641,11 @@ const Projects = () => {
                   </div>
                   <CardTitle>
                     <Link
-                      to={currentUser?.role ? `/${currentUser.role}/projects/${project.id}` : `/projects/${project.id}`}
+                      to={
+                        currentUser?.role
+                          ? `/${currentUser.role}/projects/${project.id}`
+                          : `/projects/${project.id}`
+                      }
                       className="hover:underline break-words text-base md:text-lg hover:text-primary transition-colors"
                     >
                       {project.name}
@@ -593,26 +660,40 @@ const Projects = () => {
                     {/* Bug Stats */}
                     <div className="grid grid-cols-3 gap-2 mt-2">
                       <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-                        <span className="text-xs text-muted-foreground">Total</span>
-                        <span className="font-semibold text-lg">{projectBugsCount[project.id] ?? 0}</span>
-                        <span className="text-[10px] text-muted-foreground">Bugs</span>
+                        <span className="text-xs text-muted-foreground">
+                          Total
+                        </span>
+                        <span className="font-semibold text-lg">
+                          {projectBugsCount[project.id] ?? 0}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Bugs
+                        </span>
                       </div>
                       <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
-                        <span className="text-xs text-muted-foreground">Open</span>
+                        <span className="text-xs text-muted-foreground">
+                          Open
+                        </span>
                         <span className="font-semibold text-lg text-yellow-600 dark:text-yellow-400">
                           {projectOpenBugsCount[project.id] ?? 0}
                         </span>
-                        <span className="text-[10px] text-muted-foreground">Bugs</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Bugs
+                        </span>
                       </div>
                       <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
-                        <span className="text-xs text-muted-foreground">Fixed</span>
+                        <span className="text-xs text-muted-foreground">
+                          Fixed
+                        </span>
                         <span className="font-semibold text-lg text-green-600 dark:text-green-400">
                           {projectFixedBugsCount[project.id] ?? 0}
                         </span>
-                        <span className="text-[10px] text-muted-foreground">Bugs</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Bugs
+                        </span>
                       </div>
                     </div>
-                    
+
                     {/* Team Stats */}
                     <div className="flex items-center justify-between mt-1 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/20">
                       <div className="flex items-center">
@@ -620,13 +701,23 @@ const Projects = () => {
                         <span className="text-sm font-medium">Team</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1" title="Developers">
+                        <div
+                          className="flex items-center gap-1"
+                          title="Developers"
+                        >
                           <Code className="h-3.5 w-3.5 text-emerald-600" />
-                          <span className="text-xs">{projectMemberCounts[project.id]?.developers ?? 0}</span>
+                          <span className="text-xs">
+                            {projectMemberCounts[project.id]?.developers ?? 0}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1" title="Testers">
+                        <div
+                          className="flex items-center gap-1"
+                          title="Testers"
+                        >
                           <TestTube className="h-3.5 w-3.5 text-purple-600" />
-                          <span className="text-xs">{projectMemberCounts[project.id]?.testers ?? 0}</span>
+                          <span className="text-xs">
+                            {projectMemberCounts[project.id]?.testers ?? 0}
+                          </span>
                         </div>
                         <div className="flex items-center gap-1" title="Admins">
                           <Shield className="h-3.5 w-3.5 text-blue-600" />
@@ -645,7 +736,15 @@ const Projects = () => {
                     variant="default"
                     className="w-full sm:w-auto shadow-sm hover:shadow transition-all duration-200"
                   >
-                    <Link to={currentUser?.role ? `/${currentUser.role}/projects/${project.id}` : `/projects/${project.id}`}>View Project</Link>
+                    <Link
+                      to={
+                        currentUser?.role
+                          ? `/${currentUser.role}/projects/${project.id}`
+                          : `/projects/${project.id}`
+                      }
+                    >
+                      View Project
+                    </Link>
                   </Button>
                   {currentUser?.role === "admin" && (
                     <TooltipProvider>
@@ -664,7 +763,10 @@ const Projects = () => {
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>You can only delete projects that have no team members or bugs</p>
+                          <p>
+                            You can only delete projects that have no team
+                            members or bugs
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -677,7 +779,10 @@ const Projects = () => {
       )}
 
       {/* Delete Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Project?</AlertDialogTitle>
@@ -705,8 +810,10 @@ const Projects = () => {
             <AlertDialogCancel onClick={() => setProjectToDelete(null)}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => projectToDelete && handleDelete(projectToDelete, false)}
+            <AlertDialogAction
+              onClick={() =>
+                projectToDelete && handleDelete(projectToDelete, false)
+              }
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
@@ -716,8 +823,8 @@ const Projects = () => {
       </AlertDialog>
 
       {/* Error Dialog for Delete Constraints */}
-      <AlertDialog 
-        open={isErrorDialogOpen} 
+      <AlertDialog
+        open={isErrorDialogOpen}
         onOpenChange={(open) => {
           setIsErrorDialogOpen(open);
           if (!open) {
@@ -735,26 +842,31 @@ const Projects = () => {
             <AlertDialogDescription asChild>
               <div className="text-left">
                 {deleteErrorMessage}
-                
+
                 <div className="mt-4 bg-muted p-3 rounded-md text-sm">
-                  <div className="font-medium mb-2">Before deleting a project:</div>
+                  <div className="font-medium mb-2">
+                    Before deleting a project:
+                  </div>
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Remove all team members from the project</li>
                     <li>Resolve or reassign all bugs in the project</li>
                   </ul>
                 </div>
-                
+
                 <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md text-sm border border-yellow-200 dark:border-yellow-800">
                   <div className="font-medium mb-2 flex items-center">
                     <AlertCircle className="h-4 w-4 mr-2 text-yellow-600 dark:text-yellow-400" />
                     Alternative: Force Delete
                   </div>
                   <div className="mb-2">
-                    You can also force delete this project, which will automatically delete:
+                    You can also force delete this project, which will
+                    automatically delete:
                   </div>
                   <ul className="list-disc pl-5 space-y-1 text-yellow-700 dark:text-yellow-300">
                     <li>All team member associations</li>
-                    <li>All bugs and their fixes associated with this project</li>
+                    <li>
+                      All bugs and their fixes associated with this project
+                    </li>
                   </ul>
                   <div className="mt-2 text-yellow-700 dark:text-yellow-300 font-medium">
                     Warning: This action cannot be undone!
@@ -764,9 +876,7 @@ const Projects = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="sm:mr-auto">
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel className="sm:mr-auto">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (projectToDelete) {
@@ -781,7 +891,11 @@ const Projects = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs value={tabFromUrl} onValueChange={handleTabChange} className="w-full">
+      <Tabs
+        value={tabFromUrl}
+        onValueChange={handleTabChange}
+        className="w-full"
+      >
         {/* ... */}
       </Tabs>
     </div>

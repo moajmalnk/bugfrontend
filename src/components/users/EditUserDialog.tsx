@@ -46,6 +46,7 @@ const userFormSchema = z.object({
   role: z.enum(["admin", "developer", "tester"], {
     required_error: "Please select a role",
   }),
+  phone: z.string().optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -76,6 +77,7 @@ export function EditUserDialog({
       username: user.username || "",
       email: user.email,
       role: user.role,
+      phone: user.phone || "",
     },
   });
 
@@ -85,6 +87,7 @@ export function EditUserDialog({
       username: user.username || "",
       email: user.email,
       role: user.role,
+      phone: user.phone || "",
     });
   }, [user, form]);
 
@@ -96,6 +99,7 @@ export function EditUserDialog({
         username: data.username,
         email: data.email,
         role: data.role,
+        phone: data.phone,
       });
 
       // Manually create updated user object from form data
@@ -104,11 +108,14 @@ export function EditUserDialog({
         username: data.username, // Apply updated values
         email: data.email,
         role: data.role,
+        phone: data.phone,
         // Note: The 'name' property is often derived from 'username' or handled server-side.
         // Ensure your backend returns the updated 'name' in the response if necessary,
         // or handle its derivation client-side if possible.
         // For now, we assume username update is sufficient for avatar.
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.username || data.email)}&background=3b82f6&color=fff&size=128`
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          data.username || data.email
+        )}&background=3b82f6&color=fff&size=128`,
       };
 
       // Call the onUserUpdate callback with the locally constructed updated user object
@@ -123,7 +130,11 @@ export function EditUserDialog({
     } catch (error: any) {
       // console.error("Error updating user:", error);
       let errorMessage = "Failed to update the user. Please try again.";
-      if (error.message && (error.message.includes("Username already taken") || error.message.includes("Email already in use"))) {
+      if (
+        error.message &&
+        (error.message.includes("Username already taken") ||
+          error.message.includes("Email already in use"))
+      ) {
         errorMessage = error.message;
       } else if (error.message) {
         errorMessage = error.message;
@@ -157,7 +168,11 @@ export function EditUserDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogClose asChild>
-          <Button variant="ghost" size="icon" className="absolute top-3 right-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-3 right-4"
+          >
             <X className="h-5 w-5" />
             <span className="sr-only">Close</span>
           </Button>
@@ -199,7 +214,7 @@ export function EditUserDialog({
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
-                    disabled={loggedInUserRole !== 'admin'}
+                    disabled={loggedInUserRole !== "admin"}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -212,6 +227,26 @@ export function EditUserDialog({
                       <SelectItem value="tester">Tester</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="Enter phone number"
+                      value={field.value}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      className="h-9 text-sm"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

@@ -1,25 +1,25 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { useAuth } from "@/context/AuthContext";
+import { userService } from "@/services/userService";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 import {
+  Bug,
+  Code2,
   Github,
+  Instagram,
   Linkedin,
   Link as LinkIcon,
   LogOut,
   Mail,
   MapPin,
-  Instagram,
-  Code2,
-  Bug,
+  Phone,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { EditUserDialog } from "@/components/users/EditUserDialog";
-import handlePasswordChangeFromDialog, { ChangePasswordDialog } from "@/components/users/ChangePasswordDialog";
-import { useQuery } from '@tanstack/react-query';
-import { userService } from '@/services/userService';
-import { formatDistanceToNow } from 'date-fns';
 
 // Profile skeleton components
 const ProfileHeaderSkeleton = () => (
@@ -114,10 +114,25 @@ export default function Profile() {
 
   // Fetch user statistics
   const { data: userStats, isLoading: isLoadingStats } = useQuery({
-    queryKey: ['userStats', currentUser?.id],
-    queryFn: () => currentUser?.id ? userService.getUserStats(currentUser.id) : Promise.reject('User not logged in'),
+    queryKey: ["userStats", currentUser?.id],
+    queryFn: () =>
+      currentUser?.id
+        ? userService.getUserStats(currentUser.id)
+        : Promise.reject("User not logged in"),
     enabled: !!currentUser?.id,
   });
+
+  useEffect(() => {
+    // Fetch latest user data on mount
+    if (currentUser?.id) {
+      userService.getUsers().then((users) => {
+        const freshUser = users.find((u) => u.id === currentUser.id);
+        if (freshUser) {
+          updateCurrentUser(freshUser);
+        }
+      });
+    }
+  }, [currentUser?.id, updateCurrentUser]);
 
   const handleLogout = useCallback(async () => {
     setShowConfirm(false);
@@ -161,7 +176,7 @@ export default function Profile() {
           </Card>
           <LinksCardSkeleton />
           <Card className="md:col-span-3">
-             <CardHeader>
+            <CardHeader>
               <Skeleton className="h-7 w-40" />
             </CardHeader>
             <CardContent>
@@ -180,7 +195,17 @@ export default function Profile() {
   return (
     <div className="container max-w-4xl mx-auto py-8">
       {/* Top Bar with Logout Button */}
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-end mb-6 gap-2">
+        <EditUserDialog
+          user={currentUser}
+          onUserUpdate={handleUserUpdate}
+          loggedInUserRole={currentUser.role}
+          trigger={
+            <Button variant="outline" size="sm">
+              Edit Profile
+            </Button>
+          }
+        />
         <Button
           variant="outline"
           size="sm"
@@ -248,31 +273,16 @@ export default function Profile() {
               <Mail className="w-4 h-4 mr-2" />
               {currentUser.email}
             </Button>
+            {currentUser.phone && (
+              <Button variant="outline" size="sm">
+                <Phone className="w-4 h-4 mr-2" />
+                {currentUser.phone}
+              </Button>
+            )}
             <Button variant="outline" size="sm">
               <MapPin className="w-4 h-4 mr-2" />
               BugRacer Team
             </Button>
-
-            {/* Edit Profile and Change Password Buttons */}
-            <EditUserDialog
-              user={currentUser}
-              onUserUpdate={handleUserUpdate}
-              loggedInUserRole={currentUser.role}
-              trigger={
-                <Button variant="outline" size="sm">
-                  Edit Profile
-                </Button>
-              }
-            />
-            {/* <ChangePasswordDialog
-              user={currentUser}
-              onPasswordChange={handlePasswordChangeFromDialog}
-              trigger={
-                <Button variant="outline" size="sm">
-                  Change Password
-                </Button>
-              }
-            /> */}
           </div>
         </div>
       </div>
@@ -287,51 +297,99 @@ export default function Profile() {
             {isLoadingStats ? (
               <StatsSkeleton />
             ) : userStats ? (
-              <div className={`grid gap-4 ${currentUser?.role === "admin" ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"}`}>
+              <div
+                className={`grid gap-4 ${
+                  currentUser?.role === "admin"
+                    ? "grid-cols-1 sm:grid-cols-3"
+                    : "grid-cols-1 sm:grid-cols-2"
+                }`}
+              >
                 <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
-                  <p className="text-xs text-muted-foreground mb-1">Total Projects</p>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Total Projects
+                  </p>
                   <p className="text-2xl font-bold">
-                    {userStats.total_projects > 0 ? userStats.total_projects : <span className="text-muted-foreground text-base">No projects</span>}
+                    {userStats.total_projects > 0 ? (
+                      userStats.total_projects
+                    ) : (
+                      <span className="text-muted-foreground text-base">
+                        No projects
+                      </span>
+                    )}
                   </p>
                 </div>
-                
+
                 {/* Role-based statistics */}
                 {currentUser?.role === "admin" ? (
                   // Admin sees both Total Bugs and Total Fixes
                   <>
                     <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
-                      <p className="text-xs text-muted-foreground mb-1">Total Bugs</p>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Total Bugs
+                      </p>
                       <p className="text-2xl font-bold">
-                        {userStats.total_bugs > 0 ? userStats.total_bugs : <span className="text-muted-foreground text-base">No bugs</span>}
+                        {userStats.total_bugs > 0 ? (
+                          userStats.total_bugs
+                        ) : (
+                          <span className="text-muted-foreground text-base">
+                            No bugs
+                          </span>
+                        )}
                       </p>
                     </div>
                     <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
-                      <p className="text-xs text-muted-foreground mb-1">Total Fixes</p>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Total Fixes
+                      </p>
                       <p className="text-2xl font-bold">
-                        {userStats.total_fixes > 0 ? userStats.total_fixes : <span className="text-muted-foreground text-base">No fixes</span>}
+                        {userStats.total_fixes > 0 ? (
+                          userStats.total_fixes
+                        ) : (
+                          <span className="text-muted-foreground text-base">
+                            No fixes
+                          </span>
+                        )}
                       </p>
                     </div>
                   </>
                 ) : currentUser?.role === "tester" ? (
                   // Tester sees only Total Bugs
                   <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
-                    <p className="text-xs text-muted-foreground mb-1">Total Bugs</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Total Bugs
+                    </p>
                     <p className="text-2xl font-bold">
-                      {userStats.total_bugs > 0 ? userStats.total_bugs : <span className="text-muted-foreground text-base">No bugs</span>}
+                      {userStats.total_bugs > 0 ? (
+                        userStats.total_bugs
+                      ) : (
+                        <span className="text-muted-foreground text-base">
+                          No bugs
+                        </span>
+                      )}
                     </p>
                   </div>
                 ) : (
                   // Developer sees only Total Fixes
                   <div className="bg-card rounded-lg p-4 flex flex-col items-center shadow-sm">
-                    <p className="text-xs text-muted-foreground mb-1">Total Fixes</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Total Fixes
+                    </p>
                     <p className="text-2xl font-bold">
-                      {userStats.total_fixes > 0 ? userStats.total_fixes : <span className="text-muted-foreground text-base">No fixes</span>}
+                      {userStats.total_fixes > 0 ? (
+                        userStats.total_fixes
+                      ) : (
+                        <span className="text-muted-foreground text-base">
+                          No fixes
+                        </span>
+                      )}
                     </p>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-muted-foreground text-center">Could not load statistics.</div>
+              <div className="text-muted-foreground text-center">
+                Could not load statistics.
+              </div>
             )}
           </CardContent>
         </Card>
@@ -385,29 +443,35 @@ export default function Profile() {
         <Card className="md:col-span-3">
           <CardHeader>
             <CardTitle>
-              {currentUser?.role === "admin" 
-                ? "Recent Activity" 
-                : (currentUser?.role === "tester" ? "Bugs Recent Activity" : "Fixes Recent Activity")
-              }
+              {currentUser?.role === "admin"
+                ? "Recent Activity"
+                : currentUser?.role === "tester"
+                ? "Bugs Recent Activity"
+                : "Fixes Recent Activity"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingStats ? (
               <RecentActivitySkeleton />
-            ) : userStats?.recent_activity && userStats.recent_activity.length > 0 ? (
+            ) : userStats?.recent_activity &&
+              userStats.recent_activity.length > 0 ? (
               <div className="space-y-2">
-                 {userStats.recent_activity
-                   .filter((activity) => {
-                     // Filter activities based on user role
-                     if (currentUser?.role === "admin") {
-                       return true; // Admin sees all activities (bug, fix, project)
-                     } else if (currentUser?.role === "tester") {
-                       return activity.type === "bug" || activity.type === "project"; // Testers see bugs and projects
-                     } else {
-                       return activity.type === "fix" || activity.type === "project"; // Developers see fixes and projects
-                     }
-                   })
-                   .map((activity, index) => (
+                {userStats.recent_activity
+                  .filter((activity) => {
+                    // Filter activities based on user role
+                    if (currentUser?.role === "admin") {
+                      return true; // Admin sees all activities (bug, fix, project)
+                    } else if (currentUser?.role === "tester") {
+                      return (
+                        activity.type === "bug" || activity.type === "project"
+                      ); // Testers see bugs and projects
+                    } else {
+                      return (
+                        activity.type === "fix" || activity.type === "project"
+                      ); // Developers see fixes and projects
+                    }
+                  })
+                  .map((activity, index) => (
                     <div
                       key={index}
                       className="flex items-start gap-2 text-sm break-words"
@@ -424,16 +488,18 @@ export default function Profile() {
                           {activity.title}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                          {formatDistanceToNow(new Date(activity.created_at), {
+                            addSuffix: true,
+                          })}
                         </p>
                       </div>
                     </div>
                   ))}
               </div>
             ) : (
-               <div className="text-muted-foreground text-center">
-                 No recent activity to display.
-               </div>
+              <div className="text-muted-foreground text-center">
+                No recent activity to display.
+              </div>
             )}
           </CardContent>
         </Card>

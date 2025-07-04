@@ -49,6 +49,7 @@ const userFormSchema = z.object({
   role: z.enum(["admin", "developer", "tester"], {
     required_error: "Please select a role",
   }),
+  phone: z.string().optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -66,6 +67,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
     email: "",
     password: "",
     role: "tester" as UserRole,
+    phone: "",
   });
   const [showPassword, setShowPassword] = useState(false);
 
@@ -88,6 +90,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         email: userData.email,
         password: userData.password,
         role: userData.role,
+        phone: userData.phone,
       };
       const success = await onUserAdd(payload);
       return success;
@@ -134,7 +137,11 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <DialogClose asChild>
-          <Button variant="ghost" size="icon" className="absolute top-3 right-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-3 right-4"
+          >
             <X className="h-5 w-5" />
             <span className="sr-only">Close</span>
           </Button>
@@ -229,6 +236,26 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                         <SelectItem value="tester">Tester</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        placeholder="Enter phone number"
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -1,33 +1,48 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from '@/components/ui/use-toast';
-import { BugIcon, Info, AlertCircle, Mail, User, Key } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import axios from 'axios';
-import { API_BASE_URL } from '@/lib/env';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { API_BASE_URL } from "@/lib/env";
+import axios from "axios";
+import { AlertCircle, BugIcon, Key, Mail, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-type LoginMethod = 'username' | 'email' | 'otp';
+type LoginMethod = "username" | "email" | "otp";
 
 type ApiResponse = { success: boolean; message?: string; user?: any };
 
 const Login = () => {
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>('username');
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("username");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  const [role, setRole] = useState('tester');
+  const [role, setRole] = useState("tester");
   const [otpSent, setOtpSent] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(0);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const { login, register, isAuthenticated, isLoading: isAuthLoading, currentUser } = useAuth();
+  const [otpMethod, setOtpMethod] = useState<"mail" | "whatsapp">("mail");
+  const [phone, setPhone] = useState("");
+  const {
+    login,
+    register,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    currentUser,
+  } = useAuth();
   const navigate = useNavigate();
 
   // OTP countdown timer
@@ -49,9 +64,11 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      const intendedDestination = localStorage.getItem('intendedDestination') || `/${currentUser.role}/projects`;
-      console.log('Redirecting to:', intendedDestination);
-      localStorage.removeItem('intendedDestination');
+      const intendedDestination =
+        localStorage.getItem("intendedDestination") ||
+        `/${currentUser.role}/projects`;
+      console.log("Redirecting to:", intendedDestination);
+      localStorage.removeItem("intendedDestination");
       navigate(intendedDestination, { replace: true });
     }
   }, [isAuthenticated, currentUser, navigate]);
@@ -61,7 +78,9 @@ const Login = () => {
       <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
         <div className="text-center">
           <BugIcon className="h-10 w-10 sm:h-12 sm:w-12 text-primary mx-auto mb-4 animate-spin" />
-          <p className="text-sm sm:text-base text-muted-foreground">Loading...</p>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Loading...
+          </p>
         </div>
       </div>
     );
@@ -81,25 +100,44 @@ const Login = () => {
   };
 
   const handleSendOtp = async () => {
-    if (!email || !validateEmail(email)) {
-      toast({
-        title: "Invalid Email",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsSendingOtp(true);
     try {
-      const response = await axios.post<ApiResponse>(`${API_BASE_URL}/send_otp.php`, { email });
+      let payload;
+      if (otpMethod === "whatsapp") {
+        if (!phone) {
+          toast({
+            title: "Invalid Phone",
+            description: "Please enter a valid phone number",
+            variant: "destructive",
+          });
+          return;
+        }
+        payload = { method: "whatsapp", phone };
+      } else {
+        if (!email || !validateEmail(email)) {
+          toast({
+            title: "Invalid Email",
+            description: "Please enter a valid email address",
+            variant: "destructive",
+          });
+          return;
+        }
+        payload = { method: "mail", email };
+      }
+      const response = await axios.post<ApiResponse>(
+        `${API_BASE_URL}/send_otp.php`,
+        payload
+      );
       const data = response.data as any;
       if (data.success) {
         setOtpSent(true);
         setOtpCountdown(60);
         toast({
           title: "OTP Sent",
-          description: "A one-time password has been sent to your email",
+          description:
+            otpMethod === "mail"
+              ? "A one-time password has been sent to your email"
+              : "A one-time password has been sent to your WhatsApp",
           variant: "default",
         });
       } else {
@@ -108,7 +146,10 @@ const Login = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error?.response?.data?.message || error.message || "Failed to send OTP. Please try again.",
+        description:
+          error?.response?.data?.message ||
+          error.message ||
+          "Failed to send OTP. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -125,18 +166,20 @@ const Login = () => {
       let user = null;
 
       switch (loginMethod) {
-        case 'username':
-        case 'email': {
-          const identifier = loginMethod === 'username' ? username : email;
+        case "username":
+        case "email": {
+          const identifier = loginMethod === "username" ? username : email;
           if (!identifier || !password) {
             toast({
               title: "Validation Error",
-              description: `${loginMethod === 'username' ? 'Username' : 'Email'} and password are required`,
+              description: `${
+                loginMethod === "username" ? "Username" : "Email"
+              } and password are required`,
               variant: "destructive",
             });
             return;
           }
-          if (loginMethod === 'email' && !validateEmail(email)) {
+          if (loginMethod === "email" && !validateEmail(email)) {
             toast({
               title: "Invalid Email",
               description: "Please enter a valid email address",
@@ -144,7 +187,10 @@ const Login = () => {
             });
             return;
           }
-          const response = await axios.post<ApiResponse>(`${API_BASE_URL}/login.php`, { identifier, password });
+          const response = await axios.post<ApiResponse>(
+            `${API_BASE_URL}/login.php`,
+            { identifier, password }
+          );
           const data = response.data as any;
           if (data.success) {
             success = true;
@@ -161,32 +207,41 @@ const Login = () => {
           }
           break;
         }
-        case 'otp': {
-          if (!email || !otp) {
-            toast({
-              title: "Validation Error",
-              description: "Email and OTP are required",
-              variant: "destructive",
-            });
-            return;
+        case "otp": {
+          let payload;
+          if (otpMethod === "whatsapp") {
+            if (!phone || !otp) {
+              toast({
+                title: "Validation Error",
+                description: "Phone and OTP are required",
+                variant: "destructive",
+              });
+              return;
+            }
+            payload = { method: "whatsapp", phone, otp };
+          } else {
+            if (!email || !otp) {
+              toast({
+                title: "Validation Error",
+                description: "Email and OTP are required",
+                variant: "destructive",
+              });
+              return;
+            }
+            if (!validateEmail(email)) {
+              toast({
+                title: "Invalid Email",
+                description: "Please enter a valid email address",
+                variant: "destructive",
+              });
+              return;
+            }
+            payload = { method: "mail", email, otp };
           }
-          if (!validateEmail(email)) {
-            toast({
-              title: "Invalid Email",
-              description: "Please enter a valid email address",
-              variant: "destructive",
-            });
-            return;
-          }
-          if (!validateOtp(otp)) {
-            toast({
-              title: "Invalid OTP",
-              description: "Please enter a valid 6-digit OTP",
-              variant: "destructive",
-            });
-            return;
-          }
-          const response = await axios.post<ApiResponse>(`${API_BASE_URL}/verify_otp.php`, { email, otp });
+          const response = await axios.post<ApiResponse>(
+            `${API_BASE_URL}/verify_otp.php`,
+            payload
+          );
           const data = response.data as any;
           if (data.success) {
             success = true;
@@ -212,7 +267,10 @@ const Login = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error?.response?.data?.message || error.message || "An error occurred during login",
+        description:
+          error?.response?.data?.message ||
+          error.message ||
+          "An error occurred during login",
         variant: "destructive",
       });
     } finally {
@@ -224,29 +282,47 @@ const Login = () => {
     e.preventDefault();
     toast({
       title: "Registration Disabled",
-      description: "This platform will allow external users within a few days. It is currently for testing purposes only.",
+      description:
+        "This platform will allow external users within a few days. It is currently for testing purposes only.",
       variant: "default",
     });
   };
 
   const handleMethodChange = (method: LoginMethod) => {
     setLoginMethod(method);
-    setUsername('');
-    setEmail('');
-    setPassword('');
-    setOtp('');
+    setUsername("");
+    setEmail("");
+    setPassword("");
+    setOtp("");
     setOtpSent(false);
     setOtpCountdown(0);
   };
 
   const isFormValid = () => {
     switch (loginMethod) {
-      case 'username':
+      case "username":
         return username.trim() && password.trim();
-      case 'email':
+      case "email":
         return email.trim() && password.trim() && validateEmail(email);
-      case 'otp':
-        return email.trim() && validateEmail(email) && otpSent && otp.trim() && validateOtp(otp);
+      case "otp":
+        if (otpMethod === "mail") {
+          return (
+            email.trim() &&
+            validateEmail(email) &&
+            otpSent &&
+            otp.trim() &&
+            validateOtp(otp)
+          );
+        } else {
+          // WhatsApp
+          return (
+            phone.trim() &&
+            phone.length >= 8 && // or your minimum phone length
+            otpSent &&
+            otp.trim() &&
+            validateOtp(otp)
+          );
+        }
       default:
         return false;
     }
@@ -260,17 +336,20 @@ const Login = () => {
             <BugIcon className="h-10 w-10 sm:h-12 sm:w-12 text-primary" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold">BugRacer</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">Track bugs, ship faster</p>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Track bugs, ship faster
+          </p>
         </div>
-        
+
         <Card className="border-0 shadow-lg">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl sm:text-2xl">{isSignUp ? "Create Account" : "Sign in"}</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">
+              {isSignUp ? "Create Account" : "Sign in"}
+            </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              {isSignUp 
-                ? "Fill in your details to create a new account" 
-                : "Choose your preferred login method"
-              }
+              {isSignUp
+                ? "Fill in your details to create a new account"
+                : "Choose your preferred login method"}
             </CardDescription>
           </CardHeader>
           <form onSubmit={isSignUp ? handleSignUp : handleLogin}>
@@ -282,11 +361,11 @@ const Login = () => {
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
-                      onClick={() => handleMethodChange('username')}
+                      onClick={() => handleMethodChange("username")}
                       className={`flex items-center justify-center gap-2 p-2 rounded-md border text-xs transition-colors ${
-                        loginMethod === 'username'
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background border-input hover:bg-muted/50'
+                        loginMethod === "username"
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-input hover:bg-muted/50"
                       }`}
                     >
                       <User className="h-3 w-3" />
@@ -294,11 +373,11 @@ const Login = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleMethodChange('email')}
+                      onClick={() => handleMethodChange("email")}
                       className={`flex items-center justify-center gap-2 p-2 rounded-md border text-xs transition-colors ${
-                        loginMethod === 'email'
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background border-input hover:bg-muted/50'
+                        loginMethod === "email"
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-input hover:bg-muted/50"
                       }`}
                     >
                       <Mail className="h-3 w-3" />
@@ -306,11 +385,11 @@ const Login = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleMethodChange('otp')}
+                      onClick={() => handleMethodChange("otp")}
                       className={`flex items-center justify-center gap-2 p-2 rounded-md border text-xs transition-colors ${
-                        loginMethod === 'otp'
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background border-input hover:bg-muted/50'
+                        loginMethod === "otp"
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-input hover:bg-muted/50"
                       }`}
                     >
                       <Key className="h-3 w-3" />
@@ -321,14 +400,16 @@ const Login = () => {
               )}
 
               {/* Username Field */}
-              {loginMethod === 'username' && !isSignUp && (
+              {loginMethod === "username" && !isSignUp && (
                 <div className="space-y-1">
-                  <Label htmlFor="username" className="text-sm">Username</Label>
-                  <Input 
+                  <Label htmlFor="username" className="text-sm">
+                    Username
+                  </Label>
+                  <Input
                     id="username"
-                    type="text" 
-                    placeholder="Enter Your Username" 
-                    value={username} 
+                    type="text"
+                    placeholder="Enter Your Username"
+                    value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
                     className="h-9 text-sm"
@@ -336,15 +417,17 @@ const Login = () => {
                 </div>
               )}
 
-              {/* Email Field */}
-              {(loginMethod === 'email' || loginMethod === 'otp' || isSignUp) && (
+              {/* Email Field for Email login or SignUp only */}
+              {(loginMethod === "email" || isSignUp) && (
                 <div className="space-y-1">
-                  <Label htmlFor="email" className="text-sm">Email</Label>
-                  <Input 
+                  <Label htmlFor="email" className="text-sm">
+                    Email
+                  </Label>
+                  <Input
                     id="email"
-                    type="email" 
-                    placeholder="Enter Your Email" 
-                    value={email} 
+                    type="email"
+                    placeholder="Enter Your Email"
+                    value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={isSignUp}
@@ -354,14 +437,18 @@ const Login = () => {
               )}
 
               {/* Password Field */}
-              {(loginMethod === 'username' || loginMethod === 'email' || isSignUp) && (
+              {(loginMethod === "username" ||
+                loginMethod === "email" ||
+                isSignUp) && (
                 <div className="space-y-1">
-                  <Label htmlFor="password" className="text-sm">Password</Label>
-                  <Input 
+                  <Label htmlFor="password" className="text-sm">
+                    Password
+                  </Label>
+                  <Input
                     id="password"
-                    type="password" 
-                    placeholder="••••••••" 
-                    value={password} 
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     className="h-9 text-sm"
@@ -370,13 +457,73 @@ const Login = () => {
               )}
 
               {/* OTP Section */}
-              {loginMethod === 'otp' && !isSignUp && (
+              {loginMethod === "otp" && !isSignUp && (
                 <div className="space-y-3">
+                  {/* OTP Method Toggle */}
+                  <div className="flex w-full gap-2 mb-2">
+                    <Button
+                      type="button"
+                      variant={otpMethod === "mail" ? "default" : "outline"}
+                      onClick={() => setOtpMethod("mail")}
+                      className={`flex-1 rounded-r-none ${
+                        otpMethod === "mail" ? "" : "border"
+                      }`}
+                      style={{
+                        borderTopRightRadius: 0,
+                        borderBottomRightRadius: 0,
+                      }}
+                    >
+                      Mail
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={otpMethod === "whatsapp" ? "default" : "outline"}
+                      onClick={() => setOtpMethod("whatsapp")}
+                      className={`flex-1 rounded-l-none ${
+                        otpMethod === "whatsapp" ? "" : "border"
+                      }`}
+                      style={{
+                        borderTopLeftRadius: 0,
+                        borderBottomLeftRadius: 0,
+                      }}
+                    >
+                      WhatsApp
+                    </Button>
+                  </div>
+                  {/* Input for email or phone */}
+                  {otpMethod === "mail" ? (
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter Your Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="h-9 text-sm"
+                    />
+                  ) : (
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="Enter Your Phone Number"
+                      value={phone}
+                      onChange={(e) =>
+                        setPhone(e.target.value.replace(/\D/g, "").slice(0, 15))
+                      }
+                      required
+                      className="h-9 text-sm"
+                    />
+                  )}
+                  {/* Send OTP Button */}
                   {!otpSent ? (
                     <Button
                       type="button"
                       onClick={handleSendOtp}
-                      disabled={!email || !validateEmail(email) || isSendingOtp}
+                      disabled={
+                        otpMethod === "mail"
+                          ? !email || !validateEmail(email) || isSendingOtp
+                          : !phone || phone.length < 8 || isSendingOtp
+                      }
                       className="w-full h-9 text-sm"
                       variant="outline"
                     >
@@ -385,19 +532,23 @@ const Login = () => {
                   ) : (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="otp" className="text-sm">One-Time Password</Label>
+                        <Label htmlFor="otp" className="text-sm">
+                          One-Time Password
+                        </Label>
                         {otpCountdown > 0 && (
                           <span className="text-xs text-muted-foreground">
                             Expires in {otpCountdown}s
                           </span>
                         )}
                       </div>
-                      <Input 
+                      <Input
                         id="otp"
-                        type="text" 
-                        placeholder="Enter 6-digit OTP" 
-                        value={otp} 
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        type="text"
+                        placeholder="Enter 6-digit OTP"
+                        value={otp}
+                        onChange={(e) =>
+                          setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                        }
                         required
                         maxLength={6}
                         className="h-9 text-sm"
@@ -406,7 +557,9 @@ const Login = () => {
                         <Button
                           type="button"
                           onClick={handleSendOtp}
-                          disabled={!email || !validateEmail(email) || isSendingOtp}
+                          disabled={
+                            !email || !validateEmail(email) || isSendingOtp
+                          }
                           className="w-full h-9 text-sm"
                           variant="outline"
                         >
@@ -422,7 +575,9 @@ const Login = () => {
               {isSignUp && (
                 <>
                   <div className="space-y-1">
-                    <Label htmlFor="role" className="text-sm">Role</Label>
+                    <Label htmlFor="role" className="text-sm">
+                      Role
+                    </Label>
                     <select
                       id="role"
                       className="w-full h-9 text-sm border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 rounded-md border px-3"
@@ -437,11 +592,17 @@ const Login = () => {
                     </select>
                   </div>
 
-                  <Alert variant="default" className="bg-muted/50 text-foreground border-primary/20">
+                  <Alert
+                    variant="default"
+                    className="bg-muted/50 text-foreground border-primary/20"
+                  >
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="text-xs font-medium">Registration Disabled</AlertTitle>
+                    <AlertTitle className="text-xs font-medium">
+                      Registration Disabled
+                    </AlertTitle>
                     <AlertDescription className="text-xs">
-                      This platform will allow external users within a few days. It is currently for testing purposes only.
+                      This platform will allow external users within a few days.
+                      It is currently for testing purposes only.
                     </AlertDescription>
                   </Alert>
                 </>
@@ -449,17 +610,20 @@ const Login = () => {
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-2 pt-2">
-              <Button 
-                className="w-full h-9 text-sm" 
-                type="submit" 
+              <Button
+                className="w-full h-9 text-sm"
+                type="submit"
                 disabled={isLoading || isSignUp || !isFormValid()}
               >
-                {isLoading 
-                  ? (isSignUp ? "Creating account..." : "Signing in...") 
-                  : (isSignUp ? "Create Account" : "Sign in")
-                }
+                {isLoading
+                  ? isSignUp
+                    ? "Creating account..."
+                    : "Signing in..."
+                  : isSignUp
+                  ? "Create Account"
+                  : "Sign in"}
               </Button>
-              
+
               {/* <Button 
                 variant="link" 
                 type="button"
@@ -480,7 +644,7 @@ const Login = () => {
             </CardFooter>
           </form>
         </Card>
-        
+
         {/* <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-white rounded-lg shadow-sm">
           <div className="flex items-start space-x-2">
             <Info className="h-4 w-4 sm:h-5 sm:w-5 text-primary mt-0.5" />

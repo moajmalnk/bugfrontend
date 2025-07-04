@@ -1,22 +1,13 @@
+import { Card, CardContent } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "@/components/ui/use-toast";
-import { AddUserDialog } from "@/components/users/AddUserDialog";
-import { UserDetailDialog } from "@/components/users/UserDetailDialog";
-import { useAuth } from "@/context/AuthContext";
-import { ENV } from "@/lib/env";
-import { userService } from "@/services/userService";
-import { User, UserRole } from "@/types";
-import { Bug, Code2, Shield, User as UserIcon, UserRound } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -25,6 +16,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { toast } from "@/components/ui/use-toast";
+import { AddUserDialog } from "@/components/users/AddUserDialog";
+import { UserDetailDialog } from "@/components/users/UserDetailDialog";
+import { useAuth } from "@/context/AuthContext";
+import { ENV } from "@/lib/env";
+import { userService } from "@/services/userService";
+import { User, UserRole } from "@/types";
+import { Bug, Code2, Shield, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 
 // User Card Skeleton component for loading state
 const UserCardSkeleton = () => (
@@ -53,6 +53,7 @@ interface NewUser {
   email: string;
   password: string;
   role: UserRole;
+  phone?: string;
 }
 
 const Users = () => {
@@ -61,8 +62,8 @@ const Users = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const fetchUsers = async () => {
     try {
@@ -105,6 +106,11 @@ const Users = () => {
     fetchUsers();
   }, []);
 
+  // Reset current page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const getRoleIcon = (role: string) => {
     switch (role) {
       case "admin":
@@ -125,6 +131,7 @@ const Users = () => {
         email: userData.email,
         password: userData.password,
         role: userData.role,
+        phone: userData.phone,
       };
       const result = await userService.addUser(payload);
       toast({
@@ -164,7 +171,9 @@ const Users = () => {
 
   const handleDeleteUser = async (userId: string, force = false) => {
     try {
-      const url = `${ENV.API_URL}/users/delete.php?id=${userId}${force ? '&force=true' : ''}`;
+      const url = `${ENV.API_URL}/users/delete.php?id=${userId}${
+        force ? "&force=true" : ""
+      }`;
       const response = await fetch(url, {
         method: "DELETE",
         headers: {
@@ -173,12 +182,15 @@ const Users = () => {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         // Handle specific error cases
         if (response.status === 409) {
           // Conflict - user has dependencies, throw error for dialog to handle
-          throw new Error(data.message || "User has associated data that must be removed first.");
+          throw new Error(
+            data.message ||
+              "User has associated data that must be removed first."
+          );
         } else if (response.status === 404) {
           toast({
             title: "User Not Found",
@@ -202,11 +214,15 @@ const Users = () => {
       }
     } catch (error: any) {
       // Don't show toast for dependency errors - let the dialog handle them
-      if (!error.message.includes("associated data") && !error.message.includes("Cannot delete user")) {
+      if (
+        !error.message.includes("associated data") &&
+        !error.message.includes("Cannot delete user")
+      ) {
         console.error("Error:", error);
         toast({
           title: "Error",
-          description: error.message || "Failed to delete user. Please try again.",
+          description:
+            error.message || "Failed to delete user. Please try again.",
           variant: "destructive",
         });
       } else {
@@ -216,10 +232,12 @@ const Users = () => {
     }
   };
 
-  const filteredUsers = users.filter(user =>
-    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = users.filter(
+    (user) =>
+      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
   const totalFiltered = filteredUsers.length;
   const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
@@ -244,68 +262,95 @@ const Users = () => {
       {/* Header row with title, description, add user button, and badge */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">User Management</h1>
-          <p className="text-muted-foreground mt-1 break-words max-w-xl">Manage your team members and their access levels</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">
+            User Management
+          </h1>
+          <p className="text-muted-foreground mt-1 break-words max-w-xl">
+            Manage your team members and their access levels
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           <AddUserDialog onUserAdd={handleAddUser} />
           <div className="inline-flex items-center border rounded-md px-3 py-2 bg-blue-50 ml-0 sm:ml-2">
             <UserRound className="h-4 w-4 text-blue-500 mr-2" />
             <span className="text-sm font-medium text-blue-700">
-              {users.length} <span className="hidden lg:inline">Users</span>
+              {filteredUsers.length}{" "}
+              <span className="hidden lg:inline">Users</span>
             </span>
           </div>
         </div>
       </div>
-      {/* Summary and pagination controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
-        <div>
-          <span className="text-sm text-muted-foreground font-medium">
-            Showing {(currentPage - 1) * itemsPerPage + 1}
-            -
-            {Math.min(currentPage * itemsPerPage, totalFiltered)}
-            {" "}of {totalFiltered} users
-          </span>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-          <Select value={String(itemsPerPage)} onValueChange={v => setItemsPerPage(Number(v))}>
-            <SelectTrigger className="w-full sm:w-auto bg-background/50 h-9 text-xs sm:text-sm">
-              <SelectValue>{itemsPerPage} / page</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10 / page</SelectItem>
-              <SelectItem value="25">25 / page</SelectItem>
-              <SelectItem value="50">50 / page</SelectItem>
-            </SelectContent>
-          </Select>
-          {/* Pagination controls */}
-          <div className="flex items-center gap-1">
-            <button
-              className="px-2 py-1 rounded border text-sm"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i}
-                className={`px-2 py-1 rounded border text-sm ${currentPage === i + 1 ? 'bg-primary text-white' : ''}`}
-                onClick={() => setCurrentPage(i + 1)}
-              >
-                {i + 1}
-              </button>
-            ))}
-            <button
-              className="px-2 py-1 rounded border text-sm"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </button>
+
+      {/* Search and Filter Controls */}
+      {!isLoading && (
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+            />
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!isLoading && totalFiltered > 0 && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
+          <div>
+            <span className="text-sm text-muted-foreground font-medium">
+              Showing {(currentPage - 1) * itemsPerPage + 1}-
+              {Math.min(currentPage * itemsPerPage, totalFiltered)} of{" "}
+              {totalFiltered} users
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+            <select
+              value={itemsPerPage}
+              onChange={(e) => setItemsPerPage(Number(e.target.value))}
+              className="border border-border rounded-md px-3 py-2 text-sm w-full sm:w-auto bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-label="Items per page"
+            >
+              {[10, 25, 50].map((n) => (
+                <option key={n} value={n}>
+                  {n} / page
+                </option>
+              ))}
+            </select>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    aria-disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      isActive={currentPage === i + 1}
+                      onClick={() => setCurrentPage(i + 1)}
+                    >
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    aria-disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        </div>
+      )}
+
       {/* User list */}
       <Card>
         <CardContent>
@@ -316,25 +361,35 @@ const Users = () => {
                 <TableRow>
                   <TableHead className="w-[200px]">Username</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading
-                  ? Array(5).fill(0).map((_, index) => (
-                      <TableRow key={index}>
-                        <TableCell colSpan={4}><UserCardSkeleton /></TableCell>
-                      </TableRow>
-                    ))
+                  ? Array(5)
+                      .fill(0)
+                      .map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell colSpan={4}>
+                            <UserCardSkeleton />
+                          </TableCell>
+                        </TableRow>
+                      ))
                   : paginatedUsers.map((user) => (
                       <TableRow key={user.id}>
-                        <TableCell className="font-medium max-w-[200px] truncate">{user.username}</TableCell>
+                        <TableCell className="font-medium max-w-[200px] truncate">
+                          {user.username}
+                        </TableCell>
                         <TableCell className="truncate">{user.email}</TableCell>
+                        <TableCell>{user.phone || "BugRacer"}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {getRoleIcon(user.role)}
-                            <span className="capitalize text-sm">{user.role}</span>
+                            <span className="capitalize text-sm">
+                              {user.role}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -353,7 +408,9 @@ const Users = () => {
           {/* Mobile Card View */}
           <div className="grid grid-cols-1 gap-4 w-full lg:hidden">
             {isLoading
-              ? Array(5).fill(0).map((_, index) => <UserCardSkeleton key={index} />)
+              ? Array(5)
+                  .fill(0)
+                  .map((_, index) => <UserCardSkeleton key={index} />)
               : paginatedUsers.map((user) => (
                   <div
                     key={user.id}
@@ -367,7 +424,9 @@ const Users = () => {
                       />
                       <div className="min-w-0 flex-1">
                         <p className="font-medium truncate">{user.username}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {user.email}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mb-2">

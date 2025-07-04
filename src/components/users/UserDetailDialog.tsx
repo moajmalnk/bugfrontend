@@ -8,19 +8,29 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "@/hooks/use-toast";
 import { ENV } from "@/lib/env";
+import { userService } from "@/services/userService";
 import { User } from "@/types";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { format, formatDistanceToNow } from "date-fns";
-import { AtSign, Bug, Calendar, Code2, Mail, Shield, ExternalLink, Loader2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  AtSign,
+  Bug,
+  Calendar,
+  Code2,
+  ExternalLink,
+  Loader2,
+  Mail,
+  Shield,
+  X,
+} from "lucide-react";
+import { useState } from "react";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
-import { userService } from "@/services/userService";
-import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/AuthContext";
-import { useQuery } from "@tanstack/react-query";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -56,15 +66,19 @@ async function handlePasswordChange(
       throw new Error("Authentication token not found.");
     }
 
-    await axios.post(`${ENV.API_URL}/users/change-password.php`, {
-      userId,
-      currentPassword,
-      newPassword,
-    }, {
-      headers: {
-        Authorization: `Bearer ${token}`,
+    await axios.post(
+      `${ENV.API_URL}/users/change-password.php`,
+      {
+        userId,
+        currentPassword,
+        newPassword,
       },
-    });
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
   } catch (error: any) {
     // console.error("Password change error:", error);
     throw error;
@@ -158,7 +172,7 @@ export function UserDetailDialog({
   };
 
   const handleGenerateDashboardLink = async () => {
-    if (loggedInUserRole !== 'admin') {
+    if (loggedInUserRole !== "admin") {
       toast({
         title: "Access Denied",
         description: "Only administrators can generate dashboard links.",
@@ -170,13 +184,15 @@ export function UserDetailDialog({
     setIsGeneratingLink(true);
     try {
       const linkData = await userService.generateUserDashboardLink(user.id);
-      
+
       // Open the dashboard link in a new tab
-      window.open(linkData.url, '_blank', 'noopener,noreferrer');
-      
+      window.open(linkData.url, "_blank", "noopener,noreferrer");
+
       toast({
         title: "Dashboard Link Generated",
-        description: `Link will expire in ${Math.floor(linkData.ttl_seconds / 60)} minutes.`,
+        description: `Link will expire in ${Math.floor(
+          linkData.ttl_seconds / 60
+        )} minutes.`,
       });
     } catch (error: any) {
       toast({
@@ -204,12 +220,16 @@ export function UserDetailDialog({
         </DialogHeader>
 
         <DialogClose asChild>
-          <Button variant="ghost" size="icon" className="absolute top-3 right-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-3 right-4"
+          >
             <X className="h-5 w-5" />
             <span className="sr-only">Close</span>
           </Button>
         </DialogClose>
-        
+
         {/* User Header */}
         <div className="flex flex-col sm:flex-row items-center gap-6 px-6 pt-6 pb-4 flex-shrink-0">
           <div className="flex-shrink-0">
@@ -223,7 +243,9 @@ export function UserDetailDialog({
             <h3 className="text-2xl font-bold truncate">{user.name}</h3>
             <div className="flex items-center justify-center sm:justify-start mt-1 text-muted-foreground gap-2">
               {getRoleIcon(user.role)}
-              <span className="capitalize font-medium text-lg">{user.role}</span>
+              <span className="capitalize font-medium text-lg">
+                {user.role}
+              </span>
             </div>
             <div className="flex flex-col items-center sm:items-start gap-1 mt-3 text-sm text-muted-foreground">
               <span className="flex items-center gap-2">
@@ -234,6 +256,12 @@ export function UserDetailDialog({
                 <Mail className="h-4 w-4" />
                 {user.email}
               </span>
+              {user.phone && (
+                <span className="flex items-center gap-2">
+                  <AtSign className="h-4 w-4" />
+                  {user.phone}
+                </span>
+              )}
               {user.created_at && (
                 <span className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
@@ -243,7 +271,7 @@ export function UserDetailDialog({
             </div>
           </div>
         </div>
-        
+
         {/* Scrollable content */}
         <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
           {/* Action Buttons */}
@@ -263,29 +291,33 @@ export function UserDetailDialog({
               onPasswordChange={handlePasswordChange}
               trigger={
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full" title="Change Password">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    title="Change Password"
+                  >
                     Change Password
                   </Button>
                 </DialogTrigger>
               }
             />
-            {loggedInUserRole === 'admin' && currentUser?.id !== user.id && (
-                <Button
-                  variant="outline"
-                  className="w-full flex items-center justify-center gap-2"
-                  onClick={handleGenerateDashboardLink}
-                  disabled={isGeneratingLink}
-                  title="Open user's dashboard in a new tab"
-                >
-                  {isGeneratingLink ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ExternalLink className="h-4 w-4" />
-                  )}
-                  User Dashboard
-                </Button>
+            {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
+              <Button
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2"
+                onClick={handleGenerateDashboardLink}
+                disabled={isGeneratingLink}
+                title="Open user's dashboard in a new tab"
+              >
+                {isGeneratingLink ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4" />
+                )}
+                User Dashboard
+              </Button>
             )}
-            {loggedInUserRole === 'admin' && currentUser?.id !== user.id && (
+            {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
               <DeleteUserDialog
                 user={user}
                 onUserDelete={async (userId, force) => {
@@ -296,8 +328,12 @@ export function UserDetailDialog({
                   <Button
                     variant="destructive"
                     className="w-full"
-                    title={user.role === 'admin' ? "Administrators cannot be deleted" : "Delete User"}
-                    disabled={user.role === 'admin'}
+                    title={
+                      user.role === "admin"
+                        ? "Administrators cannot be deleted"
+                        : "Delete User"
+                    }
+                    disabled={user.role === "admin"}
                   >
                     Delete User
                   </Button>
@@ -360,7 +396,9 @@ export function UserDetailDialog({
                       <div className="flex-1 min-w-0">
                         <p className="truncate">{activity.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                          {formatDistanceToNow(new Date(activity.created_at), {
+                            addSuffix: true,
+                          })}
                         </p>
                       </div>
                     </div>
