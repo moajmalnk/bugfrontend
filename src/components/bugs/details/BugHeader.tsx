@@ -1,32 +1,31 @@
-import { Link, useLocation } from 'react-router-dom';
-import { ChevronLeft, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Bug } from '@/types';
-import EditBugDialog from '@/components/bugs/EditBugDialog';
-import { Badge } from '@/components/ui/badge';
-import { CheckSquare } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { bugService } from '@/services/bugService';
-import { toast } from '@/components/ui/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
-import { WhatsAppShareButton } from '@/components/bugs/WhatsAppShareButton';
-import { useAuth } from '@/context/AuthContext';
+import EditBugDialog from "@/components/bugs/EditBugDialog";
+import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { generateShareableUrl } from "@/lib/utils";
+import { bugService } from "@/services/bugService";
+import { Bug } from "@/types";
+import { CheckSquare, ChevronLeft, Share2, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 // Add getStatusColor function
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'fixed':
-      return 'bg-green-100 text-green-800 hover:bg-green-100';
-    case 'in_progress':
-      return 'bg-blue-100 text-blue-800 hover:bg-blue-100';
-    case 'pending':
-      return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100';
-    case 'declined':
-      return 'bg-red-100 text-red-800 hover:bg-red-100';
+    case "fixed":
+      return "bg-green-100 text-green-800 hover:bg-green-100";
+    case "in_progress":
+      return "bg-blue-100 text-blue-800 hover:bg-blue-100";
+    case "pending":
+      return "bg-yellow-100 text-yellow-800 hover:bg-yellow-100";
+    case "declined":
+      return "bg-red-100 text-red-800 hover:bg-red-100";
     default:
-      return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
+      return "bg-gray-100 text-gray-800 hover:bg-gray-100";
   }
 };
 
@@ -37,25 +36,55 @@ interface BugHeaderProps {
   currentUser: any;
 }
 
-export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }: BugHeaderProps) => {
+export const BugHeader = ({
+  bug,
+  formattedCreatedDate,
+  canEditBug,
+  currentUser,
+}: BugHeaderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser: authUser } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  
-  const isFromProject = location.state?.from === 'project';
 
-  const backLink = isFromProject 
-    ? `/${authUser?.role || 'tester'}/projects/${bug.project_id}?tab=bugs`
-    : `/${authUser?.role || 'tester'}/bugs`;
+  const isFromProject = location.state?.from === "project";
 
-  const backText = isFromProject 
-    ? 'Back to Project Bugs'
-    : 'Back to Bugs';
+  const backLink = isFromProject
+    ? `/${authUser?.role || "tester"}/projects/${bug.project_id}?tab=bugs`
+    : `/${authUser?.role || "tester"}/bugs`;
+
+  const backText = isFromProject ? "Back to Project Bugs" : "Back to Bugs";
 
   // Permission check: admin can delete any bug, or user can delete their own bug
-  const canDelete = currentUser?.role === 'admin' || String(currentUser?.id) === String(bug.reported_by);
+  const canDelete =
+    currentUser?.role === "admin" ||
+    String(currentUser?.id) === String(bug.reported_by);
+
+  // Generate a role-neutral URL that works for all users
+  const generateRoleNeutralUrl = () => {
+    return generateShareableUrl("bugs", bug.id);
+  };
+
+  const handleShare = async () => {
+    const roleNeutralUrl = generateRoleNeutralUrl();
+    const shareText = `Check out this bug: ${bug.title}\n${roleNeutralUrl}`;
+
+    // Try Web Share API first
+    if (navigator.share) {
+      await navigator.share({
+        title: bug.title,
+        text: shareText,
+        url: roleNeutralUrl,
+      });
+    } else {
+      // Fallback to WhatsApp Web
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(
+        shareText
+      )}`;
+      window.open(whatsappUrl, "_blank");
+    }
+  };
 
   const handleDeleteClick = () => {
     if (canDelete) {
@@ -73,7 +102,7 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
     setIsDeleting(true);
     try {
       await bugService.deleteBug(bug.id);
-      
+
       toast({
         title: "Bug Deleted",
         description: `"${bug.title}" has been permanently deleted.`,
@@ -81,7 +110,6 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
 
       // Navigate back to the appropriate page
       navigate(backLink, { replace: true });
-      
     } catch (error) {
       // console.error('Error deleting bug:', error);
       toast({
@@ -126,7 +154,7 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
             <p className="text-gray-700 dark:text-gray-300">
               Are you sure you want to permanently delete this bug?
             </p>
-            
+
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border">
               <div className="flex items-start gap-2">
                 <div className="flex-shrink-0 mt-0.5">
@@ -137,7 +165,8 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
                     {bug.title}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Bug ID: {bug.id.substring(0, 8)}... • Created {formattedCreatedDate}
+                    Bug ID: {bug.id.substring(0, 8)}... • Created{" "}
+                    {formattedCreatedDate}
                   </p>
                 </div>
               </div>
@@ -151,7 +180,8 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
                     Warning: Permanent Deletion
                   </p>
                   <p className="text-red-700 dark:text-red-300 text-xs">
-                    This will permanently delete the bug and all associated data. This action cannot be undone.
+                    This will permanently delete the bug and all associated
+                    data. This action cannot be undone.
                   </p>
                 </div>
               </div>
@@ -162,16 +192,16 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
         {/* Modal Footer */}
         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 rounded-b-lg">
           <div className="flex gap-3 justify-end">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleDeleteCancel}
               disabled={isDeleting}
               className="min-w-[80px]"
             >
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
               className="min-w-[80px] bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
@@ -197,17 +227,19 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
   return (
     <>
       <div className="space-y-3 sm:space-y-4">
-        <Link 
+        <Link
           to={backLink}
           className="inline-flex items-center text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" />
           {backText}
         </Link>
-        
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div className="space-y-1">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words">{bug.title}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words">
+              {bug.title}
+            </h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
               Project Name: {bug.project_name}
             </p>
@@ -215,11 +247,11 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
               Bug ID: {bug.id} • Reported on {formattedCreatedDate}
             </p>
           </div>
-          
+
           <div className="flex gap-2 w-full sm:w-auto">
             {canEditBug && (
               <EditBugDialog bug={bug}>
-                <Button 
+                <Button
                   variant="outline"
                   size="sm"
                   className="flex-1 sm:flex-none h-8 sm:h-9 text-xs sm:text-sm"
@@ -228,7 +260,18 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
                 </Button>
               </EditBugDialog>
             )}
-            
+
+            {/* General Share Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleShare}
+              className="flex-1 sm:flex-none h-8 sm:h-9 text-xs sm:text-sm"
+            >
+              <Share2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              Share
+            </Button>
+
             {/* WhatsApp Share Button */}
             <WhatsAppShareButton
               data={{
@@ -238,16 +281,16 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
                 priority: bug.priority,
                 description: bug.description,
                 reportedBy: bug.reported_by,
-                projectName: bug.project_id
+                projectName: bug.project_id,
               }}
-              type={bug.status === 'fixed' ? 'status_update' : 'new_bug'}
+              type={bug.status === "fixed" ? "status_update" : "new_bug"}
               variant="outline"
               size="sm"
               showLabel={false}
             />
-            
+
             {canDelete && (
-              <Button 
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={handleDeleteClick}
@@ -268,19 +311,23 @@ export const BugHeader = ({ bug, formattedCreatedDate, canEditBug, currentUser }
           <Badge variant="outline" className={getStatusColor(bug.status)}>
             {bug.status.replace(/_/g, " ").toUpperCase()}
           </Badge>
-          {(currentUser?.role === 'admin' || currentUser?.role === 'developer') && bug.status !== 'fixed' && (
+          {(currentUser?.role === "admin" ||
+            currentUser?.role === "developer") &&
+            bug.status !== "fixed" && (
               <Button
-                  variant="default"
-                  size="sm"
-                  className="ml-auto hidden sm:flex"
-                  onClick={() => navigate(`/${authUser?.role || 'tester'}/bugs/${bug.id}/fix`)}
+                variant="default"
+                size="sm"
+                className="ml-auto hidden sm:flex"
+                onClick={() =>
+                  navigate(`/${authUser?.role || "tester"}/bugs/${bug.id}/fix`)
+                }
               >
-                  <CheckSquare className="mr-2 h-4 w-4" /> Fix Bug
+                <CheckSquare className="mr-2 h-4 w-4" /> Fix Bug
               </Button>
-          )}
+            )}
         </div>
       </div>
-      
+
       {/* Portal-rendered Delete Modal */}
       {showDeleteModal && createPortal(<DeleteModal />, document.body)}
     </>
@@ -297,7 +344,7 @@ export function BugHeaderSkeleton() {
           <Skeleton className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           <Skeleton className="h-4 w-32 sm:w-40" />
         </div>
-        
+
         {/* Header Section with Title and Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div className="space-y-1 flex-1 min-w-0">
@@ -306,7 +353,7 @@ export function BugHeaderSkeleton() {
             {/* Bug ID and Date */}
             <Skeleton className="h-4 w-48 sm:w-64" />
           </div>
-          
+
           {/* Action Buttons */}
           <div className="flex gap-2 w-full sm:w-auto">
             <Skeleton className="h-8 sm:h-9 w-20 sm:w-24 flex-1 sm:flex-none" />
@@ -340,7 +387,7 @@ export function BugHeaderSkeletonDetailed() {
           <Skeleton className="h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-sm" />
           <Skeleton className="h-4 w-36 sm:w-44" />
         </div>
-        
+
         {/* Main Header Content */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           {/* Title and Meta Information */}
@@ -350,11 +397,11 @@ export function BugHeaderSkeletonDetailed() {
               <Skeleton className="h-6 sm:h-8 w-full max-w-[280px] sm:max-w-[450px]" />
               <Skeleton className="h-5 sm:h-6 w-3/4 max-w-[200px] sm:max-w-[300px]" />
             </div>
-            
+
             {/* Bug Meta Info */}
             <Skeleton className="h-3 sm:h-4 w-52 sm:w-72" />
           </div>
-          
+
           {/* Action Buttons Group */}
           <div className="flex gap-2 w-full sm:w-auto">
             <Skeleton className="h-8 sm:h-9 w-20 sm:w-24 flex-1 sm:flex-none" />
@@ -368,12 +415,12 @@ export function BugHeaderSkeletonDetailed() {
           <Skeleton className="h-6 w-24 rounded-full" />
           {/* Status Badge */}
           <Skeleton className="h-6 w-28 rounded-full" />
-          
+
           {/* Fix Button - Desktop Only */}
           <div className="ml-auto hidden sm:flex">
             <Skeleton className="h-8 w-28" />
           </div>
-          
+
           {/* Mobile Fix Button */}
           <div className="w-full sm:hidden mt-2">
             <Skeleton className="h-8 w-full max-w-[200px]" />
@@ -390,7 +437,7 @@ export function BugDetailsHeaderSkeleton() {
     <div className="w-full max-w-7xl mx-auto space-y-6 px-4 py-6 md:px-6 lg:px-8">
       {/* Main Header Skeleton */}
       <BugHeaderSkeletonDetailed />
-      
+
       {/* Additional spacing for page layout */}
       <div className="border-t border-border pt-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -398,7 +445,7 @@ export function BugDetailsHeaderSkeleton() {
           <div className="lg:col-span-2">
             <Skeleton className="h-40 w-full rounded-lg" />
           </div>
-          
+
           {/* Sidebar placeholder */}
           <div className="space-y-4">
             <Skeleton className="h-32 w-full rounded-lg" />
