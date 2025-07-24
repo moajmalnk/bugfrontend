@@ -169,18 +169,16 @@ const Login = () => {
           const identifier = loginMethod === "username" ? username : email;
           if (!identifier || !password) {
             toast({
-              title: "Validation Error",
-              description: `${
-                loginMethod === "username" ? "Username" : "Email"
-              } and password are required`,
+              title: "Login failed",
+              description: "Invalid credentials",
               variant: "destructive",
             });
             return;
           }
           if (loginMethod === "email" && !validateEmail(email)) {
             toast({
-              title: "Invalid Email",
-              description: "Please enter a valid email address",
+              title: "Login failed",
+              description: "Invalid credentials",
               variant: "destructive",
             });
             return;
@@ -192,15 +190,11 @@ const Login = () => {
           const data = response.data as any;
           if (data.success && data.token && data.user) {
             localStorage.setItem("token", data.token);
-            // Optionally: update context state here if not handled elsewhere
-            // setCurrentUser(data.user);
-            // setIsAuthenticated(true);
-            // Now redirect
             login(identifier, password);
           } else {
             toast({
               title: "Login failed",
-              description: data.message || "Invalid credentials",
+              description: "Invalid credentials",
               variant: "destructive",
             });
           }
