@@ -36,12 +36,15 @@ const Login = () => {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [otpMethod, setOtpMethod] = useState<"mail" | "whatsapp">("mail");
   const [phone, setPhone] = useState("");
+  const [userExists, setUserExists] = useState(false);
+  const [checkingUser, setCheckingUser] = useState(false);
   const {
     login,
     register,
     isAuthenticated,
     isLoading: isAuthLoading,
     currentUser,
+    loginWithToken,
   } = useAuth();
   const navigate = useNavigate();
 
@@ -63,17 +66,16 @@ const Login = () => {
   }, [otpCountdown]);
 
   useEffect(() => {
-    if (isAuthenticated && currentUser) {
-      const intendedDestination =
-        localStorage.getItem("intendedDestination") ||
-        `/${currentUser.role}/projects`;
-      console.log("Redirecting to:", intendedDestination);
-      localStorage.removeItem("intendedDestination");
-      navigate(intendedDestination, { replace: true });
+    // Only redirect if authenticated AND token exists
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (isAuthenticated && currentUser && token) {
+      // navigate to projects
     }
   }, [isAuthenticated, currentUser, navigate]);
 
   if (isAuthLoading) {
+    // Show loading spinner
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
         <div className="text-center">
@@ -84,10 +86,6 @@ const Login = () => {
         </div>
       </div>
     );
-  }
-
-  if (isAuthenticated) {
-    return null;
   }
 
   const validateEmail = (email: string) => {
@@ -112,7 +110,7 @@ const Login = () => {
           });
           return;
         }
-        payload = { method: "whatsapp", phone };
+        payload = { method: "whatsapp", phone: "+91" + phone };
       } else {
         if (!email || !validateEmail(email)) {
           toast({
@@ -192,12 +190,13 @@ const Login = () => {
             { identifier, password }
           );
           const data = response.data as any;
-          if (data.success) {
-            success = true;
-            user = data.user;
-            if (data.token) {
-              localStorage.setItem("token", data.token);
-            }
+          if (data.success && data.token && data.user) {
+            localStorage.setItem("token", data.token);
+            // Optionally: update context state here if not handled elsewhere
+            // setCurrentUser(data.user);
+            // setIsAuthenticated(true);
+            // Now redirect
+            login(identifier, password);
           } else {
             toast({
               title: "Login failed",
@@ -218,7 +217,7 @@ const Login = () => {
               });
               return;
             }
-            payload = { method: "whatsapp", phone, otp };
+            payload = { method: "whatsapp", phone: "+91" + phone, otp };
           } else {
             if (!email || !otp) {
               toast({
@@ -247,7 +246,7 @@ const Login = () => {
             success = true;
             user = data.user;
             if (data.token) {
-              localStorage.setItem("token", data.token);
+              loginWithToken(user, data.token);
             }
           } else {
             toast({
@@ -261,8 +260,15 @@ const Login = () => {
       }
 
       if (success && user) {
-        window.location.reload();
-        // navigate(`/${user.role}/projects`);
+        // Set token and user in localStorage/sessionStorage
+        // localStorage.setItem("token", data.token); // Remove this line
+        // Use the correct variables already set above
+        // localStorage.setItem("token", token); // If you have a token variable
+        // No need to set again if already set
+        // Optionally, update context state if needed
+        // Call a context method to set currentUser and isAuthenticated
+        // Then navigate
+        // navigate(`/${user.role}/projects`, { replace: true }); // This line is removed
       }
     } catch (error: any) {
       toast({
@@ -325,6 +331,35 @@ const Login = () => {
         }
       default:
         return false;
+    }
+  };
+
+  const checkUserExists = async (type: "email" | "phone", value: string) => {
+    setCheckingUser(true);
+    setUserExists(false);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/check_user.php`, {
+        type,
+        value,
+      });
+      const exists = (response.data as { exists: boolean }).exists;
+      setUserExists(exists);
+      if (!exists) {
+        toast({
+          title: "User Not Found",
+          description: `No user found with this ${type}.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      setUserExists(false);
+      toast({
+        title: "Error",
+        description: "Failed to check user existence.",
+        variant: "destructive",
+      });
+    } finally {
+      setCheckingUser(false);
     }
   };
 
@@ -429,6 +464,9 @@ const Login = () => {
                     placeholder="Enter Your Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => {
+                      if (validateEmail(email)) checkUserExists("email", email);
+                    }}
                     required
                     disabled={isSignUp}
                     className="h-9 text-sm"
@@ -498,21 +536,43 @@ const Login = () => {
                       placeholder="Enter Your Email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() => {
+                        if (validateEmail(email))
+                          checkUserExists("email", email);
+                      }}
                       required
                       className="h-9 text-sm"
                     />
                   ) : (
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="Enter Your Phone Number"
-                      value={phone}
-                      onChange={(e) =>
-                        setPhone(e.target.value.replace(/\D/g, "").slice(0, 15))
-                      }
-                      required
-                      className="h-9 text-sm"
-                    />
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="px-3 py-2 border border-input rounded-l-md text-sm bg-input"
+                        style={{ borderRight: 0 }}
+                      >
+                        +91
+                      </span>
+                      <input
+                        id="phone"
+                        type="tel"
+                        placeholder="Enter 10-digit number"
+                        value={phone}
+                        onChange={(e) =>
+                          setPhone(
+                            e.target.value.replace(/\D/g, "").slice(0, 10)
+                          )
+                        }
+                        onBlur={() => {
+                          if (phone.length === 10)
+                            checkUserExists("phone", "+91" + phone);
+                        }}
+                        required
+                        className="h-9 text-sm flex-1 border border-input rounded-r-md px-3 bg-input text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{ borderLeft: 0 }}
+                        maxLength={10}
+                        pattern="\d{10}"
+                        inputMode="numeric"
+                      />
+                    </div>
                   )}
                   {/* Send OTP Button */}
                   {!otpSent ? (
@@ -521,8 +581,14 @@ const Login = () => {
                       onClick={handleSendOtp}
                       disabled={
                         otpMethod === "mail"
-                          ? !email || !validateEmail(email) || isSendingOtp
-                          : !phone || phone.length < 8 || isSendingOtp
+                          ? !email ||
+                            !validateEmail(email) ||
+                            isSendingOtp ||
+                            !userExists
+                          : !phone ||
+                            phone.length < 10 ||
+                            isSendingOtp ||
+                            !userExists
                       }
                       className="w-full h-9 text-sm"
                       variant="outline"

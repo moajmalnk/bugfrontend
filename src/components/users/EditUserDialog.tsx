@@ -99,7 +99,7 @@ export function EditUserDialog({
         username: data.username,
         email: data.email,
         role: data.role,
-        phone: data.phone,
+        phone: data.phone ? "+91" + data.phone : "",
       });
 
       // Manually create updated user object from form data
@@ -238,14 +238,34 @@ export function EditUserDialog({
                 <FormItem>
                   <FormLabel>Phone</FormLabel>
                   <FormControl>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="Enter phone number"
-                      value={field.value}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      className="h-9 text-sm"
-                    />
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="px-3 py-2 border border-input rounded-l-md text-sm bg-input"
+                        style={{ borderRight: 0 }}
+                      >
+                        +91
+                      </span>
+                      <input
+                        id="phone"
+                        type="tel"
+                        placeholder="Enter 10-digit number"
+                        value={
+                          field.value ? field.value.replace(/^\+91/, "") : ""
+                        }
+                        onChange={(e) => {
+                          // Only allow 10 digits
+                          const val = e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 10);
+                          field.onChange(val);
+                        }}
+                        className="h-9 text-sm flex-1 border border-input rounded-r-md px-3 bg-input text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{ borderLeft: 0 }}
+                        maxLength={10}
+                        pattern="\d{10}"
+                        inputMode="numeric"
+                      />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

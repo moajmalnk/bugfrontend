@@ -14,7 +14,8 @@ interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (identifier: string, password: string) => Promise<boolean>;
+  loginWithToken: (user: User, token: string) => void;
   logout: () => void;
   register: (data: RegisterData) => Promise<boolean>;
   updateCurrentUser: (user: User) => void;
@@ -47,25 +48,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const storeIntendedDestination = (path: string) => {
-    if (path && path !== '/login') {
-      localStorage.setItem('intendedDestination', path);
+    if (path && path !== "/login") {
+      localStorage.setItem("intendedDestination", path);
     }
   };
 
   const checkAuthStatus = async () => {
     // 1. Check for token in URL (for admin deep links)
     const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get('token');
+    const urlToken = urlParams.get("token");
 
     if (urlToken) {
       // Use the token from the URL and store it in sessionStorage for this tab only
-      sessionStorage.setItem('token', urlToken);
+      sessionStorage.setItem("token", urlToken);
       // Remove token from URL to keep it clean
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-    
+
     // 2. Prioritize sessionStorage token, then fall back to localStorage
-    const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+    const token =
+      sessionStorage.getItem("token") || localStorage.getItem("token");
 
     if (!token) {
       setIsLoading(false);
@@ -109,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (
-    username: string,
+    identifier: string,
     password: string
   ): Promise<boolean> => {
     try {
@@ -120,38 +122,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username,
+          identifier,
           password,
         }),
       });
 
       const data = await response.json();
-      // // console.log('Login response:', data);
 
-      if (data.success && data.data?.token) {
-        localStorage.setItem("token", data.data.token);
-        const user = data.data.user;
+      if (response.ok && data.success && data.token) {
+        localStorage.setItem("token", data.token);
+        const user = data.user;
         setCurrentUser(user);
-        
+
         // Get the intended destination or default to the user's role-specific projects page
-        const intendedDestination = localStorage.getItem('intendedDestination') || `/${user.role}/projects`;
-        localStorage.removeItem('intendedDestination');
+        const intendedDestination =
+          localStorage.getItem("intendedDestination") ||
+          `/${user.role}/projects`;
+        localStorage.removeItem("intendedDestination");
         navigate(intendedDestination, { replace: true });
         return true;
       }
 
-      // Show error message if available
-      if (data.message) {
-        toast({
-          title: "Login failed",
-          description: data.message,
-          variant: "destructive",
-        });
-      }
+      // Show error message for 401/400
+      toast({
+        title: "Login failed",
+        description: data.message || "Invalid credentials",
+        variant: "destructive",
+      });
 
       return false;
     } catch (error) {
-      // console.error("Login error:", error);
       toast({
         title: "Error",
         description: "Failed to connect to the server",
@@ -211,11 +211,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate("/login", { replace: true });
   };
 
+  const loginWithToken = (user: User, token: string) => {
+    localStorage.setItem("token", token);
+    setCurrentUser(user);
+
+    // Get the intended destination or default to the user's role-specific projects page
+    const intendedDestination =
+      localStorage.getItem("intendedDestination") || `/${user.role}/projects`;
+    localStorage.removeItem("intendedDestination");
+    navigate(intendedDestination, { replace: true });
+  };
+
   const value = {
     currentUser,
     isAuthenticated: !!currentUser,
     isLoading,
     login,
+    loginWithToken,
     logout,
     register,
     updateCurrentUser,
