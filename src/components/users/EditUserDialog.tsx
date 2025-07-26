@@ -77,7 +77,7 @@ export function EditUserDialog({
       username: user.username || "",
       email: user.email,
       role: user.role,
-      phone: user.phone || "",
+      phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
     },
   });
 
@@ -87,7 +87,7 @@ export function EditUserDialog({
       username: user.username || "",
       email: user.email,
       role: user.role,
-      phone: user.phone || "",
+      phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
     });
   }, [user, form]);
 
@@ -108,7 +108,7 @@ export function EditUserDialog({
         username: data.username, // Apply updated values
         email: data.email,
         role: data.role,
-        phone: data.phone,
+        phone: data.phone ? "+91" + data.phone : "",
         // Note: The 'name' property is often derived from 'username' or handled server-side.
         // Ensure your backend returns the updated 'name' in the response if necessary,
         // or handle its derivation client-side if possible.

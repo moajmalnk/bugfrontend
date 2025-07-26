@@ -156,6 +156,10 @@ const Users = () => {
       setUsers(
         users.map((user) => (user.id === updatedUser.id ? updatedUser : user))
       );
+      // Update selectedUser if it's the same user being updated
+      if (selectedUser && selectedUser.id === updatedUser.id) {
+        setSelectedUser(updatedUser);
+      }
       toast({
         title: "Success",
         description: "User has been updated successfully.",

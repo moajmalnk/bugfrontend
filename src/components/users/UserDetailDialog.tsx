@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Loader2,
   Mail,
+  Phone,
   Shield,
   X,
 } from "lucide-react";
@@ -258,7 +259,7 @@ export function UserDetailDialog({
               </span>
               {user.phone && (
                 <span className="flex items-center gap-2">
-                  <AtSign className="h-4 w-4" />
+                  <Phone className="h-4 w-4" />
                   {user.phone}
                 </span>
               )}
