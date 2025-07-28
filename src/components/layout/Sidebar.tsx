@@ -9,6 +9,7 @@ import {
   CheckCircle,
   FolderKanban,
   Menu,
+  MessageCircle,
   Settings,
   Users,
 } from "lucide-react";
@@ -32,11 +33,15 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     if (!role) return false;
     const fullPath = `/${role}${path}`;
     // Highlight "Projects" for both /projects and /projects/ID
-    if (path === '/projects') {
+    if (path === "/projects") {
       return location.pathname.startsWith(fullPath);
     }
     // For other links, do a more specific match to avoid highlighting multiple items
-    return location.pathname.startsWith(fullPath) && (location.pathname === fullPath || location.pathname.charAt(fullPath.length) === '/');
+    return (
+      location.pathname.startsWith(fullPath) &&
+      (location.pathname === fullPath ||
+        location.pathname.charAt(fullPath.length) === "/")
+    );
   };
 
   const NavLink = ({
@@ -95,10 +100,10 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             </div>
             <NavLink
-                to="/updates"
-                icon={<Bell className="h-5 w-5" />}
-                label="Updates"
-              />
+              to="/updates"
+              icon={<Bell className="h-5 w-5" />}
+              label="Updates"
+            />
             {currentUser?.role === "admin" && (
               <>
                 <Separator />
@@ -111,8 +116,13 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     icon={<Users className="h-5 w-5" />}
                     label="Users"
                   />
+                  <NavLink
+                    to="/whatsapp-messages"
+                    icon={<MessageCircle className="h-5 w-5" />}
+                    label="WhatsApp Messages"
+                  />
                   {/* <NavLink 
-                    to="/reports" 
+                    to="/reports" -
                     icon={<FileBarChart className="h-5 w-5" />} 
                     label="Reports" 
                   /> */}
@@ -141,7 +151,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{currentUser?.name}</p>
             <p className="text-xs text-muted-foreground capitalize truncate">
-              {currentUser?.role} {currentUser?.email && `(${currentUser.email})`}
+              {currentUser?.role}{" "}
+              {currentUser?.email && `(${currentUser.email})`}
             </p>
           </div>
         </Link>

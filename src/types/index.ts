@@ -31,6 +31,14 @@ export type Bug = {
     path: string;
     type: string;
   }>;
+  attachments?: Array<{
+    id: string;
+    file_name: string;
+    file_path: string;
+    file_type: string;
+    uploaded_by?: string;
+    created_at?: string;
+  }>;
   fixed_by?: string | null;
   fixed_by_name?: string | null;
 };

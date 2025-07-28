@@ -61,7 +61,7 @@ class UserService {
   }
 
   async getUsers(): Promise<User[]> {
-    const response = await this.fetchWithAuth(`${this.baseUrl}/get.php`);
+    const response = await this.fetchWithAuth(`${this.baseUrl}/getAll.php`);
     if (!response.success) {
       throw new Error(response.message);
     }

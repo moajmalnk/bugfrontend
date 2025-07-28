@@ -71,6 +71,7 @@ const NewUpdate = lazy(() => import("@/pages/NewUpdate"));
 const UpdateDetails = lazy(() => import("@/pages/UpdateDetails"));
 const EditUpdate = lazy(() => import("@/pages/EditUpdate"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const WhatsAppMessages = lazy(() => import("@/pages/WhatsAppMessages"));
 
 // Component to handle role-neutral bug redirects
 const BugRedirect = () => {
@@ -162,6 +163,7 @@ const RouteConfig = () => {
           <Route path="updates" element={<Updates />} />
           <Route path="updates/:updateId" element={<UpdateDetails />} />
           <Route path="updates/:updateId/edit" element={<EditUpdate />} />
+          <Route path="whatsapp-messages" element={<WhatsAppMessages />} />
           {/* Redirect from /:role to /:role/projects */}
           <Route index element={<Navigate to="projects" replace />} />
         </Route>
@@ -172,9 +174,7 @@ const RouteConfig = () => {
         path="/"
         element={
           <Navigate
-            to={
-              isAuthenticated && role ? `/${role}/projects` : "/login"
-            }
+            to={isAuthenticated && role ? `/${role}/projects` : "/login"}
             replace
           />
         }

@@ -18,7 +18,7 @@ import {
   MapPin,
   Phone,
 } from "lucide-react";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Profile skeleton components
@@ -122,17 +122,8 @@ export default function Profile() {
     enabled: !!currentUser?.id,
   });
 
-  useEffect(() => {
-    // Fetch latest user data on mount
-    if (currentUser?.id) {
-      userService.getUsers().then((users) => {
-        const freshUser = users.find((u) => u.id === currentUser.id);
-        if (freshUser) {
-          updateCurrentUser(freshUser);
-        }
-      });
-    }
-  }, [currentUser?.id, updateCurrentUser]);
+  // Remove the problematic useEffect that was causing infinite requests
+  // The user data is already available from AuthContext and doesn't need to be refetched
 
   const handleLogout = useCallback(async () => {
     setShowConfirm(false);

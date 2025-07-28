@@ -139,8 +139,75 @@
 /* Hide scrollbars for all browsers */
 .hide-scrollbar {
   scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none;  /* IE 10+ */
+  -ms-overflow-style: none; /* IE 10+ */
 }
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome/Safari/Webkit */
+}
+
+/* Responsive messaging improvements */
+@layer utilities {
+  /* Custom breakpoint for extra small screens */
+  @media (max-width: 480px) {
+    .xs\:max-w-\[85\%\] {
+      max-width: 85%;
+    }
+  }
+
+  /* Improved backdrop blur support */
+  .backdrop-blur {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Better touch targets for mobile */
+  @media (max-width: 768px) {
+    .mobile-touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Smooth transitions for responsive layout changes */
+  .responsive-transition {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Improved message bubble responsiveness */
+  .message-bubble {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  /* Better spacing for mobile */
+  @media (max-width: 640px) {
+    .mobile-spacing {
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+  }
+
+  /* Better text wrapping for long messages */
+  .word-break-all {
+    word-break: break-all;
+  }
+
+  .overflow-wrap-anywhere {
+    overflow-wrap: anywhere;
+  }
+
+  /* Message bubble text handling */
+  .message-text {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+  }
+
+  /* Handle extremely long strings */
+  .message-text-long {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+  }
 }

@@ -21,12 +21,10 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useBugs } from "@/context/BugContext";
 import { ENV } from "@/lib/env";
-import {
-  sendNewBugNotification,
-} from "@/services/emailService";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
-import { whatsappService } from "@/services/whatsappService";
+import { sendNewBugNotification } from "@/services/emailService";
 import { notificationService } from "@/services/notificationService";
+import { whatsappService } from "@/services/whatsappService";
 import { BugPriority, Project } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -35,7 +33,12 @@ import {
   File,
   FileImage,
   ImagePlus,
+  Mic,
   Paperclip,
+  Pause,
+  Play,
+  Square,
+  Volume2,
   X,
 } from "lucide-react";
 import React, {
@@ -49,6 +52,15 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 interface FileWithPreview extends File {
   preview?: string;
+}
+
+interface VoiceNote {
+  id: string;
+  blob: Blob;
+  duration: number;
+  name: string;
+  isPlaying: boolean;
+  audioUrl?: string;
 }
 
 interface ApiResponse<T> {
@@ -77,10 +89,46 @@ const NewBug = () => {
   // File uploads
   const [screenshots, setScreenshots] = useState<FileWithPreview[]>([]);
   const [files, setFiles] = useState<FileWithPreview[]>([]);
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
+
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
+    null
+  );
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(
+    null
+  );
+  const [showDuration, setShowDuration] = useState(false);
 
   // Refs for file inputs
   const screenshotInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup effect for blob URLs
+  useEffect(() => {
+    return () => {
+      // Clean up all blob URLs when component unmounts
+      voiceNotes.forEach((voiceNote) => {
+        if (voiceNote.audioUrl && voiceNote.audioUrl.startsWith("blob:")) {
+          try {
+            URL.revokeObjectURL(voiceNote.audioUrl);
+          } catch (error) {
+            console.error("Error revoking blob URL on cleanup:", error);
+          }
+        }
+      });
+
+      // Clean up current audio
+      if (currentAudio) {
+        currentAudio.pause();
+        setCurrentAudio(null);
+      }
+    };
+  }, [voiceNotes, currentAudio]);
 
   const {
     data: projects = [],
@@ -110,7 +158,9 @@ const NewBug = () => {
               return project.members.includes(currentUser.id);
             }
             // If array of objects
-            return project.members.some((m) => m.id === currentUser.id || m.user_id === currentUser.id);
+            return project.members.some(
+              (m) => m.id === currentUser.id || m.user_id === currentUser.id
+            );
           }
           // fallback: show if user is creator
           return project.created_by === currentUser.id;
@@ -119,6 +169,285 @@ const NewBug = () => {
       throw new Error(response.data.message || "Failed to fetch projects");
     },
   });
+
+  // Voice recording functions - using proven approach from working VoiceRecorder components
+  const startRecording = async () => {
+    try {
+      console.log("Starting voice recording...");
+
+      // Request microphone access with basic audio constraints
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      console.log("Microphone access granted");
+
+      // Use more compatible MIME type detection
+      let mimeType = "";
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        mimeType = "audio/webm";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        mimeType = "audio/mp4";
+      } else if (MediaRecorder.isTypeSupported("audio/ogg")) {
+        mimeType = "audio/ogg";
+      } else {
+        mimeType = "audio/wav";
+      }
+
+      console.log("Using MIME type:", mimeType);
+
+      const recorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined
+      );
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+          console.log(
+            "Audio chunk received, size:",
+            event.data.size,
+            "Total chunks:",
+            chunks.length
+          );
+        }
+      };
+
+      recorder.onstop = () => {
+        // Capture the recording time before it gets reset
+        const finalRecordingTime = recordingTime;
+        console.log("Recording stopped. Final time:", finalRecordingTime);
+
+        // Create blob with proper type
+        const audioBlob = new Blob(chunks, { type: mimeType || "audio/webm" });
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        console.log(
+          "Recording completed. Blob type:",
+          audioBlob.type,
+          "Size:",
+          audioBlob.size,
+          "Duration:",
+          finalRecordingTime
+        );
+
+        // Create voice note with captured duration (ensure minimum 1 second)
+        const voiceNote: VoiceNote = {
+          id: Date.now().toString(),
+          blob: audioBlob,
+          duration: finalRecordingTime > 0 ? finalRecordingTime : 1,
+          name: `Voice Note ${voiceNotes.length + 1}`,
+          isPlaying: false,
+          audioUrl: audioUrl,
+        };
+
+        console.log("=== VOICE NOTE CREATED ===");
+        console.log("Voice note object:", voiceNote);
+        console.log("Blob size:", audioBlob.size);
+        console.log("Blob type:", audioBlob.type);
+        console.log("Audio URL:", audioUrl);
+        console.log("Duration:", finalRecordingTime, "seconds");
+
+        // Add to voice notes
+        setVoiceNotes((prev) => {
+          const newList = [...prev, voiceNote];
+          console.log("Updated voice notes list:", newList);
+          return newList;
+        });
+
+        // Reset recording state with a small delay to ensure duration is captured
+        setTimeout(() => {
+          setAudioChunks([]);
+          setRecordingTime(0);
+        }, 100);
+        stream.getTracks().forEach((track) => track.stop());
+
+        setAudioChunks([]);
+        setRecordingTime(0);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      setMediaRecorder(recorder);
+      setAudioChunks([]);
+      setRecordingTime(0);
+      recorder.start(1000);
+      setIsRecording(true);
+
+      // Start timer like working components
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+
+      // Auto-stop after 5 minutes
+      setTimeout(() => {
+        if (isRecording) {
+          stopRecording();
+        }
+      }, 300000);
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      toast({
+        title: "Recording Failed",
+        description:
+          "Could not access microphone. Please check permissions and try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      console.log("Stopping recording, current time:", recordingTime);
+      mediaRecorder.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+      // Don't reset recordingTime here - let the onstop handler capture it
+    }
+  };
+
+  const playVoiceNote = (voiceNote: VoiceNote) => {
+    console.log("=== PLAY VOICE NOTE DEBUG ===");
+    console.log("Voice note:", voiceNote);
+    console.log("Current audio state:", currentAudio);
+    console.log("Current voice notes state:", voiceNotes);
+
+    if (!voiceNote.audioUrl) {
+      console.error("❌ No audio URL provided");
+      toast({
+        title: "Playback Error",
+        description: "Audio file not found. Please record again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log("✅ Audio URL exists:", voiceNote.audioUrl);
+
+    // Stop any currently playing audio
+    if (currentAudio) {
+      console.log("🛑 Stopping current audio");
+      currentAudio.pause();
+      setCurrentAudio(null);
+    }
+
+    // Set all voice notes to not playing first
+    console.log("🔄 Setting all voice notes to not playing");
+    setVoiceNotes((prev) => {
+      const updated = prev.map((vn) => ({ ...vn, isPlaying: false }));
+      console.log("Updated voice notes:", updated);
+      return updated;
+    });
+
+    // Create new audio element with the blob directly
+    console.log("🎵 Creating new audio element from blob");
+    const audio = new Audio();
+
+    // Create a new blob URL from the original blob to ensure it's valid
+    const newAudioUrl = URL.createObjectURL(voiceNote.blob);
+    console.log("🔄 Created new blob URL:", newAudioUrl);
+
+    audio.src = newAudioUrl;
+    setCurrentAudio(audio);
+
+    // Set this voice note as playing immediately
+    console.log("▶️ Setting voice note as playing:", voiceNote.id);
+    setVoiceNotes((prev) => {
+      const updated = prev.map((vn) => ({
+        ...vn,
+        isPlaying: vn.id === voiceNote.id,
+      }));
+      console.log("Updated voice notes after setting playing:", updated);
+      return updated;
+    });
+
+    // Set up event listeners
+    audio.onended = () => {
+      console.log("🏁 Audio playback ended");
+      setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
+      setCurrentAudio(null);
+      // Clean up the blob URL
+      URL.revokeObjectURL(newAudioUrl);
+    };
+
+    audio.onerror = (e) => {
+      console.error("❌ Audio playback error:", e);
+      setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
+      setCurrentAudio(null);
+      // Clean up the blob URL
+      URL.revokeObjectURL(newAudioUrl);
+    };
+
+    // Start playing
+    console.log("🚀 Starting audio playback");
+    audio
+      .play()
+      .then(() => {
+        console.log("✅ Audio playback started successfully");
+      })
+      .catch((error) => {
+        console.error("❌ Error playing audio:", error);
+        setVoiceNotes((prev) =>
+          prev.map((vn) => ({ ...vn, isPlaying: false }))
+        );
+        setCurrentAudio(null);
+        // Clean up the blob URL
+        URL.revokeObjectURL(newAudioUrl);
+      });
+  };
+
+  const pauseVoiceNote = (voiceNote: VoiceNote) => {
+    console.log("=== PAUSE VOICE NOTE DEBUG ===");
+    console.log("Pausing voice note:", voiceNote.name);
+    console.log("Current audio state:", currentAudio);
+    console.log("Current voice notes state:", voiceNotes);
+
+    // Pause the current audio
+    if (currentAudio) {
+      console.log("🛑 Pausing current audio");
+      currentAudio.pause();
+      setCurrentAudio(null);
+    } else {
+      console.log("⚠️ No current audio to pause");
+    }
+
+    // Set all voice notes to not playing
+    console.log("🔄 Setting all voice notes to not playing");
+    setVoiceNotes((prev) => {
+      const updated = prev.map((vn) => ({ ...vn, isPlaying: false }));
+      console.log("Updated voice notes after pause:", updated);
+      return updated;
+    });
+  };
+
+  const removeVoiceNote = (index: number) => {
+    const voiceNote = voiceNotes[index];
+    if (voiceNote.audioUrl) {
+      try {
+        URL.revokeObjectURL(voiceNote.audioUrl);
+        console.log("Revoked blob URL for:", voiceNote.name);
+      } catch (error) {
+        console.error("Error revoking blob URL:", error);
+      }
+    }
+    setVoiceNotes((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const formatTime = (seconds: number) => {
+    if (seconds === 0) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -167,6 +496,20 @@ const NewBug = () => {
         formData.append(`files[]`, file);
       });
 
+      // Add voice notes
+      voiceNotes.forEach((voiceNote, index) => {
+        const fileExtension = voiceNote.blob.type.includes("webm")
+          ? "webm"
+          : voiceNote.blob.type.includes("mp4")
+          ? "mp4"
+          : "wav";
+        formData.append(
+          `voice_notes[]`,
+          voiceNote.blob,
+          `${voiceNote.name}.${fileExtension}`
+        );
+      });
+
       const response = await fetch(`${ENV.API_URL}/bugs/create.php`, {
         method: "POST",
         headers: {
@@ -185,9 +528,13 @@ const NewBug = () => {
 
         // Handle redirection immediately after successful submission and toast
         if (preSelectedProjectId) {
-          navigate(currentUser?.role ? `/${currentUser.role}/projects/${preSelectedProjectId}` : `/projects/${preSelectedProjectId}`);
+          navigate(
+            currentUser?.role
+              ? `/${currentUser.role}/projects/${preSelectedProjectId}`
+              : `/projects/${preSelectedProjectId}`
+          );
         } else {
-          navigate(currentUser?.role ? `/${currentUser.role}/bugs` : '/bugs');
+          navigate(currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs");
         }
 
         // Send email notification asynchronously without blocking navigation
@@ -198,7 +545,8 @@ const NewBug = () => {
             const uploadedAttachments = data.uploadedAttachments || [];
             // console.log("Uploaded attachment paths from backend:", uploadedAttachments);
 
-            const bugId = data.data?.bug?.id || data.bugId || data.data?.id || data.id;
+            const bugId =
+              data.data?.bug?.id || data.bugId || data.data?.id || data.id;
             const bugData = {
               title: name,
               description: description,
@@ -207,13 +555,13 @@ const NewBug = () => {
               reported_by_name: currentUser?.name || "Bug Ricer User",
               attachments: uploadedAttachments,
               id: bugId,
-              project_id: projectId
+              project_id: projectId,
             };
 
             // Send email notification
             const emailResponse = await sendNewBugNotification(bugData);
             // console.log("Email notification sent:", emailResponse);
-            
+
             // Broadcast browser notification to all users
             if (data.id) {
               const bugId = String(data.id);
@@ -226,17 +574,22 @@ const NewBug = () => {
 
               // Check if WhatsApp notifications are enabled and share
               const notificationSettings = notificationService.getSettings();
-              if (notificationSettings.whatsappNotifications && notificationSettings.newBugNotifications) {
+              if (
+                notificationSettings.whatsappNotifications &&
+                notificationSettings.newBugNotifications
+              ) {
                 // Get project name for WhatsApp message
-                const selectedProject = projects?.find(p => p.id === projectId);
-                
+                const selectedProject = projects?.find(
+                  (p) => p.id === projectId
+                );
+
                 whatsappService.shareNewBug({
                   bugTitle: name,
                   bugId: bugId,
                   priority: priority,
                   description: description,
                   reportedBy: currentUser?.name || "Bug Ricer User",
-                  projectName: selectedProject?.name
+                  projectName: selectedProject?.name,
                 });
                 // console.log("WhatsApp share opened for new bug");
               }
@@ -357,8 +710,36 @@ const NewBug = () => {
       files.forEach((file) => {
         if (file.preview) URL.revokeObjectURL(file.preview);
       });
+
+      voiceNotes.forEach((voiceNote) => {
+        if (voiceNote.audioUrl) URL.revokeObjectURL(voiceNote.audioUrl);
+      });
+
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
     };
-  }, [screenshots, files]);
+  }, [screenshots, files, voiceNotes]);
+
+  // Debug voice notes duration
+  useEffect(() => {
+    if (voiceNotes.length > 0) {
+      console.log(
+        "Voice notes updated:",
+        voiceNotes.map((vn) => ({ name: vn.name, duration: vn.duration }))
+      );
+    }
+  }, [voiceNotes]);
+
+  // Cleanup currentAudio on unmount
+  useEffect(() => {
+    return () => {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = "";
+      }
+    };
+  }, [currentAudio]);
 
   return (
     <div className="space-y-6 w-full max-w-4xl mx-auto px-2 sm:px-4 py-4">
@@ -476,7 +857,7 @@ const NewBug = () => {
                 multiple
               />
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 {/* Screenshots section */}
                 <div
                   className="space-y-3"
@@ -583,6 +964,128 @@ const NewBug = () => {
                             >
                               <X className="h-4 w-4" />
                             </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Voice Notes section */}
+                <div className="space-y-3">
+                  <Button
+                    type="button"
+                    variant={isRecording ? "destructive" : "outline"}
+                    className={`h-24 w-full flex flex-col items-center justify-center transition-all duration-200 ${
+                      isRecording
+                        ? "bg-red-500 hover:bg-red-600 text-white shadow-lg animate-pulse"
+                        : "hover:bg-primary/5 hover:border-primary/30"
+                    }`}
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={isSubmitting}
+                    title={
+                      isRecording
+                        ? "Click to stop recording"
+                        : "Click to start recording"
+                    }
+                  >
+                    {isRecording ? (
+                      <>
+                        <Square className="h-8 w-8 mb-2 text-white" />
+                        <span className="font-medium">Stop Recording</span>
+                        <span className="text-xs text-white/80 mt-1 font-mono">
+                          {formatTime(recordingTime)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="h-8 w-8 mb-2 text-muted-foreground group-hover:text-primary" />
+                        <span>Record Voice Note</span>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          (Click to start)
+                        </span>
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Debug Info */}
+                  {process.env.NODE_ENV === "development" && (
+                    <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded text-xs">
+                      <div>Debug: {voiceNotes.length} voice notes</div>
+                      <div>
+                        Current Audio: {currentAudio ? "Playing" : "None"}
+                      </div>
+                      <div>
+                        Playing IDs:{" "}
+                        {voiceNotes
+                          .filter((vn) => vn.isPlaying)
+                          .map((vn) => vn.id)
+                          .join(", ") || "None"}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Preview of voice notes */}
+                  {voiceNotes.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm">
+                        Voice Notes ({voiceNotes.length})
+                      </Label>
+                      <div className="space-y-2">
+                        {voiceNotes.map((voiceNote, index) => (
+                          <div
+                            key={voiceNote.id}
+                            className="flex items-center justify-between rounded border p-2 text-sm group hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-center space-x-2 overflow-hidden">
+                              <Volume2 className="h-8 w-8 text-blue-500 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-medium">
+                                  {voiceNote.name}
+                                </div>
+                                {showDuration && (
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    {formatTime(voiceNote.duration)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-1 flex-shrink-0">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-primary/10"
+                                onClick={() => {
+                                  console.log(
+                                    "Button clicked, isPlaying:",
+                                    voiceNote.isPlaying
+                                  );
+                                  if (voiceNote.isPlaying) {
+                                    pauseVoiceNote(voiceNote);
+                                  } else {
+                                    playVoiceNote(voiceNote);
+                                  }
+                                }}
+                                title={voiceNote.isPlaying ? "Pause" : "Play"}
+                              >
+                                {voiceNote.isPlaying ? (
+                                  <Pause className="h-3 w-3" />
+                                ) : (
+                                  <Play className="h-3 w-3" />
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => removeVoiceNote(index)}
+                                title="Remove voice note"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
