@@ -368,6 +368,15 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
         open={screenshotViewerOpen}
         onOpenChange={setScreenshotViewerOpen}
         initialIndex={selectedScreenshotIndex}
+        bug_id={bug.id}
+        onScreenshotDelete={(deletedId) => {
+          // Update the bug's attachments to remove the deleted screenshot
+          if (bug.attachments) {
+            bug.attachments = bug.attachments.filter(
+              (att) => att.id !== deletedId
+            );
+          }
+        }}
       />
 
       {/* Voice Notes Card */}

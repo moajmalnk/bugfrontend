@@ -2,6 +2,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+import { toast } from "@/components/ui/use-toast";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronLeft,
@@ -16,6 +18,8 @@ import {
   RefreshCw,
   RotateCcw,
   RotateCw,
+  RotateCw as RotateIcon,
+  Search,
   Share2,
   Smartphone,
   Trash2,
@@ -23,7 +27,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Screenshot {
   id: string;
@@ -37,6 +41,8 @@ interface ScreenshotViewerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialIndex?: number;
+  bug_id?: string;
+  onScreenshotDelete?: (deletedId: string) => void;
 }
 
 export function ScreenshotViewer({
@@ -44,6 +50,8 @@ export function ScreenshotViewer({
   open,
   onOpenChange,
   initialIndex = 0,
+  bug_id,
+  onScreenshotDelete,
 }: ScreenshotViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [zoomLevel, setZoomLevel] = useState(100); // 100% default zoom
@@ -56,9 +64,17 @@ export function ScreenshotViewer({
     null
   );
   const [touchStartTime, setTouchStartTime] = useState<number>(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+  const [showZoomSlider, setShowZoomSlider] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -70,6 +86,9 @@ export function ScreenshotViewer({
       setShowInfo(false);
       setImageLoaded(false);
       setImageError(false);
+      setImagePosition({ x: 0, y: 0 });
+      setShowZoomSlider(false);
+      setShowDeleteDialog(false);
     }
   }, [open, initialIndex]);
 
@@ -120,12 +139,16 @@ export function ScreenshotViewer({
           e.preventDefault();
           setShowInfo(!showInfo);
           break;
+        case "z":
+          e.preventDefault();
+          setShowZoomSlider(!showZoomSlider);
+          break;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, showInfo]);
+  }, [open, showInfo, showZoomSlider]);
 
   // Handle fullscreen changes
   useEffect(() => {
@@ -153,24 +176,148 @@ export function ScreenshotViewer({
     setCurrentIndex((prev) => (prev < screenshots.length - 1 ? prev + 1 : 0));
   };
 
-  const zoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev + 25, 400));
-  };
+  // Enhanced zoom functions with smooth transitions
+  const zoomIn = useCallback(() => {
+    setZoomLevel((prev) => {
+      const newZoom = Math.min(prev + 25, 500);
+      return newZoom;
+    });
+  }, []);
 
-  const zoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev - 25, 25));
-  };
+  const zoomOut = useCallback(() => {
+    setZoomLevel((prev) => {
+      const newZoom = Math.max(prev - 25, 25);
+      return newZoom;
+    });
+  }, []);
 
-  const resetZoom = () => {
+  const resetZoom = useCallback(() => {
     setZoomLevel(100);
-  };
+    setImagePosition({ x: 0, y: 0 });
+  }, []);
 
-  const rotateRight = () => {
+  const handleZoomChange = useCallback((value: number[]) => {
+    setZoomLevel(value[0]);
+  }, []);
+
+  // Enhanced rotation functions
+  const rotateRight = useCallback(() => {
     setRotation((prev) => (prev + 90) % 360);
+  }, []);
+
+  const rotateLeft = useCallback(() => {
+    setRotation((prev) => (prev - 90 + 360) % 360);
+  }, []);
+
+  const resetRotation = useCallback(() => {
+    setRotation(0);
+  }, []);
+
+  // Mouse wheel zoom
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        zoomIn();
+      } else {
+        zoomOut();
+      }
+    },
+    [zoomIn, zoomOut]
+  );
+
+  // Mouse drag for panning when zoomed
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (zoomLevel > 100) {
+        setIsDragging(true);
+        setDragStart({
+          x: e.clientX - imagePosition.x,
+          y: e.clientY - imagePosition.y,
+        });
+      }
+    },
+    [zoomLevel, imagePosition]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (isDragging && dragStart && zoomLevel > 100) {
+        const newX = e.clientX - dragStart.x;
+        const newY = e.clientY - dragStart.y;
+        setImagePosition({ x: newX, y: newY });
+      }
+    },
+    [isDragging, dragStart, zoomLevel]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setDragStart(null);
+  }, []);
+
+  // Touch gesture handling with pinch zoom
+  const [pinchStart, setPinchStart] = useState<{
+    distance: number;
+    zoom: number;
+  } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      // Pinch gesture
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setPinchStart({ distance, zoom: zoomLevel });
+    } else if (e.touches.length === 1) {
+      // Single touch for navigation
+      setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+      setTouchStartTime(Date.now());
+    }
   };
 
-  const rotateLeft = () => {
-    setRotation((prev) => (prev - 90 + 360) % 360);
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStart) {
+      // Handle pinch zoom
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scale = distance / pinchStart.distance;
+      const newZoom = Math.max(25, Math.min(500, pinchStart.zoom * scale));
+      setZoomLevel(newZoom);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length === 0) {
+      setPinchStart(null);
+
+      if (touchStart) {
+        const touchEnd = {
+          x: e.changedTouches[0]?.clientX || 0,
+          y: e.changedTouches[0]?.clientY || 0,
+        };
+        const deltaX = touchEnd.x - touchStart.x;
+        const deltaY = touchEnd.y - touchStart.y;
+        const deltaTime = Date.now() - touchStartTime;
+
+        // Swipe gesture detection
+        if (
+          deltaTime < 300 &&
+          Math.abs(deltaX) > 50 &&
+          Math.abs(deltaY) < 100
+        ) {
+          if (deltaX > 0) {
+            goToPrevious();
+          } else {
+            goToNext();
+          }
+        }
+        setTouchStart(null);
+      }
+    }
   };
 
   const toggleFullscreen = async () => {
@@ -234,7 +381,94 @@ export function ScreenshotViewer({
   };
 
   const deleteScreenshot = () => {
-    console.log("Delete screenshot:", currentScreenshot.id);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      // Close the delete dialog
+      setShowDeleteDialog(false);
+
+      // Show loading state
+      toast({
+        title: "Deleting...",
+        description: "Removing screenshot from the system",
+      });
+
+      // Check if bug_id is available
+      if (!bug_id) {
+        throw new Error("Bug ID is required to delete screenshot");
+      }
+
+      // Make API call to delete the screenshot
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/bugs/delete_image.php`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            bug_id: bug_id,
+            attachment_id: currentScreenshot.id,
+            file_path: currentScreenshot.file_path,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Remove from screenshots array
+        const updatedScreenshots = screenshots.filter(
+          (s) => s.id !== currentScreenshot.id
+        );
+
+        // If no screenshots left, close the viewer
+        if (updatedScreenshots.length === 0) {
+          handleClose();
+          toast({
+            title: "Success",
+            description:
+              "Screenshot deleted successfully. No more screenshots to display.",
+          });
+          return;
+        }
+
+        // Update screenshots and reset to first image if current was deleted
+        const newIndex =
+          currentIndex >= updatedScreenshots.length ? 0 : currentIndex;
+        setCurrentIndex(newIndex);
+
+        // Notify parent component about the deletion
+        if (onScreenshotDelete) {
+          onScreenshotDelete(currentScreenshot.id);
+        }
+
+        toast({
+          title: "Success",
+          description: "Screenshot deleted successfully",
+        });
+
+        // Close the viewer if this was the last screenshot
+        if (updatedScreenshots.length === 0) {
+          handleClose();
+        }
+      } else {
+        throw new Error(data.message || "Failed to delete screenshot");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete screenshot. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleClose = () => {
@@ -243,36 +477,10 @@ export function ScreenshotViewer({
     setRotation(0);
     setIsFullscreen(false);
     setShowInfo(false);
+    setImagePosition({ x: 0, y: 0 });
+    setShowZoomSlider(false);
+    setShowDeleteDialog(false);
     onOpenChange(false);
-  };
-
-  // Touch gesture handling
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-    setTouchStartTime(Date.now());
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStart) return;
-
-    const touchEnd = {
-      x: e.changedTouches[0].clientX,
-      y: e.changedTouches[0].clientY,
-    };
-    const deltaX = touchEnd.x - touchStart.x;
-    const deltaY = touchEnd.y - touchStart.y;
-    const deltaTime = Date.now() - touchStartTime;
-
-    // Swipe gesture detection
-    if (deltaTime < 300 && Math.abs(deltaX) > 50 && Math.abs(deltaY) < 100) {
-      if (deltaX > 0) {
-        goToPrevious();
-      } else {
-        goToNext();
-      }
-    }
-
-    setTouchStart(null);
   };
 
   // Get image dimensions for responsive display
@@ -310,6 +518,7 @@ export function ScreenshotViewer({
           ref={containerRef}
           className="flex flex-col h-full relative"
           onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
           {/* Enhanced Header */}
@@ -358,7 +567,7 @@ export function ScreenshotViewer({
 
             {/* Right Section - Controls */}
             <div className="flex items-center gap-1">
-              {/* Zoom Controls */}
+              {/* Enhanced Zoom Controls */}
               <div className="hidden sm:flex items-center gap-1">
                 <Button
                   variant="ghost"
@@ -370,14 +579,19 @@ export function ScreenshotViewer({
                 >
                   <ZoomOut className="h-4 w-4" />
                 </Button>
-                <Badge variant="outline" className="text-xs font-mono">
+                <Badge
+                  variant="outline"
+                  className="text-xs font-mono cursor-pointer hover:bg-primary/10"
+                  onClick={() => setShowZoomSlider(!showZoomSlider)}
+                  title="Click to show zoom slider (Z)"
+                >
                   {zoomLevel}%
                 </Badge>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={zoomIn}
-                  disabled={zoomLevel >= 400}
+                  disabled={zoomLevel >= 500}
                   className="h-8 w-8 p-0"
                   title="Zoom In (+)"
                 >
@@ -399,7 +613,7 @@ export function ScreenshotViewer({
                 className="h-6 hidden sm:block"
               />
 
-              {/* Rotation Controls */}
+              {/* Enhanced Rotation Controls */}
               <div className="hidden sm:flex items-center gap-1">
                 <Button
                   variant="ghost"
@@ -410,6 +624,14 @@ export function ScreenshotViewer({
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
+                <Badge
+                  variant="outline"
+                  className="text-xs font-mono cursor-pointer hover:bg-primary/10"
+                  onClick={resetRotation}
+                  title="Click to reset rotation"
+                >
+                  {rotation}°
+                </Badge>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -566,8 +788,22 @@ export function ScreenshotViewer({
             </div>
           </motion.div>
 
-          {/* Enhanced Image Display */}
-          <div className="flex-1 flex items-center justify-center p-2 sm:p-4 overflow-auto bg-gradient-to-br from-muted/20 via-background to-muted/20">
+          {/* Enhanced Image Display with Pan Support */}
+          <div
+            className="flex-1 flex items-center justify-center p-2 sm:p-4 overflow-hidden bg-gradient-to-br from-muted/20 via-background to-muted/20 relative"
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            style={{
+              cursor: isDragging
+                ? "grabbing"
+                : zoomLevel > 100
+                ? "grab"
+                : "default",
+            }}
+          >
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentIndex}
@@ -575,11 +811,18 @@ export function ScreenshotViewer({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
+                ref={imageContainerRef}
                 className="relative bg-white rounded-xl shadow-2xl overflow-hidden border border-border/50"
                 style={{
-                  transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                  transform: `scale(${
+                    zoomLevel / 100
+                  }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
+                    imagePosition.y
+                  }px)`,
                   transformOrigin: "center center",
-                  transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  transition: isDragging
+                    ? "none"
+                    : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 }}
               >
                 <img
@@ -593,6 +836,7 @@ export function ScreenshotViewer({
                     width: `${width}px`,
                     height: `${height}px`,
                     objectFit: "cover",
+                    pointerEvents: "none", // Prevent image from interfering with drag
                   }}
                   onLoad={() => {
                     setImageLoaded(true);
@@ -632,6 +876,74 @@ export function ScreenshotViewer({
                 )}
               </motion.div>
             </AnimatePresence>
+
+            {/* Zoom Slider Overlay */}
+            <AnimatePresence>
+              {showZoomSlider && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="absolute top-4 right-4 bg-background/95 backdrop-blur-md border border-border/50 rounded-lg p-4 shadow-lg z-10"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <Search className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Zoom Control</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowZoomSlider(false)}
+                      className="h-6 w-6 p-0 ml-auto"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="w-48">
+                    <Slider
+                      value={[zoomLevel]}
+                      onValueChange={handleZoomChange}
+                      min={25}
+                      max={500}
+                      step={5}
+                      className="mb-2"
+                    />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>25%</span>
+                      <span className="font-medium">{zoomLevel}%</span>
+                      <span>500%</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetZoom}
+                      className="h-7 px-2 text-xs"
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setZoomLevel(100)}
+                      className="h-7 px-2 text-xs"
+                    >
+                      100%
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Zoom and Rotation Hints */}
+            {zoomLevel > 100 && (
+              <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Search className="h-3 w-3" />
+                  <span>Drag to pan • Scroll to zoom • R/L to rotate</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Enhanced Info Panel */}
@@ -686,7 +998,7 @@ export function ScreenshotViewer({
                     </div>
                   </div>
 
-                  {/* Keyboard Shortcuts */}
+                  {/* Enhanced Keyboard Shortcuts */}
                   <div className="pt-2 border-t">
                     <h4 className="font-medium text-xs mb-2 text-muted-foreground">
                       Keyboard Shortcuts
@@ -730,6 +1042,18 @@ export function ScreenshotViewer({
                       </div>
                       <div className="flex items-center gap-1">
                         <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">
+                          L
+                        </kbd>
+                        <span>Rotate Left</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">
+                          Z
+                        </kbd>
+                        <span>Zoom Slider</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">
                           F
                         </kbd>
                         <span>Fullscreen</span>
@@ -742,7 +1066,98 @@ export function ScreenshotViewer({
                       </div>
                     </div>
                   </div>
+
+                  {/* Touch Gestures */}
+                  <div className="pt-2 border-t">
+                    <h4 className="font-medium text-xs mb-2 text-muted-foreground">
+                      Touch Gestures
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center gap-1">
+                        <RotateIcon className="h-3 w-3" />
+                        <span>Swipe left/right: Navigate</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Search className="h-3 w-3" />
+                        <span>Pinch: Zoom in/out</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <RotateIcon className="h-3 w-3" />
+                        <span>Double tap: Reset zoom</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Professional Delete Confirmation Dialog */}
+          <AnimatePresence>
+            {showDeleteDialog && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                onClick={() => setShowDeleteDialog(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-background border border-border/50 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                      <Trash2 className="w-5 h-5 text-destructive" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">
+                        Delete Screenshot
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        This action cannot be undone
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Are you sure you want to delete this screenshot?
+                    </p>
+                    <div className="bg-muted/30 rounded-lg p-3 border border-border/30">
+                      <div className="flex items-center gap-2 text-sm">
+                        <FileImage className="w-4 h-4 text-primary" />
+                        <span className="font-medium text-foreground">
+                          {currentScreenshot.file_name}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        File size and type information
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowDeleteDialog(false)}
+                      className="px-4"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={confirmDelete}
+                      className="px-4"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Permanently
+                    </Button>
+                  </div>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
