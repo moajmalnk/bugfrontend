@@ -131,54 +131,17 @@ const Login = () => {
         setOtpSent(true);
         setOtpCountdown(60);
 
-        // Show OTP in toast if available (for immediate copying)
+        // Show secure OTP sent message (without displaying the actual OTP)
         const toastDescription =
           otpMethod === "mail"
             ? "A one-time password has been sent to your email"
             : "A one-time password has been sent to your WhatsApp";
 
-        if (data.otp) {
-          toast({
-            title: "OTP Sent",
-            description: (
-              <div className="space-y-2">
-                <p>{toastDescription}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                    {data.otp}
-                  </span>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(data.otp);
-                        toast({
-                          title: "OTP Copied",
-                          description: "OTP copied to clipboard",
-                        });
-                      } catch (error) {
-                        toast({
-                          title: "Copy Failed",
-                          description: "Failed to copy OTP",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-            ),
-            variant: "default",
-          });
-        } else {
-          toast({
-            title: "OTP Sent",
-            description: toastDescription,
-            variant: "default",
-          });
-        }
+        toast({
+          title: "OTP Sent",
+          description: toastDescription,
+          variant: "default",
+        });
       } else {
         throw new Error(data.message || "Failed to send OTP");
       }
