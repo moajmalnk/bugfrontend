@@ -851,29 +851,25 @@ export function ScreenshotViewer({
             }}
           >
             <AnimatePresence mode="wait">
-              <motion.div
-                key={currentIndex}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                ref={imageContainerRef}
-                className="relative bg-white rounded-xl shadow-2xl border border-border/50"
-                title={`Container: ${width}×${height}px`}
-                style={{
-                  width: `${width}px`,
-                  height: `${height}px`,
-                  transform: `scale(${
-                    zoomLevel / 100
-                  }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
-                    imagePosition.y
-                  }px)`,
-                  transformOrigin: "center center",
-                  transition: isDragging
-                    ? "none"
-                    : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                }}
-              >
+                              <motion.div
+                  key={currentIndex}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  ref={imageContainerRef}
+                  className="relative bg-white rounded-xl shadow-2xl border border-border/50"
+                  title={`Container: ${width}×${height}px`}
+                  style={{
+                    width: `${width}px`,
+                    height: `${height}px`,
+                    transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg) translate(${imagePosition.x}px, ${imagePosition.y}px)`,
+                    transformOrigin: "center center",
+                    transition: isDragging
+                      ? "none"
+                      : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  }}
+                >
                 <img
                   ref={imageRef}
                   src={imageUrl}
