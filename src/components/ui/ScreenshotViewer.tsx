@@ -177,24 +177,27 @@ export function ScreenshotViewer({
   };
 
   // Enhanced zoom functions with smooth transitions
-  const zoomIn = useCallback(() => {
+  const zoomIn = () => {
     setZoomLevel((prev) => {
       const newZoom = Math.min(prev + 25, 500);
+      console.log("Zooming in from", prev, "to", newZoom);
       return newZoom;
     });
-  }, []);
+  };
 
-  const zoomOut = useCallback(() => {
+  const zoomOut = () => {
     setZoomLevel((prev) => {
       const newZoom = Math.max(prev - 25, 25);
+      console.log("Zooming out from", prev, "to", newZoom);
       return newZoom;
     });
-  }, []);
+  };
 
-  const resetZoom = useCallback(() => {
+  const resetZoom = () => {
     setZoomLevel(100);
     setImagePosition({ x: 0, y: 0 });
-  }, []);
+    console.log("Reset zoom to 100%");
+  };
 
   const handleZoomChange = useCallback((value: number[]) => {
     setZoomLevel(value[0]);
@@ -214,17 +217,14 @@ export function ScreenshotViewer({
   }, []);
 
   // Mouse wheel zoom
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      e.preventDefault();
-      if (e.deltaY < 0) {
-        zoomIn();
-      } else {
-        zoomOut();
-      }
-    },
-    [zoomIn, zoomOut]
-  );
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      zoomIn();
+    } else {
+      zoomOut();
+    }
+  }, []);
 
   // Mouse drag for panning when zoomed
   const handleMouseDown = useCallback(
@@ -485,31 +485,59 @@ export function ScreenshotViewer({
 
   // Get image dimensions for responsive display
   const getImageDimensions = () => {
-    const baseWidth = 412;
-    const baseHeight = 914;
-    const aspectRatio = baseHeight / baseWidth;
+    // Use the FULL available space for both width and height
+    const availableWidth = window.innerWidth * 0.98; // Use 98% of viewport width
+    const availableHeight = window.innerHeight * 0.98; // Use 98% of viewport height (even more aggressive!)
 
-    // Responsive sizing based on viewport
-    const maxWidth = Math.min(window.innerWidth * 0.8, 800);
-    const maxHeight = Math.min(window.innerHeight * 0.7, 600);
+    // For mobile screenshots, prioritize height to fill the bottom space
+    // Use a more realistic mobile aspect ratio (9:16 instead of 16:9)
+    const mobileAspectRatio = 9 / 16; // Height is 1.78x the width (typical mobile)
 
-    let width = baseWidth;
-    let height = baseHeight;
+    // Calculate dimensions based on mobile aspect ratio
+    const widthBasedHeight = availableWidth * mobileAspectRatio;
+    const heightBasedWidth = availableHeight / mobileAspectRatio;
 
-    if (width > maxWidth) {
-      width = maxWidth;
-      height = width * aspectRatio;
+    let width, height;
+
+    // For mobile screenshots, prioritize height to eliminate bottom empty space
+    if (heightBasedWidth <= availableWidth) {
+      // Height constraint is tighter - use full height
+      height = availableHeight;
+      width = heightBasedWidth;
+    } else {
+      // Width constraint is tighter - use full width
+      width = availableWidth;
+      height = widthBasedHeight;
     }
 
-    if (height > maxHeight) {
-      height = maxHeight;
-      width = height / aspectRatio;
-    }
-
+    // Ensure we're using maximum possible space
+    // This should eliminate empty space on both sides AND bottom
     return { width, height };
   };
 
   const { width, height } = getImageDimensions();
+
+  // Debug: Log the calculated dimensions
+  console.log("Screenshot dimensions:", {
+    width,
+    height,
+    availableWidth: window.innerWidth * 0.98,
+    availableHeight: window.innerHeight * 0.98,
+    widthBasedHeight: window.innerWidth * 0.98 * (9 / 16),
+    heightBasedWidth: (window.innerHeight * 0.98) / (9 / 16),
+    aspectRatio: "9:16 (mobile)",
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    widthUsage: `${((width / (window.innerWidth * 0.98)) * 100).toFixed(1)}%`,
+    heightUsage: `${((height / (window.innerHeight * 0.98)) * 100).toFixed(
+      1
+    )}%`,
+    spaceEfficiency: `${(
+      ((width * height) /
+        (window.innerWidth * 0.98 * (window.innerHeight * 0.98))) *
+      100
+    ).toFixed(1)}%`,
+  });
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -572,7 +600,13 @@ export function ScreenshotViewer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={zoomOut}
+                  onClick={() => {
+                    console.log(
+                      "Zoom out button clicked, current zoom:",
+                      zoomLevel
+                    );
+                    zoomOut();
+                  }}
                   disabled={zoomLevel <= 25}
                   className="h-8 w-8 p-0"
                   title="Zoom Out (-)"
@@ -590,7 +624,13 @@ export function ScreenshotViewer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={zoomIn}
+                  onClick={() => {
+                    console.log(
+                      "Zoom in button clicked, current zoom:",
+                      zoomLevel
+                    );
+                    zoomIn();
+                  }}
                   disabled={zoomLevel >= 500}
                   className="h-8 w-8 p-0"
                   title="Zoom In (+)"
@@ -600,7 +640,13 @@ export function ScreenshotViewer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={resetZoom}
+                  onClick={() => {
+                    console.log(
+                      "Reset zoom button clicked, current zoom:",
+                      zoomLevel
+                    );
+                    resetZoom();
+                  }}
                   className="h-8 w-8 p-0"
                   title="Reset Zoom (0)"
                 >
@@ -790,7 +836,7 @@ export function ScreenshotViewer({
 
           {/* Enhanced Image Display with Pan Support */}
           <div
-            className="flex-1 flex items-center justify-center p-2 sm:p-4 overflow-hidden bg-gradient-to-br from-muted/20 via-background to-muted/20 relative"
+            className="flex-1 flex items-center justify-center overflow-hidden bg-gradient-to-br from-muted/20 via-background to-muted/20 relative"
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -812,8 +858,11 @@ export function ScreenshotViewer({
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
                 ref={imageContainerRef}
-                className="relative bg-white rounded-xl shadow-2xl overflow-hidden border border-border/50"
+                className="relative bg-white rounded-xl shadow-2xl border border-border/50"
+                title={`Container: ${width}×${height}px`}
                 style={{
+                  width: `${width}px`,
+                  height: `${height}px`,
                   transform: `scale(${
                     zoomLevel / 100
                   }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
@@ -829,18 +878,25 @@ export function ScreenshotViewer({
                   ref={imageRef}
                   src={imageUrl}
                   alt={`Screenshot ${currentIndex + 1}`}
-                  className={`max-w-none transition-opacity duration-300 ${
+                  className={`transition-opacity duration-300 ${
                     imageLoaded ? "opacity-100" : "opacity-0"
                   }`}
                   style={{
                     width: `${width}px`,
                     height: `${height}px`,
-                    objectFit: "cover",
+                    objectFit: "contain",
                     pointerEvents: "none", // Prevent image from interfering with drag
                   }}
                   onLoad={() => {
                     setImageLoaded(true);
                     setImageError(false);
+                    // Debug: Log actual image dimensions
+                    console.log("Image loaded with dimensions:", {
+                      naturalWidth: imageRef.current?.naturalWidth,
+                      naturalHeight: imageRef.current?.naturalHeight,
+                      appliedWidth: width,
+                      appliedHeight: height,
+                    });
                   }}
                   onError={() => {
                     setImageError(true);
