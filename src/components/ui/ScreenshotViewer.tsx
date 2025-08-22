@@ -161,6 +161,22 @@ export function ScreenshotViewer({
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
+  // Debug: Log when zoom or rotation changes
+  useEffect(() => {
+    if (open) {
+      console.log("Transform updated:", {
+        zoomLevel,
+        rotation,
+        imagePosition,
+        transform: `scale(${
+          zoomLevel / 100
+        }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
+          imagePosition.y
+        }px)`,
+      });
+    }
+  }, [zoomLevel, rotation, imagePosition, open]);
+
   if (screenshots.length === 0) return null;
 
   const currentScreenshot = screenshots[currentIndex];
@@ -850,84 +866,87 @@ export function ScreenshotViewer({
                 : "default",
             }}
           >
-            <AnimatePresence mode="wait">
-                              <motion.div
-                  key={currentIndex}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                  ref={imageContainerRef}
-                  className="relative bg-white rounded-xl shadow-2xl border border-border/50"
-                  title={`Container: ${width}×${height}px`}
-                  style={{
-                    width: `${width}px`,
-                    height: `${height}px`,
-                    transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg) translate(${imagePosition.x}px, ${imagePosition.y}px)`,
-                    transformOrigin: "center center",
-                    transition: isDragging
-                      ? "none"
-                      : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                  }}
-                >
-                <img
-                  ref={imageRef}
-                  src={imageUrl}
-                  alt={`Screenshot ${currentIndex + 1}`}
-                  className={`transition-opacity duration-300 ${
-                    imageLoaded ? "opacity-100" : "opacity-0"
-                  }`}
-                  style={{
-                    width: `${width}px`,
-                    height: `${height}px`,
-                    objectFit: "contain",
-                    pointerEvents: "none", // Prevent image from interfering with drag
-                  }}
-                  onLoad={() => {
-                    setImageLoaded(true);
-                    setImageError(false);
-                    // Debug: Log actual image dimensions
-                    console.log("Image loaded with dimensions:", {
-                      naturalWidth: imageRef.current?.naturalWidth,
-                      naturalHeight: imageRef.current?.naturalHeight,
-                      appliedWidth: width,
-                      appliedHeight: height,
-                    });
-                  }}
-                  onError={() => {
-                    setImageError(true);
-                    setImageLoaded(false);
-                  }}
-                />
+            <motion.div
+              key={`${currentIndex}-${zoomLevel}-${rotation}`}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              ref={imageContainerRef}
+              className="relative bg-white rounded-xl shadow-2xl border border-border/50"
+              title={`Container: ${width}×${height}px`}
+              style={{
+                width: `${width}px`,
+                height: `${height}px`,
+                transform: `scale(${
+                  zoomLevel / 100
+                }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
+                  imagePosition.y
+                }px)`,
+                transformOrigin: "center center",
+                transition: isDragging
+                  ? "none"
+                  : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                willChange: "transform",
+                backfaceVisibility: "hidden",
+              }}
+            >
+              <img
+                ref={imageRef}
+                src={imageUrl}
+                alt={`Screenshot ${currentIndex + 1}`}
+                className={`transition-opacity duration-300 ${
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                style={{
+                  width: `${width}px`,
+                  height: `${height}px`,
+                  objectFit: "contain",
+                  pointerEvents: "none", // Prevent image from interfering with drag
+                }}
+                onLoad={() => {
+                  setImageLoaded(true);
+                  setImageError(false);
+                  // Debug: Log actual image dimensions
+                  console.log("Image loaded with dimensions:", {
+                    naturalWidth: imageRef.current?.naturalWidth,
+                    naturalHeight: imageRef.current?.naturalHeight,
+                    appliedWidth: width,
+                    appliedHeight: height,
+                  });
+                }}
+                onError={() => {
+                  setImageError(true);
+                  setImageLoaded(false);
+                }}
+              />
 
-                {/* Loading State */}
-                {!imageLoaded && !imageError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                      <span className="text-sm text-muted-foreground">
-                        Loading...
-                      </span>
-                    </div>
+              {/* Loading State */}
+              {!imageLoaded && !imageError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <span className="text-sm text-muted-foreground">
+                      Loading...
+                    </span>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Error State */}
-                {imageError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-destructive/10">
-                    <div className="text-center">
-                      <FileImage className="h-12 w-12 text-destructive mx-auto mb-2" />
-                      <p className="text-sm text-destructive font-medium">
-                        Failed to load image
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {currentScreenshot.file_name}
-                      </p>
-                    </div>
+              {/* Error State */}
+              {imageError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-destructive/10">
+                  <div className="text-center">
+                    <FileImage className="h-12 w-12 text-destructive mx-auto mb-2" />
+                    <p className="text-sm text-destructive font-medium">
+                      Failed to load image
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {currentScreenshot.file_name}
+                    </p>
                   </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
+                </div>
+              )}
+            </motion.div>
 
             {/* Zoom Slider Overlay */}
             <AnimatePresence>
@@ -986,6 +1005,17 @@ export function ScreenshotViewer({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Debug Transform Info */}
+            <div className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Search className="h-3 w-3" />
+                <span>
+                  Zoom: {zoomLevel}% | Rot: {rotation}° | Pos: (
+                  {imagePosition.x}, {imagePosition.y})
+                </span>
+              </div>
+            </div>
 
             {/* Zoom and Rotation Hints */}
             {zoomLevel > 100 && (
