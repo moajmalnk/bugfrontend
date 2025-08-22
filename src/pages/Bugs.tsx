@@ -4,14 +4,6 @@ import {
 } from "@/components/bugs/BugCard";
 import { Button } from "@/components/ui/button";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -333,60 +325,306 @@ const Bugs = () => {
                 </div>
               </div>
 
-              {/* Pagination */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
-                <div>
-                  <span className="text-sm text-muted-foreground font-medium">
-                    Showing {(currentPage - 1) * itemsPerPage + 1}-
-                    {Math.min(currentPage * itemsPerPage, totalFiltered)} of{" "}
-                    {totalFiltered} bugs
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-                  <select
-                    value={itemsPerPage}
-                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                    className="border border-border rounded-md px-3 py-2 text-sm w-full sm:w-auto bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                    aria-label="Items per page"
-                  >
-                    {[10, 25, 50].map((n) => (
-                      <option key={n} value={n}>
-                        {n} / page
-                      </option>
-                    ))}
-                  </select>
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() =>
-                            setCurrentPage((p) => Math.max(1, p - 1))
+              {/* Professional Responsive Pagination Controls - Only show if there are multiple pages */}
+              {totalPages > 1 && (
+                <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                  {/* Top Row - Results Info and Items Per Page */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                      <span className="text-sm sm:text-base text-foreground font-semibold">
+                        Showing{" "}
+                        <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                          {(currentPage - 1) * itemsPerPage + 1}
+                        </span>
+                        -
+                        <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                          {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                        </span>{" "}
+                        of{" "}
+                        <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                          {totalFiltered}
+                        </span>{" "}
+                        bugs
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-center sm:justify-end gap-3">
+                      <label
+                        htmlFor="items-per-page"
+                        className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                      >
+                        Items per page:
+                      </label>
+                      <div className="relative group">
+                        <select
+                          id="items-per-page"
+                          value={itemsPerPage}
+                          onChange={(e) =>
+                            setItemsPerPage(Number(e.target.value))
                           }
-                          aria-disabled={currentPage === 1}
-                        />
-                      </PaginationItem>
-                      {Array.from({ length: totalPages }, (_, i) => (
-                        <PaginationItem key={i}>
-                          <PaginationLink
-                            isActive={currentPage === i + 1}
-                            onClick={() => setCurrentPage(i + 1)}
+                          className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                          aria-label="Items per page"
+                        >
+                          {[10, 25, 50].map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                          <svg
+                            className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            {i + 1}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ))}
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() =>
-                            setCurrentPage((p) => Math.min(totalPages, p + 1))
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Row - Pagination Navigation */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+                    {/* Page Info for Mobile */}
+                    <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
+                      <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                      Page{" "}
+                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {currentPage}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalPages}
+                      </span>
+                    </div>
+
+                    {/* Pagination Controls */}
+                    <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                      {/* Previous Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        <svg
+                          className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 19l-7-7 7-7"
+                          />
+                        </svg>
+                        <span className="hidden sm:inline">Previous</span>
+                        <span className="sm:hidden text-lg">‹</span>
+                      </Button>
+
+                      {/* Page Numbers - Responsive Display */}
+                      <div className="flex items-center gap-1.5">
+                        {/* Always show first page on larger screens */}
+                        <Button
+                          variant={currentPage === 1 ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(1)}
+                          className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        >
+                          1
+                        </Button>
+
+                        {/* Show ellipsis if needed on larger screens */}
+                        {currentPage > 4 && (
+                          <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                            •••
+                          </span>
+                        )}
+
+                        {/* Dynamic page numbers based on current page - show more on larger screens */}
+                        {(() => {
+                          const pages = [];
+                          const start = Math.max(2, currentPage - 1);
+                          const end = Math.min(totalPages - 1, currentPage + 1);
+
+                          for (let i = start; i <= end; i++) {
+                            if (i > 1 && i < totalPages) {
+                              pages.push(i);
+                            }
                           }
-                          aria-disabled={currentPage === totalPages}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+
+                          return pages.map((page) => (
+                            <Button
+                              key={page}
+                              variant={
+                                currentPage === page ? "default" : "outline"
+                              }
+                              size="sm"
+                              onClick={() => setCurrentPage(page)}
+                              className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                            >
+                              {page}
+                            </Button>
+                          ));
+                        })()}
+
+                        {/* Show ellipsis if needed on larger screens */}
+                        {currentPage < totalPages - 3 && (
+                          <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                            •••
+                          </span>
+                        )}
+
+                        {/* Always show last page if more than 1 page on larger screens */}
+                        {totalPages > 1 && (
+                          <Button
+                            variant={
+                              currentPage === totalPages ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setCurrentPage(totalPages)}
+                            className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                          >
+                            {totalPages}
+                          </Button>
+                        )}
+
+                        {/* Mobile-friendly page selector */}
+                        <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
+                          <select
+                            value={currentPage}
+                            onChange={(e) =>
+                              setCurrentPage(Number(e.target.value))
+                            }
+                            className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
+                            aria-label="Go to page"
+                          >
+                            {Array.from({ length: totalPages }, (_, i) => (
+                              <option key={i + 1} value={i + 1}>
+                                {i + 1}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-sm text-muted-foreground font-medium">
+                            {" "}
+                            <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                              {totalPages}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Next Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={currentPage === totalPages}
+                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        <span className="hidden sm:inline">Next</span>
+                        <span className="sm:hidden text-lg">›</span>
+                        <svg
+                          className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </Button>
+                    </div>
+
+                    {/* Page Info for Desktop */}
+                    <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                      <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                      Page{" "}
+                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {currentPage}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalPages}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Simple results info when no pagination needed */}
+              {totalPages <= 1 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                    <span className="text-sm sm:text-base text-foreground font-semibold">
+                      Showing{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalFiltered}
+                      </span>{" "}
+                      bugs
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center sm:justify-end gap-3">
+                    <label
+                      htmlFor="items-per-page-simple"
+                      className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                    >
+                      Items per page:
+                    </label>
+                    <div className="relative group">
+                      <select
+                        id="items-per-page-simple"
+                        value={itemsPerPage}
+                        onChange={(e) =>
+                          setItemsPerPage(Number(e.target.value))
+                        }
+                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                        aria-label="Items per page"
+                      >
+                        {[10, 25, 50].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                        <svg
+                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Content */}
               {skeletonLoading ? (
@@ -494,62 +732,313 @@ const Bugs = () => {
               </div>
             </div>
 
-            {/* Pagination for Developers */}
-            {!skeletonLoading && !loading && totalFiltered > 0 && (
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full bg-background rounded-lg shadow-sm p-3 border border-border">
-                <div>
-                  <span className="text-sm text-muted-foreground font-medium">
-                    Showing {(currentPage - 1) * itemsPerPage + 1}-
-                    {Math.min(currentPage * itemsPerPage, totalFiltered)} of{" "}
-                    {totalFiltered} bugs
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-                  <select
-                    value={itemsPerPage}
-                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                    className="border border-border rounded-md px-3 py-2 text-sm w-full sm:w-auto bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                    aria-label="Items per page"
-                  >
-                    {[10, 25, 50].map((n) => (
-                      <option key={n} value={n}>
-                        {n} / page
-                      </option>
-                    ))}
-                  </select>
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() =>
-                            setCurrentPage((p) => Math.max(1, p - 1))
+            {/* Professional Responsive Pagination for Developers - Only show if there are multiple pages */}
+            {!skeletonLoading &&
+              !loading &&
+              totalFiltered > 0 &&
+              totalPages > 1 && (
+                <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                  {/* Top Row - Results Info and Items Per Page */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                      <span className="text-sm sm:text-base text-foreground font-semibold">
+                        Showing{" "}
+                        <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                          {(currentPage - 1) * itemsPerPage + 1}
+                        </span>
+                        -
+                        <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                          {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                        </span>{" "}
+                        of{" "}
+                        <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                          {totalFiltered}
+                        </span>{" "}
+                        bugs
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-center sm:justify-end gap-3">
+                      <label
+                        htmlFor="items-per-page-dev"
+                        className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                      >
+                        Items per page:
+                      </label>
+                      <div className="relative group">
+                        <select
+                          id="items-per-page-dev"
+                          value={itemsPerPage}
+                          onChange={(e) =>
+                            setItemsPerPage(Number(e.target.value))
                           }
-                          aria-disabled={currentPage === 1}
-                        />
-                      </PaginationItem>
-                      {Array.from({ length: totalPages }, (_, i) => (
-                        <PaginationItem key={i}>
-                          <PaginationLink
-                            isActive={currentPage === i + 1}
-                            onClick={() => setCurrentPage(i + 1)}
+                          className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                          aria-label="Items per page"
+                        >
+                          {[10, 25, 50].map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                          <svg
+                            className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            {i + 1}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ))}
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() =>
-                            setCurrentPage((p) => Math.min(totalPages, p + 1))
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Row - Pagination Navigation */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+                    {/* Page Info for Mobile */}
+                    <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
+                      <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                      Page{" "}
+                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {currentPage}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalPages}
+                      </span>
+                    </div>
+
+                    {/* Pagination Controls */}
+                    <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                      {/* Previous Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        <svg
+                          className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 19l-7-7 7-7"
+                          />
+                        </svg>
+                        <span className="hidden sm:inline">Previous</span>
+                        <span className="sm:hidden text-lg">‹</span>
+                      </Button>
+
+                      {/* Page Numbers - Responsive Display */}
+                      <div className="flex items-center gap-1.5">
+                        {/* Always show first page on larger screens */}
+                        <Button
+                          variant={currentPage === 1 ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(1)}
+                          className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        >
+                          1
+                        </Button>
+
+                        {/* Show ellipsis if needed on larger screens */}
+                        {currentPage > 4 && (
+                          <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                            •••
+                          </span>
+                        )}
+
+                        {/* Dynamic page numbers based on current page - show more on larger screens */}
+                        {(() => {
+                          const pages = [];
+                          const start = Math.max(2, currentPage - 1);
+                          const end = Math.min(totalPages - 1, currentPage + 1);
+
+                          for (let i = start; i <= end; i++) {
+                            if (i > 1 && i < totalPages) {
+                              pages.push(i);
+                            }
                           }
-                          aria-disabled={currentPage === totalPages}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+
+                          return pages.map((page) => (
+                            <Button
+                              key={page}
+                              variant={
+                                currentPage === page ? "default" : "outline"
+                              }
+                              size="sm"
+                              onClick={() => setCurrentPage(page)}
+                              className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                            >
+                              {page}
+                            </Button>
+                          ));
+                        })()}
+
+                        {/* Show ellipsis if needed on larger screens */}
+                        {currentPage < totalPages - 3 && (
+                          <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                            •••
+                          </span>
+                        )}
+
+                        {/* Always show last page if more than 1 page on larger screens */}
+                        {totalPages > 1 && (
+                          <Button
+                            variant={
+                              currentPage === totalPages ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setCurrentPage(totalPages)}
+                            className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                          >
+                            {totalPages}
+                          </Button>
+                        )}
+
+                        {/* Mobile-friendly page selector */}
+                        <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
+                          {" "}
+                          <select
+                            value={currentPage}
+                            onChange={(e) =>
+                              setCurrentPage(Number(e.target.value))
+                            }
+                            className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
+                            aria-label="Go to page"
+                          >
+                            {Array.from({ length: totalPages }, (_, i) => (
+                              <option key={i + 1} value={i + 1}>
+                                {i + 1}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-sm text-muted-foreground font-medium">
+                            {" "}
+                            <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                              {totalPages}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Next Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={currentPage === totalPages}
+                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        <span className="hidden sm:inline">Next</span>
+                        <span className="sm:hidden text-lg">›</span>
+                        <svg
+                          className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </Button>
+                    </div>
+
+                    {/* Page Info for Desktop */}
+                    <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                      <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                      Page{" "}
+                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {currentPage}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalPages}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+            {/* Simple results info when no pagination needed for developers */}
+            {!skeletonLoading &&
+              !loading &&
+              totalFiltered > 0 &&
+              totalPages <= 1 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                    <span className="text-sm sm:text-base text-foreground font-semibold">
+                      Showing{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalFiltered}
+                      </span>{" "}
+                      bugs
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center sm:justify-end gap-3">
+                    <label
+                      htmlFor="items-per-page-dev-simple"
+                      className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                    >
+                      Items per page:
+                    </label>
+                    <div className="relative group">
+                      <select
+                        id="items-per-page-dev-simple"
+                        value={itemsPerPage}
+                        onChange={(e) =>
+                          setItemsPerPage(Number(e.target.value))
+                        }
+                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                        aria-label="Items per page"
+                      >
+                        {[10, 25, 50].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                        <svg
+                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
             {/* Content for Developers */}
             <div>
