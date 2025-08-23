@@ -1,20 +1,3 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from '@/components/ui/use-toast';
-import { whatsappService, WhatsAppContact } from '@/services/whatsappService';
-import { MessageCircle, Trash2, Plus, QrCode } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,14 +7,41 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/use-toast";
+import { WhatsAppContact, whatsappService } from "@/services/whatsappService";
+import { MessageCircle, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export function WhatsAppContactsManager() {
   const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [contactToDelete, setContactToDelete] = useState<WhatsAppContact | null>(null);
-  const [newContact, setNewContact] = useState<WhatsAppContact>({ name: '', phone: '' });
+  const [contactToDelete, setContactToDelete] =
+    useState<WhatsAppContact | null>(null);
+  const [newContact, setNewContact] = useState<WhatsAppContact>({
+    name: "",
+    phone: "",
+  });
 
   useEffect(() => {
     loadContacts();
@@ -65,7 +75,7 @@ export function WhatsAppContactsManager() {
 
     whatsappService.saveContact(newContact);
     loadContacts();
-    setNewContact({ name: '', phone: '' });
+    setNewContact({ name: "", phone: "" });
     setShowAddDialog(false);
 
     toast({
@@ -94,13 +104,16 @@ export function WhatsAppContactsManager() {
   };
 
   const handleTestMessage = (contact: WhatsAppContact) => {
-    whatsappService.shareNewBug({
-      bugTitle: "Test Message",
-      bugId: "test-123",
-      priority: "medium",
-      description: "This is a test message to verify WhatsApp integration.",
-      reportedBy: "Test User"
-    }, contact.phone);
+    whatsappService.shareNewBug(
+      {
+        bugTitle: "Test Message",
+        bugId: "test-123",
+        priority: "medium",
+        description: "This is a test message to verify WhatsApp integration.",
+        reportedBy: "Test User",
+      },
+      contact.phone
+    );
 
     toast({
       title: "Test message sent",
@@ -124,9 +137,9 @@ export function WhatsAppContactsManager() {
         bugId: "bulk-test",
         priority: "medium",
         description: "This is a bulk test message sent to multiple contacts.",
-        reportedBy: "Bulk Test"
+        reportedBy: "Bulk Test",
       },
-      'new_bug',
+      "new_bug",
       contacts,
       2000 // 2 second delay between messages
     );
@@ -138,27 +151,32 @@ export function WhatsAppContactsManager() {
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader className="space-y-2">
-        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-          <MessageCircle className="h-5 w-5" />
+    <Card className="w-full shadow-sm hover:shadow-md transition-all duration-200">
+      <CardHeader className="space-y-2 p-4 sm:p-5 lg:p-6">
+        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl lg:text-2xl">
+          <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
           WhatsApp Contacts
         </CardTitle>
-        <CardDescription className="text-sm sm:text-base">
+        <CardDescription className="text-sm sm:text-base lg:text-lg">
           Manage your frequently contacted WhatsApp users for quick bug sharing
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 sm:space-y-8 p-4 sm:p-5 lg:p-6 pt-0 sm:pt-0 lg:pt-0">
         {/* Add Contact Button */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <p className="text-sm text-muted-foreground">
-              {contacts.length} contact{contacts.length !== 1 ? 's' : ''} saved
+              {contacts.length} contact{contacts.length !== 1 ? "s" : ""} saved
             </p>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
             {contacts.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleBulkShare} className="flex-1 sm:flex-none">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkShare}
+                className="flex-1 sm:flex-none"
+              >
                 Bulk Test
               </Button>
             )}
@@ -174,7 +192,8 @@ export function WhatsAppContactsManager() {
                 <DialogHeader>
                   <DialogTitle>Add WhatsApp Contact</DialogTitle>
                   <DialogDescription className="text-sm">
-                    Add a contact for quick WhatsApp sharing. Include country code (e.g., +1234567890)
+                    Add a contact for quick WhatsApp sharing. Include country
+                    code (e.g., +1234567890)
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -184,7 +203,12 @@ export function WhatsAppContactsManager() {
                       id="contact-name"
                       placeholder="Contact name"
                       value={newContact.name}
-                      onChange={(e) => setNewContact(prev => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) =>
+                        setNewContact((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
                     />
                   </div>
                   <div>
@@ -193,7 +217,12 @@ export function WhatsAppContactsManager() {
                       id="contact-phone"
                       placeholder="+1234567890"
                       value={newContact.phone}
-                      onChange={(e) => setNewContact(prev => ({ ...prev, phone: e.target.value }))}
+                      onChange={(e) =>
+                        setNewContact((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
+                      }
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Include country code for international numbers
@@ -201,10 +230,17 @@ export function WhatsAppContactsManager() {
                   </div>
                 </div>
                 <DialogFooter className="flex-col sm:flex-row gap-2">
-                  <Button variant="outline" onClick={() => setShowAddDialog(false)} className="w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAddDialog(false)}
+                    className="w-full sm:w-auto"
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={handleAddContact} className="w-full sm:w-auto">
+                  <Button
+                    onClick={handleAddContact}
+                    className="w-full sm:w-auto"
+                  >
                     Add Contact
                   </Button>
                 </DialogFooter>
@@ -217,11 +253,17 @@ export function WhatsAppContactsManager() {
         {contacts.length === 0 ? (
           <div className="text-center py-12">
             <MessageCircle className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No WhatsApp contacts added yet</h3>
+            <h3 className="text-lg font-medium mb-2">
+              No WhatsApp contacts added yet
+            </h3>
             <p className="text-sm text-muted-foreground mb-4">
               Add contacts to quickly share bug notifications
             </p>
-            <Button onClick={() => setShowAddDialog(true)} variant="outline" size="sm">
+            <Button
+              onClick={() => setShowAddDialog(true)}
+              variant="outline"
+              size="sm"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Your First Contact
             </Button>
@@ -229,14 +271,21 @@ export function WhatsAppContactsManager() {
         ) : (
           <div className="space-y-3">
             {contacts.map((contact, index) => (
-              <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <MessageCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div
+                key={index}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 border rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <MessageCircle className="h-6 w-6 sm:h-7 sm:w-7 text-green-600 dark:text-green-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm sm:text-base truncate">{contact.name}</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground break-all">{contact.phone}</p>
+                    <p className="font-medium text-sm sm:text-base lg:text-lg truncate">
+                      {contact.name}
+                    </p>
+                    <p className="text-xs sm:text-sm lg:text-base text-muted-foreground break-all">
+                      {contact.phone}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2 self-start sm:self-center">
@@ -244,7 +293,7 @@ export function WhatsAppContactsManager() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleTestMessage(contact)}
-                    className="flex-1 sm:flex-none"
+                    className="flex-1 sm:flex-none h-9 sm:h-10 text-sm sm:text-base"
                   >
                     Test
                   </Button>
@@ -252,9 +301,9 @@ export function WhatsAppContactsManager() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleDeleteContact(contact)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 flex-1 sm:flex-none"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 flex-1 sm:flex-none h-9 sm:h-10 text-sm sm:text-base"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
                     <span className="sr-only">Delete {contact.name}</span>
                   </Button>
                 </div>
@@ -284,7 +333,9 @@ export function WhatsAppContactsManager() {
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1 h-1 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-              <span>Messages are pre-filled - just select contact and send</span>
+              <span>
+                Messages are pre-filled - just select contact and send
+              </span>
             </li>
           </ul>
         </div>
@@ -296,11 +347,14 @@ export function WhatsAppContactsManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Contact</AlertDialogTitle>
             <AlertDialogDescription className="text-sm">
-              Are you sure you want to delete {contactToDelete?.name}? This action cannot be undone.
+              Are you sure you want to delete {contactToDelete?.name}? This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="w-full sm:w-auto">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDeleteContact}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto"
@@ -312,4 +366,4 @@ export function WhatsAppContactsManager() {
       </AlertDialog>
     </Card>
   );
-} 
+}
