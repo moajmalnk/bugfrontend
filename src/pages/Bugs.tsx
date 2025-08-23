@@ -175,25 +175,25 @@ const Bugs = () => {
   const noBugs = !loading && filteredBugs.length === 0;
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
-      <section className="max-w-6xl mx-auto space-y-4">
-        {/* Page Header and Description */}
-        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        {/* Enhanced Page Header and Description */}
+        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="space-y-2 sm:space-y-3">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
               Bugs
             </h1>
-            <p className="text-muted-foreground text-sm sm:text-base">
+            <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
               Fix your bugs and track pending bugs
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row md:flex-row items-stretch sm:items-center md:items-center gap-3 w-full md:w-auto">
             {(currentUser?.role === "admin" ||
               currentUser?.role === "tester") && (
               <Button
                 variant="default"
                 asChild
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto h-11 sm:h-12 text-sm sm:text-base"
                 aria-label="Report a new bug"
               >
                 <Link
@@ -209,27 +209,27 @@ const Bugs = () => {
                   }}
                   className="flex items-center justify-center"
                 >
-                  <Plus className="mr-2 h-4 w-4" /> Report Bug
+                  <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Report Bug
                 </Link>
               </Button>
             )}
-            <div className="hidden sm:flex items-center border rounded-md px-3 py-2 bg-orange-50">
-              <BugIcon className="h-4 w-4 text-orange-500 mr-2" />
-              <span className="text-sm font-medium text-orange-700">
+            <div className="hidden sm:flex items-center border rounded-lg px-4 py-3 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
+              <BugIcon className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 mr-2" />
+              <span className="text-sm sm:text-base font-medium text-orange-700 dark:text-orange-300">
                 {pendingBugsCount}{" "}
                 <span className="hidden lg:inline">Bugs Pending</span>
               </span>
             </div>
           </div>
         </div>
-        {/* Professional Header for Developers */}
+        {/* Enhanced Professional Header for Developers */}
         {isDeveloper && noBugs && (
-          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-6 mb-4 flex flex-col items-center text-center">
-            <BugIcon className="h-8 w-8 text-blue-500 mb-2" />
-            <h2 className="text-xl font-bold mb-1 text-blue-900 dark:text-blue-100">
+          <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-6 sm:p-8 mb-6 sm:mb-8 flex flex-col items-center text-center">
+            <BugIcon className="h-8 w-8 sm:h-10 sm:w-10 text-blue-500 mb-3 sm:mb-4" />
+            <h2 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3 text-blue-900 dark:text-blue-100">
               No Bugs Assigned
             </h2>
-            <p className="text-sm text-blue-800 dark:text-blue-200">
+            <p className="text-sm sm:text-base text-blue-800 dark:text-blue-200 max-w-md">
               Great job! You currently have no bugs assigned to you.
               <br />
               Check back later or ask your project admin for new assignments.
@@ -244,20 +244,32 @@ const Bugs = () => {
             onValueChange={setActiveTab}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="all-bugs" className="text-xs sm:text-sm">
-                <BugIcon className="h-4 w-4 mr-1" />
-                All Bugs ({getTabCount("all-bugs")})
+            <TabsList className="grid w-full grid-cols-2 mb-6 sm:mb-8 h-12 sm:h-14">
+              <TabsTrigger
+                value="all-bugs"
+                className="text-sm sm:text-base font-medium"
+              >
+                <BugIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <span className="hidden sm:inline">All Bugs</span>
+                <span className="sm:hidden">All</span>
+                <span className="ml-1 sm:ml-2">
+                  ({getTabCount("all-bugs")})
+                </span>
               </TabsTrigger>
-              <TabsTrigger value="my-bugs" className="text-xs sm:text-sm">
-                <User className="h-4 w-4 mr-1" />
-                My Bugs ({getTabCount("my-bugs")})
+              <TabsTrigger
+                value="my-bugs"
+                className="text-sm sm:text-base font-medium"
+              >
+                <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <span className="hidden sm:inline">My Bugs</span>
+                <span className="sm:hidden">My</span>
+                <span className="ml-1 sm:ml-2">({getTabCount("my-bugs")})</span>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value={activeTab} className="space-y-4">
-              {/* Search and Filter Controls */}
-              <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+            <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
+              {/* Enhanced Search and Filter Controls */}
+              <div className="flex flex-col md:flex-row lg:flex-row gap-4 items-stretch md:items-center lg:items-center">
                 {/* Search Bar */}
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -266,12 +278,12 @@ const Bugs = () => {
                     placeholder="Search bugs by title or description..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-sm sm:text-base transition-all duration-200"
                   />
                 </div>
 
-                {/* Filter Controls */}
-                <div className="flex flex-col sm:flex-row gap-2">
+                {/* Enhanced Filter Controls */}
+                <div className="flex flex-col sm:flex-row md:flex-row gap-3">
                   {/* Priority Filter */}
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
@@ -279,7 +291,7 @@ const Bugs = () => {
                       value={priorityFilter}
                       onValueChange={setPriorityFilter}
                     >
-                      <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                      <SelectTrigger className="w-full sm:w-[140px] lg:w-[160px] text-sm h-10 sm:h-11">
                         <SelectValue placeholder="Priority" />
                       </SelectTrigger>
                       <SelectContent>
@@ -291,9 +303,9 @@ const Bugs = () => {
                     </Select>
                   </div>
 
-                  {/* Status Filter */}
+                  {/* Enhanced Status Filter */}
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                    <SelectTrigger className="w-full sm:w-[140px] lg:w-[160px] text-sm h-10 sm:h-11">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -305,7 +317,7 @@ const Bugs = () => {
                     </SelectContent>
                   </Select>
 
-                  {/* Clear Filters Button */}
+                  {/* Enhanced Clear Filters Button */}
                   {(searchTerm ||
                     priorityFilter !== "all" ||
                     statusFilter !== "all") && (
@@ -317,7 +329,7 @@ const Bugs = () => {
                         setPriorityFilter("all");
                         setStatusFilter("all");
                       }}
-                      className="w-full sm:w-auto"
+                      className="w-full sm:w-auto h-10 sm:h-11"
                     >
                       Clear Filters
                     </Button>
@@ -329,7 +341,7 @@ const Bugs = () => {
               {totalPages > 1 && (
                 <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   {/* Top Row - Results Info and Items Per Page */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
                       <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -572,7 +584,7 @@ const Bugs = () => {
 
               {/* Simple results info when no pagination needed */}
               {totalPages <= 1 && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
                     <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -662,9 +674,9 @@ const Bugs = () => {
             </TabsContent>
           </Tabs>
         ) : (
-          <div className="space-y-4">
-            {/* Search and Filter Controls for Developers */}
-            <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+          <div className="space-y-6 sm:space-y-8">
+            {/* Enhanced Search and Filter Controls for Developers */}
+            <div className="flex flex-col md:flex-row lg:flex-row gap-4 items-stretch md:items-center lg:items-center">
               {/* Search Bar */}
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -673,12 +685,12 @@ const Bugs = () => {
                   placeholder="Search bugs by title or description..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  className="w-full pl-10 pr-4 py-2.5 sm:py-3 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-sm sm:text-base transition-all duration-200"
                 />
               </div>
 
-              {/* Filter Controls */}
-              <div className="flex flex-col sm:flex-row gap-2">
+              {/* Enhanced Filter Controls */}
+              <div className="flex flex-col sm:flex-row md:flex-row gap-3">
                 {/* Priority Filter */}
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-muted-foreground" />
@@ -686,7 +698,7 @@ const Bugs = () => {
                     value={priorityFilter}
                     onValueChange={setPriorityFilter}
                   >
-                    <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                    <SelectTrigger className="w-full sm:w-[140px] lg:w-[160px] text-sm h-10 sm:h-11">
                       <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
@@ -698,9 +710,9 @@ const Bugs = () => {
                   </Select>
                 </div>
 
-                {/* Status Filter */}
+                {/* Enhanced Status Filter */}
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                  <SelectTrigger className="w-full sm:w-[140px] lg:w-[160px] text-sm h-10 sm:h-11">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -712,7 +724,7 @@ const Bugs = () => {
                   </SelectContent>
                 </Select>
 
-                {/* Clear Filters Button */}
+                {/* Enhanced Clear Filters Button */}
                 {(searchTerm ||
                   priorityFilter !== "all" ||
                   statusFilter !== "all") && (
@@ -724,7 +736,7 @@ const Bugs = () => {
                       setPriorityFilter("all");
                       setStatusFilter("all");
                     }}
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto h-10 sm:h-11"
                   >
                     Clear Filters
                   </Button>
@@ -739,7 +751,7 @@ const Bugs = () => {
               totalPages > 1 && (
                 <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   {/* Top Row - Results Info and Items Per Page */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
                       <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -986,7 +998,7 @@ const Bugs = () => {
               !loading &&
               totalFiltered > 0 &&
               totalPages <= 1 && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
                     <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -1040,8 +1052,8 @@ const Bugs = () => {
                 </div>
               )}
 
-            {/* Content for Developers */}
-            <div>
+            {/* Enhanced Content for Developers */}
+            <div className="space-y-6 sm:space-y-8">
               {skeletonLoading ? (
                 <BugCardGridSkeletonAnimated count={3} />
               ) : loading ? (

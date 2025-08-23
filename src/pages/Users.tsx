@@ -18,23 +18,23 @@ import { User, UserRole } from "@/types";
 import { Bug, Code2, Shield, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
-// User Card Skeleton component for loading state
+// Enhanced User Card Skeleton component for loading state
 const UserCardSkeleton = () => (
-  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 border rounded-lg gap-4 hover:shadow-md transition-all duration-200">
     <div className="flex items-center gap-4 min-w-0">
-      <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+      <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0" />
       <div className="min-w-0 flex-1">
-        <Skeleton className="h-5 w-32 mb-2" />
+        <Skeleton className="h-5 sm:h-6 w-32 sm:w-40 mb-2" />
         <div className="flex flex-col sm:flex-row text-sm sm:space-x-2">
           <Skeleton className="h-4 w-24 mb-1 sm:mb-0" />
           <span className="hidden sm:inline text-transparent">•</span>
-          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-40 sm:w-48" />
         </div>
       </div>
     </div>
 
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
-      <Skeleton className="h-8 w-24 rounded-full" />
+      <Skeleton className="h-8 sm:h-10 w-24 sm:w-28 rounded-full" />
     </div>
   </div>
 );
@@ -106,11 +106,11 @@ const Users = () => {
   const getRoleIcon = (role: string) => {
     switch (role) {
       case "admin":
-        return <Shield className="h-5 w-5 text-blue-500" />;
+        return <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />;
       case "developer":
-        return <Code2 className="h-5 w-5 text-green-500" />;
+        return <Code2 className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />;
       case "tester":
-        return <Bug className="h-5 w-5 text-yellow-500" />;
+        return <Bug className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />;
       default:
         return null;
     }
@@ -254,22 +254,22 @@ const Users = () => {
   }
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-6 max-w-7xl">
-      {/* Header row with title, description, add user button, and badge */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">
+    <div className="container mx-auto px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 space-y-6 sm:space-y-8 max-w-7xl">
+      {/* Enhanced Header row with title, description, add user button, and badge */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 sm:gap-6">
+        <div className="space-y-2 sm:space-y-3">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight break-words">
             User Management
           </h1>
-          <p className="text-muted-foreground mt-1 break-words max-w-xl">
+          <p className="text-muted-foreground text-sm sm:text-base lg:text-lg mt-1 sm:mt-2 break-words max-w-xl">
             Manage your team members and their access levels
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+        <div className="flex flex-col sm:flex-row md:flex-row items-stretch sm:items-center md:items-center gap-3 w-full md:w-auto mt-2 sm:mt-0">
           <AddUserDialog onUserAdd={handleAddUser} />
-          <div className="inline-flex items-center border rounded-md px-3 py-2 bg-blue-50 ml-0 sm:ml-2">
-            <UserRound className="h-4 w-4 text-blue-500 mr-2" />
-            <span className="text-sm font-medium text-blue-700">
+          <div className="inline-flex items-center border rounded-lg px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 ml-0 sm:ml-2">
+            <UserRound className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 mr-2" />
+            <span className="text-sm sm:text-base font-medium text-blue-700 dark:text-blue-300">
               {filteredUsers.length}{" "}
               <span className="hidden lg:inline">Users</span>
             </span>
@@ -277,16 +277,16 @@ const Users = () => {
         </div>
       </div>
 
-      {/* Search and Filter Controls */}
+      {/* Enhanced Search and Filter Controls */}
       {!isLoading && (
-        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
+        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
           <div className="flex-1">
             <input
               type="text"
               placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              className="w-full px-4 py-2.5 sm:py-3 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-sm sm:text-base transition-all duration-200"
             />
           </div>
         </div>
@@ -296,7 +296,7 @@ const Users = () => {
       {!isLoading && totalFiltered > 0 && totalPages > 1 && (
         <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
           {/* Top Row - Results Info and Items Per Page */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
               <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -356,7 +356,7 @@ const Users = () => {
           </div>
 
           {/* Bottom Row - Pagination Navigation */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+          <div className="flex flex-col sm:flex-row md:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 md:pt-0 border-t border-border/30">
             {/* Page Info for Mobile */}
             <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
               <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
@@ -370,16 +370,16 @@ const Users = () => {
               </span>
             </div>
 
-            {/* Pagination Controls */}
-            <div className="flex items-center justify-around gap-2 w-full sm:w-auto">
+            {/* Enhanced Pagination Controls */}
+            <div className="flex items-center justify-around gap-2 w-full sm:w-auto md:w-auto">
               {/* Previous Button */}
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border border-border/60 hover:border-primary/50 hover:bg-primary/5 rounded-lg bg-background/80 hover:bg-background/90 disabled:cursor-not-allowed"
+                className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border border-border/60 hover:border-primary/50 hover:bg-primary/5 rounded-lg bg-background/80 hover:bg-background/90 disabled:cursor-not-allowed"
               >
                 <svg
-                  className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                  className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -492,12 +492,12 @@ const Users = () => {
                   setCurrentPage((p) => Math.min(totalPages, p + 1))
                 }
                 disabled={currentPage === totalPages}
-                className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border border-border/60 hover:border-primary/50 hover:bg-primary/5 rounded-lg bg-background/80 hover:bg-background/90 disabled:cursor-not-allowed"
+                className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border border-border/60 hover:border-primary/50 hover:bg-primary/5 rounded-lg bg-background/80 hover:bg-background/90 disabled:cursor-not-allowed"
               >
                 <span className="hidden sm:inline">Next</span>
                 <span className="sm:hidden text-lg">›</span>
                 <svg
-                  className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                  className="w-4 h-4 ml-1 sm:ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -530,7 +530,7 @@ const Users = () => {
 
       {/* Simple results info when no pagination needed */}
       {!isLoading && totalFiltered > 0 && totalPages <= 1 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+        <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
             <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -585,16 +585,26 @@ const Users = () => {
       {/* User list */}
       <Card>
         <CardContent>
-          {/* Desktop Table View */}
+          {/* Enhanced Desktop Table View */}
           <div className="hidden lg:block w-full overflow-x-auto">
             <Table className="w-full min-w-[600px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[200px]">Username</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+              <TableHeader className="bg-muted/30">
+                <TableRow className="bg-muted/30">
+                  <TableHead className="w-[200px] lg:w-[250px] font-semibold text-sm sm:text-base">
+                    Username
+                  </TableHead>
+                  <TableHead className="font-semibold text-sm sm:text-base">
+                    Email
+                  </TableHead>
+                  <TableHead className="font-semibold text-sm sm:text-base">
+                    Phone
+                  </TableHead>
+                  <TableHead className="font-semibold text-sm sm:text-base">
+                    Role
+                  </TableHead>
+                  <TableHead className="text-right font-semibold text-sm sm:text-base">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -603,29 +613,36 @@ const Users = () => {
                       .fill(0)
                       .map((_, index) => (
                         <TableRow key={index}>
-                          <TableCell colSpan={4}>
+                          <TableCell colSpan={5}>
                             <UserCardSkeleton />
                           </TableCell>
                         </TableRow>
                       ))
                   : paginatedUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium max-w-[200px] truncate">
+                      <TableRow
+                        key={user.id}
+                        className="hover:bg-muted/20 transition-colors duration-200"
+                      >
+                        <TableCell className="font-medium max-w-[200px] lg:max-w-[250px] truncate text-sm sm:text-base">
                           {user.username}
                         </TableCell>
-                        <TableCell className="truncate">{user.email}</TableCell>
-                        <TableCell>{user.phone || "BugRacer"}</TableCell>
+                        <TableCell className="truncate text-sm sm:text-base">
+                          {user.email}
+                        </TableCell>
+                        <TableCell className="text-sm sm:text-base">
+                          {user.phone || "BugRacer"}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {getRoleIcon(user.role)}
-                            <span className="capitalize text-sm">
+                            <span className="capitalize text-sm sm:text-base">
                               {user.role}
                             </span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <button
-                            className="px-3 py-1 rounded border text-sm bg-background hover:bg-accent transition-colors"
+                            className="px-3 py-2 rounded-lg border text-sm bg-background hover:bg-accent hover:border-primary/50 transition-all duration-200 h-9 sm:h-10"
                             onClick={() => setSelectedUser(user)}
                           >
                             View Details
@@ -636,8 +653,8 @@ const Users = () => {
               </TableBody>
             </Table>
           </div>
-          {/* Mobile Card View */}
-          <div className="grid grid-cols-1 gap-4 w-full lg:hidden">
+          {/* Enhanced Mobile & Tablet Card View */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4 w-full lg:hidden">
             {isLoading
               ? Array(5)
                   .fill(0)
@@ -645,27 +662,31 @@ const Users = () => {
               : paginatedUsers.map((user) => (
                   <div
                     key={user.id}
-                    className="rounded-lg bg-card text-card-foreground shadow p-4 flex flex-col gap-2 w-full"
+                    className="rounded-lg bg-card text-card-foreground shadow-sm hover:shadow-md transition-all duration-200 p-4 sm:p-5 flex flex-col gap-3 w-full border border-border/50"
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <img
                         src={user.avatar}
                         alt={`${user.username}'s avatar`}
-                        className="h-10 w-10 rounded-full shrink-0"
+                        className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{user.username}</p>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="font-medium truncate text-sm sm:text-base">
+                          {user.username}
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
                           {user.email}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-3">
                       {getRoleIcon(user.role)}
-                      <span className="capitalize text-sm">{user.role}</span>
+                      <span className="capitalize text-sm sm:text-base">
+                        {user.role}
+                      </span>
                     </div>
                     <button
-                      className="w-full px-3 py-2 rounded border text-sm bg-background hover:bg-accent transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background hover:bg-accent hover:border-primary/50 transition-all duration-200 h-10 sm:h-11"
                       onClick={() => setSelectedUser(user)}
                     >
                       View Details

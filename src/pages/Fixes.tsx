@@ -35,23 +35,23 @@ import {
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-// Table row skeleton component for loading state
+// Enhanced table row skeleton component for loading state
 const TableRowSkeleton = () => (
   <TableRow>
-    <TableCell className="w-[250px]">
+    <TableCell className="w-[250px] lg:w-[300px]">
       <Skeleton className="h-5 w-4/5" />
     </TableCell>
     <TableCell>
-      <Skeleton className="h-5 w-24" />
+      <Skeleton className="h-5 w-20 lg:w-24" />
     </TableCell>
-    <TableCell className="hidden md:table-cell">
-      <Skeleton className="h-5 w-32" />
-    </TableCell>
-    <TableCell className="hidden lg:table-cell">
-      <Skeleton className="h-5 w-32" />
+    <TableCell className="hidden sm:table-cell">
+      <Skeleton className="h-5 w-28 lg:w-32" />
     </TableCell>
     <TableCell className="hidden lg:table-cell">
-      <Skeleton className="h-5 w-28" />
+      <Skeleton className="h-5 w-28 lg:w-32" />
+    </TableCell>
+    <TableCell className="hidden xl:table-cell">
+      <Skeleton className="h-5 w-28 lg:w-32" />
     </TableCell>
     <TableCell className="text-right">
       <Skeleton className="h-9 w-24 ml-auto" />
@@ -59,12 +59,12 @@ const TableRowSkeleton = () => (
   </TableRow>
 );
 
-// Card skeleton for mobile view
+// Enhanced card skeleton for mobile and tablet view
 const CardSkeleton = () => (
-  <div className="rounded-xl border bg-card text-card-foreground shadow p-4 space-y-3">
-    <div className="flex justify-between items-start">
-      <Skeleton className="h-5 w-3/5" />
-      <Skeleton className="h-6 w-20 rounded-full" />
+  <div className="rounded-xl border bg-card text-card-foreground shadow p-4 sm:p-5 space-y-3">
+    <div className="flex justify-between items-start gap-3">
+      <Skeleton className="h-5 w-3/5 flex-1" />
+      <Skeleton className="h-6 w-20 rounded-full shrink-0" />
     </div>
     <div className="space-y-2 text-sm text-muted-foreground">
       <Skeleton className="h-4 w-4/5" />
@@ -77,12 +77,15 @@ const CardSkeleton = () => (
   </div>
 );
 
-// Header skeleton
+// Enhanced header skeleton
 const PageHeaderSkeleton = () => (
-  <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-    <Skeleton className="h-10 w-48" />
-    <div className="flex items-center gap-4 w-full sm:w-auto">
-      <Skeleton className="h-10 w-full sm:w-52" />
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-2">
+      <Skeleton className="h-8 sm:h-10 w-48 lg:w-56" />
+      <Skeleton className="h-4 w-64 lg:w-80" />
+    </div>
+    <div className="flex items-center gap-3 w-full sm:w-auto">
+      <Skeleton className="h-10 w-full sm:w-52 lg:w-60" />
       <Skeleton className="h-10 w-24 hidden md:block" />
     </div>
   </div>
@@ -111,28 +114,37 @@ const getPriorityBadgeVariant = (
   }
 };
 
+// Enhanced bug card component with better responsive design
 const BugCard = ({ bug }: { bug: BugType }) => {
   const { currentUser } = useAuth();
   const role = currentUser?.role;
+
   return (
-    <div className="rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md">
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <p className="font-bold text-base break-words pr-2">{bug.title}</p>
+    <div className="rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md hover:border-primary/20">
+      <div className="p-4 sm:p-5">
+        <div className="flex justify-between items-start mb-3 gap-3">
+          <h3 className="font-semibold text-base lg:text-lg break-words pr-2 flex-1 leading-tight">
+            {bug.title}
+          </h3>
           <Badge
             variant={getPriorityBadgeVariant(bug.priority)}
-            className="capitalize shrink-0"
+            className="capitalize shrink-0 text-xs sm:text-sm px-2 py-1"
           >
             {bug.priority}
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-          Bug ID: <span className="font-mono text-xs">{bug.id}</span>
+
+        <p className="text-sm text-muted-foreground mb-4">
+          Bug ID:{" "}
+          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
+            {bug.id}
+          </span>
         </p>
-        <div className="space-y-2 text-sm text-muted-foreground">
+
+        <div className="space-y-3 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <User className="h-4 w-4 shrink-0" />
-            <span>
+            <User className="h-4 w-4 shrink-0 text-primary/70" />
+            <span className="flex-1">
               Reported by:{" "}
               <span className="font-medium text-foreground">
                 {bug.reporter_name || "BugRicer"}
@@ -140,8 +152,8 @@ const BugCard = ({ bug }: { bug: BugType }) => {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <UserCheck className="h-4 w-4 shrink-0" />
-            <span>
+            <UserCheck className="h-4 w-4 shrink-0 text-green-600" />
+            <span className="flex-1">
               Fixed by:{" "}
               <span className="font-medium text-foreground">
                 {bug.updated_by_name || "BugRicer"}
@@ -149,8 +161,8 @@ const BugCard = ({ bug }: { bug: BugType }) => {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 shrink-0" />
-            <span>
+            <Calendar className="h-4 w-4 shrink-0 text-blue-600" />
+            <span className="flex-1">
               Fixed on:{" "}
               <span className="font-medium text-foreground">
                 {formatDate(bug.updated_at)}
@@ -158,8 +170,14 @@ const BugCard = ({ bug }: { bug: BugType }) => {
             </span>
           </div>
         </div>
+
         <div className="flex justify-end pt-4">
-          <Button variant="secondary" size="sm" asChild>
+          <Button
+            variant="secondary"
+            size="sm"
+            asChild
+            className="w-full sm:w-auto"
+          >
             <Link to={role ? `/${role}/bugs/${bug.id}` : `/bugs/${bug.id}`}>
               View Details
             </Link>
@@ -223,20 +241,22 @@ const Fixes = () => {
     if (isLoading) {
       return (
         <>
-          {/* Desktop Table Skeleton */}
-          <div className="hidden md:block">
+          {/* Desktop & Tablet Table Skeleton */}
+          <div className="hidden sm:block">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[250px]">Title</TableHead>
+                  <TableHead className="w-[250px] sm:w-[280px] lg:w-[300px]">
+                    Title
+                  </TableHead>
                   <TableHead>Priority</TableHead>
-                  <TableHead className="hidden md:table-cell">
+                  <TableHead className="hidden sm:table-cell">
                     Reported By
                   </TableHead>
                   <TableHead className="hidden lg:table-cell">
                     Fixed By
                   </TableHead>
-                  <TableHead className="hidden lg:table-cell">
+                  <TableHead className="hidden xl:table-cell">
                     Fixed Date
                   </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -249,8 +269,8 @@ const Fixes = () => {
               </TableBody>
             </Table>
           </div>
-          {/* Mobile Card Skeleton */}
-          <div className="grid md:hidden grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Mobile & Tablet Card Skeleton */}
+          <div className="grid sm:hidden grid-cols-1 gap-4 md:grid-cols-2">
             {[...Array(4)].map((_, i) => (
               <CardSkeleton key={i} />
             ))}
@@ -281,11 +301,10 @@ const Fixes = () => {
           <p className="mt-2 text-sm text-muted-foreground">
             There are no fixed bugs to display.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button asChild>
+          <div className="flex flex-col sm:flex-row gap-4 mt-4">
+            <Button asChild className="w-full sm:w-auto">
               <Link
                 to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}
-                className="w-full md:w-auto"
               >
                 <Bug className="mr-2 h-4 w-4" />
                 View All Bugs
@@ -300,7 +319,7 @@ const Fixes = () => {
       return (
         <div className="text-center py-10 px-4 rounded-lg border border-dashed">
           <CheckCircle className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-medium">All Clear!</h3>
+          <h3 className="mt-4 text-lg font-medium">No Results Found</h3>
           <p className="mt-2 text-sm text-muted-foreground">
             No fixes match your current filters.
           </p>
@@ -327,8 +346,8 @@ const Fixes = () => {
 
     return (
       <>
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+        {/* Enhanced Search and Filter Controls */}
+        <div className="flex flex-col md:flex-row lg:flex-row gap-4 items-stretch md:items-center lg:items-center">
           {/* Search Bar */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -337,17 +356,17 @@ const Fixes = () => {
               placeholder="Search fixes by title or description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              className="w-full pl-10 pr-4 py-2.5 sm:py-3 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-sm sm:text-base transition-all duration-200"
             />
           </div>
 
           {/* Filter Controls */}
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row md:flex-row gap-3">
             {/* Priority Filter */}
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-full sm:w-[140px] text-sm">
+                <SelectTrigger className="w-full sm:w-[140px] lg:w-[160px] text-sm h-10 sm:h-11">
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -368,7 +387,7 @@ const Fixes = () => {
                   setSearchTerm("");
                   setPriorityFilter("all");
                 }}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto h-10 sm:h-11"
               >
                 Clear Filters
               </Button>
@@ -376,11 +395,11 @@ const Fixes = () => {
           </div>
         </div>
 
-        {/* Responsive Pagination Controls - Only show if there are multiple pages */}
+        {/* Enhanced Pagination Controls */}
         {totalPages > 1 && (
           <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             {/* Top Row - Results Info and Items Per Page */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
                 <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -440,7 +459,7 @@ const Fixes = () => {
             </div>
 
             {/* Bottom Row - Pagination Navigation */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+            <div className="flex flex-col sm:flex-row md:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 md:pt-0 border-t border-border/30">
               {/* Page Info for Mobile */}
               <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
                 <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
@@ -455,17 +474,17 @@ const Fixes = () => {
               </div>
 
               {/* Pagination Controls */}
-              <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center justify-center gap-2 w-full sm:w-auto md:w-auto">
                 {/* Previous Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                 >
                   <svg
-                    className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                    className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -577,12 +596,12 @@ const Fixes = () => {
                     setCurrentPage((p) => Math.min(totalPages, p + 1))
                   }
                   disabled={currentPage === totalPages}
-                  className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                 >
                   <span className="hidden sm:inline">Next</span>
                   <span className="sm:hidden text-lg">›</span>
                   <svg
-                    className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                    className="w-4 h-4 ml-1 sm:ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -615,7 +634,7 @@ const Fixes = () => {
 
         {/* Simple results info when no pagination needed */}
         {totalPages <= 1 && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+          <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
               <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -667,48 +686,64 @@ const Fixes = () => {
           </div>
         )}
 
-        {/* Desktop & Tablet View */}
-        <div className="hidden md:block rounded-md border">
+        {/* Enhanced Desktop & Tablet View */}
+        <div className="hidden sm:block rounded-lg border overflow-hidden shadow-sm">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[300px]">Title</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead className="hidden md:table-cell">
+            <TableHeader className="bg-muted/30">
+              <TableRow className="bg-muted/30">
+                <TableHead className="w-[250px] sm:w-[280px] lg:w-[300px] xl:w-[350px] font-semibold text-sm sm:text-base">
+                  Title
+                </TableHead>
+                <TableHead className="font-semibold text-sm sm:text-base">
+                  Priority
+                </TableHead>
+                <TableHead className="hidden sm:table-cell font-semibold text-sm sm:text-base">
                   Reported By
                 </TableHead>
-                <TableHead className="hidden lg:table-cell">Fixed By</TableHead>
-                <TableHead className="hidden lg:table-cell">
+                <TableHead className="hidden lg:table-cell font-semibold text-sm sm:text-base">
+                  Fixed By
+                </TableHead>
+                <TableHead className="hidden xl:table-cell font-semibold text-sm sm:text-base">
                   Fixed Date
                 </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-right font-semibold text-sm sm:text-base">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedBugs.map((bug) => (
-                <TableRow key={bug.id}>
-                  <TableCell className="font-medium max-w-[300px] truncate">
+                <TableRow
+                  key={bug.id}
+                  className="hover:bg-muted/20 transition-colors duration-200"
+                >
+                  <TableCell className="font-medium max-w-[250px] sm:max-w-[280px] lg:max-w-[300px] xl:max-w-[350px] truncate text-sm sm:text-base">
                     {bug.title}
                   </TableCell>
                   <TableCell>
                     <Badge
                       variant={getPriorityBadgeVariant(bug.priority)}
-                      className="capitalize"
+                      className="capitalize text-xs sm:text-sm px-2 py-1"
                     >
                       {bug.priority}
                     </Badge>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
+                  <TableCell className="hidden sm:table-cell text-sm sm:text-base">
                     {bug.reporter_name || "BugRicer"}
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
+                  <TableCell className="hidden lg:table-cell text-sm sm:text-base">
                     {bug.updated_by_name || "BugRicer"}
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
+                  <TableCell className="hidden xl:table-cell text-sm sm:text-base">
                     {formatDate(bug.updated_at)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="outline" size="sm" asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="h-9 sm:h-10"
+                    >
                       <Link
                         to={
                           currentUser?.role
@@ -726,8 +761,8 @@ const Fixes = () => {
           </Table>
         </div>
 
-        {/* Mobile View */}
-        <div className="grid md:hidden grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Enhanced Mobile & Tablet Card View */}
+        <div className="grid sm:hidden grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
           {paginatedBugs.map((bug) => (
             <BugCard key={bug.id} bug={bug} />
           ))}
@@ -751,33 +786,36 @@ const Fixes = () => {
   );
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-2 py-4 sm:px-6">
-      <section className="max-w-6xl mx-auto space-y-4">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        {/* Enhanced Header */}
+        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 sm:gap-6 md:gap-6">
+          <div className="space-y-2 sm:space-y-3">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
               Fixed Bugs
             </h1>
-            <p className="text-muted-foreground text-sm sm:text-base">
+            <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
               Review all completed and resolved issues.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row md:flex-row items-stretch sm:items-center md:items-center gap-3 w-full md:w-auto">
             {showTabs && (
               <Link
                 to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}
-                className="w-full md:w-auto"
+                className="w-full sm:w-auto"
               >
-                <Button variant="default" className="w-full md:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
+                <Button
+                  variant="default"
+                  className="w-full sm:w-auto h-11 sm:h-12 text-sm sm:text-base"
+                >
+                  <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                   Fix a Bug
                 </Button>
               </Link>
             )}
-            <div className="hidden sm:flex items-center border rounded-md px-3 py-2 bg-background">
-              <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-              <span className="text-sm font-medium text-muted-foreground">
+            <div className="hidden sm:flex items-center border rounded-lg px-4 py-3 bg-background">
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 mr-2" />
+              <span className="text-sm sm:text-base font-medium text-muted-foreground">
                 {filteredBugs.length}{" "}
                 <span className="hidden lg:inline">Issues Fixed</span>
               </span>
@@ -785,27 +823,48 @@ const Fixes = () => {
           </div>
         </div>
 
+        {/* Enhanced Tabs */}
         {showTabs ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="all-fixes">
-                <Code className="h-4 w-4 mr-2" />
-                All Fixes ({allFixesCount})
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2 mb-6 sm:mb-8 h-12 sm:h-14 md:h-14">
+              <TabsTrigger
+                value="all-fixes"
+                className="text-sm sm:text-base font-medium"
+              >
+                <Code className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <span className="hidden sm:inline">All Fixes</span>
+                <span className="sm:hidden">All</span>
+                <span className="ml-1 sm:ml-2">({allFixesCount})</span>
               </TabsTrigger>
-              <TabsTrigger value="my-fixes">
-                <User className="h-4 w-4 mr-2" />
-                My Fixes ({myFixesCount})
+              <TabsTrigger
+                value="my-fixes"
+                className="text-sm sm:text-base font-medium"
+              >
+                <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <span className="hidden sm:inline">My Fixes</span>
+                <span className="sm:hidden">My</span>
+                <span className="ml-1 sm:ml-2">({myFixesCount})</span>
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="all-fixes" className="mt-4">
-              <div className="space-y-4">{renderContent()}</div>
+            <TabsContent value="all-fixes" className="mt-0">
+              <div className="space-y-6 sm:space-y-8 md:space-y-8">
+                {renderContent()}
+              </div>
             </TabsContent>
-            <TabsContent value="my-fixes" className="mt-4">
-              <div className="space-y-4">{renderContent()}</div>
+            <TabsContent value="my-fixes" className="mt-0">
+              <div className="space-y-6 sm:space-y-8 md:space-y-8">
+                {renderContent()}
+              </div>
             </TabsContent>
           </Tabs>
         ) : (
-          <div className="space-y-4">{renderContent()}</div>
+          <div className="space-y-6 sm:space-y-8 md:space-y-8">
+            {renderContent()}
+          </div>
         )}
       </section>
     </main>

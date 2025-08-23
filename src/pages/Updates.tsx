@@ -64,36 +64,39 @@ const TableRowSkeleton = () => (
   </TableRow>
 );
 
-// Card skeleton for mobile view
+// Enhanced Card skeleton for mobile and tablet view
 const CardSkeleton = () => (
-  <Card>
-    <CardHeader>
-      <div className="flex justify-between items-center">
-        <Skeleton className="h-5 w-24" />
-        <Skeleton className="h-6 w-16 rounded-md" />
+  <Card className="hover:shadow-md transition-all duration-200">
+    <CardHeader className="p-4 sm:p-5">
+      <div className="flex justify-between items-center gap-3">
+        <Skeleton className="h-5 sm:h-6 w-24 sm:w-32" />
+        <Skeleton className="h-6 w-16 sm:w-20 rounded-md" />
       </div>
     </CardHeader>
-    <CardContent className="space-y-3">
+    <CardContent className="space-y-3 p-4 sm:p-5 pt-0">
       <Skeleton className="h-5 w-4/5" />
       <div className="space-y-2 text-sm">
         <Skeleton className="h-4 w-3/5" />
         <Skeleton className="h-4 w-1/2" />
       </div>
     </CardContent>
-    <CardFooter>
-      <Skeleton className="h-9 w-[120px]" />
+    <CardFooter className="p-4 sm:p-5 pt-0">
+      <Skeleton className="h-10 sm:h-11 w-[120px] sm:w-[140px]" />
     </CardFooter>
   </Card>
 );
 
-// Header skeleton
+// Enhanced Header skeleton
 const HeaderSkeleton = () => (
-  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-    <div className="space-y-1">
-      <Skeleton className="h-8 w-32" />
-      <Skeleton className="h-4 w-48" />
+  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 sm:gap-6">
+    <div className="space-y-2 sm:space-y-3">
+      <Skeleton className="h-8 sm:h-10 w-32 sm:w-40 lg:w-48" />
+      <Skeleton className="h-4 sm:h-5 w-48 sm:w-64 lg:w-80" />
     </div>
-    <Skeleton className="h-10 w-full sm:w-32 rounded-lg" />
+    <div className="flex items-center gap-3 w-full md:w-auto">
+      <Skeleton className="h-11 sm:h-12 w-full sm:w-32 lg:w-40 rounded-lg" />
+      <Skeleton className="h-12 w-32 lg:w-40 rounded-lg" />
+    </div>
   </div>
 );
 
@@ -239,21 +242,31 @@ const Updates = () => {
   // Updates Tabs Component
   const UpdatesTabs = () => (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-4">
-        <TabsTrigger value="all-updates" className="text-xs sm:text-sm">
-          <Bell className="h-4 w-4 mr-2" />
-          All Updates ({getTabCount("all-updates")})
+      <TabsList className="grid w-full grid-cols-2 mb-6 sm:mb-8 h-12 sm:h-14">
+        <TabsTrigger
+          value="all-updates"
+          className="text-sm sm:text-base font-medium"
+        >
+          <Bell className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+          <span className="hidden sm:inline">All Updates</span>
+          <span className="sm:hidden">All</span>
+          <span className="ml-1 sm:ml-2">({getTabCount("all-updates")})</span>
         </TabsTrigger>
-        <TabsTrigger value="my-updates" className="text-xs sm:text-sm">
-          <User className="h-4 w-4 mr-2" />
-          My Updates ({getTabCount("my-updates")})
+        <TabsTrigger
+          value="my-updates"
+          className="text-sm sm:text-base font-medium"
+        >
+          <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+          <span className="hidden sm:inline">My Updates</span>
+          <span className="sm:hidden">My</span>
+          <span className="ml-1 sm:ml-2">({getTabCount("my-updates")})</span>
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value={activeTab} className="space-y-4">
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col gap-4 p-4 bg-muted/30 rounded-lg border">
-          <div className="flex flex-col sm:flex-row gap-3">
+      <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
+        {/* Enhanced Search and Filter Controls */}
+        <div className="flex flex-col gap-4 p-4 sm:p-5 bg-muted/30 rounded-lg border">
+          <div className="flex flex-col md:flex-row gap-3">
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -261,13 +274,13 @@ const Updates = () => {
                 placeholder="Search updates, projects, or creators..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-10 sm:h-11 text-sm sm:text-base"
               />
             </div>
 
-            {/* Type Filter */}
+            {/* Enhanced Type Filter */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full sm:w-[140px] text-sm">
+              <SelectTrigger className="w-full sm:w-[140px] lg:w-[160px] text-sm h-10 sm:h-11">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
@@ -278,9 +291,9 @@ const Updates = () => {
               </SelectContent>
             </Select>
 
-            {/* Created By Filter */}
+            {/* Enhanced Created By Filter */}
             <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
-              <SelectTrigger className="w-full sm:w-[160px] text-sm">
+              <SelectTrigger className="w-full sm:w-[160px] lg:w-[180px] text-sm h-10 sm:h-11">
                 <SelectValue placeholder="Created By" />
               </SelectTrigger>
               <SelectContent>
@@ -294,7 +307,7 @@ const Updates = () => {
             </Select>
           </div>
 
-          {/* Clear Filters Button */}
+          {/* Enhanced Clear Filters Button */}
           {(searchTerm ||
             typeFilter !== "all" ||
             createdByFilter !== "all") && (
@@ -306,7 +319,7 @@ const Updates = () => {
                 setTypeFilter("all");
                 setCreatedByFilter("all");
               }}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto h-10 sm:h-11"
             >
               <X className="h-4 w-4 mr-2" />
               Clear Filters
@@ -318,7 +331,7 @@ const Updates = () => {
         {filteredUpdates.length > 0 && totalPages > 1 && (
           <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             {/* Top Row - Results Info and Items Per Page */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
                 <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -378,7 +391,7 @@ const Updates = () => {
             </div>
 
             {/* Bottom Row - Pagination Navigation */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+            <div className="flex flex-col sm:flex-row md:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 md:pt-0 border-t border-border/30">
               {/* Page Info for Mobile */}
               <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
                 <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
@@ -392,18 +405,18 @@ const Updates = () => {
                 </span>
               </div>
 
-              {/* Pagination Controls */}
-              <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+              {/* Enhanced Pagination Controls */}
+              <div className="flex items-center justify-center gap-2 w-full sm:w-auto md:w-auto">
                 {/* Previous Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                 >
                   <svg
-                    className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                    className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -518,12 +531,12 @@ const Updates = () => {
                     setCurrentPage((p) => Math.min(totalPages, p + 1))
                   }
                   disabled={currentPage === totalPages}
-                  className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                 >
                   <span className="hidden sm:inline">Next</span>
                   <span className="sm:hidden text-lg">›</span>
                   <svg
-                    className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                    className="w-4 h-4 ml-1 sm:ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -556,7 +569,7 @@ const Updates = () => {
 
         {/* Simple results info when no pagination needed */}
         {filteredUpdates.length > 0 && totalPages <= 1 && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+          <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
               <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -612,16 +625,26 @@ const Updates = () => {
         {isLoading ? (
           <>
             {/* Table skeleton for desktop and large tablets */}
-            <div className="hidden lg:block rounded-md border">
+            <div className="hidden lg:block rounded-lg border overflow-hidden shadow-sm">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[250px]">Title</TableHead>
-                    <TableHead className="w-[100px]">Type</TableHead>
-                    <TableHead className="w-[150px]">Project</TableHead>
-                    <TableHead className="w-[150px]">Created By</TableHead>
-                    <TableHead className="w-[120px]">Date</TableHead>
-                    <TableHead className="w-[100px] text-right">
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="bg-muted/30">
+                    <TableHead className="w-[250px] lg:w-[300px] font-semibold text-sm sm:text-base">
+                      Title
+                    </TableHead>
+                    <TableHead className="w-[100px] lg:w-[120px] font-semibold text-sm sm:text-base">
+                      Type
+                    </TableHead>
+                    <TableHead className="w-[150px] lg:w-[180px] font-semibold text-sm sm:text-base">
+                      Project
+                    </TableHead>
+                    <TableHead className="w-[150px] lg:w-[180px] font-semibold text-sm sm:text-base">
+                      Created By
+                    </TableHead>
+                    <TableHead className="w-[120px] lg:w-[140px] font-semibold text-sm sm:text-base">
+                      Date
+                    </TableHead>
+                    <TableHead className="w-[100px] text-right font-semibold text-sm sm:text-base">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -636,8 +659,8 @@ const Updates = () => {
               </Table>
             </div>
 
-            {/* Card skeleton for mobile and tablets */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
+            {/* Enhanced Card skeleton for mobile and tablets */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4 lg:hidden">
               {Array(4)
                 .fill(0)
                 .map((_, index) => (
@@ -649,48 +672,68 @@ const Updates = () => {
           renderEmptyState()
         ) : (
           <>
-            <div className="hidden lg:block rounded-md border">
+            <div className="hidden lg:block rounded-lg border overflow-hidden shadow-sm">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[250px]">Title</TableHead>
-                    <TableHead className="w-[100px]">Type</TableHead>
-                    <TableHead className="w-[150px]">Project</TableHead>
-                    <TableHead className="w-[150px]">Created By</TableHead>
-                    <TableHead className="w-[120px]">Date</TableHead>
-                    <TableHead className="w-[100px] text-right">
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="bg-muted/30">
+                    <TableHead className="w-[250px] lg:w-[300px] font-semibold text-sm sm:text-base">
+                      Title
+                    </TableHead>
+                    <TableHead className="w-[100px] lg:w-[120px] font-semibold text-sm sm:text-base">
+                      Type
+                    </TableHead>
+                    <TableHead className="w-[150px] lg:w-[180px] font-semibold text-sm sm:text-base">
+                      Project
+                    </TableHead>
+                    <TableHead className="w-[150px] lg:w-[180px] font-semibold text-sm sm:text-base">
+                      Created By
+                    </TableHead>
+                    <TableHead className="w-[120px] lg:w-[140px] font-semibold text-sm sm:text-base">
+                      Date
+                    </TableHead>
+                    <TableHead className="w-[100px] text-right font-semibold text-sm sm:text-base">
                       Actions
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedUpdates.map((update) => (
-                    <TableRow key={update.id}>
-                      <TableCell className="max-w-[250px] break-words">
+                    <TableRow
+                      key={update.id}
+                      className="hover:bg-muted/20 transition-colors duration-200"
+                    >
+                      <TableCell className="max-w-[250px] lg:max-w-[300px] break-words text-sm sm:text-base">
                         {update.title}
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className={`font-medium ${getTypeColor(update.type)}`}
+                          className={`font-medium text-xs sm:text-sm px-2 py-1 ${getTypeColor(
+                            update.type
+                          )}`}
                         >
                           {update.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="max-w-[150px] break-words">
+                      <TableCell className="max-w-[150px] lg:max-w-[180px] break-words text-sm sm:text-base">
                         {update.project_name}
                       </TableCell>
-                      <TableCell className="max-w-[150px] break-words">
+                      <TableCell className="max-w-[150px] lg:max-w-[180px] break-words text-sm sm:text-base">
                         <span className="font-medium">
                           {update.created_by || "Unknown"}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-sm sm:text-base">
                         {format(new Date(update.created_at), "PPPp")}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            className="h-9 sm:h-10"
+                          >
                             <Link
                               to={
                                 currentUser?.role
@@ -709,12 +752,15 @@ const Updates = () => {
               </Table>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4 lg:hidden">
               {paginatedUpdates.map((update) => (
-                <Card key={update.id} className="flex flex-col justify-between">
-                  <CardHeader>
-                    <div className="flex justify-between items-start gap-2">
-                      <CardTitle className="text-base font-bold leading-tight break-all">
+                <Card
+                  key={update.id}
+                  className="flex flex-col justify-between hover:shadow-md transition-all duration-200"
+                >
+                  <CardHeader className="p-4 sm:p-5">
+                    <div className="flex justify-between items-start gap-3">
+                      <CardTitle className="text-base sm:text-lg font-bold leading-tight break-all flex-1">
                         <Link
                           to={
                             currentUser?.role
@@ -728,7 +774,7 @@ const Updates = () => {
                       </CardTitle>
                       <Badge
                         variant="outline"
-                        className={`text-xs h-fit shrink-0 ${getTypeColor(
+                        className={`text-xs sm:text-sm h-fit shrink-0 px-2 py-1 ${getTypeColor(
                           update.type
                         )}`}
                       >
@@ -736,20 +782,24 @@ const Updates = () => {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
+                  <CardContent className="space-y-3 text-sm sm:text-base p-4 sm:p-5 pt-0">
                     <div className="flex items-center text-muted-foreground">
-                      <Lock className="h-4 w-4 mr-2" /> Project:{" "}
-                      {update.project_name}
+                      <Lock className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-primary/70" />{" "}
+                      Project:{" "}
+                      <span className="font-medium text-foreground ml-1">
+                        {update.project_name}
+                      </span>
                     </div>
                     <div className="flex items-center text-muted-foreground">
-                      <User className="h-4 w-4 mr-2" /> By:{" "}
-                      <span className="font-medium text-foreground">
+                      <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-blue-600" />{" "}
+                      By:{" "}
+                      <span className="font-medium text-foreground ml-1">
                         {update.created_by || "BugRicer"}
                       </span>
                     </div>
                   </CardContent>
-                  <CardFooter className="flex-col items-start gap-2">
-                    <div className="text-xs text-muted-foreground">
+                  <CardFooter className="flex-col items-start gap-3 p-4 sm:p-5 pt-0">
+                    <div className="text-xs sm:text-sm text-muted-foreground">
                       {format(new Date(update.created_at), "PPPp")}
                     </div>
                     <div className="flex justify-end w-full gap-2">
@@ -757,7 +807,7 @@ const Updates = () => {
                         variant="outline"
                         size="sm"
                         asChild
-                        className="w-full"
+                        className="w-full h-10 sm:h-11"
                       >
                         <Link
                           to={
@@ -781,21 +831,21 @@ const Updates = () => {
   );
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background p-4 sm:p-6 lg:p-8">
-      <section className="max-w-7xl mx-auto space-y-6">
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
         {isLoading ? (
           <HeaderSkeleton />
         ) : (
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 sm:gap-6">
+            <div className="space-y-2 sm:space-y-3">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
                 Updates
               </h1>
-              <p className="text-muted-foreground text-sm mt-1">
+              <p className="text-muted-foreground text-sm sm:text-base lg:text-lg mt-1 sm:mt-2">
                 A log of all features, fixes, and maintenance updates.
               </p>
             </div>
-            <div className="flex-shrink-0 w-full sm:w-auto flex items-center gap-2 mt-2 sm:mt-0">
+            <div className="flex-shrink-0 w-full md:w-auto flex flex-col sm:flex-row items-center gap-3 mt-2 sm:mt-0">
               {projects.length > 0 && (
                 <>
                   <Link
@@ -805,14 +855,14 @@ const Updates = () => {
                         : "/new-update"
                     }
                   >
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
+                    <Button className="w-full sm:w-auto h-11 sm:h-12 text-sm sm:text-base">
+                      <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                       New Update
                     </Button>
                   </Link>
-                  <div className="inline-flex items-center border rounded-md px-3 py-2 bg-blue-50 ml-2">
-                    <Bell className="h-4 w-4 text-blue-500 mr-2" />
-                    <span className="text-sm font-medium text-blue-700">
+                  <div className="inline-flex items-center border rounded-lg px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                    <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 mr-2" />
+                    <span className="text-sm sm:text-base font-medium text-blue-700 dark:text-blue-300">
                       {updates.length}{" "}
                       <span className="hidden lg:inline">Updates</span>
                     </span>
