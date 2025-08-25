@@ -1,5 +1,5 @@
-import { Bug } from '@/types';
 import { apiClient } from '@/lib/axios';
+import { Bug } from '@/types';
 
 export type { Bug };
 
@@ -30,7 +30,19 @@ export const bugService = {
   },
 
   async createBug(bugData: Omit<Bug, 'id' | 'created_at' | 'updated_at'>): Promise<Bug> {
-    const response = await apiClient.post<{ success: boolean, data: Bug }>(`${API_ENDPOINT}/create.php`, bugData);
+    // Ensure dates are in Asia/Calcutta timezone when creating bugs
+    const now = new Date();
+    // Convert to Asia/Calcutta timezone (UTC+5:30)
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const calcuttaTime = new Date(utcTime + (5.5 * 60 * 60000));
+    
+    const bugDataWithDates = {
+      ...bugData,
+      created_at: calcuttaTime.toISOString(),
+      updated_at: calcuttaTime.toISOString(),
+    };
+    
+    const response = await apiClient.post<{ success: boolean, data: Bug }>(`${API_ENDPOINT}/create.php`, bugDataWithDates);
     if(response.data.success) {
       return response.data.data;
     }
@@ -38,7 +50,18 @@ export const bugService = {
   },
 
   async updateBug(bug: Bug): Promise<Bug> {
-    const response = await apiClient.post<{ success: boolean, data: Bug }>(`${API_ENDPOINT}/update.php`, bug);
+    // Ensure updated_at is set to current Asia/Calcutta time
+    const now = new Date();
+    // Convert to Asia/Calcutta timezone (UTC+5:30)
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const calcuttaTime = new Date(utcTime + (5.5 * 60 * 60000));
+    
+    const updatedBug = {
+      ...bug,
+      updated_at: calcuttaTime.toISOString(),
+    };
+    
+    const response = await apiClient.post<{ success: boolean, data: Bug }>(`${API_ENDPOINT}/update.php`, updatedBug);
     if(response.data.success) {
       return response.data.data;
     }

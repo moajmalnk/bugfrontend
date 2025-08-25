@@ -107,8 +107,8 @@ class NotificationService {
       if (!granted) return false;
     }
 
-    new Notification('BugRacer Notification Test', {
-      body: 'This is a test notification from BugRacer',
+    new Notification('BugRicer Notification Test', {
+      body: 'This is a test notification from BugRicer',
       icon: '/favicon.ico'
     });
 

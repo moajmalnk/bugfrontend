@@ -1,35 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Pin, 
-  PinOff, 
-  MessageCircle, 
-  Mic, 
-  X,
-  Clock
-} from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { MessagingService } from '@/services/messagingService';
-import { PinnedMessage } from '@/types';
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { formatLocalDate } from "@/lib/utils/dateUtils";
+import { MessagingService } from "@/services/messagingService";
+import { PinnedMessage } from "@/types";
+import { Clock, MessageCircle, Mic, Pin, PinOff, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 
 interface PinnedMessagesProps {
   groupId: string;
   onMessageClick?: (messageId: string) => void;
 }
 
-export const PinnedMessages: React.FC<PinnedMessagesProps> = ({ 
-  groupId, 
-  onMessageClick 
+export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
+  groupId,
+  onMessageClick,
 }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -37,7 +31,7 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === "admin";
 
   useEffect(() => {
     if (groupId) {
@@ -51,11 +45,11 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
       const messages = await MessagingService.getPinnedMessages(groupId);
       setPinnedMessages(messages);
     } catch (error) {
-      console.error('Error loading pinned messages:', error);
+      console.error("Error loading pinned messages:", error);
       toast({
         title: "Error",
         description: "Failed to load pinned messages",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -65,37 +59,31 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
   const handleUnpinMessage = async (messageId: string) => {
     try {
       await MessagingService.unpinMessage(messageId);
-      setPinnedMessages(prev => prev.filter(msg => msg.id !== messageId));
+      setPinnedMessages((prev) => prev.filter((msg) => msg.id !== messageId));
       toast({
         title: "Success",
-        description: "Message unpinned successfully"
+        description: "Message unpinned successfully",
       });
     } catch (error) {
-      console.error('Error unpinning message:', error);
+      console.error("Error unpinning message:", error);
       toast({
         title: "Error",
         description: "Failed to unpin message",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const formatPinnedTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatLocalDate(timestamp, "datetime");
   };
 
   const getMessagePreview = (message: PinnedMessage) => {
-    if (message.message_type === 'voice') {
-      return '🎤 Voice message';
+    if (message.message_type === "voice") {
+      return "🎤 Voice message";
     }
-    return message.content?.length > 50 
-      ? `${message.content.substring(0, 50)}...` 
+    return message.content?.length > 50
+      ? `${message.content.substring(0, 50)}...`
       : message.content;
   };
 
@@ -118,7 +106,7 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
               onClick={() => setIsExpanded(!isExpanded)}
               className="h-6 px-2 text-xs"
             >
-              {isExpanded ? 'Collapse' : 'Expand'}
+              {isExpanded ? "Collapse" : "Expand"}
             </Button>
             <Button
               variant="ghost"
@@ -131,7 +119,7 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
           </div>
         </div>
       </CardHeader>
-      
+
       {isExpanded ? (
         <CardContent className="pt-0">
           <ScrollArea className="max-h-48">
@@ -141,7 +129,7 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
                   key={message.id}
                   className="flex items-start justify-between p-2 rounded-lg bg-background/50 border hover:bg-background/80 transition-colors"
                 >
-                  <div 
+                  <div
                     className="flex-1 min-w-0 cursor-pointer"
                     onClick={() => onMessageClick?.(message.id)}
                   >
@@ -150,7 +138,7 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
                         {message.sender_name}
                       </span>
                       <Badge variant="secondary" className="text-xs">
-                        {message.message_type === 'voice' ? (
+                        {message.message_type === "voice" ? (
                           <Mic className="h-3 w-3 mr-1" />
                         ) : (
                           <MessageCircle className="h-3 w-3 mr-1" />
@@ -163,14 +151,21 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      <span>Pinned {formatPinnedTime(message.pinned_at)} by {message.pinned_by_name}</span>
+                      <span>
+                        Pinned {formatPinnedTime(message.pinned_at)} by{" "}
+                        {message.pinned_by_name}
+                      </span>
                     </div>
                   </div>
-                  
+
                   {isAdmin && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                        >
                           <PinOff className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -195,10 +190,9 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
               <div className="text-sm text-muted-foreground">
-                {pinnedMessages.length === 1 
+                {pinnedMessages.length === 1
                   ? getMessagePreview(pinnedMessages[0])
-                  : `${pinnedMessages.length} pinned messages`
-                }
+                  : `${pinnedMessages.length} pinned messages`}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Latest: {formatPinnedTime(pinnedMessages[0].pinned_at)}
@@ -220,4 +214,4 @@ export const PinnedMessages: React.FC<PinnedMessagesProps> = ({
       )}
     </Card>
   );
-}; 
+};

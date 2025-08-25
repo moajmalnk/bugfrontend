@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
+import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -92,11 +93,7 @@ const PageHeaderSkeleton = () => (
 );
 
 const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return formatLocalDate(dateString, "date");
 };
 
 const getPriorityBadgeVariant = (

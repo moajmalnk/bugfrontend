@@ -78,7 +78,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
       <div className="p-4 pb-2">
         <div className="flex items-center mb-8 px-2">
           <Bug className="h-6 w-6 text-primary mr-2" />
-          <h2 className="text-xl font-bold truncate">BugRacer</h2>
+          <h2 className="text-xl font-bold truncate">BugRicer</h2>
         </div>
         <ScrollArea className="flex-1 min-w-0">
           <div className="space-y-4 px-1">
@@ -203,7 +203,7 @@ export default function MainLayout({ children }) {
           >
             <Menu className="h-6 w-6" />
           </Button>
-          <span className="ml-2 font-bold text-lg truncate">BugRacer</span>
+          <span className="ml-2 font-bold text-lg truncate">BugRicer</span>
         </div>
         <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
       </div>

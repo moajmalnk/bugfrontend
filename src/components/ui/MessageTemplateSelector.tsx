@@ -37,7 +37,7 @@ const defaultTemplates: MessageTemplate[] = [
     id: "otp-login",
     name: "OTP Login",
     content:
-      "🔐 *BugRacer Login OTP*\n\nYour one-time password is: *{OTP}*\nThis OTP is valid for 5 minutes.\n\n⚠️ *Do not share this code with anyone.*\n\n🐞 _Sent from BugRacer_",
+      "🔐 *BugRicer Login OTP*\n\nYour one-time password is: *{OTP}*\nThis OTP is valid for 5 minutes.\n\n⚠️ *Do not share this code with anyone.*\n\n🐞 _Sent from BugRicer_",
     category: "otp",
     description: "Standard OTP login message",
   },
@@ -45,7 +45,7 @@ const defaultTemplates: MessageTemplate[] = [
     id: "bug-notification",
     name: "Bug Notification",
     content:
-      "🐛 *New Bug Reported*\n\nBug: {BUG_TITLE}\nProject: {PROJECT_NAME}\nPriority: {PRIORITY}\n\nPlease review and take necessary action.\n\n🐞 _BugRacer_",
+      "🐛 *New Bug Reported*\n\nBug: {BUG_TITLE}\nProject: {PROJECT_NAME}\nPriority: {PRIORITY}\n\nPlease review and take necessary action.\n\n🐞 _BugRicer_",
     category: "notification",
     description: "Notify about new bug reports",
   },
@@ -53,7 +53,7 @@ const defaultTemplates: MessageTemplate[] = [
     id: "status-update",
     name: "Status Update",
     content:
-      "📊 *Status Update*\n\nBug: {BUG_TITLE}\nStatus: {STATUS}\nUpdated by: {UPDATED_BY}\n\nView details: {LINK}\n\n🐞 _BugRacer_",
+      "📊 *Status Update*\n\nBug: {BUG_TITLE}\nStatus: {STATUS}\nUpdated by: {UPDATED_BY}\n\nView details: {LINK}\n\n🐞 _BugRicer_",
     category: "notification",
     description: "Status change notifications",
   },
@@ -61,7 +61,7 @@ const defaultTemplates: MessageTemplate[] = [
     id: "project-reminder",
     name: "Project Reminder",
     content:
-      "⏰ *Project Reminder*\n\nProject: {PROJECT_NAME}\nDeadline: {DEADLINE}\nPending tasks: {TASK_COUNT}\n\nPlease review your assigned tasks.\n\n🐞 _BugRacer_",
+      "⏰ *Project Reminder*\n\nProject: {PROJECT_NAME}\nDeadline: {DEADLINE}\nPending tasks: {TASK_COUNT}\n\nPlease review your assigned tasks.\n\n🐞 _BugRicer_",
     category: "reminder",
     description: "Project deadline reminders",
   },
@@ -69,7 +69,7 @@ const defaultTemplates: MessageTemplate[] = [
     id: "meeting-reminder",
     name: "Meeting Reminder",
     content:
-      "📅 *Meeting Reminder*\n\nMeeting: {MEETING_TITLE}\nTime: {MEETING_TIME}\nDate: {MEETING_DATE}\n\nPlease join on time.\n\n🐞 _BugRacer_",
+      "📅 *Meeting Reminder*\n\nMeeting: {MEETING_TITLE}\nTime: {MEETING_TIME}\nDate: {MEETING_DATE}\n\nPlease join on time.\n\n🐞 _BugRicer_",
     category: "reminder",
     description: "Meeting reminders",
   },
@@ -77,7 +77,7 @@ const defaultTemplates: MessageTemplate[] = [
     id: "welcome-message",
     name: "Welcome Message",
     content:
-      "🎉 *Welcome to BugRacer!*\n\nHi {USER_NAME},\n\nWelcome to our bug tracking platform. Your account has been successfully created.\n\nRole: {USER_ROLE}\nUsername: {USERNAME}\n\nStart tracking bugs and ship faster! 🚀\n\n🐞 _BugRacer Team_",
+      "🎉 *Welcome to BugRicer!*\n\nHi {USER_NAME},\n\nWelcome to our bug tracking platform. Your account has been successfully created.\n\nRole: {USER_ROLE}\nUsername: {USERNAME}\n\nStart tracking bugs and ship faster! 🚀\n\n🐞 _BugRicer Team_",
     category: "custom",
     description: "Welcome message for new users",
   },
@@ -85,7 +85,7 @@ const defaultTemplates: MessageTemplate[] = [
     id: "password-reset",
     name: "Password Reset",
     content:
-      "🔑 *Password Reset Request*\n\nHi {USER_NAME},\n\nYou requested a password reset for your BugRacer account.\n\nReset Code: *{RESET_CODE}*\n\nThis code is valid for 10 minutes.\n\nIf you didn't request this, please ignore this message.\n\n🐞 _BugRacer Security_",
+      "🔑 *Password Reset Request*\n\nHi {USER_NAME},\n\nYou requested a password reset for your BugRicer account.\n\nReset Code: *{RESET_CODE}*\n\nThis code is valid for 10 minutes.\n\nIf you didn't request this, please ignore this message.\n\n🐞 _BugRicer Security_",
     category: "otp",
     description: "Password reset notifications",
   },
@@ -93,7 +93,7 @@ const defaultTemplates: MessageTemplate[] = [
     id: "custom-message",
     name: "Custom Message",
     content:
-      "📝 *Custom Message*\n\n{Your custom message here}\n\n🐞 _BugRacer_",
+      "📝 *Custom Message*\n\n{Your custom message here}\n\n🐞 _BugRicer_",
     category: "custom",
     description: "Template for custom messages",
   },

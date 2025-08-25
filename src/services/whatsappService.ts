@@ -1,4 +1,3 @@
-import { useAuth } from '@/context/AuthContext';
 
 interface WhatsAppMessageData {
   bugTitle?: string;
@@ -133,7 +132,7 @@ class WhatsAppService {
     }
     
     message += `\n🔗 *View Bug:* ${bugUrl}`;
-    message += `\n\n_Sent from BugRacer 🚀_`;
+    message += `\n\n_Sent from BugRicer 🚀_`;
     
     return message;
   }
@@ -157,7 +156,7 @@ class WhatsAppService {
     }
     
     message += `\n🔗 *View Bug:* ${bugUrl}`;
-    message += `\n\n_Sent from BugRacer 🚀_`;
+    message += `\n\n_Sent from BugRicer 🚀_`;
     
     return message;
   }
@@ -193,7 +192,7 @@ class WhatsAppService {
     }
     
     message += `\n🔗 *View Update:* ${updateUrl}`;
-    message += `\n\n_Sent from BugRacer 🚀_`;
+    message += `\n\n_Sent from BugRicer 🚀_`;
     
     return message;
   }
@@ -323,4 +322,4 @@ class WhatsAppService {
 }
 
 export const whatsappService = new WhatsAppService();
-export type { WhatsAppMessageData, WhatsAppContact }; 
+export type { WhatsAppContact, WhatsAppMessageData };

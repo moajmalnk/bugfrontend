@@ -30,6 +30,7 @@ import {
 import { toast, useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
+import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService } from "@/services/bugService";
 import { Project, projectService } from "@/services/projectService";
 import { motion } from "framer-motion";
@@ -872,7 +873,7 @@ const Projects = () => {
                     </Badge>
                     <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
                       <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      {new Date(project.created_at).toLocaleDateString()}
+                      {formatLocalDate(project.created_at, "date")}
                     </div>
                   </div>
                   <CardTitle>

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
+import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { Copy, MessageCircle, Phone } from "lucide-react";
 import { useState } from "react";
 
@@ -134,7 +135,7 @@ export function WhatsAppMessage({
               )}
               {timestamp && (
                 <span className="text-xs text-muted-foreground">
-                  {new Date(timestamp).toLocaleTimeString()}
+                  {formatLocalDate(timestamp, "time")}
                 </span>
               )}
             </div>

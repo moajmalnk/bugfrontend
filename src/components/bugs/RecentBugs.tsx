@@ -1,17 +1,16 @@
-import { Link } from 'react-router-dom';
-import { Bug } from '@/types';
-import { useBugs } from '@/context/BugContext';
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { BugCard } from './BugCard';
-import { Bug as BugIcon, Plus } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useAuth } from "@/context/AuthContext";
+import { Bug } from "@/types";
+import { Bug as BugIcon, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BugCard } from "./BugCard";
 
 interface RecentBugsProps {
   title: string;
@@ -27,11 +26,16 @@ export function RecentBugs({ title, bugs }: RecentBugsProps) {
         <div>
           <CardTitle>{title}</CardTitle>
           <CardDescription>
-            {bugs.length === 0 ? 'No bugs found' : `Showing ${bugs.length} bugs`}
+            {bugs.length === 0
+              ? "No bugs found"
+              : `Showing ${bugs.length} bugs`}
           </CardDescription>
         </div>
         <Button size="sm" asChild>
-          <Link to={role ? `/${role}/bugs/new` : "/bugs/new"} state={{ from: '/' }}>
+          <Link
+            to={role ? `/${role}/bugs/new` : "/bugs/new"}
+            state={{ from: "/" }}
+          >
             <Plus className="mr-2 h-4 w-4" /> Report Bug
           </Link>
         </Button>
@@ -47,7 +51,12 @@ export function RecentBugs({ title, bugs }: RecentBugsProps) {
               Start by reporting a new bug.
             </p>
             <Button className="mt-4" asChild>
-              <Link to={role ? `/${role}/bugs/new` : "/bugs/new"} state={{ from: '/' }}>Report Bug</Link>
+              <Link
+                to={role ? `/${role}/bugs/new` : "/bugs/new"}
+                state={{ from: "/" }}
+              >
+                Report Bug
+              </Link>
             </Button>
           </div>
         ) : (

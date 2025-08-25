@@ -1,14 +1,14 @@
 import { apiClient as axiosInstance } from '@/lib/axios';
-import { 
-  ChatGroup, 
-  ChatMessage, 
-  ChatGroupMember, 
-  TypingIndicator, 
-  MessageResponse,
-  MessageReaction,
-  EmojiReaction,
-  PinnedMessage,
-  GroupSettings
+import {
+    ChatGroup,
+    ChatGroupMember,
+    ChatMessage,
+    EmojiReaction,
+    GroupSettings,
+    MessageReaction,
+    MessageResponse,
+    PinnedMessage,
+    TypingIndicator
 } from '@/types';
 
 const MESSAGING_API_BASE = '/messaging';
@@ -250,7 +250,12 @@ export class MessagingService {
     } else if (diffInHours < 24) {
       return `${Math.floor(diffInHours)}h ago`;
     } else {
-      return date.toLocaleDateString();
+      // Use local time formatting
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
     }
   }
 

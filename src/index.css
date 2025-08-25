@@ -115,7 +115,7 @@
   display: none !important;
 }
 
-/* Custom scrollbar for BugRacer theme - for individual elements */
+/* Custom scrollbar for BugRicer theme - for individual elements */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
   background: transparent;

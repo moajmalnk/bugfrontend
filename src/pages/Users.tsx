@@ -630,7 +630,7 @@ const Users = () => {
                           {user.email}
                         </TableCell>
                         <TableCell className="text-sm sm:text-base">
-                          {user.phone || "BugRacer"}
+                          {user.phone || "BugRicer"}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">

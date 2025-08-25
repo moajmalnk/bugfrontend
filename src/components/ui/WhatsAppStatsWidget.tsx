@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatLocalDate } from "@/lib/utils/dateUtils";
 import {
   AlertCircle,
   CheckCircle,
@@ -280,7 +281,7 @@ export function WhatsAppStatsWidget({ className }: WhatsAppStatsWidgetProps) {
                   <div>
                     <div className="text-sm font-medium">{activity.phone}</div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(activity.timestamp).toLocaleTimeString()}
+                      {formatLocalDate(activity.timestamp, "time")}
                     </div>
                   </div>
                 </div>

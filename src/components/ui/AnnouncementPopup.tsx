@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Bug, X } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import { announcementService, Announcement } from '@/services/announcementService';
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Announcement,
+  announcementService,
+} from "@/services/announcementService";
+import { Bug, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 const AnnouncementPopup: React.FC = () => {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
@@ -16,9 +25,14 @@ const AnnouncementPopup: React.FC = () => {
         if (data) {
           const seenInfo = localStorage.getItem(`seen_announcement_${data.id}`);
           const lastSeenDate = seenInfo ? new Date(seenInfo) : null;
-          const broadcastDate = data.last_broadcast_at ? new Date(data.last_broadcast_at) : null;
+          const broadcastDate = data.last_broadcast_at
+            ? new Date(data.last_broadcast_at)
+            : null;
 
-          if (!lastSeenDate || (broadcastDate && lastSeenDate < broadcastDate)) {
+          if (
+            !lastSeenDate ||
+            (broadcastDate && lastSeenDate < broadcastDate)
+          ) {
             setAnnouncement(data);
             setIsVisible(true);
           }
@@ -35,7 +49,10 @@ const AnnouncementPopup: React.FC = () => {
     setIsVisible(false);
     if (announcement) {
       window.location.reload();
-      localStorage.setItem(`seen_announcement_${announcement.id}`, new Date().toISOString());
+      localStorage.setItem(
+        `seen_announcement_${announcement.id}`,
+        new Date().toISOString()
+      );
     }
   };
 
@@ -52,7 +69,7 @@ const AnnouncementPopup: React.FC = () => {
     >
       <Card
         className="relative w-[98vw] max-w-md sm:max-w-lg md:max-w-xl rounded-2xl border-0 p-0 shadow-2xl bg-background animate-popup-glow"
-        style={{ animation: 'popup-glow 0.5s cubic-bezier(.4,2,.6,1)' }}
+        style={{ animation: "popup-glow 0.5s cubic-bezier(.4,2,.6,1)" }}
       >
         {/* Gradient Accent Bar */}
         <div className="absolute top-0 left-0 w-full h-2 rounded-t-2xl bg-gradient-to-r from-primary to-blue-400 animate-gradient-move" />
@@ -69,20 +86,27 @@ const AnnouncementPopup: React.FC = () => {
             <span className="inline-block animate-bounce-slow">
               <Bug className="h-8 w-8 text-primary drop-shadow-glow" />
             </span>
-            <h2 className="text-2xl font-bold tracking-tight ml-2">BugRacer</h2>
+            <h2 className="text-2xl font-bold tracking-tight ml-2">BugRicer</h2>
           </div>
-          <CardTitle className="text-xl sm:text-2xl">{announcement.title}</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl">
+            {announcement.title}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div
             className="prose prose-sm dark:prose-invert max-w-none text-center mx-auto sm:text-base text-sm
               max-h-[40vh] sm:max-h-[50vh] overflow-y-auto px-2 custom-scrollbar"
-            style={{ wordBreak: 'break-word' }}
+            style={{ wordBreak: "break-word" }}
           >
             <ReactMarkdown
               components={{
                 a: ({ node, ...props }) => (
-                  <a {...props} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" />
+                  <a
+                    {...props}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  />
                 ),
               }}
             >

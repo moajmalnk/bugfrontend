@@ -368,7 +368,7 @@ const Login = () => {
           <div className="flex justify-center mb-2">
             <BugIcon className="h-10 w-10 sm:h-12 sm:w-12 text-primary" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold">BugRacer</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">BugRicer</h1>
           <p className="text-sm sm:text-base text-muted-foreground">
             Track bugs, ship faster
           </p>
@@ -715,7 +715,7 @@ const Login = () => {
             <div>
               <h3 className="font-medium text-xs sm:text-sm">First time here?</h3>
               <p className="text-xs text-muted-foreground mt-0.5 sm:mt-1">
-                Create a new account to start tracking bugs with BugRacer.
+                Create a new account to start tracking bugs with BugRicer.
               </p>
             </div>
           </div>

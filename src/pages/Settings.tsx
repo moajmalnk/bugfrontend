@@ -100,7 +100,7 @@ const Settings = () => {
             Settings
           </h1>
           <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
-            Manage your BugRacer application configuration
+            Manage your BugRicer application configuration
           </p>
         </div>
       </div>
@@ -140,7 +140,7 @@ const Settings = () => {
                 General Settings
               </CardTitle>
               <CardDescription className="text-sm sm:text-base lg:text-lg">
-                Manage your BugRacer application settings
+                Manage your BugRicer application settings
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 sm:space-y-8 p-4 sm:p-5 lg:p-6 pt-0 sm:pt-0 lg:pt-0">

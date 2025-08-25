@@ -804,7 +804,7 @@ export function ScreenshotViewer({
             <div className="flex items-center gap-2 mb-2 sm:mb-0">
               <Smartphone className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
               <span className="font-medium">
-                BugRacer | CODO AI Innovations
+                BugRicer | CODO AI Innovations
               </span>
               <Separator orientation="vertical" className="h-3" />
               <span className="font-mono">

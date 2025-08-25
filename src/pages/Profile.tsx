@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { useAuth } from "@/context/AuthContext";
+import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { userService } from "@/services/userService";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -308,7 +309,7 @@ export default function Profile() {
               className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
             >
               <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              BugRacer Team
+              BugRicer Team
             </Button>
           </div>
         </div>
@@ -505,22 +506,13 @@ export default function Profile() {
                     }
                   })
                   .map((activity, index) => {
-                    const activityDate = new Date(activity.created_at);
-                    const formattedDate = activityDate.toLocaleDateString(
-                      "en-US",
-                      {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      }
+                    const formattedDate = formatLocalDate(
+                      activity.created_at,
+                      "date"
                     );
-                    const formattedTime = activityDate.toLocaleTimeString(
-                      "en-US",
-                      {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                      }
+                    const formattedTime = formatLocalDate(
+                      activity.created_at,
+                      "time"
                     );
 
                     // Navigation function based on activity type with role-based URLs
@@ -584,9 +576,12 @@ export default function Profile() {
                             </div>
                             <div className="flex items-center gap-2">
                               <p className="text-xs text-muted-foreground">
-                                {formatDistanceToNow(activityDate, {
-                                  addSuffix: true,
-                                })}
+                                {formatDistanceToNow(
+                                  new Date(activity.created_at),
+                                  {
+                                    addSuffix: true,
+                                  }
+                                )}
                               </p>
                               <Button
                                 variant="outline"
