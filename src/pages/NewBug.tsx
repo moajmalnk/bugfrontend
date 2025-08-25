@@ -589,7 +589,7 @@ const NewBug = () => {
                   priority: priority,
                   description: description,
                   reportedBy: currentUser?.name || "Bug Ricer User",
-                  projectName: selectedProject?.name,
+                  projectName: selectedProject?.name || "BugRicer Project",
                 });
                 // console.log("WhatsApp share opened for new bug");
               }

@@ -1,24 +1,27 @@
 import { BugContentCards } from "@/components/bugs/details/BugContentCards";
 import { BugDetailsCard } from "@/components/bugs/details/BugDetailsCard";
-import { BugHeader, BugHeaderSkeletonDetailed } from "@/components/bugs/details/BugHeader";
+import {
+  BugHeader,
+  BugHeaderSkeletonDetailed,
+} from "@/components/bugs/details/BugHeader";
 import { BugNotFound } from "@/components/bugs/details/BugNotFound";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { ENV } from "@/lib/env";
 import { formatDetailedDate } from "@/lib/dateUtils";
-import { sendBugStatusUpdateNotification } from "@/services/emailService";
+import { ENV } from "@/lib/env";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
-import { whatsappService } from "@/services/whatsappService";
+import { bugService } from "@/services/bugService";
+import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { notificationService } from "@/services/notificationService";
+import { whatsappService } from "@/services/whatsappService";
 import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { Lock, ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from 'react';
-import { bugService } from "@/services/bugService";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -118,7 +121,8 @@ const AccessError = () => (
       </div>
       <h1 className="text-2xl font-bold tracking-tight">Access Denied</h1>
       <p className="text-muted-foreground max-w-md">
-        You don't have permission to view this bug. You need to be a member of the project this bug belongs to.
+        You don't have permission to view this bug. You need to be a member of
+        the project this bug belongs to.
       </p>
     </section>
   </main>
@@ -139,7 +143,7 @@ const BugDetails = () => {
     error,
     refetch,
     isFetching,
-    isStale
+    isStale,
   } = useQuery({
     queryKey: ["bug", bugId],
     queryFn: async () => {
@@ -172,22 +176,32 @@ const BugDetails = () => {
   useEffect(() => {
     let isMounted = true;
     setBugListLoading(true);
-    bugService.getBugs({ page: 1, limit: 1000, status: "fixed", userId: currentUser?.id }).then((res) => {
-      if (isMounted) {
-        setBugList(res.bugs);
-        setBugListLoading(false);
-      }
-    }).catch(() => setBugListLoading(false));
-    return () => { isMounted = false; };
+    bugService
+      .getBugs({
+        page: 1,
+        limit: 1000,
+        status: "fixed",
+        userId: currentUser?.id,
+      })
+      .then((res) => {
+        if (isMounted) {
+          setBugList(res.bugs);
+          setBugListLoading(false);
+        }
+      })
+      .catch(() => setBugListLoading(false));
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Check if this is an access error
-  const isAccessError = error && (
-    (error as Error).message?.toLowerCase().includes('access') || 
-    (error as Error).message?.toLowerCase().includes('permission') || 
-    (error as Error).message?.toLowerCase().includes('forbidden') ||
-    (error as Error).message?.toLowerCase().includes('403')
-  );
+  const isAccessError =
+    error &&
+    ((error as Error).message?.toLowerCase().includes("access") ||
+      (error as Error).message?.toLowerCase().includes("permission") ||
+      (error as Error).message?.toLowerCase().includes("forbidden") ||
+      (error as Error).message?.toLowerCase().includes("403"));
 
   // Show skeleton only when:
   // 1. Initial loading (no cached data) OR
@@ -225,7 +239,12 @@ const BugDetails = () => {
   // Now you can do your early returns
   if (shouldShowSkeleton) return renderSkeleton();
   if (isAccessError) return <AccessError />;
-  if (error || !bug) return <main><BugNotFound /></main>;
+  if (error || !bug)
+    return (
+      <main>
+        <BugNotFound />
+      </main>
+    );
 
   const formattedCreatedDate = formatDetailedDate(bug.created_at);
   const formattedUpdatedDate = formatDetailedDate(bug.updated_at);
@@ -255,7 +274,14 @@ const BugDetails = () => {
       // Update local bugList state immediately
       setBugList((prevList) =>
         prevList.map((b) =>
-          b.id === bug.id ? { ...b, status: newStatus, updated_by: currentUser?.id, updated_by_name: currentUser?.name } : b
+          b.id === bug.id
+            ? {
+                ...b,
+                status: newStatus,
+                updated_by: currentUser?.id,
+                updated_by_name: currentUser?.name,
+              }
+            : b
         )
       );
 
@@ -267,10 +293,10 @@ const BugDetails = () => {
             status: newStatus,
             updated_by_name: currentUser?.name || "Bug Ricer", // Include updater name in notification
           };
-          
+
           // Send email notification
           await sendBugStatusUpdateNotification(bugData);
-          
+
           // Broadcast browser notification to all users
           await broadcastNotificationService.broadcastStatusChange(
             bug.title,
@@ -282,15 +308,19 @@ const BugDetails = () => {
 
           // Check if WhatsApp notifications are enabled and share
           const notificationSettings = notificationService.getSettings();
-          if (notificationSettings.whatsappNotifications && notificationSettings.statusChangeNotifications) {
+          if (
+            notificationSettings.whatsappNotifications &&
+            notificationSettings.statusChangeNotifications
+          ) {
             whatsappService.shareStatusUpdate({
               bugTitle: bug.title,
               bugId: bug.id,
               status: newStatus,
               priority: bug.priority,
-              updatedBy: currentUser?.name || "Bug Ricer User"
+              updatedBy: currentUser?.name || "Bug Ricer User",
+              projectName: bug.project_name || bug.project_id,
             });
-           // console.log("WhatsApp share opened for status change");
+            // console.log("WhatsApp share opened for status change");
           }
         } catch (notificationError) {
           // // console.error("Failed to send notification:", notificationError);
@@ -321,8 +351,12 @@ const BugDetails = () => {
       b.id === bugId // Always include the current bug
   );
   const currentIndex = filteredBugList.findIndex((b) => b.id === bugId);
-  const prevBugId = currentIndex > 0 ? filteredBugList[currentIndex - 1]?.id : null;
-  const nextBugId = currentIndex >= 0 && currentIndex < filteredBugList.length - 1 ? filteredBugList[currentIndex + 1]?.id : null;
+  const prevBugId =
+    currentIndex > 0 ? filteredBugList[currentIndex - 1]?.id : null;
+  const nextBugId =
+    currentIndex >= 0 && currentIndex < filteredBugList.length - 1
+      ? filteredBugList[currentIndex + 1]?.id
+      : null;
   const totalBugs = filteredBugList.length;
 
   const role = currentUser?.role || "admin";
@@ -374,7 +408,9 @@ const BugDetails = () => {
           <ArrowLeft className="mr-2 h-5 w-5" /> Previous
         </button>
         <span className="text-sm font-medium text-muted-foreground select-none">
-          {totalBugs > 0 ? `Bug ${currentIndex + 1} of ${totalBugs}` : "No bugs"}
+          {totalBugs > 0
+            ? `Bug ${currentIndex + 1} of ${totalBugs}`
+            : "No bugs"}
         </span>
         <button
           className="flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors"

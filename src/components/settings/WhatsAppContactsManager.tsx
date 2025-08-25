@@ -111,6 +111,7 @@ export function WhatsAppContactsManager() {
         priority: "medium",
         description: "This is a test message to verify WhatsApp integration.",
         reportedBy: "Test User",
+        projectName: "Test Project",
       },
       contact.phone
     );
@@ -138,6 +139,7 @@ export function WhatsAppContactsManager() {
         priority: "medium",
         description: "This is a bulk test message sent to multiple contacts.",
         reportedBy: "Bulk Test",
+        projectName: "Test Project",
       },
       "new_bug",
       contacts,
