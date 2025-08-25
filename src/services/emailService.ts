@@ -176,7 +176,7 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
         // In a more sophisticated system, you might want to send individual emails
         emailResult = await sendEmailNotification(
           recipientEmails,
-          `Bug Fixed: ${bug.title}`,
+          `[${bug.project_name || 'BugRicer'}] Bug Fixed: ${bug.title}`,
           personalizedBodies[0]
         );
       } else {
@@ -278,7 +278,7 @@ export const sendNewBugNotification = async (bug: any) => {
 
         emailResult = await sendEmailNotification(
           recipientEmails,
-          `New Bug Reported: ${bug.title}`,
+          `[${bug.project_name || 'BugRicer'}] New Bug Reported: ${bug.title}`,
           personalizedBodies[0],
           bug.attachments || []
         );
@@ -373,7 +373,7 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
 
         emailResult = await sendEmailNotification(
           recipientEmails,
-          subject,
+          `[${bug.project_name || 'BugRicer'}] ${subject}`,
           personalizedBodies[0]
         );
       } else {
@@ -449,7 +449,7 @@ export const sendNewUpdateNotification = async (update: any) => {
 
         emailResult = await sendEmailNotification(
           recipientEmails,
-          `New Update: ${update.title}`,
+          `[${update.project_name || 'BugRicer'}] New Update: ${update.title}`,
           personalizedBodies[0]
         );
       } else {
