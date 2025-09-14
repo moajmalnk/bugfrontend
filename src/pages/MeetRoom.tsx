@@ -93,6 +93,23 @@ export default function MeetRoom() {
     return `${proto}://${host}:${port}`;
   }, []);
 
+  // Debug video element state
+  const debugVideoElement = useCallback((videoElement: HTMLVideoElement, context: string) => {
+    console.log(`[${context}] Video element debug:`, {
+      readyState: videoElement.readyState,
+      networkState: videoElement.networkState,
+      paused: videoElement.paused,
+      ended: videoElement.ended,
+      muted: videoElement.muted,
+      autoplay: videoElement.autoplay,
+      srcObject: !!videoElement.srcObject,
+      videoWidth: videoElement.videoWidth,
+      videoHeight: videoElement.videoHeight,
+      currentTime: videoElement.currentTime,
+      duration: videoElement.duration
+    });
+  }, []);
+
   // Safe video play function to prevent AbortError
   const safePlayVideo = useCallback(async (videoElement: HTMLVideoElement) => {
     if (isPlayingRef.current || playPromiseRef.current) {
@@ -100,12 +117,54 @@ export default function MeetRoom() {
       return;
     }
 
-    if (!videoElement || videoElement.readyState < 2) {
-      console.log('Video not ready, skipping play...');
+    if (!videoElement) {
+      console.log('Video element not found, skipping play...');
       return;
     }
 
+    // Debug video element state
+    debugVideoElement(videoElement, 'safePlayVideo');
+
+    // Wait for video to be ready with retries
+    const waitForVideoReady = (retries = 10) => {
+      return new Promise<boolean>((resolve) => {
+        if (videoElement.readyState >= 2) {
+          resolve(true);
+          return;
+        }
+        
+        if (retries <= 0) {
+          console.log('Video not ready after retries, forcing play...');
+          resolve(false);
+          return;
+        }
+
+        console.log(`Video not ready (readyState: ${videoElement.readyState}), waiting... (${retries} retries left)`);
+        
+        const handleReady = () => {
+          console.log('Video became ready, readyState:', videoElement.readyState);
+          resolve(true);
+        };
+        
+        videoElement.addEventListener('loadedmetadata', handleReady, { once: true });
+        videoElement.addEventListener('canplay', handleReady, { once: true });
+        videoElement.addEventListener('loadeddata', handleReady, { once: true });
+        
+        setTimeout(() => {
+          videoElement.removeEventListener('loadedmetadata', handleReady);
+          videoElement.removeEventListener('canplay', handleReady);
+          videoElement.removeEventListener('loadeddata', handleReady);
+          waitForVideoReady(retries - 1).then(resolve);
+        }, 300);
+      });
+    };
+
     try {
+      const isReady = await waitForVideoReady();
+      if (!isReady) {
+        console.log('Video still not ready, attempting to play anyway...');
+      }
+
       isPlayingRef.current = true;
       playPromiseRef.current = videoElement.play();
       await playPromiseRef.current;
@@ -473,10 +532,44 @@ export default function MeetRoom() {
       // Set local video source with retry mechanism
       const setVideoSource = (retries = 5) => {
         if (localVideoRef.current) {
+          console.log('Setting video source...');
+          debugVideoElement(localVideoRef.current, 'before setVideoSource');
           localVideoRef.current.srcObject = stream;
+          debugVideoElement(localVideoRef.current, 'after setVideoSource');
+          
+          // Add event listeners to ensure video plays when ready
+          const videoElement = localVideoRef.current;
+          
+          const handleLoadedMetadata = () => {
+            console.log('Video metadata loaded, readyState:', videoElement.readyState);
+            safePlayVideo(videoElement);
+          };
+          
+          const handleCanPlay = () => {
+            console.log('Video can play, readyState:', videoElement.readyState);
+            safePlayVideo(videoElement);
+          };
+          
+          // Remove existing listeners to avoid duplicates
+          videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+          videoElement.removeEventListener('canplay', handleCanPlay);
+          
+          // Add new listeners
+          videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+          videoElement.addEventListener('canplay', handleCanPlay);
+          
           console.log('Video element srcObject set successfully');
-          // Use safe play function
-          safePlayVideo(localVideoRef.current);
+          
+          // Try to play immediately as well
+          safePlayVideo(videoElement);
+          
+          // Fallback: Force play after a delay if video still not playing
+          setTimeout(() => {
+            if (videoElement.paused && videoElement.srcObject) {
+              console.log('Fallback: Forcing video play after delay');
+              safePlayVideo(videoElement);
+            }
+          }, 2000);
         } else if (retries > 0) {
           console.log(`Video element not ready, retrying... (${retries} attempts left)`);
           setTimeout(() => setVideoSource(retries - 1), 100);
@@ -1101,8 +1194,16 @@ export default function MeetRoom() {
                 muted
                 playsInline
                 className="w-full h-full object-cover"
-                style={{ backgroundColor: '#1f2937' }}
-                onLoadedMetadata={() => console.log('Local video loaded')}
+                style={{ 
+                  backgroundColor: '#1f2937',
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
+                }}
+                onLoadedMetadata={() => {
+                  console.log('Local video loaded');
+                  debugVideoElement(localVideoRef.current!, 'onLoadedMetadata');
+                }}
                 onError={(e) => console.error('Local video error:', e)}
                 onPlay={() => {
                   console.log('Local video started playing');
@@ -1111,6 +1212,10 @@ export default function MeetRoom() {
                 onPause={() => {
                   console.log('Local video paused');
                   setIsVideoPlaying(false);
+                }}
+                onCanPlay={() => {
+                  console.log('Local video can play');
+                  debugVideoElement(localVideoRef.current!, 'onCanPlay');
                 }}
               />
               
@@ -1174,7 +1279,8 @@ export default function MeetRoom() {
                     <Button
                       onClick={() => {
                         if (localVideoRef.current) {
-                          localVideoRef.current.play().catch(console.error);
+                          console.log('Manual play attempt, readyState:', localVideoRef.current.readyState);
+                          safePlayVideo(localVideoRef.current);
                         }
                       }}
                       className="bg-blue-600 hover:bg-blue-700 text-white"

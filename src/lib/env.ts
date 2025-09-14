@@ -18,7 +18,7 @@ const getApiUrl = () => {
   // Production detection - check if we're on the bug tracker domain
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    if (hostname.includes('bugs.moajmalnk.in')) {
+    if (hostname.includes('bugs.moajmalnk.in') || hostname.includes('bugricer.com')) {
       return 'https://bugbackend.moajmalnk.in/api';
     }
   }
