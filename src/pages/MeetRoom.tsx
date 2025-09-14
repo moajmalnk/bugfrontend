@@ -433,21 +433,14 @@ export default function MeetRoom() {
       console.log('Video tracks:', stream.getVideoTracks());
       console.log('Audio tracks:', stream.getAudioTracks());
       
-      // Set local video source with retry mechanism
-      const setVideoSource = (retries = 3) => {
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-          localVideoRef.current.play().catch(console.error);
-          console.log('Video element srcObject set');
-        } else if (retries > 0) {
-          console.log(`Local video ref is null, retrying... (${retries} attempts left)`);
-          setTimeout(() => setVideoSource(retries - 1), 200);
-        } else {
-          console.error('Local video ref is still null after all retries');
-        }
-      };
-      
-      setTimeout(() => setVideoSource(), 100);
+      // Set local video source - the video element should exist by now
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play().catch(console.error);
+        console.log('Video element srcObject set');
+      } else {
+        console.warn('Local video ref is null, will be set in useEffect');
+      }
       
       // Setup audio level monitoring
       setupAudioLevelMonitoring(stream);
@@ -542,6 +535,19 @@ export default function MeetRoom() {
       };
       
       playVideo();
+    } else if (localStream && !localVideoRef.current) {
+      // If we have a stream but no video element yet, wait a bit and try again
+      console.log('Stream available but video element not ready, retrying...');
+      const retrySetVideo = () => {
+        if (localVideoRef.current && localStream) {
+          localVideoRef.current.srcObject = localStream;
+          localVideoRef.current.play().catch(console.error);
+          console.log('Video element set after retry');
+        } else {
+          setTimeout(retrySetVideo, 100);
+        }
+      };
+      setTimeout(retrySetVideo, 100);
     }
   }, [localStream]);
 
