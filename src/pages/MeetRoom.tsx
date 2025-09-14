@@ -83,12 +83,43 @@ export default function MeetRoom() {
   const recordingRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isPlayingRef = useRef(false);
+  const playPromiseRef = useRef<Promise<void> | null>(null);
 
   const wsUrl = useMemo(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const host = location.hostname;
     const port = 8089;
     return `${proto}://${host}:${port}`;
+  }, []);
+
+  // Safe video play function to prevent AbortError
+  const safePlayVideo = useCallback(async (videoElement: HTMLVideoElement) => {
+    if (isPlayingRef.current || playPromiseRef.current) {
+      console.log('Video play already in progress, skipping...');
+      return;
+    }
+
+    if (!videoElement || videoElement.readyState < 2) {
+      console.log('Video not ready, skipping play...');
+      return;
+    }
+
+    try {
+      isPlayingRef.current = true;
+      playPromiseRef.current = videoElement.play();
+      await playPromiseRef.current;
+      console.log('Video played successfully');
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Video play was aborted (expected)');
+      } else {
+        console.error('Error playing video:', error);
+      }
+    } finally {
+      isPlayingRef.current = false;
+      playPromiseRef.current = null;
+    }
   }, []);
 
   const createPeerConnection = useCallback((peerId: string): RTCPeerConnection => {
@@ -192,12 +223,13 @@ export default function MeetRoom() {
       wsRef.current = null;
     }
     
+    console.log('Attempting to connect to WebSocket:', wsUrl);
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected to meeting:', code);
         setIsConnected(true);
         setIsConnecting(false);
         setError(null);
@@ -297,8 +329,8 @@ export default function MeetRoom() {
         }
       };
       
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected:', event.code, event.reason);
         setIsConnected(false);
         setConnectionQuality('unknown');
         
@@ -307,7 +339,11 @@ export default function MeetRoom() {
         
         // Only show error if we were connected
         if (isConnected) {
-          setError('Connection lost. Please refresh the page.');
+          if (event.code === 1006) {
+            setError('WebSocket connection failed. Please check if the signaling server is running.');
+          } else {
+            setError('Connection lost. Please refresh the page.');
+          }
           setIsConnecting(false);
         }
       };
@@ -343,10 +379,10 @@ export default function MeetRoom() {
         console.log(`Handling ${desc.type} from peer ${fromId}, current state: ${pc.signalingState}`);
         
         if (desc.type === 'offer') {
-          // Handle offer - reset connection if needed
+          // Handle offer - only reset if we're in a bad state
           let currentPc = pc;
-          if (pc.signalingState !== 'stable') {
-            console.log(`Resetting peer connection for ${fromId} before handling offer`);
+          if (pc.signalingState === 'have-local-offer' || pc.signalingState === 'have-remote-offer') {
+            console.log(`Resetting peer connection for ${fromId} before handling offer (state: ${pc.signalingState})`);
             pc.close();
             const newPc = createPeerConnection(fromId);
             setPeers(prev => ({
@@ -367,9 +403,10 @@ export default function MeetRoom() {
             payload: { to: fromId, signal: { sdp: answer } }
           }));
         } else if (desc.type === 'answer') {
-          // Handle answer
+          // Handle answer - only if we're expecting one
           if (pc.signalingState === 'have-local-offer') {
             await pc.setRemoteDescription(desc);
+            console.log(`Answer processed for ${fromId}`);
           } else {
             console.log(`Skipping answer from ${fromId}, not in have-local-offer state: ${pc.signalingState}`);
           }
@@ -404,9 +441,9 @@ export default function MeetRoom() {
       // Set a timeout to prevent infinite loading
       const timeoutId = setTimeout(() => {
         console.log('Meeting initialization timeout');
-        setError('Meeting initialization timed out. Please try again.');
+        setError('Meeting initialization timed out. Please check if the WebSocket server is running and try again.');
         setIsConnecting(false);
-      }, 15000); // 15 second timeout
+      }, 10000); // 10 second timeout
       
       // Get available devices first
       await getAvailableDevices();
@@ -433,14 +470,23 @@ export default function MeetRoom() {
       console.log('Video tracks:', stream.getVideoTracks());
       console.log('Audio tracks:', stream.getAudioTracks());
       
-      // Set local video source - the video element should exist by now
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.play().catch(console.error);
-        console.log('Video element srcObject set');
-      } else {
-        console.warn('Local video ref is null, will be set in useEffect');
-      }
+      // Set local video source with retry mechanism
+      const setVideoSource = (retries = 5) => {
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          console.log('Video element srcObject set successfully');
+          // Use safe play function
+          safePlayVideo(localVideoRef.current);
+        } else if (retries > 0) {
+          console.log(`Video element not ready, retrying... (${retries} attempts left)`);
+          setTimeout(() => setVideoSource(retries - 1), 100);
+        } else {
+          console.error('Video element still not available after all retries');
+        }
+      };
+      
+      // Try to set video source immediately, then with retries
+      setVideoSource();
       
       // Setup audio level monitoring
       setupAudioLevelMonitoring(stream);
@@ -520,28 +566,15 @@ export default function MeetRoom() {
       console.log('Updating local video with stream:', localStream);
       localVideoRef.current.srcObject = localStream;
       
-      // Force play the video
-      const playVideo = async () => {
-        try {
-          await localVideoRef.current?.play();
-          console.log('Local video playing successfully');
-        } catch (error) {
-          console.error('Error playing local video:', error);
-          // Try again after a short delay
-          setTimeout(() => {
-            localVideoRef.current?.play().catch(console.error);
-          }, 100);
-        }
-      };
-      
-      playVideo();
+      // Use safe play function
+      safePlayVideo(localVideoRef.current);
     } else if (localStream && !localVideoRef.current) {
       // If we have a stream but no video element yet, wait a bit and try again
       console.log('Stream available but video element not ready, retrying...');
       const retrySetVideo = () => {
         if (localVideoRef.current && localStream) {
           localVideoRef.current.srcObject = localStream;
-          localVideoRef.current.play().catch(console.error);
+          safePlayVideo(localVideoRef.current);
           console.log('Video element set after retry');
         } else {
           setTimeout(retrySetVideo, 100);
@@ -549,7 +582,7 @@ export default function MeetRoom() {
       };
       setTimeout(retrySetVideo, 100);
     }
-  }, [localStream]);
+  }, [localStream, safePlayVideo]);
 
   // Close device settings when clicking outside
   useEffect(() => {
@@ -946,6 +979,15 @@ export default function MeetRoom() {
           <Loader2 className="h-12 w-12 animate-spin text-white mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-white mb-2">Joining Meeting</h2>
           <p className="text-gray-300">Setting up your video call...</p>
+          {/* Hidden video element for stream setup */}
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            className="hidden"
+            style={{ display: 'none', position: 'absolute', top: '-9999px' }}
+          />
         </div>
       </div>
     );
