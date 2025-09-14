@@ -1,0 +1,25 @@
+{
+  "short_name": "Bug Ricer",
+  "name": "Bug Ricer | CODO AI Innovations",
+  "icons": [
+    {
+      "src": "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
