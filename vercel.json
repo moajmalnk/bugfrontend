@@ -9,6 +9,13 @@
       }
     }
   ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://bugs.bugricer.com/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/:path*",
@@ -74,4 +81,4 @@
       ]
     }
   ]
-} 
+}
