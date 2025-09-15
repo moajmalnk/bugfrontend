@@ -13,7 +13,13 @@
     {
       "source": "/(.*)",
       "destination": "https://bugs.bugricer.com/$1",
-      "permanent": true
+      "permanent": true,
+      "has": [
+        {
+          "type": "host",
+          "value": "bugs.moajmalnk.in"
+        }
+      ]
     }
   ],
   "rewrites": [
