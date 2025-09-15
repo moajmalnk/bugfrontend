@@ -9,13 +9,6 @@
       }
     }
   ],
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "destination": "https://bugricer.com/:1",
-      "permanent": true
-    }
-  ],
   "rewrites": [
     {
       "source": "/:path*",
