@@ -33,7 +33,7 @@ const ResetPassword = () => {
       }
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://bugbackend.moajmalnk.in/api'}/auth/verify_reset_token.php`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://bugbackend.bugricer.com/api'}/auth/verify_reset_token.php`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -75,7 +75,7 @@ const ResetPassword = () => {
     setError("");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://bugbackend.moajmalnk.in/api'}/auth/reset_password.php`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://bugbackend.bugricer.com/api'}/auth/reset_password.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

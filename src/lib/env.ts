@@ -19,12 +19,12 @@ const getApiUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname.includes('bugs.moajmalnk.in') || hostname.includes('bugricer.com') || hostname.includes('bugs.bugricer.com')) {
-      return 'https://bugbackend.moajmalnk.in/api';
+      return 'https://bugbackend.bugricer.com/api';
     }
   }
   
   // Default production fallback
-  return 'https://bugbackend.moajmalnk.in/api';
+  return 'https://bugbackend.bugricer.com/api';
 };
 
 export const ENV = {
@@ -56,4 +56,4 @@ export const validateEnv = () => {
 // Production: https://bugsbackend.moajmalnk.in/api/auth
 export const API_BASE_URL = isLocalhost
   ? "http://localhost/BugRicer/backend/api/auth"
-  : "https://bugbackend.moajmalnk.in/api/auth";
+  : "https://bugbackend.bugricer.com/api/auth";
