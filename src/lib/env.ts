@@ -70,18 +70,23 @@ export const getWebSocketUrl = () => {
     return 'ws://localhost:8089';
   }
   
-  // Production detection - check if we're on the bug tracker domain
+  // Production detection - Vercel frontend connecting to Hostinger backend
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
+    
+    // If frontend is on Vercel (vercel.app domain), connect to Hostinger backend
+    if (hostname.includes('vercel.app')) {
+      return 'wss://bugbackend.bugricer.com:8089';
+    }
+    
+    // If frontend is on custom domain, use the same domain for WebSocket
     if (hostname.includes('bugs.moajmalnk.in') || hostname.includes('bugricer.com') || hostname.includes('bugs.bugricer.com')) {
-      // For production, we'll use the same domain with port 8089
-      // This assumes the signaling server is deployed on the same server
       return `wss://${hostname}:8089`;
     }
   }
   
-  // Default production fallback
-  return 'wss://bugs.bugricer.com:8089';
+  // Default production fallback - connect to Hostinger backend
+  return 'wss://bugbackend.bugricer.com:8089';
 };
 
 export const WS_URL = getWebSocketUrl();
