@@ -550,7 +550,13 @@ const Projects = () => {
   }, [projects, userProjectMemberships]);
 
   const totalFiltered = filteredProjects.length;
-  const paginatedProjects = filteredProjects.slice(
+  // Sort projects by highest count of open bugs before pagination
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    const openA = projectOpenBugsCount[a.id] ?? 0;
+    const openB = projectOpenBugsCount[b.id] ?? 0;
+    return openB - openA;
+  });
+  const paginatedProjects = sortedProjects.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );

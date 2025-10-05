@@ -24,9 +24,14 @@ const EXCLUDE_FROM_CACHE = [
   'moz-extension://',
   'safari-extension://',
   'ms-browser-extension://',
+  // Dev servers and hot-reload endpoints (Vite/React Refresh)
+  'http://localhost:8080',
+  '/@vite/client',
+  '/@react-refresh',
   '/sockjs-node/',
   '/hot-update',
   '.hot-update.',
+  '/src/',
 ];
 
 /**
@@ -34,17 +39,23 @@ const EXCLUDE_FROM_CACHE = [
  * Professional filtering to prevent caching issues
  */
 function shouldCache(request) {
-  const url = request.url;
-  
+  const urlString = request.url;
+  const url = new URL(urlString);
+
   // Exclude unsupported schemes and development resources
   for (const exclude of EXCLUDE_FROM_CACHE) {
-    if (url.includes(exclude)) {
+    if (urlString.includes(exclude)) {
       return false;
     }
   }
-  
+
+  // Never intercept localhost dev server requests
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    return false;
+  }
+
   // Only cache HTTP/HTTPS requests
-  return url.startsWith('http://') || url.startsWith('https://');
+  return url.protocol === 'http:' || url.protocol === 'https:';
 }
 
 /**
@@ -133,6 +144,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   // Skip non-cacheable requests early
   if (!shouldCache(event.request)) {
+    // Let the request pass through without SW interference
     return;
   }
   
@@ -279,23 +291,37 @@ async function cacheFirst(request) {
  */
 async function staleWhileRevalidate(request) {
   const cachedResponse = await caches.match(request);
-  
+
   // Always fetch from network to update cache
-  const networkPromise = fetch(request).then(response => {
-    if (response.ok && shouldCache(request)) {
-      const cache = caches.open(DYNAMIC_CACHE);
-      cache.then(c => c.put(request, response.clone())).catch(err => {
-        // console.warn('[ServiceWorker] Failed to update cache:', err);
+  const networkPromise = fetch(request)
+    .then(response => {
+      if (response && response.ok && shouldCache(request)) {
+        const cache = caches.open(DYNAMIC_CACHE);
+        cache.then(c => c.put(request, response.clone())).catch(() => {});
+      }
+      return response;
+    })
+    .catch(() => null);
+
+  // Return cached version immediately if available; otherwise wait for network;
+  // if both unavailable, fall back to a direct fetch to ensure a valid Response
+  const result = cachedResponse || (await networkPromise);
+  if (result) return result;
+
+  try {
+    return await fetch(request);
+  } catch (e) {
+    // As a final fallback for navigation requests, show simple offline response
+    if (request.mode === 'navigate') {
+      return new Response('Offline', {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'text/plain' }
       });
     }
-    return response;
-  }).catch(error => {
-    // console.warn('[ServiceWorker] Network update failed:', error);
-    return null;
-  });
-  
-  // Return cached version immediately if available, otherwise wait for network
-  return cachedResponse || networkPromise;
+    // If not navigation, return a basic 504 response
+    return new Response('Gateway Timeout', { status: 504 });
+  }
 }
 
 // Handle messages from main thread

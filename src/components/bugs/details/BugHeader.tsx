@@ -255,9 +255,9 @@ export const BugHeader = ({
             </p>
           </div>
 
-          {/* Actions: keep all buttons in a single horizontal row with mobile horizontal scroll */}
-          <div className="w-full sm:w-auto overflow-x-auto">
-            <div className="flex flex-row flex-nowrap items-center gap-2 min-w-max">
+          {/* Actions: allow wrapping on small screens, no horizontal scrollbar */}
+          <div className="w-full sm:w-auto">
+            <div className="flex flex-row flex-wrap items-center gap-2">
             {canEditBug && (
               <EditBugDialog bug={bug}>
                 <Button
