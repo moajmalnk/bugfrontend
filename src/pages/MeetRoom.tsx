@@ -30,7 +30,35 @@ import {
   CameraOff,
   MoreVertical,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  MessageSquare,
+  MessageSquareOff,
+  Hand,  
+  Share,
+  Download,
+  Upload,
+  Grid,
+  Grid3X3,
+  Layout,
+  LayoutGrid,
+  Eye,
+  EyeOff,
+  Pin,
+  PinOff,
+  Volume1,
+  Volume2 as Volume2Icon,
+  Headphones,
+  HeadphoneOff as HeadphonesOff,
+  Shield,
+  ShieldCheck,
+  Lock,
+  Unlock,
+  Clock,
+  Timer,
+  Zap,
+  ZapOff,
+  Star,
+  StarOff
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -69,6 +97,24 @@ export default function MeetRoom() {
   const [recordingUrl, setRecordingUrl] = useState<string>('');
   const [recordingSize, setRecordingSize] = useState<number>(0);
   
+  // Enhanced Google Meet-like features
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{id: string, user: string, message: string, timestamp: Date}>>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set());
+  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'speaker' | 'spotlight'>('grid');
+  const [pinnedParticipant, setPinnedParticipant] = useState<string | null>(null);
+  const [isMeetingLocked, setIsMeetingLocked] = useState(false);
+  const [meetingTimer, setMeetingTimer] = useState(0);
+  const [isNoiseSuppression, setIsNoiseSuppression] = useState(true);
+  const [isEchoCancellation, setIsEchoCancellation] = useState(true);
+  const [isAutoGainControl, setIsAutoGainControl] = useState(true);
+  const [isHDVideo, setIsHDVideo] = useState(true);
+  const [participantNames, setParticipantNames] = useState<Record<string, string>>({});
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [meetingStartTime] = useState(new Date());
+  
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
@@ -85,6 +131,8 @@ export default function MeetRoom() {
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingRef = useRef(false);
   const playPromiseRef = useRef<Promise<void> | null>(null);
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+  const meetingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const wsUrl = useMemo(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -382,6 +430,33 @@ export default function MeetRoom() {
             const fromId = msg.from;
           const signal = msg.signal;
             await handleSignal(fromId, signal);
+          }
+          
+          // Handle chat messages
+          if (msg.type === 'chat') {
+            const message = {
+              id: Date.now().toString(),
+              user: `Participant ${msg.from?.slice(-4) || 'Unknown'}`,
+              message: msg.message || '',
+              timestamp: new Date()
+            };
+            setChatMessages(prev => [...prev, message]);
+          }
+          
+          // Handle hand raising
+          if (msg.type === 'hand-raise') {
+            const participantId = msg.from;
+            const isRaised = msg.raised;
+            
+            setRaisedHands(prev => {
+              const newSet = new Set(prev);
+              if (isRaised) {
+                newSet.add(participantId);
+              } else {
+                newSet.delete(participantId);
+              }
+              return newSet;
+            });
           }
         } catch (err) {
           console.error('Error handling WebSocket message:', err);
@@ -691,6 +766,34 @@ export default function MeetRoom() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showDeviceSettings]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
+
+  // Start meeting timer when connected
+  useEffect(() => {
+    if (isConnected && !meetingTimerRef.current) {
+      startMeetingTimer();
+    }
+    
+    return () => {
+      if (meetingTimerRef.current) {
+        clearInterval(meetingTimerRef.current);
+        meetingTimerRef.current = null;
+      }
+    };
+  }, [isConnected]);
+
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (isChatOpen && chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, isChatOpen]);
 
 
   const handleLeaveMeeting = async () => {
@@ -1047,6 +1150,133 @@ export default function MeetRoom() {
     toast.info('Recording discarded');
   };
 
+  // Enhanced Google Meet-like features
+  
+  // Chat functionality
+  const sendChatMessage = () => {
+    if (!newMessage.trim() || !wsRef.current) return;
+    
+    const message = {
+      id: Date.now().toString(),
+      user: 'You',
+      message: newMessage.trim(),
+      timestamp: new Date()
+    };
+    
+    setChatMessages(prev => [...prev, message]);
+    setNewMessage('');
+    
+    // Broadcast to other participants
+    wsRef.current.send(JSON.stringify({
+      type: 'chat',
+      code,
+      payload: { message: newMessage.trim() }
+    }));
+    
+    toast.success('Message sent');
+  };
+
+  // Hand raising functionality
+  const toggleHandRaise = () => {
+    if (!wsRef.current) return;
+    
+    const newHandRaised = !isHandRaised;
+    setIsHandRaised(newHandRaised);
+    
+    if (newHandRaised) {
+      setRaisedHands(prev => new Set([...prev, 'You']));
+      toast.info('Hand raised');
+    } else {
+      setRaisedHands(prev => {
+        const newSet = new Set(prev);
+        newSet.delete('You');
+        return newSet;
+      });
+      toast.info('Hand lowered');
+    }
+    
+    // Broadcast hand raise status
+    wsRef.current.send(JSON.stringify({
+      type: 'hand-raise',
+      code,
+      payload: { raised: newHandRaised }
+    }));
+  };
+
+  // View mode switching
+  const switchViewMode = (mode: 'grid' | 'speaker' | 'spotlight') => {
+    setViewMode(mode);
+    toast.success(`Switched to ${mode} view`);
+  };
+
+  // Pin participant
+  const togglePinParticipant = (participantId: string) => {
+    if (pinnedParticipant === participantId) {
+      setPinnedParticipant(null);
+      toast.info('Participant unpinned');
+    } else {
+      setPinnedParticipant(participantId);
+      toast.info('Participant pinned');
+    }
+  };
+
+  // Meeting timer
+  const startMeetingTimer = () => {
+    meetingTimerRef.current = setInterval(() => {
+      setMeetingTimer(prev => prev + 1);
+    }, 1000);
+  };
+
+  // Enhanced device settings with audio processing
+  const updateAudioSettings = async () => {
+    if (!localStream) return;
+    
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          width: { ideal: isHDVideo ? 1920 : 1280, min: 640 },
+          height: { ideal: isHDVideo ? 1080 : 720, min: 480 },
+          frameRate: { ideal: 30, min: 15 },
+          deviceId: selectedVideoDevice ? { exact: selectedVideoDevice } : undefined
+        },
+        audio: {
+          echoCancellation: isEchoCancellation,
+          noiseSuppression: isNoiseSuppression,
+          autoGainControl: isAutoGainControl,
+          sampleRate: 48000,
+          deviceId: selectedAudioDevice ? { exact: selectedAudioDevice } : undefined
+        }
+      });
+
+      // Update peer connections
+      const audioTrack = newStream.getAudioTracks()[0];
+      Object.values(peersRef.current).forEach(peer => {
+        const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+        if (sender) {
+          sender.replaceTrack(audioTrack);
+        }
+      });
+
+      setLocalStream(newStream);
+      toast.success('Audio settings updated');
+    } catch (err) {
+      console.error('Error updating audio settings:', err);
+      toast.error('Failed to update audio settings');
+    }
+  };
+
+  // Format meeting time
+  const formatMeetingTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
   // Reset meeting state
   const resetMeeting = () => {
     isInitialized.current = false;
@@ -1062,6 +1292,19 @@ export default function MeetRoom() {
     setAudioLevel(0);
     setIsRecording(false);
     setRecordingTime(0);
+    
+    // Reset enhanced features
+    setIsChatOpen(false);
+    setChatMessages([]);
+    setNewMessage('');
+    setRaisedHands(new Set());
+    setIsHandRaised(false);
+    setViewMode('grid');
+    setPinnedParticipant(null);
+    setIsMeetingLocked(false);
+    setMeetingTimer(0);
+    setParticipantNames({});
+    setShowParticipants(false);
   };
 
 
@@ -1142,6 +1385,13 @@ export default function MeetRoom() {
               </div>
               
               <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg">
+                <Clock className="h-4 w-4 text-gray-300" />
+                <span className="text-gray-200 font-medium font-mono">
+                  {formatMeetingTime(meetingTimer)}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg">
                 <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
                 <span className="text-gray-200 font-medium">
                   {isConnected ? 'Connected' : 'Disconnected'}
@@ -1157,6 +1407,22 @@ export default function MeetRoom() {
                   </div>
                 )}
               </div>
+              
+              {raisedHands.size > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-600/20 rounded-lg border border-yellow-500/30">
+                  <Hand className="h-4 w-4 text-yellow-400" />
+                  <span className="text-yellow-200 font-medium">
+                    {raisedHands.size} hand{raisedHands.size !== 1 ? 's' : ''} raised
+                  </span>
+                </div>
+              )}
+              
+              {isMeetingLocked && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 rounded-lg border border-red-500/30">
+                  <Lock className="h-4 w-4 text-red-400" />
+                  <span className="text-red-200 font-medium">Meeting Locked</span>
+                </div>
+              )}
             </div>
           </div>
           
@@ -1183,9 +1449,11 @@ export default function MeetRoom() {
       </div>
 
       {/* Video Grid */}
-      <div className="flex-1 p-6 pb-24">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] lg:[grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
+      <div className={`flex-1 p-6 pb-24 transition-all duration-300 ${isChatOpen ? 'pr-0' : ''}`}>
+        <div className="max-w-7xl mx-auto flex gap-6">
+          {/* Main video area */}
+          <div className={`flex-1 transition-all duration-300 ${isChatOpen ? 'max-w-4xl' : ''}`}>
+            <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] lg:[grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
             {/* Local Video */}
             <div className="group relative aspect-video bg-gray-800/50 rounded-2xl overflow-hidden border border-gray-600/50 hover:border-blue-500/50 transition-all duration-300 shadow-2xl hover:shadow-blue-500/10">
               <video
@@ -1338,7 +1606,76 @@ export default function MeetRoom() {
                 )}
               </div>
             ))}
+            </div>
           </div>
+          
+          {/* Chat Panel */}
+          {isChatOpen && (
+            <div className="w-80 bg-gray-800/95 backdrop-blur-sm border-l border-gray-700/50 flex flex-col h-[calc(100vh-200px)]">
+              <div className="p-4 border-b border-gray-700/50">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white">Chat</h3>
+                  <Button
+                    onClick={() => setIsChatOpen(false)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-white"
+                  >
+                    ×
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-400 mt-1">
+                  {Object.keys(peers).length + 1} participant{(Object.keys(peers).length + 1) !== 1 ? 's' : ''}
+                </p>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {chatMessages.length === 0 ? (
+                  <div className="text-center text-gray-400 py-8">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No messages yet</p>
+                    <p className="text-sm">Start a conversation!</p>
+                  </div>
+                ) : (
+                  chatMessages.map((message) => (
+                    <div key={message.id} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-blue-400">{message.user}</span>
+                        <span className="text-xs text-gray-500">
+                          {message.timestamp.toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-gray-200 text-sm bg-gray-700/50 rounded-lg p-2">
+                        {message.message}
+                      </p>
+                    </div>
+                  ))
+                )}
+                <div ref={chatMessagesEndRef} />
+              </div>
+              
+              <div className="p-4 border-t border-gray-700/50">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+                    placeholder="Type a message..."
+                    className="flex-1 bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  />
+                  <Button
+                    onClick={sendChatMessage}
+                    disabled={!newMessage.trim()}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Send
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1430,6 +1767,34 @@ export default function MeetRoom() {
             >
               {isRecording ? <Square className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
             </Button>
+            
+            <Button
+              onClick={toggleHandRaise}
+              variant={isHandRaised ? 'default' : 'outline'}
+              size="lg"
+              className={`rounded-full w-14 h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                isHandRaised 
+                  ? 'bg-yellow-600 hover:bg-yellow-700 shadow-lg hover:shadow-yellow-500/25' 
+                  : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+              }`}
+              title={isHandRaised ? 'Lower hand' : 'Raise hand'}
+            >
+              {isHandRaised ? <Hand className="h-6 w-6 fill-current" /> : <Hand className="h-6 w-6" />}
+            </Button>
+            
+            <Button
+              onClick={() => setIsChatOpen(!isChatOpen)}
+              variant={isChatOpen ? 'default' : 'outline'}
+              size="lg"
+              className={`rounded-full w-14 h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                isChatOpen 
+                  ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-blue-500/25' 
+                  : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+              }`}
+              title={isChatOpen ? 'Close chat' : 'Open chat'}
+            >
+              {isChatOpen ? <MessageSquareOff className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
+            </Button>
           </div>
 
           {/* Right: actions */}
@@ -1456,7 +1821,7 @@ export default function MeetRoom() {
               </Button>
               
               {showDeviceSettings && (
-                <div className="absolute bottom-16 right-0 bg-gray-800/95 backdrop-blur-sm rounded-xl p-6 min-w-72 shadow-2xl border border-gray-700/50">
+                <div className="absolute bottom-16 right-0 bg-gray-800/95 backdrop-blur-sm rounded-xl p-6 min-w-80 shadow-2xl border border-gray-700/50 max-h-96 overflow-y-auto">
                   <h3 className="text-lg font-semibold text-white mb-4">Device Settings</h3>
                   <div className="space-y-4">
                     <div>
@@ -1491,6 +1856,76 @@ export default function MeetRoom() {
                             </option>
                           ))}
                       </select>
+                    </div>
+                    
+                    {/* Audio Processing Settings */}
+                    <div className="border-t border-gray-600/50 pt-4">
+                      <h4 className="text-sm font-medium text-gray-300 mb-3">Audio Processing</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-300">Noise Suppression</span>
+                          <Button
+                            onClick={() => {
+                              setIsNoiseSuppression(!isNoiseSuppression);
+                              updateAudioSettings();
+                            }}
+                            variant={isNoiseSuppression ? "default" : "outline"}
+                            size="sm"
+                            className="text-xs"
+                          >
+                            {isNoiseSuppression ? "On" : "Off"}
+                          </Button>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-300">Echo Cancellation</span>
+                          <Button
+                            onClick={() => {
+                              setIsEchoCancellation(!isEchoCancellation);
+                              updateAudioSettings();
+                            }}
+                            variant={isEchoCancellation ? "default" : "outline"}
+                            size="sm"
+                            className="text-xs"
+                          >
+                            {isEchoCancellation ? "On" : "Off"}
+                          </Button>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-300">Auto Gain Control</span>
+                          <Button
+                            onClick={() => {
+                              setIsAutoGainControl(!isAutoGainControl);
+                              updateAudioSettings();
+                            }}
+                            variant={isAutoGainControl ? "default" : "outline"}
+                            size="sm"
+                            className="text-xs"
+                          >
+                            {isAutoGainControl ? "On" : "Off"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Video Quality Settings */}
+                    <div className="border-t border-gray-600/50 pt-4">
+                      <h4 className="text-sm font-medium text-gray-300 mb-3">Video Quality</h4>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-300">HD Video</span>
+                        <Button
+                          onClick={() => {
+                            setIsHDVideo(!isHDVideo);
+                            updateAudioSettings();
+                          }}
+                          variant={isHDVideo ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                        >
+                          {isHDVideo ? "On" : "Off"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
