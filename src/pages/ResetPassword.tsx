@@ -7,6 +7,7 @@ import { BugIcon, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle } from "lucide
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
+import { ENV } from "@/lib/env";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
@@ -33,7 +34,7 @@ const ResetPassword = () => {
       }
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://bugbackend.bugricer.com/api'}/auth/verify_reset_token.php`, {
+        const response = await fetch(`${ENV.API_URL}/auth/verify_reset_token.php`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -75,7 +76,7 @@ const ResetPassword = () => {
     setError("");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://bugbackend.bugricer.com/api'}/auth/reset_password.php`, {
+      const response = await fetch(`${ENV.API_URL}/auth/reset_password.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

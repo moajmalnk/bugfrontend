@@ -12,7 +12,7 @@ const getApiUrl = () => {
   
   // Auto-detect based on current URL
   if (isLocalhost) {
-    return 'http://localhost/BugRicer/backend/api';
+    return 'http://localhost:8080/BugRicer/api';
   }
   
   // Production detection - check if we're on the bug tracker domain
@@ -52,8 +52,8 @@ export const validateEnv = () => {
   return true;
 };
 
-// Local: http://localhost/BugRicer/backend/api/auth
+// Local: http://localhost:8080/BugRicer/api/auth
 // Production: https://bugsbackend.moajmalnk.in/api/auth
 export const API_BASE_URL = isLocalhost
-  ? "http://localhost/BugRicer/backend/api/auth"
+  ? "http://localhost:8080/BugRicer/api/auth"
   : "https://bugbackend.bugricer.com/api/auth";
