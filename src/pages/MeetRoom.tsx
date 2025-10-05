@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { joinMeeting, leaveMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { WS_URL } from "@/lib/env";
 import { 
   Video, 
   VideoOff, 
@@ -135,10 +136,7 @@ export default function MeetRoom() {
   const meetingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const wsUrl = useMemo(() => {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = location.hostname;
-    const port = 8089;
-    return `${proto}://${host}:${port}`;
+    return WS_URL;
   }, []);
 
   // Debug video element state

@@ -57,3 +57,31 @@ export const validateEnv = () => {
 export const API_BASE_URL = isLocalhost
   ? "http://localhost/BugRicer/backend/api/auth"
   : "https://bugbackend.bugricer.com/api/auth";
+
+// WebSocket URL configuration
+export const getWebSocketUrl = () => {
+  // Check for environment variable first
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL;
+  }
+  
+  // Auto-detect based on current URL
+  if (isLocalhost) {
+    return 'ws://localhost:8089';
+  }
+  
+  // Production detection - check if we're on the bug tracker domain
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname.includes('bugs.moajmalnk.in') || hostname.includes('bugricer.com') || hostname.includes('bugs.bugricer.com')) {
+      // For production, we'll use the same domain with port 8089
+      // This assumes the signaling server is deployed on the same server
+      return `wss://${hostname}:8089`;
+    }
+  }
+  
+  // Default production fallback
+  return 'wss://bugs.bugricer.com:8089';
+};
+
+export const WS_URL = getWebSocketUrl();
