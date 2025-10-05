@@ -1,6 +1,6 @@
-import { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { AuthProvider } from '@/context/AuthContext';
 import { BugProvider } from '@/context/BugContext';
 import { ThemeProvider } from '@/context/ThemeContext';
@@ -17,13 +17,13 @@ interface AppProvidersProps {
 export const CoreProviders = ({ children, queryClient }: AppProvidersProps) => {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ThemeProvider>
+      <ThemeProvider>
+        <TooltipPrimitive.Provider>
           <Toaster />
           <Sonner />
           {children}
-        </ThemeProvider>
-      </TooltipProvider>
+        </TooltipPrimitive.Provider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };

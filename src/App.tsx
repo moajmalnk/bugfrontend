@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { PrivacyOverlay } from "@/components/PrivacyOverlay";
 import AppProviders, { CoreProviders, RouterProviders } from "@/components/providers/AppProviders";
@@ -6,7 +7,6 @@ import { initOfflineDetector } from "@/lib/offline";
 import { initializeServiceWorker, serviceWorkerManager } from "@/lib/serviceWorkerManager";
 import { initDevUtils } from "@/lib/devUtils";
 import { QueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 import { BrowserRouter as Router } from "react-router-dom";
 import { requestNotificationPermission } from "./firebase-messaging-sw";
 import ContextMenu from "./components/ContextMenu";
