@@ -20,6 +20,7 @@ import {
   AtSign,
   Bug,
   Calendar,
+  Clock,
   Code2,
   ExternalLink,
   Loader2,
@@ -32,6 +33,7 @@ import { useState } from "react";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
+import { UserWorkStats } from "./UserWorkStats";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -341,9 +343,18 @@ export function UserDetailDialog({
             )}
           </div>
 
-          {/* Stats */}
+          {/* Work Statistics */}
           <div>
-            <h4 className="text-lg font-semibold mb-3">User Statistics</h4>
+            <h4 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-blue-500" />
+              Work Statistics
+            </h4>
+            <UserWorkStats userId={user.id} showTrend={true} />
+          </div>
+
+          {/* Project & Bug Stats */}
+          <div>
+            <h4 className="text-lg font-semibold mb-3">Project & Bug Statistics</h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted/30 rounded-lg p-4 flex flex-col items-center justify-center shadow-sm">
                 <p className="text-sm text-muted-foreground mb-1">

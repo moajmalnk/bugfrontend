@@ -14,6 +14,8 @@ import {
   Settings,
   Users,
   X,
+  FileText,
+  ListTodo,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -140,6 +142,22 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               icon={<Bell className="h-5 w-5" />}
               label="Updates"
             />
+            
+            {/* Daily Update & My Tasks - Only for Admins and Developers */}
+            {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+              <>
+                <NavLink
+                  to="/daily-update"
+                  icon={<FileText className="h-5 w-5" />}
+                  label="Daily Update"
+                />
+                <NavLink
+                  to="/my-tasks"
+                  icon={<ListTodo className="h-5 w-5" />}
+                  label="My Tasks"
+                />
+              </>
+            )}
           </div>
 
           {/* Admin Section */}

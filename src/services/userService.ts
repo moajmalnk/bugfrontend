@@ -122,6 +122,14 @@ class UserService {
     return response.data; // Assuming response.data contains the UserStats object
   }
 
+  async getUserWorkStats(userId: string): Promise<any> {
+    const response = await this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?id=${userId}`);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch work statistics');
+    }
+    return response.data;
+  }
+
   async deleteUser(userId: string, force = false): Promise<boolean> {
     const token = localStorage.getItem('token');
     const url = `${this.baseUrl}/delete.php?id=${userId}${force ? '&force=true' : ''}`;
