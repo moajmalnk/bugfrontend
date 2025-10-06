@@ -102,7 +102,7 @@ function UpdateNotificationModal({ show, onAccept, onDismiss }: {
           color: "#6b7280",
           lineHeight: 1.6
         }}>
-          A new version of Bugricer is ready with improvements and bug fixes.
+          A new version of BugRicer is ready with improvements and bug fixes.
           Would you like to update now?
         </p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>

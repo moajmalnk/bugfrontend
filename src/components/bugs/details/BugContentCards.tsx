@@ -33,7 +33,7 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
 
   // Robust media URL helpers (use PHP endpoints to avoid CORS and set headers)
   const apiBaseUrl =
-    import.meta.env.VITE_API_URL || "http://localhost/Bugricer/backend/api";
+    import.meta.env.VITE_API_URL || "http://localhost/BugRicer/backend/api";
 
   const buildImageUrl = (path: string) =>
     /^https?:\/\//i.test(path)

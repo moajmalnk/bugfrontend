@@ -167,7 +167,7 @@ export function initDevUtils(): void {
     window.__SW_DEBUG__ = false;
     
     console.log(`
-🚀 Bugricer Development Mode
+🚀 BugRicer Development Mode
 
 Type __DEV_UTILS__.help() in the // console for available commands.
 
