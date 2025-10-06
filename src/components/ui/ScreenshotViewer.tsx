@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/use-toast";
@@ -67,6 +67,7 @@ export function ScreenshotViewer({
     null
   );
   const [touchStartTime, setTouchStartTime] = useState<number>(0);
+  const [lastTapTime, setLastTapTime] = useState<number>(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(
     null
@@ -95,63 +96,6 @@ export function ScreenshotViewer({
     }
   }, [open, initialIndex]);
 
-  // Handle keyboard navigation
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "ArrowLeft":
-          e.preventDefault();
-          goToPrevious();
-          break;
-        case "ArrowRight":
-          e.preventDefault();
-          goToNext();
-          break;
-        case "Escape":
-          e.preventDefault();
-          handleClose();
-          break;
-        case "+":
-        case "=":
-          e.preventDefault();
-          zoomIn();
-          break;
-        case "-":
-          e.preventDefault();
-          zoomOut();
-          break;
-        case "0":
-          e.preventDefault();
-          resetZoom();
-          break;
-        case "r":
-          e.preventDefault();
-          rotateRight();
-          break;
-        case "l":
-          e.preventDefault();
-          rotateLeft();
-          break;
-        case "f":
-          e.preventDefault();
-          toggleFullscreen();
-          break;
-        case "i":
-          e.preventDefault();
-          setShowInfo(!showInfo);
-          break;
-        case "z":
-          e.preventDefault();
-          setShowZoomSlider(!showZoomSlider);
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, showInfo, showZoomSlider]);
 
   // Handle fullscreen changes
   useEffect(() => {
@@ -164,57 +108,40 @@ export function ScreenshotViewer({
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
-  // Debug: Log when zoom or rotation changes
-  useEffect(() => {
-    if (open) {
-      console.log("Transform updated:", {
-        zoomLevel,
-        rotation,
-        imagePosition,
-        transform: `scale(${
-          zoomLevel / 100
-        }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
-          imagePosition.y
-        }px)`,
-      });
-    }
-  }, [zoomLevel, rotation, imagePosition, open]);
 
   const currentScreenshot = screenshots[currentIndex];
-  const imageUrl = `${import.meta.env.VITE_API_URL?.replace("/api", "")}/${
-    currentScreenshot.file_path
-  }`;
+  const imageUrl = `${import.meta.env.VITE_API_URL}/image.php?path=${encodeURIComponent(currentScreenshot.file_path)}`;
 
-  const goToPrevious = () => {
+  const goToPrevious = useCallback(() => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : screenshots.length - 1));
-  };
+  }, [screenshots.length]);
 
-  const goToNext = () => {
+  const goToNext = useCallback(() => {
     setCurrentIndex((prev) => (prev < screenshots.length - 1 ? prev + 1 : 0));
-  };
+  }, [screenshots.length]);
 
   // Enhanced zoom functions with smooth transitions
-  const zoomIn = () => {
+  const zoomIn = useCallback(() => {
     setZoomLevel((prev) => {
       const newZoom = Math.min(prev + 25, 500);
       console.log("Zooming in from", prev, "to", newZoom);
       return newZoom;
     });
-  };
+  }, []);
 
-  const zoomOut = () => {
+  const zoomOut = useCallback(() => {
     setZoomLevel((prev) => {
       const newZoom = Math.max(prev - 25, 25);
       console.log("Zooming out from", prev, "to", newZoom);
       return newZoom;
     });
-  };
+  }, []);
 
-  const resetZoom = () => {
+  const resetZoom = useCallback(() => {
     setZoomLevel(100);
     setImagePosition({ x: 0, y: 0 });
     console.log("Reset zoom to 100%");
-  };
+  }, []);
 
   const handleZoomChange = useCallback((value: number[]) => {
     setZoomLevel(value[0]);
@@ -233,15 +160,68 @@ export function ScreenshotViewer({
     setRotation(0);
   }, []);
 
-  // Mouse wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      zoomIn();
-    } else {
-      zoomOut();
+  // Mouse wheel zoom with native event listener
+  useEffect(() => {
+    if (!open) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.deltaY < 0) {
+        setZoomLevel((prev) => {
+          const newZoom = Math.min(prev + 25, 500);
+          console.log("Zooming in from", prev, "to", newZoom);
+          return newZoom;
+        });
+      } else {
+        setZoomLevel((prev) => {
+          const newZoom = Math.max(prev - 25, 25);
+          console.log("Zooming out from", prev, "to", newZoom);
+          return newZoom;
+        });
+      }
+    };
+
+    // Add native wheel event listener with passive: false
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('wheel', handleWheel, { passive: false });
+      return () => {
+        container.removeEventListener('wheel', handleWheel);
+      };
     }
-  }, []);
+  }, [open]);
+
+  // Additional wheel event listener for image display area
+  useEffect(() => {
+    if (!open) return;
+
+    const handleImageAreaWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.deltaY < 0) {
+        setZoomLevel((prev) => {
+          const newZoom = Math.min(prev + 25, 500);
+          console.log("Zooming in from", prev, "to", newZoom);
+          return newZoom;
+        });
+      } else {
+        setZoomLevel((prev) => {
+          const newZoom = Math.max(prev - 25, 25);
+          console.log("Zooming out from", prev, "to", newZoom);
+          return newZoom;
+        });
+      }
+    };
+
+    const imageArea = imageContainerRef.current;
+    if (imageArea) {
+      imageArea.addEventListener('wheel', handleImageAreaWheel, { passive: false });
+      return () => {
+        imageArea.removeEventListener('wheel', handleImageAreaWheel);
+      };
+    }
+  }, [open]);
 
   // Mouse drag for panning when zoomed
   const handleMouseDown = useCallback(
@@ -262,6 +242,7 @@ export function ScreenshotViewer({
       if (isDragging && dragStart && zoomLevel > 100) {
         const newX = e.clientX - dragStart.x;
         const newY = e.clientY - dragStart.y;
+        
         setImagePosition({ x: newX, y: newY });
       }
     },
@@ -272,6 +253,10 @@ export function ScreenshotViewer({
     setIsDragging(false);
     setDragStart(null);
   }, []);
+
+  const handleDoubleClick = useCallback(() => {
+    resetZoom();
+  }, [resetZoom]);
 
   // Touch gesture handling with pinch zoom
   const [pinchStart, setPinchStart] = useState<{
@@ -288,9 +273,21 @@ export function ScreenshotViewer({
       );
       setPinchStart({ distance, zoom: zoomLevel });
     } else if (e.touches.length === 1) {
-      // Single touch for navigation
+      // Single touch for navigation and double-tap
+      const currentTime = Date.now();
+      const tapLength = currentTime - lastTapTime;
+      
       setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-      setTouchStartTime(Date.now());
+      setTouchStartTime(currentTime);
+      
+      // Check for double tap (within 300ms)
+      if (tapLength < 300 && tapLength > 0) {
+        // Double tap - reset zoom
+        resetZoom();
+        setLastTapTime(0); // Reset to prevent triple tap
+      } else {
+        setLastTapTime(currentTime);
+      }
     }
   };
 
@@ -304,6 +301,13 @@ export function ScreenshotViewer({
       const scale = distance / pinchStart.distance;
       const newZoom = Math.max(25, Math.min(500, pinchStart.zoom * scale));
       setZoomLevel(newZoom);
+    } else if (e.touches.length === 1 && touchStart && zoomLevel > 100) {
+      // Handle single finger pan
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - touchStart.x;
+      const deltaY = touch.clientY - touchStart.y;
+      
+      setImagePosition({ x: deltaX, y: deltaY });
     }
   };
 
@@ -337,7 +341,7 @@ export function ScreenshotViewer({
     }
   };
 
-  const toggleFullscreen = async () => {
+  const toggleFullscreen = useCallback(async () => {
     try {
       if (!document.fullscreenElement) {
         await containerRef.current?.requestFullscreen();
@@ -347,32 +351,57 @@ export function ScreenshotViewer({
     } catch (error) {
       console.error("Fullscreen error:", error);
     }
-  };
+  }, []);
 
-  const downloadScreenshot = () => {
-    const link = document.createElement("a");
-    link.href = imageUrl;
-    link.download = currentScreenshot.file_name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const downloadScreenshot = useCallback(() => {
+    try {
+      // Use the proper API endpoint for downloading
+      const downloadUrl = `${import.meta.env.VITE_API_URL}/get_attachment.php?path=${encodeURIComponent(currentScreenshot.file_path)}&name=${encodeURIComponent(currentScreenshot.file_name)}${bug_id ? `&bug_id=${encodeURIComponent(bug_id)}` : ''}`;
+      
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = currentScreenshot.file_name;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download Error",
+        description: "Failed to download screenshot. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [currentScreenshot, bug_id]);
 
-  const copyScreenshot = async () => {
+  const copyScreenshot = useCallback(async () => {
     try {
       const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const blob = await response.blob();
       await navigator.clipboard.write([
         new ClipboardItem({
           [blob.type]: blob,
         }),
       ]);
+      toast({
+        title: "Copied",
+        description: "Screenshot copied to clipboard",
+      });
     } catch (error) {
       console.error("Failed to copy screenshot:", error);
+      toast({
+        title: "Copy Error",
+        description: "Failed to copy screenshot to clipboard",
+        variant: "destructive",
+      });
     }
-  };
+  }, [imageUrl]);
 
-  const shareScreenshot = async () => {
+  const shareScreenshot = useCallback(async () => {
     try {
       if (navigator.share) {
         await navigator.share({
@@ -385,23 +414,50 @@ export function ScreenshotViewer({
       }
     } catch (error) {
       console.error("Failed to share screenshot:", error);
+      toast({
+        title: "Share Error",
+        description: "Failed to share screenshot",
+        variant: "destructive",
+      });
     }
-  };
+  }, [imageUrl, currentScreenshot.file_name, copyScreenshot]);
 
-  const printScreenshot = () => {
-    const printWindow = window.open(imageUrl, "_blank");
-    if (printWindow) {
-      printWindow.onload = () => {
-        printWindow.print();
-      };
+  const printScreenshot = useCallback(() => {
+    try {
+      const printWindow = window.open(imageUrl, "_blank");
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+        printWindow.onerror = () => {
+          toast({
+            title: "Print Error",
+            description: "Failed to open print dialog",
+            variant: "destructive",
+          });
+        };
+      } else {
+        toast({
+          title: "Print Error",
+          description: "Failed to open print window. Please check popup blockers.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Print error:", error);
+      toast({
+        title: "Print Error",
+        description: "Failed to print screenshot",
+        variant: "destructive",
+      });
     }
-  };
+  }, [imageUrl]);
 
-  const deleteScreenshot = () => {
+  const deleteScreenshot = useCallback(() => {
     setShowDeleteDialog(true);
-  };
+  }, []);
 
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     try {
       // Close the delete dialog
       setShowDeleteDialog(false);
@@ -486,9 +542,9 @@ export function ScreenshotViewer({
         variant: "destructive",
       });
     }
-  };
+  }, [currentScreenshot, bug_id, screenshots, currentIndex, onScreenshotDelete, onOpenChange]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setCurrentIndex(initialIndex);
     setZoomLevel(100);
     setRotation(0);
@@ -498,66 +554,259 @@ export function ScreenshotViewer({
     setShowZoomSlider(false);
     setShowDeleteDialog(false);
     onOpenChange(false);
-  };
+  }, [initialIndex, onOpenChange]);
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case "ArrowLeft":
+          e.preventDefault();
+          goToPrevious();
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          goToNext();
+          break;
+        case "Escape":
+          e.preventDefault();
+          handleClose();
+          break;
+        case "+":
+        case "=":
+          e.preventDefault();
+          zoomIn();
+          break;
+        case "-":
+          e.preventDefault();
+          zoomOut();
+          break;
+        case "0":
+          e.preventDefault();
+          resetZoom();
+          break;
+        case "r":
+          e.preventDefault();
+          rotateRight();
+          break;
+        case "l":
+          e.preventDefault();
+          rotateLeft();
+          break;
+        case "f":
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case "i":
+          e.preventDefault();
+          setShowInfo(!showInfo);
+          break;
+        case "z":
+          e.preventDefault();
+          setShowZoomSlider(!showZoomSlider);
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, showInfo, showZoomSlider, goToPrevious, goToNext, zoomIn, zoomOut, resetZoom, rotateRight, rotateLeft, toggleFullscreen, handleClose]);
 
   // Get image dimensions for responsive display
   const getImageDimensions = () => {
-    // Use the FULL available space for both width and height
-    const availableWidth = window.innerWidth * 0.98; // Use 98% of viewport width
-    const availableHeight = window.innerHeight * 0.98; // Use 98% of viewport height (even more aggressive!)
+    // Use the FULL available space for both width and height - MAXIMIZE dialog space
+    const availableWidth = window.innerWidth * 0.98; // Use 98% of viewport width (maximize dialog space)
+    const availableHeight = window.innerHeight * 0.95; // Use 95% of viewport height (maximize dialog space)
 
-    // For mobile screenshots, prioritize height to fill the bottom space
-    // Use a more realistic mobile aspect ratio (9:16 instead of 16:9)
-    const mobileAspectRatio = 9 / 16; // Height is 1.78x the width (typical mobile)
-
-    // Calculate dimensions based on mobile aspect ratio
-    const widthBasedHeight = availableWidth * mobileAspectRatio;
-    const heightBasedWidth = availableHeight / mobileAspectRatio;
-
+    // Prioritize height while maintaining reasonable width constraints
+    // Use more flexible aspect ratios to allow taller containers
     let width, height;
 
-    // For mobile screenshots, prioritize height to eliminate bottom empty space
-    if (heightBasedWidth <= availableWidth) {
-      // Height constraint is tighter - use full height
-      height = availableHeight;
-      width = heightBasedWidth;
+    // Detect device type for responsive sizing
+    const isMobile = window.innerWidth < 768;
+    const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
+    const isDesktop = window.innerWidth >= 1024;
+
+    // Define device-specific constraints
+    let maxWidth, maxHeight, minWidth, minHeight, targetAspectRatio;
+
+    if (isMobile) {
+      // Mobile: MAXIMIZE space usage
+      maxWidth = availableWidth;
+      maxHeight = availableHeight;
+      minWidth = 280;
+      minHeight = 350;
+      targetAspectRatio = 4 / 3; // More square-ish for mobile
+    } else if (isTablet) {
+      // Tablet: MAXIMIZE space usage
+      maxWidth = availableWidth;
+      maxHeight = availableHeight;
+      minWidth = 450;
+      minHeight = 450;
+      targetAspectRatio = 3 / 2; // Slightly taller
     } else {
-      // Width constraint is tighter - use full width
-      width = availableWidth;
-      height = widthBasedHeight;
+      // Desktop: MAXIMIZE space usage
+      maxWidth = availableWidth;
+      maxHeight = availableHeight;
+      minWidth = 550;
+      minHeight = 550;
+      targetAspectRatio = 5 / 4; // Even taller for desktop
     }
 
-    // Ensure we're using maximum possible space
-    // This should eliminate empty space on both sides AND bottom
+    // Calculate dimensions prioritizing height
+    const heightBasedWidth = maxHeight * targetAspectRatio;
+    const widthBasedHeight = maxWidth / targetAspectRatio;
+
+    // Choose the approach that gives us more height
+    if (heightBasedWidth <= maxWidth) {
+      // Height constraint - use more height
+      height = maxHeight;
+      width = Math.min(heightBasedWidth, maxWidth);
+    } else {
+      // Width constraint - but still try to maximize height
+      width = maxWidth;
+      height = Math.min(widthBasedHeight, maxHeight);
+    }
+
+    // Apply minimum constraints
+    if (width < minWidth) {
+      width = minWidth;
+      height = Math.max(height, minHeight);
+    }
+    
+    if (height < minHeight) {
+      height = minHeight;
+      width = Math.max(width, minWidth);
+    }
+
+    // Account for rotation - when rotated 90° or 270°, dimensions are swapped
+    // We need to ensure the rotated image fits within the container
+    const isRotated = rotation === 90 || rotation === 270;
+    if (isRotated) {
+      // When rotated, the image's effective width becomes height and vice versa
+      // We need to ensure that when rotated, it still fits in the container
+      const maxDimension = Math.min(availableWidth, availableHeight);
+      const minDimension = Math.min(width, height);
+      
+      // Scale down if necessary to fit within container when rotated
+      if (maxDimension < Math.max(width, height)) {
+        const scale = maxDimension / Math.max(width, height);
+        width *= scale;
+        height *= scale;
+      }
+    }
+
+    // Additional safety check: ensure image never exceeds container bounds
+    // This prevents overflow even at maximum zoom (500%)
+    const maxZoomScale = 5; // 500% zoom
+    const maxAllowedWidth = availableWidth / maxZoomScale;
+    const maxAllowedHeight = availableHeight / maxZoomScale;
+    
+    if (width > maxAllowedWidth) {
+      const scale = maxAllowedWidth / width;
+      width *= scale;
+      height *= scale;
+    }
+    
+    if (height > maxAllowedHeight) {
+      const scale = maxAllowedHeight / height;
+      width *= scale;
+      height *= scale;
+    }
+
     return { width, height };
   };
 
   const { width, height } = getImageDimensions();
 
+  // Helper function to constrain image position within container bounds
+  const constrainImagePosition = useCallback((x: number, y: number) => {
+    if (zoomLevel <= 100) return { x: 0, y: 0 };
+    
+    // Calculate the scaled dimensions of the image
+    const scaledWidth = width * (zoomLevel / 100);
+    const scaledHeight = height * (zoomLevel / 100);
+    
+    // Get container bounds (accounting for dialog padding)
+    const containerWidth = window.innerWidth * 0.98;
+    const containerHeight = window.innerHeight * 0.95;
+    
+    // Calculate maximum allowed positions to keep image within bounds
+    const maxX = Math.max(0, (scaledWidth - containerWidth) / 2);
+    const maxY = Math.max(0, (scaledHeight - containerHeight) / 2);
+    const minX = -maxX;
+    const minY = -maxY;
+    
+    // Constrain the position
+    const constrainedX = Math.max(minX, Math.min(maxX, x));
+    const constrainedY = Math.max(minY, Math.min(maxY, y));
+    
+    return { x: constrainedX, y: constrainedY };
+  }, [zoomLevel, width, height]);
+
   // Debug: Log the calculated dimensions
+  const deviceType = window.innerWidth < 768 ? 'Mobile' : window.innerWidth < 1024 ? 'Tablet' : 'Desktop';
+  const aspectRatio = (width / height).toFixed(2);
+  
   console.log("Screenshot dimensions:", {
     width,
     height,
+    deviceType,
+    aspectRatio: `${aspectRatio}:1 (${deviceType} MAXIMIZED)`,
     availableWidth: window.innerWidth * 0.98,
-    availableHeight: window.innerHeight * 0.98,
-    widthBasedHeight: window.innerWidth * 0.98 * (9 / 16),
-    heightBasedWidth: (window.innerHeight * 0.98) / (9 / 16),
-    aspectRatio: "9:16 (mobile)",
+    availableHeight: window.innerHeight * 0.95,
     viewportWidth: window.innerWidth,
     viewportHeight: window.innerHeight,
     widthUsage: `${((width / (window.innerWidth * 0.98)) * 100).toFixed(1)}%`,
-    heightUsage: `${((height / (window.innerHeight * 0.98)) * 100).toFixed(
-      1
-    )}%`,
+    heightUsage: `${((height / (window.innerHeight * 0.95)) * 100).toFixed(1)}%`,
     spaceEfficiency: `${(
       ((width * height) /
-        (window.innerWidth * 0.98 * (window.innerHeight * 0.98))) *
+        (window.innerWidth * 0.98 * (window.innerHeight * 0.95))) *
       100
     ).toFixed(1)}%`,
+    spaceUtilization: "MAXIMIZED - Using 98% width, 95% height of viewport",
   });
+
+  // Debug: Log when zoom or rotation changes
+  useEffect(() => {
+    if (open) {
+      console.log("🔍 Transform updated:", {
+        zoomLevel,
+        rotation,
+        imagePosition,
+        scale: zoomLevel / 100,
+        transform: `scale(${
+          zoomLevel / 100
+        }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
+          imagePosition.y
+        }px)`,
+        containerSize: `${width}×${height}px`,
+      });
+      
+      // Force a re-render check
+      console.log("🎯 Component should re-render with new transform");
+    }
+  }, [zoomLevel, rotation, imagePosition, open, width, height]);
+
+  // Constrain image position when zoom or rotation changes to prevent overflow
+  useEffect(() => {
+    if (open && zoomLevel > 100) {
+      const constrainedPosition = constrainImagePosition(imagePosition.x, imagePosition.y);
+      if (constrainedPosition.x !== imagePosition.x || constrainedPosition.y !== imagePosition.y) {
+        console.log("🔒 Constraining position:", imagePosition, "→", constrainedPosition);
+        setImagePosition(constrainedPosition);
+      }
+    }
+  }, [zoomLevel, rotation, open, constrainImagePosition, imagePosition]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
+      <DialogTitle className="sr-only">Screenshot Viewer</DialogTitle>
+      <DialogDescription className="sr-only">
+        Interactive screenshot viewer with zoom, pan, and navigation controls
+      </DialogDescription>
       <DialogContent className="max-w-[98vw] max-h-[98vh] p-0 bg-background/95 backdrop-blur-md border-0 shadow-2xl">
         <div
           ref={containerRef}
@@ -632,7 +881,11 @@ export function ScreenshotViewer({
                 </Button>
                 <Badge
                   variant="outline"
-                  className="text-xs font-mono cursor-pointer hover:bg-primary/10"
+                  className={`text-xs font-mono cursor-pointer hover:bg-primary/10 ${
+                    zoomLevel > 100 
+                      ? "bg-primary/20 border-primary/50 text-primary font-bold" 
+                      : "bg-background"
+                  }`}
                   onClick={() => setShowZoomSlider(!showZoomSlider)}
                   title="Click to show zoom slider (Z)"
                 >
@@ -823,7 +1076,7 @@ export function ScreenshotViewer({
 
             {/* Mobile Navigation Hint */}
             <div className="sm:hidden text-muted-foreground text-xs">
-              Swipe left/right to navigate • Pinch to zoom
+              Swipe left/right to navigate • Pinch to zoom • Double tap to reset
             </div>
 
             {/* Desktop Navigation */}
@@ -852,29 +1105,32 @@ export function ScreenshotViewer({
           </motion.div>
 
           {/* Enhanced Image Display with Pan Support */}
-          <div
-            className="flex-1 flex items-center justify-center overflow-hidden bg-gradient-to-br from-muted/20 via-background to-muted/20 relative"
-            onWheel={handleWheel}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            style={{
-              cursor: isDragging
-                ? "grabbing"
-                : zoomLevel > 100
-                ? "grab"
-                : "default",
-            }}
-          >
-            <motion.div
-              key={`${currentIndex}-${zoomLevel}-${rotation}`}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.2 }}
+        <div
+          className="flex-1 flex items-center justify-center bg-gradient-to-br from-muted/20 via-background to-muted/20 relative"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          style={{
+            cursor: isDragging
+              ? "grabbing"
+              : zoomLevel > 100
+              ? "grab"
+              : "default",
+            overflow: "hidden", // Keep content within container bounds
+            minHeight: "100%",
+          }}
+        >
+            <div
+              key={`${currentIndex}`}
               ref={imageContainerRef}
-              className="relative bg-white rounded-xl shadow-2xl border border-border/50"
-              title={`Container: ${width}×${height}px`}
+              className={`relative bg-white rounded-xl shadow-2xl transition-all duration-300 ${
+                zoomLevel > 100 
+                  ? "border-2 border-primary/60 shadow-primary/20" 
+                  : "border border-border/50"
+              }`}
+              title={`Container: ${width}×${height}px | Zoom: ${zoomLevel}% | Rot: ${rotation}°`}
+              onDoubleClick={handleDoubleClick}
               style={{
                 width: `${width}px`,
                 height: `${height}px`,
@@ -889,6 +1145,11 @@ export function ScreenshotViewer({
                   : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 willChange: "transform",
                 backfaceVisibility: "hidden",
+                // Ensure the scaled container doesn't get clipped
+                zIndex: 10,
+                opacity: imageLoaded ? 1 : 0,
+                // Temporary debug: change background based on zoom
+                backgroundColor: zoomLevel > 100 ? "#fef3c7" : "#ffffff",
               }}
             >
               <img
@@ -947,7 +1208,7 @@ export function ScreenshotViewer({
                   </div>
                 </div>
               )}
-            </motion.div>
+            </div>
 
             {/* Zoom Slider Overlay */}
             <AnimatePresence>
@@ -1008,13 +1269,21 @@ export function ScreenshotViewer({
             </AnimatePresence>
 
             {/* Debug Transform Info */}
-            <div className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Search className="h-3 w-3" />
-                <span>
-                  Zoom: {zoomLevel}% | Rot: {rotation}° | Pos: (
-                  {imagePosition.x}, {imagePosition.y})
-                </span>
+            <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 text-xs font-mono">
+              <div className="flex flex-col gap-1 text-foreground">
+                <div className="flex items-center gap-2">
+                  <Search className="h-3 w-3 text-primary" />
+                  <span className={`font-bold ${zoomLevel > 100 ? "text-primary" : "text-muted-foreground"}`}>
+                    ZOOM: {zoomLevel}% (×{zoomLevel / 100})
+                  </span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className={`font-bold ${rotation !== 0 ? "text-blue-600" : "text-muted-foreground"}`}>
+                    ROT: {rotation}°
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Transform: scale({zoomLevel / 100}) rotate({rotation}deg) translate({imagePosition.x}px, {imagePosition.y}px)
+                </div>
               </div>
             </div>
 
@@ -1023,7 +1292,7 @@ export function ScreenshotViewer({
               <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Search className="h-3 w-3" />
-                  <span>Drag to pan • Scroll to zoom • R/L to rotate</span>
+                  <span>Drag to pan • Scroll to zoom • Double-click to reset • R/L to rotate</span>
                 </div>
               </div>
             )}
@@ -1166,7 +1435,7 @@ export function ScreenshotViewer({
                       </div>
                       <div className="flex items-center gap-1">
                         <RotateIcon className="h-3 w-3" />
-                        <span>Double tap: Reset zoom</span>
+                        <span>Double tap/click: Reset zoom</span>
                       </div>
                     </div>
                   </div>

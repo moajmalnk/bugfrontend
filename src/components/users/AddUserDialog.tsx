@@ -89,7 +89,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         email: userData.email,
         password: userData.password,
         role: userData.role,
-        phone: userData.phone ? "+91" + userData.phone : "",
+        phone: userData.phone && userData.phone.trim() ? "+91" + userData.phone.trim() : undefined,
       };
       const success = await onUserAdd(payload);
       return success;

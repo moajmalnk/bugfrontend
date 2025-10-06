@@ -524,7 +524,12 @@ function App() {
   const chunkErrorModal = useChunkLoadErrorRefresh();
 
   return (
-    <Router>
+    <Router
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <ThemeProvider>
         <AppProviders queryClient={queryClient}>
           <AuthProvider>
