@@ -154,7 +154,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 <NavLink
                   to="/my-tasks"
                   icon={<ListTodo className="h-5 w-5" />}
-                  label="My Tasks"
+                  label="BugToDo"
                 />
               </>
             )}

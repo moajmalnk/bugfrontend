@@ -614,128 +614,19 @@ export function ScreenshotViewer({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, showInfo, showZoomSlider, goToPrevious, goToNext, zoomIn, zoomOut, resetZoom, rotateRight, rotateLeft, toggleFullscreen, handleClose]);
 
-  // Get image dimensions for responsive display
-  const getImageDimensions = () => {
-    // Use the FULL available space for both width and height - MAXIMIZE dialog space
-    const availableWidth = window.innerWidth * 0.98; // Use 98% of viewport width (maximize dialog space)
-    const availableHeight = window.innerHeight * 0.95; // Use 95% of viewport height (maximize dialog space)
-
-    // Prioritize height while maintaining reasonable width constraints
-    // Use more flexible aspect ratios to allow taller containers
-    let width, height;
-
-    // Detect device type for responsive sizing
-    const isMobile = window.innerWidth < 768;
-    const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
-    const isDesktop = window.innerWidth >= 1024;
-
-    // Define device-specific constraints
-    let maxWidth, maxHeight, minWidth, minHeight, targetAspectRatio;
-
-    if (isMobile) {
-      // Mobile: MAXIMIZE space usage
-      maxWidth = availableWidth;
-      maxHeight = availableHeight;
-      minWidth = 280;
-      minHeight = 350;
-      targetAspectRatio = 4 / 3; // More square-ish for mobile
-    } else if (isTablet) {
-      // Tablet: MAXIMIZE space usage
-      maxWidth = availableWidth;
-      maxHeight = availableHeight;
-      minWidth = 450;
-      minHeight = 450;
-      targetAspectRatio = 3 / 2; // Slightly taller
-    } else {
-      // Desktop: MAXIMIZE space usage
-      maxWidth = availableWidth;
-      maxHeight = availableHeight;
-      minWidth = 550;
-      minHeight = 550;
-      targetAspectRatio = 5 / 4; // Even taller for desktop
-    }
-
-    // Calculate dimensions prioritizing height
-    const heightBasedWidth = maxHeight * targetAspectRatio;
-    const widthBasedHeight = maxWidth / targetAspectRatio;
-
-    // Choose the approach that gives us more height
-    if (heightBasedWidth <= maxWidth) {
-      // Height constraint - use more height
-      height = maxHeight;
-      width = Math.min(heightBasedWidth, maxWidth);
-    } else {
-      // Width constraint - but still try to maximize height
-      width = maxWidth;
-      height = Math.min(widthBasedHeight, maxHeight);
-    }
-
-    // Apply minimum constraints
-    if (width < minWidth) {
-      width = minWidth;
-      height = Math.max(height, minHeight);
-    }
-    
-    if (height < minHeight) {
-      height = minHeight;
-      width = Math.max(width, minWidth);
-    }
-
-    // Account for rotation - when rotated 90° or 270°, dimensions are swapped
-    // We need to ensure the rotated image fits within the container
-    const isRotated = rotation === 90 || rotation === 270;
-    if (isRotated) {
-      // When rotated, the image's effective width becomes height and vice versa
-      // We need to ensure that when rotated, it still fits in the container
-      const maxDimension = Math.min(availableWidth, availableHeight);
-      const minDimension = Math.min(width, height);
-      
-      // Scale down if necessary to fit within container when rotated
-      if (maxDimension < Math.max(width, height)) {
-        const scale = maxDimension / Math.max(width, height);
-        width *= scale;
-        height *= scale;
-      }
-    }
-
-    // Additional safety check: ensure image never exceeds container bounds
-    // This prevents overflow even at maximum zoom (500%)
-    const maxZoomScale = 5; // 500% zoom
-    const maxAllowedWidth = availableWidth / maxZoomScale;
-    const maxAllowedHeight = availableHeight / maxZoomScale;
-    
-    if (width > maxAllowedWidth) {
-      const scale = maxAllowedWidth / width;
-      width *= scale;
-      height *= scale;
-    }
-    
-    if (height > maxAllowedHeight) {
-      const scale = maxAllowedHeight / height;
-      width *= scale;
-      height *= scale;
-    }
-
-    return { width, height };
-  };
-
-  const { width, height } = getImageDimensions();
 
   // Helper function to constrain image position within container bounds
   const constrainImagePosition = useCallback((x: number, y: number) => {
     if (zoomLevel <= 100) return { x: 0, y: 0 };
     
-    // Calculate the scaled dimensions of the image
-    const scaledWidth = width * (zoomLevel / 100);
-    const scaledHeight = height * (zoomLevel / 100);
-    
-    // Get container bounds (accounting for dialog padding)
-    const containerWidth = window.innerWidth * 0.98;
+    // Get container bounds (accounting for dialog padding and headers)
+    const containerWidth = window.innerWidth * 0.95;
     const containerHeight = window.innerHeight * 0.95;
     
     // Calculate maximum allowed positions to keep image within bounds
-    const maxX = Math.max(0, (scaledWidth - containerWidth) / 2);
-    const maxY = Math.max(0, (scaledHeight - containerHeight) / 2);
+    // Since we're using 100% dimensions, we need to account for the zoom scale
+    const maxX = Math.max(0, (containerWidth * (zoomLevel / 100 - 1)) / 2);
+    const maxY = Math.max(0, (containerHeight * (zoomLevel / 100 - 1)) / 2);
     const minX = -maxX;
     const minY = -maxY;
     
@@ -744,29 +635,19 @@ export function ScreenshotViewer({
     const constrainedY = Math.max(minY, Math.min(maxY, y));
     
     return { x: constrainedX, y: constrainedY };
-  }, [zoomLevel, width, height]);
+  }, [zoomLevel]);
 
-  // Debug: Log the calculated dimensions
+  // Debug: Log the container dimensions
   const deviceType = window.innerWidth < 768 ? 'Mobile' : window.innerWidth < 1024 ? 'Tablet' : 'Desktop';
-  const aspectRatio = (width / height).toFixed(2);
   
-  console.log("Screenshot dimensions:", {
-    width,
-    height,
+  console.log("Screenshot container:", {
+    containerSize: "100% × 100%",
     deviceType,
-    aspectRatio: `${aspectRatio}:1 (${deviceType} MAXIMIZED)`,
-    availableWidth: window.innerWidth * 0.98,
+    availableWidth: window.innerWidth * 0.95,
     availableHeight: window.innerHeight * 0.95,
     viewportWidth: window.innerWidth,
     viewportHeight: window.innerHeight,
-    widthUsage: `${((width / (window.innerWidth * 0.98)) * 100).toFixed(1)}%`,
-    heightUsage: `${((height / (window.innerHeight * 0.95)) * 100).toFixed(1)}%`,
-    spaceEfficiency: `${(
-      ((width * height) /
-        (window.innerWidth * 0.98 * (window.innerHeight * 0.95))) *
-      100
-    ).toFixed(1)}%`,
-    spaceUtilization: "MAXIMIZED - Using 98% width, 95% height of viewport",
+    spaceUtilization: "MAXIMIZED - Using 100% width and height of available container space",
   });
 
   // Debug: Log when zoom or rotation changes
@@ -782,13 +663,13 @@ export function ScreenshotViewer({
         }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
           imagePosition.y
         }px)`,
-        containerSize: `${width}×${height}px`,
+        containerSize: "100% × 100%",
       });
       
       // Force a re-render check
       console.log("🎯 Component should re-render with new transform");
     }
-  }, [zoomLevel, rotation, imagePosition, open, width, height]);
+  }, [zoomLevel, rotation, imagePosition, open]);
 
   // Constrain image position when zoom or rotation changes to prevent overflow
   useEffect(() => {
@@ -802,13 +683,13 @@ export function ScreenshotViewer({
   }, [zoomLevel, rotation, open, constrainImagePosition, imagePosition]);
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleClose} >
       <DialogTitle className="sr-only">Screenshot Viewer</DialogTitle>
       <DialogDescription className="sr-only">
         Interactive screenshot viewer with zoom, pan, and navigation controls
       </DialogDescription>
-      <DialogContent className="max-w-[98vw] max-h-[98vh] p-0 bg-background/95 backdrop-blur-md border-0 shadow-2xl">
-        <div
+      <DialogContent className="fixed left-[50%] top-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] gap-4 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-w-[95vw] max-h-[95vh] p-0 bg-background/95 backdrop-blur-md border-0 shadow-2xl">
+        <div 
           ref={containerRef}
           className="flex flex-col h-full relative"
           onTouchStart={handleTouchStart}
@@ -1062,7 +943,7 @@ export function ScreenshotViewer({
               </span>
               <Separator orientation="vertical" className="h-3" />
               <span className="font-mono">
-                {width} × {height}
+                Full Container
               </span>
               <Separator orientation="vertical" className="h-3" />
               <span className="font-mono">{zoomLevel}%</span>
@@ -1124,16 +1005,12 @@ export function ScreenshotViewer({
             <div
               key={`${currentIndex}`}
               ref={imageContainerRef}
-              className={`relative bg-white rounded-xl shadow-2xl transition-all duration-300 ${
-                zoomLevel > 100 
-                  ? "border-2 border-primary/60 shadow-primary/20" 
-                  : "border border-border/50"
-              }`}
-              title={`Container: ${width}×${height}px | Zoom: ${zoomLevel}% | Rot: ${rotation}°`}
+              className="relative bg-white rounded-xl shadow-2xl transition-all duration-300 border border-border/50"
+              title={`Container: 100%×100% | Zoom: ${zoomLevel}% | Rot: ${rotation}°`}
               onDoubleClick={handleDoubleClick}
               style={{
-                width: `${width}px`,
-                height: `${height}px`,
+                width: "100%",
+                height: "100%",
                 transform: `scale(${
                   zoomLevel / 100
                 }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
@@ -1145,25 +1022,21 @@ export function ScreenshotViewer({
                   : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 willChange: "transform",
                 backfaceVisibility: "hidden",
-                // Ensure the scaled container doesn't get clipped
                 zIndex: 10,
                 opacity: imageLoaded ? 1 : 0,
-                // Temporary debug: change background based on zoom
-                backgroundColor: zoomLevel > 100 ? "#fef3c7" : "#ffffff",
+                backgroundColor: "rgb(255, 255, 255)",
               }}
             >
               <img
                 ref={imageRef}
                 src={imageUrl}
                 alt={`Screenshot ${currentIndex + 1}`}
-                className={`transition-opacity duration-300 ${
-                  imageLoaded ? "opacity-100" : "opacity-0"
-                }`}
+                className="transition-opacity duration-300 opacity-100"
                 style={{
-                  width: `${width}px`,
-                  height: `${height}px`,
+                  width: "100%",
+                  height: "100%",
                   objectFit: "contain",
-                  pointerEvents: "none", // Prevent image from interfering with drag
+                  pointerEvents: "none",
                 }}
                 onLoad={() => {
                   setImageLoaded(true);
@@ -1172,8 +1045,7 @@ export function ScreenshotViewer({
                   console.log("Image loaded with dimensions:", {
                     naturalWidth: imageRef.current?.naturalWidth,
                     naturalHeight: imageRef.current?.naturalHeight,
-                    appliedWidth: width,
-                    appliedHeight: height,
+                    appliedSize: "100% × 100%",
                   });
                 }}
                 onError={() => {
@@ -1329,7 +1201,7 @@ export function ScreenshotViewer({
                     <div>
                       <span className="text-muted-foreground">Dimensions:</span>
                       <p className="font-medium">
-                        {width} × {height} pixels
+                        Full container (responsive)
                       </p>
                     </div>
                     <div>
