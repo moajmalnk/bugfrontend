@@ -38,6 +38,16 @@ import { z } from "zod";
 const formSchema = z.object({
   title: z.string().min(3, "Bug title must be at least 3 characters"),
   description: z.string().min(2, "Description must be at least 2 characters"),
+  expected_result: z
+    .string()
+    .max(1000, "Expected result must be at most 1000 characters")
+    .optional()
+    .or(z.literal("")),
+  actual_result: z
+    .string()
+    .max(1000, "Actual result must be at most 1000 characters")
+    .optional()
+    .or(z.literal("")),
   priority: z.enum(["low", "medium", "high"] as const),
   status: z.enum([
     "pending",
@@ -71,6 +81,8 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
     defaultValues: {
       title: bug.title,
       description: bug.description,
+      expected_result: (bug as any).expected_result || "",
+      actual_result: (bug as any).actual_result || "",
       priority: bug.priority as BugPriority,
       status: bug.status as BugStatus,
     },
@@ -81,6 +93,8 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
     form.reset({
       title: bug.title,
       description: bug.description,
+      expected_result: (bug as any).expected_result || "",
+      actual_result: (bug as any).actual_result || "",
       priority: bug.priority as BugPriority,
       status: bug.status as BugStatus,
     });
@@ -104,6 +118,8 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
           id: bug.id,
           title: values.title,
           description: values.description,
+          expected_result: values.expected_result || "",
+          actual_result: values.actual_result || "",
           priority: values.priority,
           status: values.status,
           updated_by: bug.updated_by || bug.reported_by, // Ensure we have an updater
@@ -223,6 +239,32 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                   <FormLabel>Description</FormLabel>
                   <FormControl>
                     <Textarea rows={5} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="expected_result"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Expected Result (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea rows={4} maxLength={1000} placeholder="What should have happened?" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="actual_result"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Actual Result (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea rows={4} maxLength={1000} placeholder="What actually happened?" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
