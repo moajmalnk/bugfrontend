@@ -34,6 +34,7 @@ interface Screenshot {
   file_name: string;
   file_path: string;
   file_type: string;
+  project_name?: string;
 }
 
 interface ScreenshotViewerProps {
@@ -939,7 +940,7 @@ export function ScreenshotViewer({
             <div className="flex items-center gap-2 mb-2 sm:mb-0">
               <Smartphone className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
               <span className="font-medium">
-                BugRicer | CODO AI Innovations
+                BugRicer | {currentScreenshot.project_name || "CODO AI Innovations"}
               </span>
               <Separator orientation="vertical" className="h-3" />
               <span className="font-mono">
