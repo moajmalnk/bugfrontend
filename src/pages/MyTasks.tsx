@@ -1354,14 +1354,16 @@ export default function MyTasks() {
                       >
                         View
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => openEditShared(t)} 
-                        className="h-10 px-3 text-xs"
-                      >
-                        Edit
-                      </Button>
+                      {t.created_by === currentUser?.id && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => openEditShared(t)} 
+                          className="h-10 px-3 text-xs"
+                        >
+                          Edit
+                        </Button>
+                      )}
                     </div>
                     {/* Individual completion buttons for assigned users */}
                     {t.status !== 'completed' && t.status !== 'approved' && ((t as any).assigned_to_ids ? (t as any).assigned_to_ids.includes(currentUser?.id || '') : t.assigned_to === currentUser?.id) && (
@@ -1392,7 +1394,7 @@ export default function MyTasks() {
                         </Button>
                       </div>
                     )}
-                    {t.status === 'completed' && currentUser?.role === 'admin' && (
+                    {t.status === 'completed' && t.created_by === currentUser?.id && (
                       <Button 
                         size="sm" 
                         onClick={() => approveSharedTask(t)} 
@@ -1401,7 +1403,7 @@ export default function MyTasks() {
                         Approve
                       </Button>
                     )}
-                    {(t.created_by === currentUser?.id || currentUser?.role === 'admin') && (
+                    {t.created_by === currentUser?.id && (
                       <Button 
                         variant="outline"
                         size="sm" 
@@ -1505,7 +1507,7 @@ export default function MyTasks() {
                       Projects (Optional)
                     </Label>
                     <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                      {projects.filter(project => project.created_by === currentUser?.id).map((project) => (
+                      {projects.map((project) => (
                         <label key={project.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded">
                           <input
                             type="checkbox"
