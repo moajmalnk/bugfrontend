@@ -714,24 +714,24 @@ export default function MyTasks() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => openDetails(t)} 
-                    className="h-10 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                    className="h-8 px-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 min-w-0"
                   >
-                    <span className="hidden sm:inline">View</span>
+                    <span className="hidden sm:inline truncate">View</span>
                     <span className="sm:hidden flex items-center gap-1">
                       <span>👁</span>
-                      <span>View</span>
+                      <span className="truncate">View</span>
                     </span>
                   </Button>
                   {t.status !== 'done' && (
                     <Button 
                       size="sm" 
                       onClick={() => markCompleted(t)} 
-                      className="h-10 px-3 text-xs bg-green-600 hover:bg-green-700 text-white"
+                      className="h-8 px-2 text-xs bg-green-600 hover:bg-green-700 text-white min-w-0"
                     >
-                      <span className="hidden sm:inline">Complete</span>
+                      <span className="hidden sm:inline truncate">Complete</span>
                       <span className="sm:hidden flex items-center gap-1">
                         <span>✓</span>
-                        <span>Complete</span>
+                        <span className="truncate">Complete</span>
                       </span>
                     </Button>
                   )}
@@ -739,24 +739,24 @@ export default function MyTasks() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => openEdit(t)} 
-                    className="h-10 px-3 text-xs"
+                    className="h-8 px-2 text-xs min-w-0"
                   >
-                    <span className="hidden sm:inline">Edit</span>
+                    <span className="hidden sm:inline truncate">Edit</span>
                     <span className="sm:hidden flex items-center gap-1">
                       <span>✏</span>
-                      <span>Edit</span>
+                      <span className="truncate">Edit</span>
                     </span>
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => onDelete(t.id)} 
-                    className="h-10 px-3 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                    className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 min-w-0"
                   >
-                    <span className="hidden sm:inline">Delete</span>
+                    <span className="hidden sm:inline truncate">Delete</span>
                     <span className="sm:hidden flex items-center gap-1">
                       <span>🗑</span>
-                      <span>Delete</span>
+                      <span className="truncate">Delete</span>
                     </span>
                   </Button>
                 </div>
@@ -1345,52 +1345,52 @@ export default function MyTasks() {
 
                   {/* Actions */}
                   <div className="mt-auto flex flex-col gap-2">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className={`${t.created_by === currentUser?.id ? 'grid grid-cols-2' : 'grid grid-cols-1'} gap-2`}>
                       <Button 
                         variant="outline" 
                         size="sm" 
                         onClick={() => openDetailsShared(t)} 
-                        className="h-10 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                        className="h-8 px-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 min-w-0"
                       >
-                        View
+                        <span className="truncate">View</span>
                       </Button>
                       {t.created_by === currentUser?.id && (
                         <Button 
                           variant="outline" 
                           size="sm" 
                           onClick={() => openEditShared(t)} 
-                          className="h-10 px-3 text-xs"
+                          className="h-8 px-2 text-xs min-w-0"
                         >
-                          Edit
+                          <span className="truncate">Edit</span>
                         </Button>
                       )}
                     </div>
                     {/* Individual completion buttons for assigned users */}
                     {t.status !== 'completed' && t.status !== 'approved' && ((t as any).assigned_to_ids ? (t as any).assigned_to_ids.includes(currentUser?.id || '') : t.assigned_to === currentUser?.id) && (
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         {((t as any).completed_assignee_ids?.includes(currentUser?.id || '')) ? (
                           <Button 
                             size="sm" 
                             onClick={() => uncompleteSharedTask(t)} 
-                            className="h-10 w-full text-xs bg-yellow-600 hover:bg-yellow-700 text-white"
+                            className="h-8 w-full text-xs bg-yellow-600 hover:bg-yellow-700 text-white min-w-0"
                           >
-                            Mark Incomplete
+                            <span className="truncate">Mark Incomplete</span>
                           </Button>
                         ) : (
                           <Button 
                             size="sm" 
                             onClick={() => markSharedCompleted(t)} 
-                            className="h-10 w-full text-xs bg-green-600 hover:bg-green-700 text-white"
+                            className="h-8 w-full text-xs bg-green-600 hover:bg-green-700 text-white min-w-0"
                           >
-                            Mark Complete
+                            <span className="truncate">Mark Complete</span>
                           </Button>
                         )}
                         <Button 
                           size="sm" 
                           onClick={() => declineSharedTask(t)} 
-                          className="h-10 w-full text-xs bg-red-600 hover:bg-red-700 text-white"
+                          className="h-8 w-full text-xs bg-red-600 hover:bg-red-700 text-white min-w-0"
                         >
-                          Decline Task
+                          <span className="truncate">Decline Task</span>
                         </Button>
                       </div>
                     )}
@@ -1398,9 +1398,9 @@ export default function MyTasks() {
                       <Button 
                         size="sm" 
                         onClick={() => approveSharedTask(t)} 
-                        className="h-10 w-full text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                        className="h-8 w-full text-xs bg-purple-600 hover:bg-purple-700 text-white min-w-0"
                       >
-                        Approve
+                        <span className="truncate">Approve</span>
                       </Button>
                     )}
                     {t.created_by === currentUser?.id && (
@@ -1408,9 +1408,9 @@ export default function MyTasks() {
                         variant="outline"
                         size="sm" 
                         onClick={() => onDeleteShared(t.id)} 
-                        className="h-10 w-full text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                        className="h-8 w-full text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 min-w-0"
                       >
-                        Delete
+                        <span className="truncate">Delete</span>
                       </Button>
                     )}
                   </div>
@@ -1785,17 +1785,19 @@ export default function MyTasks() {
 
                 {/* Actions */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setSharedDetailOpen(false);
-                      openEditShared(selectedShared);
-                    }} 
-                    className="h-11 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 order-2 sm:order-1"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Edit Task
-                  </Button>
+                  {selectedShared.created_by === currentUser?.id && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setSharedDetailOpen(false);
+                        openEditShared(selectedShared);
+                      }} 
+                      className="h-11 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 order-2 sm:order-1"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Edit Task
+                    </Button>
+                  )}
                   
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 order-1 sm:order-2">
                     <Button variant="outline" onClick={() => setSharedDetailOpen(false)} className="h-11 px-6">
@@ -1812,7 +1814,7 @@ export default function MyTasks() {
                         Mark as Completed
                       </Button>
                     )}
-                    {selectedShared.status === 'completed' && currentUser?.role === 'admin' && (
+                    {selectedShared.status === 'completed' && selectedShared.created_by === currentUser?.id && (
                       <Button 
                         onClick={async () => { 
                           await approveSharedTask(selectedShared); 
@@ -1823,7 +1825,7 @@ export default function MyTasks() {
                         Approve Task
                       </Button>
                     )}
-                    {(selectedShared.created_by === currentUser?.id || currentUser?.role === 'admin') && (
+                    {selectedShared.created_by === currentUser?.id && (
                       <Button 
                         variant="outline"
                         onClick={async () => { 
