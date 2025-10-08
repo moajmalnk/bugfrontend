@@ -20,10 +20,12 @@ type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
 export default function MyTasks() {
   const { currentUser } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const [myLoading, setMyLoading] = useState(true);
+  const [sharedLoading, setSharedLoading] = useState(false);
   const [items, setItems] = useState<UserTask[]>([]);
   const [sharedTasks, setSharedTasks] = useState<SharedTask[]>([]);
-  const [filter, setFilter] = useState<{ status?: string; q?: string }>({});
+  const [myFilter, setMyFilter] = useState<{ status?: string; q?: string }>({});
+  const [sharedFilter, setSharedFilter] = useState<{ status?: string; q?: string }>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [sharedModalOpen, setSharedModalOpen] = useState(false);
   const [editing, setEditing] = useState<UserTask | null>(null);
@@ -42,26 +44,26 @@ export default function MyTasks() {
 
   async function load() {
     try {
-      setLoading(true);
-      const res: ApiResponse<UserTask[]> = await listMyTasks(filter);
+      setMyLoading(true);
+      const res: ApiResponse<UserTask[]> = await listMyTasks(myFilter);
       const data = (res as any).data ?? res;
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setError(e?.message || 'Failed to load tasks');
     } finally {
-      setLoading(false);
+      setMyLoading(false);
     }
   }
 
   async function loadSharedTasks() {
     try {
-      setLoading(true);
-      const tasks = await sharedTaskService.getSharedTasks();
+      setSharedLoading(true);
+      const tasks = await sharedTaskService.getSharedTasks(sharedFilter.status);
       setSharedTasks(tasks);
     } catch (e: any) {
       setError(e?.message || 'Failed to load shared tasks');
     } finally {
-      setLoading(false);
+      setSharedLoading(false);
     }
   }
 
@@ -97,11 +99,23 @@ export default function MyTasks() {
   useEffect(() => {
     if (activeTab === 'my-tasks') {
       load();
-    } else if (activeTab === 'shared-tasks') {
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, myFilter?.status, myFilter?.q]);
+
+  useEffect(() => {
+    if (activeTab === 'shared-tasks') {
       loadSharedTasks();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, filter?.status, filter?.q]);
+  }, [activeTab, sharedFilter?.status, sharedFilter?.q]);
+
+  // Preload both lists once to keep tab counters accurate
+  useEffect(() => {
+    load();
+    loadSharedTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     loadProjects();
@@ -369,17 +383,57 @@ export default function MyTasks() {
   async function markSharedCompleted(t: SharedTask) {
     if (!t?.id) return;
     
+    // Show confirmation dialog
+    const confirmed = window.confirm('Are you sure you want to mark this task as completed?');
+    if (!confirmed) return;
+    
     try {
-      await sharedTaskService.updateSharedTask({ id: t.id, status: 'completed' });
-      toast({ title: 'Shared task marked as completed!' });
+      await sharedTaskService.completeTaskForUser(t.id);
+      toast({ title: 'Task marked as completed!' });
       await loadSharedTasks();
     } catch (e: any) {
       toast({ title: 'Failed to mark as completed', description: e?.message, variant: 'destructive' });
     }
   }
 
+  async function uncompleteSharedTask(t: SharedTask) {
+    if (!t?.id) return;
+    
+    // Show confirmation dialog
+    const confirmed = window.confirm('Are you sure you want to mark this task as incomplete?');
+    if (!confirmed) return;
+    
+    try {
+      await sharedTaskService.uncompleteTaskForUser(t.id);
+      toast({ title: 'Task marked as incomplete!' });
+      await loadSharedTasks();
+    } catch (e: any) {
+      toast({ title: 'Failed to mark as incomplete', description: e?.message, variant: 'destructive' });
+    }
+  }
+
+  async function declineSharedTask(t: SharedTask) {
+    if (!t?.id) return;
+    
+    // Show confirmation dialog
+    const confirmed = window.confirm('Are you sure you want to decline this task? This will remove you from the task.');
+    if (!confirmed) return;
+    
+    try {
+      await sharedTaskService.declineTask(t.id);
+      toast({ title: 'Task declined successfully!' });
+      await loadSharedTasks();
+    } catch (e: any) {
+      toast({ title: 'Failed to decline task', description: e?.message, variant: 'destructive' });
+    }
+  }
+
   async function approveSharedTask(t: SharedTask) {
     if (!t?.id) return;
+    
+    // Show confirmation dialog
+    const confirmed = window.confirm('Are you sure you want to approve this task?');
+    if (!confirmed) return;
     
     try {
       await sharedTaskService.updateSharedTask({ id: t.id, status: 'approved' });
@@ -525,11 +579,14 @@ export default function MyTasks() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
+                    <input
                     type="text"
                     placeholder="Search tasks by title or description..."
-                    value={filter.q || ''}
-                    onChange={(e) => setFilter((f) => ({ ...f, q: e.target.value }))}
+                    value={(activeTab === 'my-tasks' ? myFilter.q : sharedFilter.q) || ''}
+                    onChange={(e) => {
+                      if (activeTab === 'my-tasks') setMyFilter((f) => ({ ...f, q: e.target.value }));
+                      else setSharedFilter((f) => ({ ...f, q: e.target.value }));
+                    }}
                     className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
                   />
                 </div>
@@ -539,8 +596,11 @@ export default function MyTasks() {
                   </div>
                     <select
                     className="h-11 w-full sm:w-[140px] rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
-                      value={filter.status || ''}
-                      onChange={(e) => setFilter({ ...filter, status: e.target.value || undefined })}
+                      value={(activeTab === 'my-tasks' ? myFilter.status : sharedFilter.status) || ''}
+                      onChange={(e) => {
+                        if (activeTab === 'my-tasks') setMyFilter({ ...myFilter, status: e.target.value || undefined });
+                        else setSharedFilter({ ...sharedFilter, status: e.target.value || undefined });
+                      }}
                     >
                       <option value="">All statuses</option>
                       {statuses.map((s) => (
@@ -555,11 +615,11 @@ export default function MyTasks() {
 
         {/* Grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {loading
+          {myLoading
             ? Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-36 rounded-lg" />
               ))
-            : itemsFiltered(items, filter.q).length === 0
+            : itemsFiltered(items, myFilter.q).length === 0
             ? (
               <div className="col-span-full relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
@@ -575,7 +635,7 @@ export default function MyTasks() {
                 </div>
               </div>
             )
-            : itemsFiltered(items, filter.q).map((t) => (
+            : itemsFiltered(items, myFilter.q).map((t) => (
               <div key={t.id ?? Math.random()} className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex flex-col p-5 shadow-sm hover:shadow-lg transition-all duration-200">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3 mb-3">
@@ -706,7 +766,7 @@ export default function MyTasks() {
 
         {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-2 sm:p-4 overflow-y-auto no-scrollbar">
-          <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 my-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 mt-0">
             {/* Header */}
             <div className="relative overflow-hidden rounded-t-xl">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-emerald-50/50 dark:from-blue-950/20 dark:to-emerald-950/20"></div>
@@ -870,7 +930,7 @@ export default function MyTasks() {
         {/* Detail Modal */}
         {detailOpen && selected && (
           <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-2 sm:p-4 overflow-y-auto no-scrollbar">
-            <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 my-4">
+            <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 mt-0">
               {/* Header */}
               <div className="relative overflow-hidden rounded-t-xl">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-emerald-50/50 dark:from-blue-950/20 dark:to-emerald-950/20"></div>
@@ -1133,8 +1193,8 @@ export default function MyTasks() {
                   <input
                     type="text"
                     placeholder="Search shared tasks by title or description..."
-                    value={filter.q || ''}
-                    onChange={(e) => setFilter((f) => ({ ...f, q: e.target.value }))}
+                    value={sharedFilter.q || ''}
+                    onChange={(e) => setSharedFilter((f) => ({ ...f, q: e.target.value }))}
                     className="w-full pl-4 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
                   />
                 </div>
@@ -1144,8 +1204,8 @@ export default function MyTasks() {
                   </div>
                   <select
                     className="h-11 w-full sm:w-[140px] rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
-                    value={filter.status || ''}
-                    onChange={(e) => setFilter({ ...filter, status: e.target.value || undefined })}
+                    value={sharedFilter.status || ''}
+                    onChange={(e) => setSharedFilter({ ...sharedFilter, status: e.target.value || undefined })}
                   >
                     <option value="">All statuses</option>
                     {sharedStatuses.map((s) => (
@@ -1159,11 +1219,11 @@ export default function MyTasks() {
 
           {/* Shared Tasks Grid */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {loading
+            {sharedLoading
               ? Array.from({ length: 6 }).map((_, i) => (
                   <Skeleton key={i} className="h-36 rounded-lg" />
                 ))
-              : itemsFilteredShared(sharedTasks, filter.q).length === 0
+              : itemsFilteredShared(sharedTasks, sharedFilter.q).length === 0
               ? (
                 <div className="col-span-full relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
@@ -1179,7 +1239,7 @@ export default function MyTasks() {
                   </div>
                 </div>
               )
-              : itemsFilteredShared(sharedTasks, filter.q).map((t) => (
+              : itemsFilteredShared(sharedTasks, sharedFilter.q).map((t) => (
                 <div key={t.id ?? Math.random()} className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex flex-col p-5 shadow-sm hover:shadow-lg transition-all duration-200">
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3 mb-3">
@@ -1222,12 +1282,30 @@ export default function MyTasks() {
                         {t.created_by_name || 'Unknown'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <Users className="h-3 w-3 text-purple-500" />
+                    <div className="flex items-start gap-2 text-xs">
+                      <Users className="h-3 w-3 text-purple-500 mt-0.5" />
                       <span className="text-gray-500 dark:text-gray-400">Assigned to:</span>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        {t.assigned_to_name || 'Unknown'}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {(t as any).assigned_to_names?.map((name: string, index: number) => {
+                          const isCompleted = (t as any).completed_assignee_names?.includes(name);
+                          return (
+                            <span
+                              key={index}
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                isCompleted
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                              }`}
+                            >
+                              {name} {isCompleted && '✓'}
+                            </span>
+                          );
+                        }) || [(t as any).assigned_to_name || 'Unknown'].map((name: string) => (
+                          <span key={name} className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                            {name}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     {t.project_names && t.project_names.length > 0 && (
                       <div className="flex items-center gap-2 text-xs">
@@ -1285,14 +1363,34 @@ export default function MyTasks() {
                         Edit
                       </Button>
                     </div>
-                    {t.status !== 'completed' && t.status !== 'approved' && t.assigned_to === currentUser?.id && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => markSharedCompleted(t)} 
-                        className="h-10 w-full text-xs bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        Mark Complete
-                      </Button>
+                    {/* Individual completion buttons for assigned users */}
+                    {t.status !== 'completed' && t.status !== 'approved' && ((t as any).assigned_to_ids ? (t as any).assigned_to_ids.includes(currentUser?.id || '') : t.assigned_to === currentUser?.id) && (
+                      <div className="space-y-2">
+                        {((t as any).completed_assignee_ids?.includes(currentUser?.id || '')) ? (
+                          <Button 
+                            size="sm" 
+                            onClick={() => uncompleteSharedTask(t)} 
+                            className="h-10 w-full text-xs bg-yellow-600 hover:bg-yellow-700 text-white"
+                          >
+                            Mark Incomplete
+                          </Button>
+                        ) : (
+                          <Button 
+                            size="sm" 
+                            onClick={() => markSharedCompleted(t)} 
+                            className="h-10 w-full text-xs bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Mark Complete
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          onClick={() => declineSharedTask(t)} 
+                          className="h-10 w-full text-xs bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          Decline Task
+                        </Button>
+                      </div>
                     )}
                     {t.status === 'completed' && currentUser?.role === 'admin' && (
                       <Button 
@@ -1323,7 +1421,7 @@ export default function MyTasks() {
         {/* Shared Task Creation/Edit Modal */}
         {sharedModalOpen && (
           <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-2 sm:p-4 overflow-y-auto no-scrollbar">
-            <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 my-4">
+            <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 mt-0">
               {/* Header */}
               <div className="relative overflow-hidden rounded-t-xl">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-emerald-50/50 dark:from-blue-950/20 dark:to-emerald-950/20"></div>
@@ -1371,26 +1469,34 @@ export default function MyTasks() {
                     />
                   </div>
 
-                  {/* Assigned To */}
+                  {/* Assigned To (multiple) */}
                   <div>
                     <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Assign To <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      value={editingShared?.assigned_to || ''}
-                      onValueChange={(value) => setEditingShared((prev) => ({ ...(prev as SharedTask), assigned_to: value }))}
-                    >
-                      <SelectTrigger className="h-11">
-                        <SelectValue placeholder="Select user" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.username} ({user.role})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                      {users.filter(user => user.id !== currentUser?.id).map((user) => (
+                        <label key={user.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={(editingShared?.assigned_to_ids || (editingShared?.assigned_to ? [editingShared.assigned_to] : [])).includes(user.id)}
+                            onChange={(e) => {
+                              const current = editingShared?.assigned_to_ids || (editingShared?.assigned_to ? [editingShared.assigned_to] : []);
+                              const next = e.target.checked
+                                ? Array.from(new Set([...current, user.id]))
+                                : current.filter((id) => id !== user.id);
+                              const primary = next[0] || '';
+                              setEditingShared((prev) => ({ ...(prev as SharedTask), assigned_to_ids: next, assigned_to: primary }));
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">{user.username} ({user.role})</span>
+                        </label>
+                      ))}
+                    </div>
+                    {!(editingShared?.assigned_to_ids && editingShared.assigned_to_ids.length > 0) && (
+                      <p className="mt-2 text-xs text-red-600 dark:text-red-400">Select at least one assignee</p>
+                    )}
                   </div>
 
                   {/* Projects Selection */}
@@ -1399,7 +1505,7 @@ export default function MyTasks() {
                       Projects (Optional)
                     </Label>
                     <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                      {projects.map((project) => (
+                      {projects.filter(project => project.created_by === currentUser?.id).map((project) => (
                         <label key={project.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded">
                           <input
                             type="checkbox"
@@ -1486,7 +1592,7 @@ export default function MyTasks() {
         {/* Shared Task Detail Modal */}
         {sharedDetailOpen && selectedShared && (
           <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-2 sm:p-4 overflow-y-auto no-scrollbar">
-            <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 my-4">
+            <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 mt-0">
               {/* Header */}
               <div className="relative overflow-hidden rounded-t-xl">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-emerald-50/50 dark:from-blue-950/20 dark:to-emerald-950/20"></div>
@@ -1576,7 +1682,9 @@ export default function MyTasks() {
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Assigned To</span>
                       </div>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {selectedShared.assigned_to_name || 'Unknown'}
+                        {((selectedShared as any).assigned_to_names?.length
+                          ? (selectedShared as any).assigned_to_names
+                          : [(selectedShared as any).assigned_to_name || 'Unknown']).join(', ')}
                       </p>
                     </div>
 
