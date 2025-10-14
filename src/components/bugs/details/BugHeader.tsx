@@ -8,7 +8,8 @@ import { useAuth } from "@/context/AuthContext";
 import { generateShareableUrl } from "@/lib/utils";
 import { bugService } from "@/services/bugService";
 import { Bug } from "@/types";
-import { CheckSquare, ChevronLeft, Edit2, Share2, Trash2 } from "lucide-react";
+import { useUndoDelete } from "@/hooks/useUndoDelete";
+import { CheckSquare, ChevronLeft, Edit2, Share2, Trash2, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -47,6 +48,7 @@ export const BugHeader = ({
   const { currentUser: authUser } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showUndoNotification, setShowUndoNotification] = useState(false);
 
   const searchParams = new URLSearchParams(location.search);
   const fromParam = searchParams.get("from");
@@ -93,6 +95,44 @@ export const BugHeader = ({
     }
   };
 
+  // Undo delete functionality
+  const { isCountingDown, timeLeft, startCountdown, cancelCountdown, confirmDelete } = useUndoDelete({
+    duration: 10,
+    onConfirm: async () => {
+      setIsDeleting(true);
+      try {
+        await bugService.deleteBug(bug.id);
+
+        toast({
+          title: "Bug Deleted",
+          description: `"${bug.title}" has been permanently deleted.`,
+        });
+
+        // Navigate back to the appropriate page
+        navigate(backLink, { replace: true });
+      } catch (error) {
+        // console.error('Error deleting bug:', error);
+        toast({
+          title: "Delete Failed",
+          description: "Failed to delete the bug. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsDeleting(false);
+        setShowDeleteModal(false);
+        setShowUndoNotification(false);
+      }
+    },
+    onUndo: () => {
+      setShowUndoNotification(false);
+      setShowDeleteModal(false);
+      toast({
+        title: "Delete Cancelled",
+        description: "Bug deletion has been cancelled.",
+      });
+    },
+  });
+
   const handleDeleteClick = () => {
     if (canDelete) {
       setShowDeleteModal(true);
@@ -105,33 +145,18 @@ export const BugHeader = ({
     }
   };
 
-  const handleDeleteConfirm = async () => {
-    setIsDeleting(true);
-    try {
-      await bugService.deleteBug(bug.id);
-
-      toast({
-        title: "Bug Deleted",
-        description: `"${bug.title}" has been permanently deleted.`,
-      });
-
-      // Navigate back to the appropriate page
-      navigate(backLink, { replace: true });
-    } catch (error) {
-      // console.error('Error deleting bug:', error);
-      toast({
-        title: "Delete Failed",
-        description: "Failed to delete the bug. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteModal(false);
-    }
+  const handleDeleteConfirm = () => {
+    setShowDeleteModal(false);
+    setShowUndoNotification(true);
+    startCountdown();
   };
 
   const handleDeleteCancel = () => {
     setShowDeleteModal(false);
+  };
+
+  const handleUndoClick = () => {
+    cancelCountdown();
   };
 
   // Professional Delete Modal Component
@@ -213,17 +238,56 @@ export const BugHeader = ({
               disabled={isDeleting}
               className="min-w-[80px] bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
             >
-              {isDeleting ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Deleting...</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete Bug</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Bug</span>
+              </div>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Undo Notification Component
+  const UndoNotification = () => (
+    <div className="fixed top-4 right-4 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-2xl p-4 max-w-sm w-full mx-4">
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 w-8 h-8 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+          <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Bug Deleted
+            </h4>
+            <button
+              onClick={handleUndoClick}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+            "{bug.title}" has been deleted
+          </p>
+          <div className="mt-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Auto-deleting in {timeLeft}s
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleUndoClick}
+              className="h-7 px-3 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              <Undo2 className="w-3 h-3 mr-1" />
+              Undo
             </Button>
           </div>
         </div>
@@ -338,6 +402,9 @@ export const BugHeader = ({
 
       {/* Portal-rendered Delete Modal */}
       {showDeleteModal && createPortal(<DeleteModal />, document.body)}
+      
+      {/* Portal-rendered Undo Notification */}
+      {showUndoNotification && createPortal(<UndoNotification />, document.body)}
     </>
   );
 };
