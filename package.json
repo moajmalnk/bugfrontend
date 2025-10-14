@@ -5,12 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:dev": "vite build --mode development",
+    "build": "NODE_ENV=production node scripts/optimize-build.js",
+    "build:dev": "NODE_ENV=development node scripts/optimize-build.js",
+    "build:analyze": "NODE_ENV=production node scripts/optimize-build.js --analyze",
+    "build:simple": "vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "deploy:safe": "node scripts/deploy-safe.js",
-    "deploy:vercel": "vercel --prod --yes"
+    "deploy:vercel": "vercel --prod --yes",
+    "optimize": "node scripts/optimize-build.js",
+    "lighthouse": "lighthouse http://localhost:8080 --output html --output-path ./lighthouse-report.html",
+    "perf:audit": "npm run build && npm run lighthouse"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -60,6 +66,7 @@
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
+    "react-helmet-async": "^2.0.4",
     "react-hook-form": "^7.55.0",
     "react-icons": "^5.5.0",
     "react-markdown": "^10.1.0",

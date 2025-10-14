@@ -1,25 +1,89 @@
 {
-  "short_name": "Bug Ricer",
-  "name": "Bug Ricer | CODO AI Innovations",
+  "name": "BugRicer - Bug Tracking & Project Management",
+  "short_name": "BugRicer",
+  "description": "Professional bug tracking and project management platform for development teams",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "business", "developer"],
   "icons": [
     {
       "src": "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "sizes": "16x16 32x32 48x48",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "sizes": "192x192"
+      "purpose": "any maskable"
     },
     {
       "src": "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png",
+      "sizes": "512x512",
       "type": "image/png",
-      "sizes": "512x512"
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "screenshots": [
+    {
+      "src": "https://bugbackend.bugricer.com/uploads/dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "BugRicer Dashboard"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Bug",
+      "short_name": "New Bug",
+      "description": "Report a new bug",
+      "url": "/bugs/new",
+      "icons": [
+        {
+          "src": "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "short_name": "Projects",
+      "description": "View all projects",
+      "url": "/projects",
+      "icons": [
+        {
+          "src": "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View dashboard",
+      "url": "/dashboard",
+      "icons": [
+        {
+          "src": "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }

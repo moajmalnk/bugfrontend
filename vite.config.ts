@@ -14,7 +14,12 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [
-    react(),
+    react({
+      // Enable SWC optimizations
+      plugins: [
+        // Add any SWC plugins here
+      ],
+    }),
   ],
   resolve: {
     alias: {
@@ -31,12 +36,20 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-dialog',
       '@radix-ui/react-tooltip',
       '@tanstack/react-query',
+      'framer-motion',
+      'lucide-react',
+      'axios',
+    ],
+    exclude: [
+      // Exclude heavy dependencies that should be loaded on demand
     ],
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
-    // Disable chunking for development builds to avoid chunk loading issues
+    sourcemap: mode === 'development',
+    minify: mode === 'production' ? 'esbuild' : false,
+    cssMinify: mode === 'production',
+    // Enhanced chunking strategy for better caching
     rollupOptions: mode === 'development' ? {
       output: {
         manualChunks: undefined,
@@ -46,26 +59,99 @@ export default defineConfig(({ mode }) => ({
         manualChunks: (id) => {
           // Create more stable chunking strategy for production only
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
+            // React ecosystem
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
               return 'react-vendor';
             }
+            // UI Components
             if (id.includes('@radix-ui')) {
-              return 'radix-ui';
+              return 'ui-vendor';
             }
-            if (id.includes('@tanstack')) {
-              return 'tanstack';
+            // Data fetching and state management
+            if (id.includes('@tanstack') || id.includes('axios')) {
+              return 'data-vendor';
             }
+            // Animation and motion
             if (id.includes('framer-motion')) {
-              return 'framer-motion';
+              return 'animation-vendor';
             }
+            // Icons and utilities
+            if (id.includes('lucide-react') || id.includes('clsx') || id.includes('tailwind-merge')) {
+              return 'utils-vendor';
+            }
+            // Charts and visualization
+            if (id.includes('recharts')) {
+              return 'charts-vendor';
+            }
+            // Forms and validation
+            if (id.includes('react-hook-form') || id.includes('zod') || id.includes('@hookform')) {
+              return 'forms-vendor';
+            }
+            // Firebase and external services
+            if (id.includes('firebase') || id.includes('@supabase')) {
+              return 'services-vendor';
+            }
+            // Everything else
             return 'vendor';
+          }
+          
+          // Split by feature for better caching
+          if (id.includes('/pages/')) {
+            const pageName = id.split('/pages/')[1]?.split('/')[0];
+            if (pageName) {
+              return `page-${pageName}`;
+            }
+          }
+          
+          if (id.includes('/components/')) {
+            return 'components';
           }
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
+        assetFileNames: (assetInfo) => {
+          if (!assetInfo.name) return 'assets/[name]-[hash].[ext]';
+          const info = assetInfo.name.split('.');
+          const ext = info[info.length - 1];
+          if (/\.(png|jpe?g|gif|svg|webp|avif)$/.test(assetInfo.name)) {
+            return `assets/images/[name]-[hash].${ext}`;
+          }
+          if (/\.(woff2?|eot|ttf|otf)$/.test(assetInfo.name)) {
+            return `assets/fonts/[name]-[hash].${ext}`;
+          }
+          return `assets/[name]-[hash].${ext}`;
+        },
       },
     },
     chunkSizeWarningLimit: 1000,
+    // Enable tree shaking
+    treeshake: {
+      moduleSideEffects: false,
+    },
+    // Target modern browsers for better performance
+    target: 'esnext',
+    // Enable CSS code splitting
+    cssCodeSplit: true,
+  },
+  // Enhanced CSS handling
+  css: {
+    devSourcemap: mode === 'development',
+    modules: {
+      localsConvention: 'camelCase',
+    },
+  },
+  // Performance optimizations
+  ...(mode === 'production' && {
+    esbuild: {
+      // Enable tree shaking
+      treeShaking: true,
+      // Target modern browsers
+      target: 'esnext',
+    },
+  }),
+  // Define global constants
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
 }));

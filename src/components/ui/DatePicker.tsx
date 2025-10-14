@@ -26,12 +26,14 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className={`w-full justify-start text-left font-normal ${className || ''}`}>
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {selectedDate ? format(selectedDate, 'PPP') : <span className="text-muted-foreground">{placeholder}</span>}
+        <Button variant="outline" className={`w-full justify-start text-left font-normal text-xs sm:text-sm ${className || ''}`}>
+          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+          <span className="truncate">
+            {selectedDate ? format(selectedDate, 'PPP') : <span className="text-muted-foreground">{placeholder}</span>}
+          </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0" align="start" side="bottom" alignOffset={0}>
         <Calendar
           mode="single"
           selected={selectedDate}

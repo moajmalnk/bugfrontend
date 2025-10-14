@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<browserconfig>
+    <msapplication>
+        <tile>
+            <square70x70logo src="https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png"/>
+            <square150x150logo src="https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png"/>
+            <square310x310logo src="https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png"/>
+            <wide310x150logo src="https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png"/>
+            <TileColor>#2563eb</TileColor>
+        </tile>
+    </msapplication>
+</browserconfig>

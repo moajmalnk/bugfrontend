@@ -8,6 +8,7 @@ import { initializeServiceWorker, serviceWorkerManager } from "@/lib/serviceWork
 import { initDevUtils } from "@/lib/devUtils";
 import { QueryClient } from "@tanstack/react-query";
 import { BrowserRouter as Router } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import { requestNotificationPermission } from "./firebase-messaging-sw";
 import ContextMenu from "./components/ContextMenu";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -24,6 +25,11 @@ import { broadcastNotificationService } from "@/services/broadcastNotificationSe
 import NetworkError from './components/NetworkError';
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationSettingsProvider } from "./context/NotificationSettingsContext";
+import { PerformanceMonitor } from "@/components/performance/PerformanceMonitor";
+import { BundleAnalyzer } from "@/components/performance/BundleAnalyzer";
+import { AccessibilityProvider, SkipToContent } from "@/components/accessibility/AccessibilityProvider";
+import { ModernErrorBoundary } from "@/components/error/ModernErrorBoundary";
+import { SEOHead } from "@/components/seo/SEOHead";
 
 // Initialize the query client outside of the component with optimized defaults
 const queryClient = new QueryClient({
@@ -296,6 +302,8 @@ function AppContent() {
 
   return (
     <>
+      <SEOHead />
+      <SkipToContent />
       <OfflineBanner show={isOffline} />
       <div style={{ paddingTop: isOffline ? '3rem' : '0' }}>
         <RouteConfig />
@@ -313,6 +321,8 @@ function AppContent() {
         />
         <TimezoneDebug />
         {networkError && <NetworkError />}
+        <PerformanceMonitor enabled={process.env.NODE_ENV === 'development'} />
+        <BundleAnalyzer enabled={process.env.NODE_ENV === 'development'} />
       </div>
     </>
   );
@@ -524,29 +534,62 @@ function App() {
   const chunkErrorModal = useChunkLoadErrorRefresh();
 
   return (
-    <Router
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
-      <ThemeProvider>
-        <AppProviders queryClient={queryClient}>
-          <AuthProvider>
-            <BugProvider>
-              <NotificationProvider>
-                <NotificationSettingsProvider>
-                  <ErrorBoundaryProvider>
-                    <AppContent />
-                  </ErrorBoundaryProvider>
-                </NotificationSettingsProvider>
-              </NotificationProvider>
-            </BugProvider>
-          </AuthProvider>
-        </AppProviders>
-      </ThemeProvider>
-      {chunkErrorModal}
-    </Router>
+    <HelmetProvider>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        <ThemeProvider>
+          <AccessibilityProvider>
+            <AppProviders queryClient={queryClient}>
+              <AuthProvider>
+                <BugProvider>
+                  <NotificationProvider>
+                    <NotificationSettingsProvider>
+                      <ModernErrorBoundary
+                        fallbackRender={({ error, resetError, retry }) => (
+                          <div className="min-h-screen flex items-center justify-center bg-background p-4">
+                            <div className="max-w-md w-full bg-card rounded-lg shadow-lg p-6 text-center">
+                              <h1 className="text-xl font-semibold text-foreground mb-2">
+                                Application Error
+                              </h1>
+                              <p className="text-muted-foreground mb-4">
+                                Something went wrong. Please try again.
+                              </p>
+                              <div className="space-y-2">
+                                <button
+                                  onClick={retry}
+                                  className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                                >
+                                  Try Again
+                                </button>
+                                <button
+                                  onClick={resetError}
+                                  className="w-full bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors"
+                                >
+                                  Reset
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      >
+                        <ErrorBoundaryProvider>
+                          <AppContent />
+                        </ErrorBoundaryProvider>
+                      </ModernErrorBoundary>
+                    </NotificationSettingsProvider>
+                  </NotificationProvider>
+                </BugProvider>
+              </AuthProvider>
+            </AppProviders>
+          </AccessibilityProvider>
+        </ThemeProvider>
+        {chunkErrorModal}
+      </Router>
+    </HelmetProvider>
   );
 }
 
