@@ -115,13 +115,19 @@ export default function FeedbackModal({ isOpen, onClose, onSubmit }: FeedbackMod
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
-      await fetch(`${ENV.API_URL}/feedback/dismiss.php`, {
+      const response = await fetch(`${ENV.API_URL}/feedback/dismiss.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
+        body: JSON.stringify({}), // Send empty body to indicate dismiss action
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Feedback dismiss error:', errorData.message || 'Failed to dismiss feedback');
+      }
 
       onClose();
     } catch (error) {
