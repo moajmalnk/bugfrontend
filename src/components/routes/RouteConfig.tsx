@@ -77,6 +77,7 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const WhatsAppMessages = lazy(() => import("@/pages/WhatsAppMessages"));
 const MyTasks = lazy(() => import("@/pages/MyTasks"));
 const DailyUpdate = lazy(() => import("@/pages/DailyUpdate"));
+const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 
 // Component to handle role-neutral bug redirects
 const BugRedirect = () => {
@@ -174,6 +175,7 @@ const RouteConfig = () => {
           <Route path="meet/:code" element={<MeetRoom />} />
           <Route path="my-tasks" element={<MyTasks />} />
           <Route path="daily-update" element={<DailyUpdate />} />
+          <Route path="feedback-stats" element={<FeedbackStats />} />
           {/* Redirect from /:role to /:role/projects */}
           <Route index element={<Navigate to="projects" replace />} />
         </Route>

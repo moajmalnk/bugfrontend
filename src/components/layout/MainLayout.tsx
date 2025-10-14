@@ -10,6 +10,7 @@ import FirebaseListener from "../messaging/FirebaseListener";
 import AnnouncementPopup from "../ui/AnnouncementPopup";
 import { ImpersonateBanner } from "../ui/ImpersonateBanner";
 import { Sidebar } from "./Sidebar";
+import FeedbackWidget from "../feedback/FeedbackWidget";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -152,6 +153,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       </div>
       <AnnouncementPopup />
       <FirebaseListener />
+      <FeedbackWidget />
     </NotificationProvider>
   );
 };

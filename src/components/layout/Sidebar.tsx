@@ -16,6 +16,7 @@ import {
   X,
   FileText,
   ListTodo,
+  BarChart3,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -179,6 +180,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   to="/whatsapp-messages"
                   icon={<MessageCircle className="h-5 w-5" />}
                   label="WhatsApp"
+                />
+                <NavLink
+                  to="/feedback-stats"
+                  icon={<BarChart3 className="h-5 w-5" />}
+                  label="Feedback Stats"
                 />
                 <NavLink
                   to="/meet"
