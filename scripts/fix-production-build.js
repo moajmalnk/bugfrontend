@@ -37,7 +37,7 @@ try {
 // Step 3: Run optimized build
 console.log('3. Running optimized build...');
 try {
-  const buildCommand = PRODUCTION_BUILD ? 'npm run build' : 'npm run build:dev';
+  const buildCommand = PRODUCTION_BUILD ? 'npx vite build' : 'npx vite build --mode development';
   execSync(buildCommand, { stdio: 'inherit', cwd: path.join(__dirname, '..') });
   console.log('✅ Build completed successfully\n');
 } catch (error) {
