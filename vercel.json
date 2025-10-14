@@ -68,6 +68,10 @@
         {
           "key": "Access-Control-Allow-Methods",
           "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type"
         }
       ]
     },
@@ -98,6 +102,10 @@
         {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "unsafe-none"
         }
       ]
     },
@@ -126,6 +134,26 @@
           "value": "public, max-age=0, must-revalidate"
         }
       ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
-  ]
+  ],
+  "functions": {
+    "dist/assets/**/*.js": {
+      "headers": {
+        "Content-Type": "application/javascript; charset=utf-8"
+      }
+    }
+  }
 }
