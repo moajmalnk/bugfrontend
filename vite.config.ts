@@ -80,16 +80,8 @@ export default defineConfig(({ mode }) => ({
             return 'react-core';
           }
           
-          // Split by feature for better caching
-          if (id.includes('/pages/')) {
-            const pageName = id.split('/pages/')[1]?.split('/')[0];
-            if (pageName) {
-              return `page-${pageName}`;
-            }
-          }
-          
-          // Components depend on React, so include them in react-core to ensure proper loading order
-          if (id.includes('/components/')) {
+          // Move ALL pages and components to react-core to prevent any dependency issues
+          if (id.includes('/pages/') || id.includes('/components/')) {
             return 'react-core';
           }
         },
