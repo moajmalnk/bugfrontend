@@ -109,78 +109,93 @@ export function ProfessionalMessageComposer({
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageCircle className="w-5 h-5" />
-          Professional Message Composer
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Recipient Selection */}
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Recipient
-          </Label>
-          <UserPhoneSelector
-            selectedUserId={selectedUser?.id}
-            onUserSelect={setSelectedUser}
-          />
-        </div>
-
-        {/* Message Template Selection */}
-        {showTemplates && (
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Message Template
-            </Label>
-            <MessageTemplateSelector onTemplateSelect={handleTemplateSelect} />
+    <div className="w-full space-y-6">
+      {/* Recipient Selection */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50/50 to-green-50/50 dark:from-blue-950/20 dark:to-green-950/20 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+          <div className="p-2 bg-blue-500 rounded-lg">
+            <User className="w-4 h-4 text-white" />
           </div>
-        )}
-
-        {/* Message Content */}
-        <div className="space-y-2">
-          <Label htmlFor="message">Message Content</Label>
-          <Textarea
-            id="message"
-            placeholder="Type your message here... Use {USER_NAME}, {USER_EMAIL}, {USER_PHONE}, {USER_ROLE} for personalization"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className="min-h-[120px]"
-          />
+          <div className="flex-1">
+            <Label className="text-sm font-semibold text-gray-900 dark:text-white">Recipient</Label>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Select who will receive this message</p>
+          </div>
         </div>
+        <UserPhoneSelector
+          selectedUserId={selectedUser?.id}
+          onUserSelect={setSelectedUser}
+        />
+      </div>
 
-        {/* Message Preview */}
-        {messagePreview && messagePreview !== message && (
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="w-4 h-4" />
-              Message Preview
-            </Label>
-            <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md">
-              <p className="text-sm whitespace-pre-wrap">{messagePreview}</p>
+      {/* Message Template Selection */}
+      {showTemplates && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+            <div className="p-2 bg-purple-500 rounded-lg">
+              <FileText className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <Label className="text-sm font-semibold text-gray-900 dark:text-white">Message Template</Label>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Choose from predefined templates</p>
             </div>
           </div>
-        )}
-
-        {/* Send Button */}
-        <div className="flex justify-end">
-          <Button
-            onClick={handleSendMessage}
-            disabled={
-              isSending ||
-              !selectedUser ||
-              !(message && typeof message === "string" && message.trim())
-            }
-            className="flex items-center gap-2"
-          >
-            <Send className="w-4 h-4" />
-            {isSending ? "Sending..." : "Send Message"}
-          </Button>
+          <MessageTemplateSelector onTemplateSelect={handleTemplateSelect} />
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {/* Message Content */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/20 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+          <div className="p-2 bg-green-500 rounded-lg">
+            <MessageCircle className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1">
+            <Label htmlFor="message" className="text-sm font-semibold text-gray-900 dark:text-white">Message Content</Label>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Use variables like {`{USER_NAME}`}, {`{USER_EMAIL}`}, {`{USER_PHONE}`}, {`{USER_ROLE}`} for personalization</p>
+          </div>
+        </div>
+        <Textarea
+          id="message"
+          placeholder="Type your message here... Use {USER_NAME}, {USER_EMAIL}, {USER_PHONE}, {USER_ROLE} for personalization"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          className="min-h-[120px] border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+        />
+      </div>
+
+      {/* Message Preview */}
+      {messagePreview && messagePreview !== message && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+            <div className="p-2 bg-emerald-500 rounded-lg">
+              <CheckCircle className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <Label className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Message Preview</Label>
+              <p className="text-xs text-gray-600 dark:text-gray-400">How your message will appear to the recipient</p>
+            </div>
+          </div>
+          <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
+            <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed">{messagePreview}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Send Button */}
+      <div className="flex justify-end pt-4">
+        <Button
+          onClick={handleSendMessage}
+          disabled={
+            isSending ||
+            !selectedUser ||
+            !(message && typeof message === "string" && message.trim())
+          }
+          className="h-12 px-8 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 rounded-xl"
+        >
+          <Send className="w-5 h-5 mr-2" />
+          {isSending ? "Sending..." : "Send Message"}
+        </Button>
+      </div>
+    </div>
   );
 }
