@@ -148,12 +148,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "dist/assets/**/*.js": {
-      "headers": {
-        "Content-Type": "application/javascript; charset=utf-8"
-      }
-    }
-  }
+  ]
 }

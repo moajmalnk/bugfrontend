@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/tooltip";
 import { toast, useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { ENV } from "@/lib/env";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService } from "@/services/bugService";
@@ -49,9 +50,12 @@ import {
   FolderKanban,
   Shield,
   TestTube,
+  Trash2,
+  Undo2,
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 
 // Enhanced Project Card Skeleton component for loading state
@@ -117,6 +121,8 @@ const Projects = () => {
   const tabFromUrl = searchParams.get("tab") || (currentUser?.role === "admin" ? "all-projects" : "overview");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [showUndoNotification, setShowUndoNotification] = useState(false);
+  const [projectToUndo, setProjectToUndo] = useState<Project | null>(null);
 
   useEffect(() => {
     // Fetch projects when component mounts
@@ -420,8 +426,117 @@ const Projects = () => {
     }
   };
 
+  // Undo delete functionality
+  const { isCountingDown, timeLeft, startCountdown, cancelCountdown } = useUndoDelete({
+    duration: 10,
+    onConfirm: async () => {
+      if (!projectToUndo) return;
+
+      try {
+        // Use direct URL construction to match what works in Postman
+        const baseUrl = `${ENV.API_URL}/projects/delete.php?id=${projectToUndo.id}`;
+        const url = baseUrl; // For now, we'll use regular delete, not force delete
+
+        console.log("Delete URL:", url);
+
+        const token = localStorage.getItem("token");
+        if (!token) {
+          toast({
+            title: "Error",
+            description: "Authentication required",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        console.log("Making DELETE request to:", url);
+        const response = await fetch(url, {
+          method: "DELETE",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        console.log("Response status:", response.status);
+        
+        let data;
+        try {
+          data = await response.json();
+          console.log("Response data:", data);
+        } catch (jsonError) {
+          console.error("Failed to parse JSON response:", jsonError);
+          const textResponse = await response.text();
+          console.log("Raw response text:", textResponse);
+          toast({
+            title: "Error",
+            description: "Invalid response from server",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (data.success) {
+          // Update both project arrays
+          setProjects((prevProjects) =>
+            prevProjects.filter((p) => p.id !== projectToUndo.id)
+          );
+          setFilteredProjects((prevProjects) =>
+            prevProjects.filter((p) => p.id !== projectToUndo.id)
+          );
+
+          toast({
+            title: "Project Deleted",
+            description: `"${projectToUndo.name}" has been permanently deleted.`,
+          });
+        } else {
+          // Check for constraint errors
+          if (
+            data.message?.includes("team members") ||
+            data.message?.includes("bugs") ||
+            data.message?.includes("constraint")
+          ) {
+            setDeleteErrorMessage(data.message);
+            setIsErrorDialogOpen(true);
+            // Don't show undo notification if there are constraints
+            setShowUndoNotification(false);
+            setProjectToUndo(null);
+          } else {
+            toast({
+              title: "Error",
+              description: data.message || "Failed to delete project",
+              variant: "destructive",
+            });
+          }
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete project. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setShowUndoNotification(false);
+        setProjectToUndo(null);
+      }
+    },
+    onUndo: () => {
+      setShowUndoNotification(false);
+      setProjectToUndo(null);
+      toast({
+        title: "Delete Cancelled",
+        description: "Project deletion has been cancelled.",
+      });
+    },
+  });
+
   const handleDelete = async (projectId: string, force: boolean = false) => {
     if (!projectId) return;
+
+    // Find the project to delete
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
 
     // Close the delete dialog if it's open
     if (isDeleteDialogOpen) {
@@ -433,81 +548,69 @@ const Projects = () => {
       setIsErrorDialogOpen(false);
     }
 
-    try {
-      // Use direct URL construction to match what works in Postman
-      // Force parameter is only added if true
-      const baseUrl = `${ENV.API_URL}/projects/delete.php?id=${projectId}`;
-      const url = force ? `${baseUrl}&force_delete=true` : baseUrl;
-
-      console.log("Delete URL:", url);
-      console.log("Force delete:", force);
-
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast({
-          title: "Error",
-          description: "Authentication required",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log("Making DELETE request to:", url);
-      const response = await fetch(url, {
-        method: "DELETE",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      console.log("Response status:", response.status);
-      console.log("Response headers:", response.headers);
-      
-      let data;
+    // If force delete, proceed immediately without undo
+    if (force) {
       try {
-        data = await response.json();
-        console.log("Response data:", data);
-      } catch (jsonError) {
-        console.error("Failed to parse JSON response:", jsonError);
-        const textResponse = await response.text();
-        console.log("Raw response text:", textResponse);
-        toast({
-          title: "Error",
-          description: "Invalid response from server",
-          variant: "destructive",
+        // Use direct URL construction to match what works in Postman
+        const baseUrl = `${ENV.API_URL}/projects/delete.php?id=${projectId}`;
+        const url = `${baseUrl}&force_delete=true`;
+
+        console.log("Force Delete URL:", url);
+
+        const token = localStorage.getItem("token");
+        if (!token) {
+          toast({
+            title: "Error",
+            description: "Authentication required",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        console.log("Making DELETE request to:", url);
+        const response = await fetch(url, {
+          method: "DELETE",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         });
-        return;
-      }
 
-      if (data.success) {
-        // Update both project arrays
-        setProjects((prevProjects) =>
-          prevProjects.filter((p) => p.id !== projectId)
-        );
-        setFilteredProjects((prevProjects) =>
-          prevProjects.filter((p) => p.id !== projectId)
-        );
+        console.log("Response status:", response.status);
+        
+        let data;
+        try {
+          data = await response.json();
+          console.log("Response data:", data);
+        } catch (jsonError) {
+          console.error("Failed to parse JSON response:", jsonError);
+          const textResponse = await response.text();
+          console.log("Raw response text:", textResponse);
+          toast({
+            title: "Error",
+            description: "Invalid response from server",
+            variant: "destructive",
+          });
+          return;
+        }
 
-        // Clear the project to delete state
-        setProjectToDelete(null);
+        if (data.success) {
+          // Update both project arrays
+          setProjects((prevProjects) =>
+            prevProjects.filter((p) => p.id !== projectId)
+          );
+          setFilteredProjects((prevProjects) =>
+            prevProjects.filter((p) => p.id !== projectId)
+          );
 
-        toast({
-          title: "Success",
-          description: force
-            ? "Project and all related data deleted successfully"
-            : "Project deleted successfully",
-        });
-      } else {
-        // Check for constraint errors
-        if (
-          data.message?.includes("team members") ||
-          data.message?.includes("bugs") ||
-          data.message?.includes("constraint")
-        ) {
-          setDeleteErrorMessage(data.message);
-          setIsErrorDialogOpen(true);
+          // Clear the project to delete state
+          setProjectToDelete(null);
+
+          toast({
+            title: "Success",
+            description: "Project and all related data deleted successfully",
+          });
         } else {
           toast({
             title: "Error",
@@ -515,14 +618,24 @@ const Projects = () => {
             variant: "destructive",
           });
         }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete project. Please try again.",
+          variant: "destructive",
+        });
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete project. Please try again.",
-        variant: "destructive",
-      });
+      return;
     }
+
+    // For regular delete, start the undo countdown
+    setProjectToUndo(project);
+    setShowUndoNotification(true);
+    startCountdown();
+  };
+
+  const handleUndoClick = () => {
+    cancelCountdown();
   };
 
   const handleTabChange = (tab) => {
