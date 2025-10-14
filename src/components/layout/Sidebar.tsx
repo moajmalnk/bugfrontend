@@ -147,16 +147,17 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             {/* Daily Update & My Tasks - Only for Admins and Developers */}
             {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
               <>
+               <NavLink
+                  to="/my-tasks"
+                  icon={<ListTodo className="h-5 w-5" />}
+                  label="BugToDo"
+                />
                 <NavLink
                   to="/daily-update"
                   icon={<FileText className="h-5 w-5" />}
                   label="Daily Update"
                 />
-                <NavLink
-                  to="/my-tasks"
-                  icon={<ListTodo className="h-5 w-5" />}
-                  label="BugToDo"
-                />
+                
               </>
             )}
           </div>
@@ -184,7 +185,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 <NavLink
                   to="/feedback-stats"
                   icon={<BarChart3 className="h-5 w-5" />}
-                  label="Feedback Stats"
+                  label="Feedbacks"
                 />
                 <NavLink
                   to="/meet"
