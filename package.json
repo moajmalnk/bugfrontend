@@ -11,6 +11,7 @@
     "build:simple": "vite build",
     "build:fix": "NODE_ENV=production node scripts/fix-production-build.js",
     "build:mime-fix": "NODE_ENV=production node scripts/fix-production-mime-issues.js",
+    "build:component-fix": "NODE_ENV=production node scripts/fix-component-dependency-issue.js",
     "deploy:fix": "node scripts/deploy-production-fix.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
