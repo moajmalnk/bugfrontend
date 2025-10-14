@@ -8,6 +8,10 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     http: {},
+    // Force cache busting in development
+    hmr: {
+      overlay: true,
+    },
   },
   plugins: [
     react(),
@@ -17,42 +21,51 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Force fresh chunks in development
+  optimizeDeps: {
+    force: true,
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-tooltip',
+      '@tanstack/react-query',
+    ],
+  },
   build: {
     outDir: "dist",
     sourcemap: true,
-    rollupOptions: {
+    // Disable chunking for development builds to avoid chunk loading issues
+    rollupOptions: mode === 'development' ? {
       output: {
-        manualChunks: {
-          vendor: [
-            'react',
-            'react-dom',
-            'react-router-dom',
-            '@tanstack/react-query',
-            'axios',
-          ],
-          ui: [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-tooltip',
-            'framer-motion',
-          ],
+        manualChunks: undefined,
+      },
+    } : {
+      output: {
+        manualChunks: (id) => {
+          // Create more stable chunking strategy for production only
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'react-vendor';
+            }
+            if (id.includes('@radix-ui')) {
+              return 'radix-ui';
+            }
+            if (id.includes('@tanstack')) {
+              return 'tanstack';
+            }
+            if (id.includes('framer-motion')) {
+              return 'framer-motion';
+            }
+            return 'vendor';
+          }
         },
-        chunkFileNames: (chunkInfo) => {
-          const facadeModuleId = chunkInfo.facadeModuleId
-            ? chunkInfo.facadeModuleId.split('/').pop()?.replace('.tsx', '').replace('.ts', '') || 'chunk'
-            : 'chunk';
-          return `assets/${facadeModuleId}-[hash].js`;
-        },
+        chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
-    // Ensure proper chunking for better caching
     chunkSizeWarningLimit: 1000,
-    // Add build timestamp to prevent caching issues
-    define: {
-      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-    },
   },
 }));
