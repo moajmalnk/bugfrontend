@@ -58,28 +58,75 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 
-// Enhanced Project Card Skeleton component for loading state
-const ProjectCardSkeleton = () => (
-  <Card className="flex flex-col h-full rounded-xl shadow-sm border border-border bg-background/90 hover:shadow-md transition-all duration-200">
-    <CardHeader className="pb-2 p-4 sm:p-5">
-      <Skeleton className="h-6 sm:h-7 w-3/4 mb-2" />
-      <Skeleton className="h-4 sm:h-5 w-1/2" />
-    </CardHeader>
-    <CardContent className="flex-1 flex flex-col justify-end px-4 sm:px-5">
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
-        <Skeleton className="h-5 sm:h-6 w-16 sm:w-20" />
-        <div className="ml-auto flex flex-col items-start gap-1 min-w-[110px] sm:min-w-[130px] rounded-md">
-          <Skeleton className="h-4 sm:h-5 w-24 sm:w-28 mb-1" />
-          <Skeleton className="h-3 sm:h-4 w-20 sm:w-24 mb-1" />
-          <Skeleton className="h-3 sm:h-4 w-20 sm:w-24" />
+// Enhanced Professional Project Card Skeleton with animations
+const ProjectCardSkeleton = ({ index = 0 }: { index?: number }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3, delay: index * 0.1 }}
+  >
+    <Card className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex flex-col h-full shadow-sm transition-all duration-300 hover:shadow-2xl">
+      {/* Animated gradient overlay */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-emerald-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-emerald-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      
+      {/* Header skeleton */}
+      <CardHeader className="pb-2 p-4 sm:p-5">
+        <div className="flex items-center justify-between mb-2">
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-4 w-20" />
         </div>
-      </div>
-    </CardContent>
-    <CardFooter className="flex flex-col gap-2 sm:gap-3 sm:flex-row mt-auto p-4 sm:p-5">
-      <Skeleton className="h-8 sm:h-10 w-full sm:w-24" />
-      <Skeleton className="h-8 sm:h-10 w-full sm:w-24" />
-    </CardFooter>
-  </Card>
+        <Skeleton className="h-6 sm:h-7 w-3/4 mb-2" />
+        <Skeleton className="h-4 sm:h-5 w-full" />
+        <Skeleton className="h-4 sm:h-5 w-2/3 mt-1" />
+      </CardHeader>
+      
+      {/* Content skeleton */}
+      <CardContent className="flex-1 flex flex-col justify-end px-4 sm:px-5">
+        <div className="flex flex-col gap-3">
+          {/* Bug stats skeleton */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-2">
+            <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-blue-50/70 dark:bg-blue-900/20">
+              <Skeleton className="h-3 w-8 mb-1" />
+              <Skeleton className="h-5 w-6 mb-1" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+            <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-yellow-50/70 dark:bg-yellow-900/20">
+              <Skeleton className="h-3 w-8 mb-1" />
+              <Skeleton className="h-5 w-6 mb-1" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+            <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-green-50/70 dark:bg-green-900/20">
+              <Skeleton className="h-3 w-8 mb-1" />
+              <Skeleton className="h-5 w-6 mb-1" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+          </div>
+          
+          {/* Team stats skeleton */}
+          <div className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/20">
+            <div className="flex items-center">
+              <Skeleton className="h-4 w-4 mr-2 rounded" />
+              <Skeleton className="h-4 w-12" />
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Skeleton className="h-4 w-4 rounded" />
+              <Skeleton className="h-3 w-4" />
+              <Skeleton className="h-4 w-4 rounded" />
+              <Skeleton className="h-3 w-4" />
+              <Skeleton className="h-4 w-4 rounded" />
+              <Skeleton className="h-3 w-4" />
+            </div>
+          </div>
+        </div>
+      </CardContent>
+      
+      {/* Footer skeleton */}
+      <CardFooter className="flex flex-col gap-2 sm:gap-3 sm:flex-row mt-auto p-4 sm:p-5">
+        <Skeleton className="h-11 w-full sm:flex-1" />
+        <Skeleton className="h-11 w-full sm:flex-1" />
+      </CardFooter>
+    </Card>
+  </motion.div>
 );
 
 interface ProjectMemberCounts {
@@ -132,41 +179,45 @@ const Projects = () => {
   const fetchProjects = async () => {
     try {
       setIsLoading(true);
-      setSkeletonLoading(true); // Ensure skeleton is showing while fetching
+      setSkeletonLoading(true);
 
+      // Show skeleton immediately for better UX
       const data = await projectService.getProjects();
       setProjects(data);
-
-      // Initialize filteredProjects with the fetched data to avoid showing "No projects found"
-      // But we won't display them until membership is checked
       setFilteredProjects(data);
+
+      // For better UX, if there are no projects, show empty state immediately
+      if (data.length === 0) {
+        setSkeletonLoading(false);
+      }
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to load projects. Please try again.",
         variant: "destructive",
       });
-      // On error, turn off skeleton loading since membership check won't run
       setSkeletonLoading(false);
     } finally {
       setIsLoading(false);
-      // We'll keep skeleton loading active until membership check completes
     }
   };
 
   useEffect(() => {
     if (projects.length > 0) {
-      // Check user membership first, then fetch bugs
-      checkUserMembership().then(() => {
-        fetchAndCountBugs();
-        fetchProjectMembers();
+      // Optimize: Run all data fetching operations in parallel
+      Promise.all([
+        checkUserMembership(),
+        fetchProjectMembers(),
+        fetchAndCountBugs()
+      ]).finally(() => {
+        setSkeletonLoading(false);
       });
     }
   }, [projects]);
 
   // Apply filtering whenever search query, memberships, tab, or filters change
   useEffect(() => {
-    if (projects.length > 0) {
+    if (projects.length > 0 && Object.keys(userProjectMemberships).length > 0) {
       applyFilters();
     }
   }, [searchQuery, userProjectMemberships, projects, tabFromUrl, statusFilter, dateFilter]);
@@ -176,17 +227,15 @@ const Projects = () => {
     setCurrentPage(1);
   }, [searchQuery, userProjectMemberships, projects.length, statusFilter, dateFilter]);
 
-  // Check if the current user is a member of each project
+  // Optimized membership checking with parallel requests
   const checkUserMembership = async () => {
     if (!currentUser) {
-      setSkeletonLoading(false);
       return;
     }
 
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        setSkeletonLoading(false);
         return;
       }
 
@@ -198,46 +247,50 @@ const Projects = () => {
           memberships[project.id] = true;
         });
         setUserProjectMemberships(memberships);
-        //.log("Memberships:", memberships);
-        setSkeletonLoading(false);
         return;
       }
 
-      // For developers and testers, check each project
-      for (const project of projects) {
-        const response = await fetch(
-          `${ENV.API_URL}/projects/get_members.php?project_id=${project.id}`,
-          {
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+      // For developers and testers, make parallel requests for all projects
+      const membershipPromises = projects.map(async (project) => {
+        try {
+          const response = await fetch(
+            `${ENV.API_URL}/projects/get_members.php?project_id=${project.id}`,
+            {
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            // Check if current user is in the members list
-            const members = data.data?.members || [];
-            const isMember = members.some(
-              (member) => String(member.id) === String(currentUser.id)
-            );
-            memberships[project.id] = isMember;
-            //.log("API members for project", project.id, data.members);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              const members = data.data?.members || [];
+              const isMember = members.some(
+                (member) => String(member.id) === String(currentUser.id)
+              );
+              return { projectId: project.id, isMember };
+            }
           }
+          return { projectId: project.id, isMember: false };
+        } catch (error) {
+          return { projectId: project.id, isMember: false };
         }
-      }
+      });
+
+      // Wait for all membership checks to complete
+      const results = await Promise.all(membershipPromises);
+      
+      // Build memberships object
+      results.forEach(({ projectId, isMember }) => {
+        memberships[projectId] = isMember;
+      });
 
       setUserProjectMemberships(memberships);
-      //.log("Memberships:", memberships);
-
-      // Turn off skeleton loading only after membership check is complete
-      setSkeletonLoading(false);
     } catch (error) {
-      // Even on error, turn off skeleton loading
-      setSkeletonLoading(false);
+      console.error("Error checking memberships:", error);
     }
   };
 
@@ -325,44 +378,53 @@ const Projects = () => {
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      // For each project, fetch its members
-      const memberCounts: Record<string, ProjectMemberCounts> = {};
+      // Make parallel requests for all projects
+      const memberPromises = projects.map(async (project) => {
+        try {
+          const response = await fetch(
+            `${ENV.API_URL}/projects/get_members.php?project_id=${project.id}`,
+            {
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
 
-      for (const project of projects) {
-        const response = await fetch(
-          `${ENV.API_URL}/projects/get_members.php?project_id=${project.id}`,
-          {
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              const members = data.data?.members || [];
+              const devCount = members.filter((m) => m.role === "developer").length;
+              const testerCount = members.filter((m) => m.role === "tester").length;
+
+              return {
+                projectId: project.id,
+                counts: {
+                  total: members.length,
+                  developers: devCount,
+                  testers: testerCount,
+                }
+              };
+            }
           }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            const members = data.data?.members || [];
-            const devCount = members.filter(
-              (m) => m.role === "developer"
-            ).length;
-            const testerCount = members.filter(
-              (m) => m.role === "tester"
-            ).length;
-
-            memberCounts[project.id] = {
-              total: members.length,
-              developers: devCount,
-              testers: testerCount,
-            };
-          }
+          return { projectId: project.id, counts: { total: 0, developers: 0, testers: 0 } };
+        } catch (error) {
+          return { projectId: project.id, counts: { total: 0, developers: 0, testers: 0 } };
         }
-      }
+      });
+
+      const results = await Promise.all(memberPromises);
+      const memberCounts: Record<string, ProjectMemberCounts> = {};
+      
+      results.forEach(({ projectId, counts }) => {
+        memberCounts[projectId] = counts;
+      });
 
       setProjectMemberCounts(memberCounts);
     } catch (error) {
-      // Silent fail
+      console.error("Error fetching project members:", error);
     }
   };
 
@@ -372,33 +434,56 @@ const Projects = () => {
       const openCounts: Record<string, number> = {};
       const fixedCounts: Record<string, number> = {};
 
-      for (const project of projects) {
-        if (!userProjectMemberships[project.id]) continue;
-        const { bugs } = await bugService.getBugs({
-          projectId: project.id,
-          page: 1,
-          limit: 1000,
-          status: "pending",
-          userId: currentUser?.id,
-        });
-        const totalBugs = bugs.length;
+      // Only fetch bugs for projects where user is a member
+      const accessibleProjects = projects.filter(project => 
+        userProjectMemberships[project.id] || currentUser?.role === "admin"
+      );
 
-        totalCounts[project.id] = totalBugs;
+      // Make parallel requests for all accessible projects
+      const bugPromises = accessibleProjects.map(async (project) => {
+        try {
+          const { bugs } = await bugService.getBugs({
+            projectId: project.id,
+            page: 1,
+            limit: 1000,
+            status: "pending",
+            userId: currentUser?.id,
+          });
 
-        const openBugs = bugs.filter(
-          (bug) => bug.status === "pending" || bug.status === "in_progress"
-        );
-        openCounts[project.id] = openBugs.length;
+          const openBugs = bugs.filter(
+            (bug) => bug.status === "pending" || bug.status === "in_progress"
+          );
+          const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
 
-        const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
-        fixedCounts[project.id] = fixedBugs.length;
-      }
+          return {
+            projectId: project.id,
+            total: bugs.length,
+            open: openBugs.length,
+            fixed: fixedBugs.length,
+          };
+        } catch (error) {
+          return {
+            projectId: project.id,
+            total: 0,
+            open: 0,
+            fixed: 0,
+          };
+        }
+      });
+
+      const results = await Promise.all(bugPromises);
+      
+      results.forEach(({ projectId, total, open, fixed }) => {
+        totalCounts[projectId] = total;
+        openCounts[projectId] = open;
+        fixedCounts[projectId] = fixed;
+      });
 
       setProjectBugsCount(totalCounts);
       setProjectOpenBugsCount(openCounts);
       setProjectFixedBugsCount(fixedCounts);
     } catch (error) {
-      // Fallback: do nothing
+      console.error("Error fetching bug counts:", error);
     }
   };
 
