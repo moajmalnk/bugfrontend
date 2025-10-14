@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { setGlobalLoadingErrorModal } from '@/utils/testLoadingError';
 
 interface LoadingErrorModalState {
   isOpen: boolean;
@@ -88,6 +89,17 @@ export function useLoadingErrorModal(): UseLoadingErrorModalReturn {
   const handleCancel = useCallback(() => {
     hideModal();
   }, [hideModal]);
+
+  // Register globally for testing in development
+  useEffect(() => {
+    setGlobalLoadingErrorModal({
+      showModal,
+      hideModal,
+      handleRetry,
+      handleRefresh,
+      handleCancel,
+    });
+  }, [showModal, hideModal, handleRetry, handleRefresh, handleCancel]);
 
   // Set up global error handlers
   useEffect(() => {

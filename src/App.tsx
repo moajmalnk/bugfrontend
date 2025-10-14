@@ -21,6 +21,7 @@ import { ChunkErrorHandler } from "@/components/ChunkErrorHandler";
 import { useAuth } from "@/context/AuthContext";
 import { LoadingErrorModal } from "@/components/ui/LoadingErrorModal";
 import { useLoadingErrorModal } from "@/hooks/useLoadingErrorModal";
+import "@/utils/testLoadingError"; // Import for development testing
 import { BugProvider } from "@/context/BugContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
