@@ -132,6 +132,10 @@ export default defineConfig(({ mode }) => ({
     target: 'esnext',
     // Enable CSS code splitting
     cssCodeSplit: true,
+    // Ensure proper module format
+    modulePreload: {
+      polyfill: true,
+    },
   },
   // Enhanced CSS handling
   css: {
