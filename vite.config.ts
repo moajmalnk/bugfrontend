@@ -59,29 +59,20 @@ export default defineConfig(({ mode }) => ({
         manualChunks: (id) => {
           // Create more stable chunking strategy for production only
           if (id.includes('node_modules')) {
-            // Core React ecosystem - MUST be in the same chunk to prevent dependency issues
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || id.includes('framer-motion')) {
+            // ALL React-dependent libraries MUST be in react-core to prevent dependency issues
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || 
+                id.includes('framer-motion') || id.includes('@radix-ui') || id.includes('@tanstack') ||
+                id.includes('lucide-react') || id.includes('recharts') || id.includes('react-hook-form') ||
+                id.includes('@hookform') || id.includes('clsx') || id.includes('tailwind-merge') ||
+                id.includes('sonner') || id.includes('next-themes') || id.includes('react-helmet-async') ||
+                id.includes('react-day-picker') || id.includes('react-resizable-panels') ||
+                id.includes('react-markdown') || id.includes('input-otp') || id.includes('vaul') ||
+                id.includes('cmdk') || id.includes('embla-carousel-react') || id.includes('class-variance-authority')) {
               return 'react-core';
             }
-            // UI Components - depends on React, include in react-core for dependency safety
-            if (id.includes('@radix-ui')) {
-              return 'react-core';
-            }
-            // Data fetching and state management
-            if (id.includes('@tanstack') || id.includes('axios')) {
+            // Data fetching (non-React)
+            if (id.includes('axios')) {
               return 'data-vendor';
-            }
-            // Icons and utilities
-            if (id.includes('lucide-react') || id.includes('clsx') || id.includes('tailwind-merge')) {
-              return 'utils-vendor';
-            }
-            // Charts and visualization
-            if (id.includes('recharts')) {
-              return 'charts-vendor';
-            }
-            // Forms and validation
-            if (id.includes('react-hook-form') || id.includes('zod') || id.includes('@hookform')) {
-              return 'forms-vendor';
             }
             // Firebase and external services
             if (id.includes('firebase') || id.includes('@supabase')) {
