@@ -222,90 +222,100 @@ export function BulkMessageSender({
   const roles = Array.from(new Set(users.map((u) => u.role)));
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="w-5 h-5" />
-          Bulk Message Sender
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Filters */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+    <div className={`w-full space-y-6 ${className || ''}`}>
+      {/* Search and Quick Selection */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+          <div className="p-2 bg-blue-500 rounded-lg">
+            <Users className="w-4 h-4 text-white" />
           </div>
-
-          {/* Quick Selection */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSelectAll}
-              disabled={loading}
-            >
-              {selectedUsers.size === filteredUsers.length
-                ? "Deselect All"
-                : "Select All"}
-            </Button>
-            {roles.map((role) => (
-              <Button
-                key={role}
-                variant="outline"
-                size="sm"
-                onClick={() => handleSelectByRole(role)}
-                disabled={loading}
-              >
-                Select {role} ({getSelectedRoleCount(role)}/{getRoleCount(role)}
-                )
-              </Button>
-            ))}
+          <div className="flex-1">
+            <Label className="text-sm font-semibold text-gray-900 dark:text-white">Recipients</Label>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Search and select users to send messages to</p>
           </div>
         </div>
+        
+        <Input
+          placeholder="Search users by name, username, phone, or email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+        />
 
-        {/* User List */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">
+        {/* Quick Selection */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSelectAll}
+            disabled={loading}
+            className="h-9 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 rounded-xl"
+          >
+            {selectedUsers.size === filteredUsers.length
+              ? "Deselect All"
+              : "Select All"}
+          </Button>
+          {roles.map((role) => (
+            <Button
+              key={role}
+              variant="outline"
+              size="sm"
+              onClick={() => handleSelectByRole(role)}
+              disabled={loading}
+              className="h-9 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 dark:hover:border-purple-700 text-gray-700 dark:text-gray-300 hover:text-purple-700 dark:hover:text-purple-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 rounded-xl"
+            >
+              Select {role} ({getSelectedRoleCount(role)}/{getRoleCount(role)})
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* User List */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold text-gray-900 dark:text-white">
             Recipients ({selectedUsers.size} selected)
           </Label>
-          <div className="max-h-60 overflow-y-auto border rounded-lg p-2 space-y-2 custom-scrollbar">
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            {filteredUsers.length} users available
+          </div>
+        </div>
+        <div className="max-h-60 overflow-y-auto border border-gray-200/50 dark:border-gray-700/50 rounded-xl bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="p-4 space-y-3">
             {loading ? (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-2 text-sm text-muted-foreground">
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                <p className="mt-3 text-sm text-gray-600 dark:text-gray-400 font-medium">
                   Loading users...
                 </p>
               </div>
             ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground">
-                No users found
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm font-medium">No users found</p>
+                <p className="text-xs">Try adjusting your search criteria</p>
               </div>
             ) : (
               filteredUsers.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded"
+                  className="flex items-center gap-3 p-3 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 dark:hover:from-blue-950/20 dark:hover:to-purple-950/20 rounded-xl transition-all duration-200 group"
                 >
                   <Checkbox
                     checked={selectedUsers.has(user.id)}
                     onCheckedChange={() => handleUserToggle(user.id)}
+                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">
+                      <span className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
                         {user.name || user.username}
                       </span>
-                      <span className="text-xs bg-muted px-2 py-1 rounded">
+                      <span className="text-xs bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-lg font-medium">
                         {user.role}
                       </span>
                     </div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       {user.phone} • {user.email}
                     </div>
                   </div>
@@ -314,89 +324,103 @@ export function BulkMessageSender({
             )}
           </div>
         </div>
+      </div>
 
-        {/* Message Template */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Message Template
-          </Label>
-          <MessageTemplateSelector
-            onTemplateSelect={handleTemplateSelect}
-            disabled={isSending}
-          />
+      {/* Message Template */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+          <div className="p-2 bg-purple-500 rounded-lg">
+            <FileText className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1">
+            <Label className="text-sm font-semibold text-gray-900 dark:text-white">Message Template</Label>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Choose from predefined templates</p>
+          </div>
         </div>
+        <MessageTemplateSelector
+          onTemplateSelect={handleTemplateSelect}
+          disabled={isSending}
+        />
+      </div>
 
-        {/* Message Content */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Message Content</Label>
-          <Textarea
-            placeholder="Enter your message here..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={4}
-            disabled={isSending}
-          />
+      {/* Message Content */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/20 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+          <div className="p-2 bg-green-500 rounded-lg">
+            <Send className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1">
+            <Label className="text-sm font-semibold text-gray-900 dark:text-white">Message Content</Label>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Enter your message content</p>
+          </div>
         </div>
+        <Textarea
+          placeholder="Enter your message here..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={4}
+          disabled={isSending}
+          className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+        />
+      </div>
 
-        {/* Progress Indicator */}
-        {showProgress && (
-          <div className="p-4 bg-muted/30 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Sending Progress</span>
-              <span className="text-sm text-muted-foreground">
-                {progress.sent}/{progress.total}
-              </span>
+      {/* Progress Indicator */}
+      {showProgress && (
+        <div className="p-4 bg-gradient-to-r from-blue-50/50 to-green-50/50 dark:from-blue-950/20 dark:to-green-950/20 border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">Sending Progress</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {progress.sent}/{progress.total}
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+            <div
+              className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-300"
+              style={{ width: `${(progress.sent / progress.total) * 100}%` }}
+            />
+          </div>
+          {progress.failed > 0 && (
+            <div className="mt-3 text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {progress.failed} messages failed to send
             </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div
-                className="bg-primary h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(progress.sent / progress.total) * 100}%` }}
-              />
-            </div>
-            {progress.failed > 0 && (
-              <div className="mt-2 text-sm text-red-500 flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" />
-                {progress.failed} failed
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            {selectedUsers.size > 0 && (
-              <span>Ready to send to {selectedUsers.size} recipient(s)</span>
-            )}
-          </div>
-
-          <Button
-            onClick={handleSendBulkMessage}
-            disabled={isSending || selectedUsers.size === 0 || !message.trim()}
-            className="flex items-center gap-2"
-          >
-            <Send className="w-4 h-4" />
-            {isSending ? "Sending..." : `Send to ${selectedUsers.size}`}
-          </Button>
+      {/* Action Buttons */}
+      <div className="flex items-center justify-between pt-4">
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          {selectedUsers.size > 0 && (
+            <span className="font-medium">Ready to send to {selectedUsers.size} recipient(s)</span>
+          )}
         </div>
 
-        {/* Status Indicators */}
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Clock className="w-4 h-4" />
-            <span>Batch processing</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <CheckCircle className="w-4 h-4" />
-            <span>Progress tracking</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <AlertCircle className="w-4 h-4" />
-            <span>Error handling</span>
-          </div>
+        <Button
+          onClick={handleSendBulkMessage}
+          disabled={isSending || selectedUsers.size === 0 || !message.trim()}
+          className="h-12 px-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 rounded-xl"
+        >
+          <Send className="w-5 h-5 mr-2" />
+          {isSending ? "Sending..." : `Send to ${selectedUsers.size}`}
+        </Button>
+      </div>
+
+      {/* Status Indicators */}
+      <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400 pt-2">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4" />
+          <span className="font-medium">Batch processing</span>
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" />
+          <span className="font-medium">Progress tracking</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          <span className="font-medium">Error handling</span>
+        </div>
+      </div>
+    </div>
   );
 }
