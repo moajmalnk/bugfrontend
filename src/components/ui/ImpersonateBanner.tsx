@@ -70,10 +70,6 @@ export function ImpersonateBanner() {
             
             {/* User information */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
-              <div className="flex items-center gap-2 text-slate-200">
-                <Shield className="h-4 w-4 text-purple-300 flex-shrink-0" />
-                <span className="text-sm font-medium whitespace-nowrap">Managing Account:</span>
-              </div>
               
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
                 {/* User avatar and name */}
@@ -117,7 +113,7 @@ export function ImpersonateBanner() {
                   className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
                 >
                   <X className="h-4 w-4 mr-2" />
-                  Exit Impersonation
+                  Exit
                 </Button>
               </TooltipTrigger>
               <TooltipContent>

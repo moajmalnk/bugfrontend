@@ -204,12 +204,26 @@ const Projects = () => {
 
   useEffect(() => {
     if (projects.length > 0) {
-      // Optimize: Run all data fetching operations in parallel
+      // Optimize: Run membership and project data fetching in parallel first
+      const minLoadingTime = 800; // 800ms minimum for better UX
+      const startTime = Date.now();
+      
       Promise.all([
         checkUserMembership(),
-        fetchProjectMembers(),
-        fetchAndCountBugs()
-      ]).finally(() => {
+        fetchProjectMembers()
+      ]).then(() => {
+        // After membership is determined, fetch bugs
+        fetchAndCountBugs();
+        
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
+        
+        // If loading was too fast, add a small delay for better UX
+        setTimeout(() => {
+          setSkeletonLoading(false);
+        }, remainingTime);
+      }).catch(() => {
+        // Even on error, ensure skeleton is turned off
         setSkeletonLoading(false);
       });
     }
@@ -434,10 +448,19 @@ const Projects = () => {
       const openCounts: Record<string, number> = {};
       const fixedCounts: Record<string, number> = {};
 
+      // Wait for membership data to be available
+      if (Object.keys(userProjectMemberships).length === 0) {
+        return;
+      }
+
       // Only fetch bugs for projects where user is a member
       const accessibleProjects = projects.filter(project => 
         userProjectMemberships[project.id] || currentUser?.role === "admin"
       );
+
+      if (accessibleProjects.length === 0) {
+        return;
+      }
 
       // Make parallel requests for all accessible projects
       const bugPromises = accessibleProjects.map(async (project) => {
@@ -740,10 +763,10 @@ const Projects = () => {
     console.log("Dialog state changed to:", isDeleteDialogOpen);
   }, [isDeleteDialogOpen]);
 
+  // Fetch bugs after membership is determined
   useEffect(() => {
     if (projects.length > 0 && Object.keys(userProjectMemberships).length > 0) {
       fetchAndCountBugs();
-      fetchProjectMembers();
     }
   }, [projects, userProjectMemberships]);
 
@@ -1149,7 +1172,7 @@ const Projects = () => {
           </div>
         )}
 
-        {/* Projects Grid with Loading Skeletons */}
+        {/* Projects Grid with Enhanced Professional Skeletons */}
         {skeletonLoading ||
         isLoading ||
         (totalFiltered === 0 &&
@@ -1163,7 +1186,7 @@ const Projects = () => {
           {Array(6)
             .fill(0)
             .map((_, index) => (
-              <ProjectCardSkeleton key={index} />
+              <ProjectCardSkeleton key={`skeleton-${index}`} index={index} />
             ))}
         </div>
       ) : totalFiltered === 0 ? (
@@ -1411,8 +1434,20 @@ const Projects = () => {
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                        {userProjectsCount}
+                        {skeletonLoading ? (
+                          <div className="flex items-center gap-2">
+                            <Skeleton className="h-6 w-8" />
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                          </div>
+                        ) : (
+                          userProjectsCount
+                        )}
                       </div>
+                      {skeletonLoading && (
+                        <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+                          Loading projects...
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

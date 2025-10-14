@@ -726,14 +726,6 @@ export default function DailyUpdate() {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={onCopyPreview} 
-                      className="gap-2 text-sm h-10 rounded-xl border-2 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                    >
-                      <ClipboardCopy className="h-4 w-4" /> Copy to Clipboard
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
                       onClick={onSharePreview} 
                       className="gap-2 text-sm h-10 rounded-xl border-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
                     >
@@ -741,7 +733,7 @@ export default function DailyUpdate() {
                     </Button>
                   </div>
                   
-                  <div className={`flex-1 min-h-0 ${!canSubmit ? 'max-h-[48rem]' : 'max-h-[42rem]'} overflow-y-auto overflow-x-hidden rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 lg:p-5 border-2 border-gray-200 dark:border-gray-700 no-scrollbar`}>
+                  <div className={`flex-1 min-h-0 ${!canSubmit ? 'max-h-[50rem]' : 'max-h-[44rem]'} overflow-y-auto overflow-x-hidden rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 lg:p-5 border-2 border-gray-200 dark:border-gray-700 no-scrollbar`}>
                     <pre className="text-xs whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed font-mono">
                       {template || 'Start filling the form above to see your daily update preview...'}
                     </pre>
