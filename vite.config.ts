@@ -7,8 +7,6 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    http: {},
-    // Force cache busting in development
     hmr: {
       overlay: true,
     },
@@ -16,9 +14,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react({
       // Enable SWC optimizations
-      plugins: [
-        // Add any SWC plugins here
-      ],
+      plugins: [],
     }),
   ],
   resolve: {
@@ -26,9 +22,8 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Force fresh chunks in development
   optimizeDeps: {
-    force: true,
+    force: mode === 'development',
     include: [
       'react',
       'react-dom',
@@ -40,16 +35,13 @@ export default defineConfig(({ mode }) => ({
       'lucide-react',
       'axios',
     ],
-    exclude: [
-      // Exclude heavy dependencies that should be loaded on demand
-    ],
   },
   build: {
     outDir: "dist",
     sourcemap: mode === 'development',
     minify: mode === 'production' ? 'esbuild' : false,
     cssMinify: mode === 'production',
-    // Enhanced chunking strategy for better caching and dependency resolution
+    // Optimized chunking strategy for production
     rollupOptions: mode === 'development' ? {
       output: {
         manualChunks: undefined,
@@ -57,47 +49,12 @@ export default defineConfig(({ mode }) => ({
     } : {
       output: {
         manualChunks: (id) => {
-          // Create more stable chunking strategy for production only
-          if (id.includes('node_modules')) {
-            // ALL React-dependent libraries MUST be in react-core to prevent dependency issues
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || 
-                id.includes('framer-motion') || id.includes('@radix-ui') || id.includes('@tanstack') ||
-                id.includes('lucide-react') || id.includes('recharts') || id.includes('react-hook-form') ||
-                id.includes('@hookform') || id.includes('clsx') || id.includes('tailwind-merge') ||
-                id.includes('sonner') || id.includes('next-themes') || id.includes('react-helmet-async') ||
-                id.includes('react-day-picker') || id.includes('react-resizable-panels') ||
-                id.includes('react-markdown') || id.includes('input-otp') || id.includes('vaul') ||
-                id.includes('cmdk') || id.includes('embla-carousel-react') || id.includes('class-variance-authority')) {
-              return 'react-core';
-            }
-            // Move ALL potential React-dependent libraries to react-core for safety
-            // Only keep truly non-React libraries separate
-            if (id.includes('axios') || id.includes('firebase') || id.includes('@supabase') ||
-                id.includes('jspdf') || id.includes('zod') || id.includes('date-fns')) {
-              return 'react-core';
-            }
-            // Everything else also goes to react-core for maximum safety
-            return 'react-core';
-          }
-          
-          // Move ALL pages and components to react-core to prevent any dependency issues
-          if (id.includes('/pages/') || id.includes('/components/')) {
+          // Single chunk strategy for maximum reliability
+          if (id.includes('node_modules') || id.includes('/src/')) {
             return 'react-core';
           }
         },
-        // Ensure proper chunk loading order
-        chunkFileNames: (chunkInfo) => {
-          // React core should load first
-          if (chunkInfo.name === 'react-core') {
-            return 'assets/00-react-core-[hash].js';
-          }
-          // Then other vendor chunks
-          if (chunkInfo.name && chunkInfo.name.includes('vendor')) {
-            return 'assets/01-[name]-[hash].js';
-          }
-          // Then components and pages
-          return 'assets/[name]-[hash].js';
-        },
+        chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
           if (!assetInfo.name) return 'assets/[name]-[hash].[ext]';
@@ -113,41 +70,25 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
-    chunkSizeWarningLimit: 1000,
-    // Enable tree shaking
-    treeshake: {
-      moduleSideEffects: false,
-    },
-    // Target modern browsers for better performance
+    chunkSizeWarningLimit: 3000,
     target: 'esnext',
-    // Enable CSS code splitting
     cssCodeSplit: true,
-    // Ensure proper module format and MIME types
     modulePreload: {
       polyfill: true,
     },
-    // Ensure proper MIME types for production
     assetsInlineLimit: 4096,
-    // Better chunk naming for debugging
     assetsDir: 'assets',
   },
-  // Enhanced CSS handling
   css: {
     devSourcemap: mode === 'development',
     modules: {
       localsConvention: 'camelCase',
     },
   },
-  // Performance optimizations
-  ...(mode === 'production' && {
-    esbuild: {
-      // Enable tree shaking
-      treeShaking: true,
-      // Target modern browsers
-      target: 'esnext',
-    },
-  }),
-  // Define global constants and ensure proper module resolution
+  esbuild: mode === 'production' ? {
+    treeShaking: true,
+    target: 'esnext',
+  } : undefined,
   define: {
     global: 'globalThis',
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),

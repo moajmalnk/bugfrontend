@@ -33,12 +33,16 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        },
-        {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "unsafe-none"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
         }
       ]
     },
@@ -54,12 +58,16 @@
           "value": "public, max-age=31536000, immutable"
         },
         {
-          "key": "Cross-Origin-Embedder-Policy",
-          "value": "unsafe-none"
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         },
         {
-          "key": "Cross-Origin-Opener-Policy",
-          "value": "same-origin"
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, HEAD, OPTIONS"
         }
       ]
     },
@@ -75,8 +83,8 @@
           "value": "public, max-age=31536000, immutable"
         },
         {
-          "key": "Cross-Origin-Embedder-Policy",
-          "value": "unsafe-none"
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         }
       ]
     },
@@ -88,8 +96,8 @@
           "value": "application/javascript; charset=utf-8"
         },
         {
-          "key": "Cross-Origin-Embedder-Policy",
-          "value": "unsafe-none"
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         }
       ]
     },
