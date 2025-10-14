@@ -60,6 +60,7 @@ export interface User {
   role: UserRole;
   avatar?: string;
   created_at?: string;
+  admin_id?: string; // For impersonation tracking
 }
 
 // Messaging System Types

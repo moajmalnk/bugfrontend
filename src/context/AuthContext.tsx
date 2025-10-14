@@ -20,6 +20,7 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<boolean>;
   updateCurrentUser: (user: User) => void;
   storeIntendedDestination: (path: string) => void;
+  exitImpersonateMode: () => void;
 }
 
 interface RegisterData {
@@ -88,6 +89,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // // console.log("Auth check response:", data);
 
       if (data.success && data.data) {
+        // Check if this is an impersonation token by decoding the JWT
+        try {
+          const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+          if (tokenPayload.purpose === 'dashboard_access' && tokenPayload.admin_id) {
+            // This is an impersonation token, add admin_id to user data
+            data.data.admin_id = tokenPayload.admin_id;
+          }
+        } catch (e) {
+          // If token decoding fails, continue with normal flow
+        }
+        
         setCurrentUser(data.data);
       } else {
         // console.error("Auth check failed:", data);
@@ -222,6 +234,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate(intendedDestination, { replace: true });
   };
 
+  const exitImpersonateMode = async () => {
+    try {
+      // Log the impersonation exit before clearing tokens
+      const token = sessionStorage.getItem("token");
+      if (token) {
+        await fetch(`${ENV.API_URL}/auth/log-impersonate-exit.php`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+    } catch (error) {
+      // Don't block exit if logging fails
+      console.error('Failed to log impersonation exit:', error);
+    }
+    
+    // Clear session storage (which contains the impersonation token)
+    sessionStorage.removeItem("token");
+    
+    // Redirect to admin dashboard
+    navigate("/admin/projects", { replace: true });
+    
+    // Reload the page to refresh authentication state
+    window.location.reload();
+  };
+
   const value = {
     currentUser,
     isAuthenticated: !!currentUser,
@@ -232,6 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     register,
     updateCurrentUser,
     storeIntendedDestination,
+    exitImpersonateMode,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

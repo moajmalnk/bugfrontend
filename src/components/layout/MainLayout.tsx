@@ -8,6 +8,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FirebaseListener from "../messaging/FirebaseListener";
 import AnnouncementPopup from "../ui/AnnouncementPopup";
+import { ImpersonateBanner } from "../ui/ImpersonateBanner";
 import { Sidebar } from "./Sidebar";
 
 interface MainLayoutProps {
@@ -61,6 +62,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
   return (
     <NotificationProvider>
+      <ImpersonateBanner />
       <div className="flex h-screen min-w-0 bg-background">
         {/* Sidebar for desktop */}
         <div className="hidden lg:block w-72 min-w-0">
