@@ -17,6 +17,7 @@ import { ErrorBoundaryProvider } from "@/components/ErrorBoundaryManager";
 import { useApiErrorHandler } from "@/hooks/useApiErrorHandler";
 import { DebugInfo } from "@/components/DebugInfo";
 import { TimezoneDebug } from "@/components/TimezoneDebug";
+import { ChunkErrorHandler } from "@/components/ChunkErrorHandler";
 import { useAuth } from "@/context/AuthContext";
 import { BugProvider } from "@/context/BugContext";
 import { NotificationProvider } from "@/context/NotificationContext";
@@ -534,18 +535,19 @@ function App() {
   const chunkErrorModal = useChunkLoadErrorRefresh();
 
   return (
-    <HelmetProvider>
-      <Router
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true,
-        }}
-      >
-        <ThemeProvider>
-          <AccessibilityProvider>
-            <AppProviders queryClient={queryClient}>
-              <AuthProvider>
-                <BugProvider>
+    <ChunkErrorHandler>
+      <HelmetProvider>
+        <Router
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
+          <ThemeProvider>
+            <AccessibilityProvider>
+              <AppProviders queryClient={queryClient}>
+                <AuthProvider>
+                  <BugProvider>
                   <NotificationProvider>
                     <NotificationSettingsProvider>
                       <ModernErrorBoundary
@@ -590,6 +592,7 @@ function App() {
         {chunkErrorModal}
       </Router>
     </HelmetProvider>
+    </ChunkErrorHandler>
   );
 }
 

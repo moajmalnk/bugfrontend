@@ -122,5 +122,29 @@
   <body>
     <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
+    
+    <!-- Fallback script to handle chunk loading errors -->
+    <script>
+      // Handle chunk loading errors
+      window.addEventListener('error', function(e) {
+        if (e.filename && (e.filename.includes('.js') || e.filename.includes('chunk'))) {
+          console.error('Chunk loading error detected:', e);
+          // Force a hard refresh to reload all chunks
+          if (confirm('A loading error occurred. Would you like to refresh the page?')) {
+            window.location.reload();
+          }
+        }
+      });
+      
+      // Handle unhandled promise rejections from chunk loading
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e.reason && e.reason.message && e.reason.message.includes('Loading chunk')) {
+          console.error('Chunk loading rejection:', e.reason);
+          if (confirm('A loading error occurred. Would you like to refresh the page?')) {
+            window.location.reload(true);
+          }
+        }
+      });
+    </script>
   </body>
 </html>

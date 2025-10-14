@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "NODE_ENV=production node scripts/optimize-build.js",
-    "build:dev": "NODE_ENV=development node scripts/optimize-build.js",
+    "build": "NODE_ENV=production node scripts/fix-production-build.js",
+    "build:dev": "NODE_ENV=development node scripts/fix-production-build.js",
     "build:analyze": "NODE_ENV=production node scripts/optimize-build.js --analyze",
     "build:simple": "vite build",
+    "build:fix": "NODE_ENV=production node scripts/fix-production-build.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",

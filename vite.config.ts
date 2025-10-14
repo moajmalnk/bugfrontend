@@ -59,9 +59,13 @@ export default defineConfig(({ mode }) => ({
         manualChunks: (id) => {
           // Create more stable chunking strategy for production only
           if (id.includes('node_modules')) {
-            // React ecosystem
+            // React ecosystem - MUST come first for dependency resolution
             if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
               return 'react-vendor';
+            }
+            // Animation and motion - depends on React, so keep React available
+            if (id.includes('framer-motion')) {
+              return 'react-vendor'; // Move to react-vendor to ensure React is available
             }
             // UI Components
             if (id.includes('@radix-ui')) {
@@ -70,10 +74,6 @@ export default defineConfig(({ mode }) => ({
             // Data fetching and state management
             if (id.includes('@tanstack') || id.includes('axios')) {
               return 'data-vendor';
-            }
-            // Animation and motion
-            if (id.includes('framer-motion')) {
-              return 'animation-vendor';
             }
             // Icons and utilities
             if (id.includes('lucide-react') || id.includes('clsx') || id.includes('tailwind-merge')) {
