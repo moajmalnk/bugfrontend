@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Build optimization script for BugRicer
@@ -25,7 +29,8 @@ console.log('✅ Build directory cleaned\n');
 // Step 2: Run Vite build
 console.log('2. Running Vite build...');
 try {
-  const buildCommand = PRODUCTION_BUILD ? 'npm run build' : 'npm run build:dev';
+  // Use vite build directly to avoid circular dependency
+  const buildCommand = PRODUCTION_BUILD ? 'npx vite build' : 'npx vite build --mode development';
   execSync(buildCommand, { stdio: 'inherit', cwd: path.join(__dirname, '..') });
   console.log('✅ Vite build completed\n');
 } catch (error) {

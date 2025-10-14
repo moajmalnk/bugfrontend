@@ -149,8 +149,9 @@ export default defineConfig(({ mode }) => ({
       target: 'esnext',
     },
   }),
-  // Define global constants
+  // Define global constants and ensure proper module resolution
   define: {
+    global: 'globalThis',
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
