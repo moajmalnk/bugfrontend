@@ -107,7 +107,7 @@ export default function WhatsAppMessages() {
             </div>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto">
+          <div className="w-full">
             {/* Professional Tabs */}
             <Tabs
               value={activeTab}
