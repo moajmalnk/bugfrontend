@@ -36,7 +36,30 @@ export function ImpersonateBanner() {
   return (
     <div className="bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 text-white border-b border-purple-500/20 shadow-lg relative z-50 animate-in slide-in-from-top duration-300">
       <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        {/* Mobile Layout - Center aligned, single row */}
+        <div className="flex flex-col sm:hidden items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4 w-full">
+            {/* Warning badge */}
+            <div className="flex items-center gap-2 bg-amber-500 text-amber-900 px-3 py-2 rounded-lg font-semibold shadow-sm border border-amber-400">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-bold">IMPERSONATE MODE</span>
+            </div>
+            
+            {/* Exit button */}
+            <Button
+              onClick={handleExitImpersonate}
+              variant="outline"
+              size="sm"
+              className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Exit
+            </Button>
+          </div>
+        </div>
+
+        {/* Desktop Layout - Full details */}
+        <div className="hidden sm:flex lg:flex-row items-start lg:items-center justify-between gap-4">
           {/* Left side - Warning and user info */}
           <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 w-full lg:w-auto">
             {/* Warning badge */}
@@ -47,6 +70,10 @@ export function ImpersonateBanner() {
             
             {/* User information */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+              <div className="flex items-center gap-2 text-slate-200">
+                <Shield className="h-4 w-4 text-purple-300 flex-shrink-0" />
+                <span className="text-sm font-medium whitespace-nowrap">Managing Account:</span>
+              </div>
               
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
                 {/* User avatar and name */}
@@ -87,11 +114,10 @@ export function ImpersonateBanner() {
                   onClick={handleExitImpersonate}
                   variant="outline"
                   size="sm"
-                  className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md w-full sm:w-auto"
+                  className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
                 >
                   <X className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Exit Impersonation</span>
-                  <span className="sm:hidden">Exit</span>
+                  Exit Impersonation
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
