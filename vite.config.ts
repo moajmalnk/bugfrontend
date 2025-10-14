@@ -63,9 +63,9 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || id.includes('framer-motion')) {
               return 'react-core';
             }
-            // UI Components - depends on React
+            // UI Components - depends on React, include in react-core for dependency safety
             if (id.includes('@radix-ui')) {
-              return 'ui-vendor';
+              return 'react-core';
             }
             // Data fetching and state management
             if (id.includes('@tanstack') || id.includes('axios')) {
@@ -99,11 +99,24 @@ export default defineConfig(({ mode }) => ({
             }
           }
           
+          // Components depend on React, so include them in react-core to ensure proper loading order
           if (id.includes('/components/')) {
-            return 'components';
+            return 'react-core';
           }
         },
-        chunkFileNames: 'assets/[name]-[hash].js',
+        // Ensure proper chunk loading order
+        chunkFileNames: (chunkInfo) => {
+          // React core should load first
+          if (chunkInfo.name === 'react-core') {
+            return 'assets/00-react-core-[hash].js';
+          }
+          // Then other vendor chunks
+          if (chunkInfo.name && chunkInfo.name.includes('vendor')) {
+            return 'assets/01-[name]-[hash].js';
+          }
+          // Then components and pages
+          return 'assets/[name]-[hash].js';
+        },
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
           if (!assetInfo.name) return 'assets/[name]-[hash].[ext]';
