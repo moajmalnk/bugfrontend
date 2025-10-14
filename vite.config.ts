@@ -70,16 +70,14 @@ export default defineConfig(({ mode }) => ({
                 id.includes('cmdk') || id.includes('embla-carousel-react') || id.includes('class-variance-authority')) {
               return 'react-core';
             }
-            // Data fetching (non-React)
-            if (id.includes('axios')) {
-              return 'data-vendor';
+            // Move ALL potential React-dependent libraries to react-core for safety
+            // Only keep truly non-React libraries separate
+            if (id.includes('axios') || id.includes('firebase') || id.includes('@supabase') ||
+                id.includes('jspdf') || id.includes('zod') || id.includes('date-fns')) {
+              return 'react-core';
             }
-            // Firebase and external services
-            if (id.includes('firebase') || id.includes('@supabase')) {
-              return 'services-vendor';
-            }
-            // Everything else
-            return 'vendor';
+            // Everything else also goes to react-core for maximum safety
+            return 'react-core';
           }
           
           // Split by feature for better caching
