@@ -736,7 +736,7 @@ const Users = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
             {/* Enhanced Desktop Table View */}
-            <div className="hidden xl:block w-full overflow-x-auto">
+            <div className="hidden 2xl:block w-full overflow-x-auto">
               <Table className="w-full">
                 <TableHeader className="bg-gradient-to-r from-gray-50/80 to-blue-50/80 dark:from-gray-800/80 dark:to-blue-900/80 backdrop-blur-sm">
                   <TableRow className="border-b border-gray-200/60 dark:border-gray-700/60 hover:bg-transparent">
@@ -837,7 +837,7 @@ const Users = () => {
               </Table>
             </div>
             {/* Enhanced Mobile & Tablet Card View */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:hidden gap-4 sm:gap-6 p-4 sm:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:hidden gap-4 sm:gap-6 p-4 sm:p-6">
             {isLoading
               ? Array(6)
                   .fill(0)

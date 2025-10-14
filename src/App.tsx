@@ -19,6 +19,8 @@ import { DebugInfo } from "@/components/DebugInfo";
 import { TimezoneDebug } from "@/components/TimezoneDebug";
 import { ChunkErrorHandler } from "@/components/ChunkErrorHandler";
 import { useAuth } from "@/context/AuthContext";
+import { LoadingErrorModal } from "@/components/ui/LoadingErrorModal";
+import { useLoadingErrorModal } from "@/hooks/useLoadingErrorModal";
 import { BugProvider } from "@/context/BugContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -190,6 +192,7 @@ function OfflineBanner({ show }: { show: boolean }) {
 // Component that uses the error handler hook inside the provider
 function AppContent() {
   useApiErrorHandler(); // This will set up automatic error handling for API calls
+  const loadingErrorModal = useLoadingErrorModal(); // Set up loading error modal
   
   const [privacy, setPrivacy] = useState(() => {
     return localStorage.getItem("privacyMode") === "true";
@@ -324,215 +327,23 @@ function AppContent() {
         {networkError && <NetworkError />}
         <PerformanceMonitor enabled={process.env.NODE_ENV === 'development'} />
         <BundleAnalyzer enabled={process.env.NODE_ENV === 'development'} />
+        
+        {/* Loading Error Modal */}
+        <LoadingErrorModal
+          open={loadingErrorModal.isOpen}
+          onOpenChange={loadingErrorModal.hideModal}
+          onRefresh={loadingErrorModal.handleRefresh}
+          onCancel={loadingErrorModal.handleCancel}
+          retryCount={loadingErrorModal.retryCount}
+          showRetryOption={loadingErrorModal.retryCount < 3}
+        />
       </div>
     </>
   );
 }
 
-// Professional chunk loading error handler using service worker
-export function useChunkLoadErrorRefresh() {
-  const [showModal, setShowModal] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [isRetrying, setIsRetrying] = useState(false);
-
-  useEffect(() => {
-    const handler = (event: ErrorEvent) => {
-      const message = event?.message || '';
-      if (
-        message.includes("Failed to fetch dynamically imported module") ||
-        message.includes("Loading chunk") ||
-        message.includes("expected a JavaScript module script") ||
-        message.includes("Loading CSS chunk") ||
-        message.includes("MIME type") ||
-        message.includes("module script")
-      ) {
-        console.warn('[App] Chunk loading error detected:', message);
-        setShowModal(true);
-      }
-    };
-    window.addEventListener("error", handler);
-
-    // Handle unhandled promise rejections for dynamic imports
-    const rejectionHandler = (event: PromiseRejectionEvent) => {
-      const reason = event?.reason?.message || '';
-      if (
-        reason.includes("Failed to fetch dynamically imported module") ||
-        reason.includes("Loading chunk") ||
-        reason.includes("expected a JavaScript module script") ||
-        reason.includes("Loading CSS chunk") ||
-        reason.includes("MIME type") ||
-        reason.includes("module script")
-      ) {
-        console.warn('[App] Chunk loading promise rejection:', reason);
-        setShowModal(true);
-      }
-    };
-    window.addEventListener("unhandledrejection", rejectionHandler);
-
-    return () => {
-      window.removeEventListener("error", handler);
-      window.removeEventListener("unhandledrejection", rejectionHandler);
-    };
-  }, []);
-
-  const handleRefresh = async () => {
-    setIsRetrying(true);
-    
-    try {
-      // Clear all caches before refresh
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(
-          cacheNames.map(cacheName => caches.delete(cacheName))
-        );
-      }
-      
-      // Clear service worker cache
-      await serviceWorkerManager.clearCache();
-      
-      // Clear localStorage cache if any
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.includes('cache') || key.includes('chunk'))) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach(key => localStorage.removeItem(key));
-      
-      console.log('[App] All caches cleared before refresh');
-    } catch (error) {
-      console.warn('[App] Failed to clear some caches before refresh:', error);
-    }
-    
-    // Force reload with cache bypass
-    window.location.href = window.location.href + '?v=' + Date.now();
-  };
-
-  const handleRetry = async () => {
-    if (retryCount >= 3) {
-      handleRefresh();
-      return;
-    }
-    
-    setIsRetrying(true);
-    setRetryCount(prev => prev + 1);
-    
-    try {
-      // Try to reload the current page
-      window.location.reload();
-    } catch (error) {
-      console.error('[App] Retry failed:', error);
-      handleRefresh();
-    }
-  };
-
-  return showModal ? (
-    <div
-      style={{
-        position: "fixed",
-        top: 0, left: 0, right: 0, bottom: 0,
-        background: "rgba(0,0,0,0.6)",
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backdropFilter: "blur(4px)"
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 12,
-          padding: "2rem",
-          maxWidth: 420,
-          width: "90%",
-          boxShadow: "0 20px 64px rgba(0,0,0,0.15)",
-          textAlign: "center",
-          border: "1px solid #e5e7eb"
-        }}
-      >
-        <div style={{ marginBottom: 16, fontSize: 24 }}>⚠️</div>
-        <h2 style={{ 
-          marginBottom: 12, 
-          color: "#111827",
-          fontSize: "1.25rem",
-          fontWeight: 600
-        }}>
-          Application Update Required
-        </h2>
-        <p style={{ 
-          marginBottom: 24, 
-          color: "#6b7280",
-          lineHeight: 1.6
-        }}>
-          The application needs to be refreshed to load the latest updates.
-          This may be due to a new deployment or network connectivity issues.
-          {retryCount > 0 && (
-            <span style={{ display: 'block', marginTop: 8, fontSize: '0.875rem' }}>
-              Retry attempt: {retryCount}/3
-            </span>
-          )}
-        </p>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          {retryCount < 3 && (
-            <button
-              style={{
-                background: "#f3f4f6",
-                color: "#374151",
-                border: "1px solid #d1d5db",
-                borderRadius: 6,
-                padding: "0.75rem 1.5rem",
-                fontWeight: 500,
-                cursor: isRetrying ? "not-allowed" : "pointer",
-                opacity: isRetrying ? 0.6 : 1,
-                transition: "all 0.2s"
-              }}
-              onClick={handleRetry}
-              disabled={isRetrying}
-              onMouseOver={(e) => {
-                if (!isRetrying) {
-                  e.currentTarget.style.background = "#e5e7eb";
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!isRetrying) {
-                  e.currentTarget.style.background = "#f3f4f6";
-                }
-              }}
-            >
-              {isRetrying ? "Retrying..." : "Try Again"}
-            </button>
-          )}
-          <button
-            style={{
-              background: "#dc2626",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              padding: "0.75rem 1.5rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.2s"
-            }}
-            onClick={handleRefresh}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = "#b91c1c";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = "#dc2626";
-            }}
-          >
-            {isRetrying ? "Force Refresh" : "Refresh Application"}
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : null;
-}
 
 function App() {
-  const chunkErrorModal = useChunkLoadErrorRefresh();
 
   return (
     <ChunkErrorHandler>
@@ -589,7 +400,6 @@ function App() {
             </AppProviders>
           </AccessibilityProvider>
         </ThemeProvider>
-        {chunkErrorModal}
       </Router>
     </HelmetProvider>
     </ChunkErrorHandler>

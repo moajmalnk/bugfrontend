@@ -123,16 +123,13 @@
     <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
     
-    <!-- Fallback script to handle chunk loading errors -->
+    <!-- Loading error handling is now managed by React components -->
     <script>
-      // Handle chunk loading errors
+      // Log chunk loading errors for debugging but let React handle the UI
       window.addEventListener('error', function(e) {
         if (e.filename && (e.filename.includes('.js') || e.filename.includes('chunk'))) {
           console.error('Chunk loading error detected:', e);
-          // Force a hard refresh to reload all chunks
-          if (confirm('A loading error occurred. Would you like to refresh the page?')) {
-            window.location.reload();
-          }
+          // The React LoadingErrorModal will handle showing the UI
         }
       });
       
@@ -140,9 +137,7 @@
       window.addEventListener('unhandledrejection', function(e) {
         if (e.reason && e.reason.message && e.reason.message.includes('Loading chunk')) {
           console.error('Chunk loading rejection:', e.reason);
-          if (confirm('A loading error occurred. Would you like to refresh the page?')) {
-            window.location.reload(true);
-          }
+          // The React LoadingErrorModal will handle showing the UI
         }
       });
     </script>

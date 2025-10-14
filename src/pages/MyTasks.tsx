@@ -746,19 +746,23 @@ export default function MyTasks() {
                   <div className="p-2 bg-purple-600 rounded-lg shrink-0">
                     <Filter className="h-4 w-4 text-white" />
                   </div>
-                    <select
-                    className="h-11 w-full sm:w-[140px] rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
-                      value={(activeTab === 'my-tasks' ? myFilter.status : sharedFilter.status) || ''}
-                      onChange={(e) => {
-                        if (activeTab === 'my-tasks') setMyFilter({ ...myFilter, status: e.target.value || undefined });
-                        else setSharedFilter({ ...sharedFilter, status: e.target.value || undefined });
-                      }}
-                    >
-                      <option value="">All statuses</option>
+                  <Select
+                    value={(activeTab === 'my-tasks' ? myFilter.status : sharedFilter.status) || 'all'}
+                    onValueChange={(value) => {
+                      if (activeTab === 'my-tasks') setMyFilter({ ...myFilter, status: value === 'all' ? undefined : value });
+                      else setSharedFilter({ ...sharedFilter, status: value === 'all' ? undefined : value });
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-[140px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500">
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[60]">
+                      <SelectItem value="all">All statuses</SelectItem>
                       {statuses.map((s) => (
-                        <option key={s} value={s}>{s.replace('_',' ')}</option>
+                        <SelectItem key={s} value={s}>{s.replace('_',' ')}</SelectItem>
                       ))}
-                    </select>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
@@ -1354,16 +1358,20 @@ export default function MyTasks() {
                   <div className="p-2 bg-purple-600 rounded-lg shrink-0">
                     <Filter className="h-4 w-4 text-white" />
                   </div>
-                  <select
-                    className="h-11 w-full sm:w-[140px] rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
-                    value={sharedFilter.status || ''}
-                    onChange={(e) => setSharedFilter({ ...sharedFilter, status: e.target.value || undefined })}
+                  <Select
+                    value={sharedFilter.status || 'all'}
+                    onValueChange={(value) => setSharedFilter({ ...sharedFilter, status: value === 'all' ? undefined : value })}
                   >
-                    <option value="">All statuses</option>
-                    {sharedStatuses.map((s) => (
-                      <option key={s} value={s}>{s.replace('_',' ')}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full sm:w-[140px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500">
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[60]">
+                      <SelectItem value="all">All statuses</SelectItem>
+                      {sharedStatuses.map((s) => (
+                        <SelectItem key={s} value={s}>{s.replace('_',' ')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
