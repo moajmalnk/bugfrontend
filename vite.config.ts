@@ -49,7 +49,7 @@ export default defineConfig(({ mode }) => ({
     sourcemap: mode === 'development',
     minify: mode === 'production' ? 'esbuild' : false,
     cssMinify: mode === 'production',
-    // Enhanced chunking strategy for better caching
+    // Enhanced chunking strategy for better caching and dependency resolution
     rollupOptions: mode === 'development' ? {
       output: {
         manualChunks: undefined,
@@ -59,15 +59,11 @@ export default defineConfig(({ mode }) => ({
         manualChunks: (id) => {
           // Create more stable chunking strategy for production only
           if (id.includes('node_modules')) {
-            // React ecosystem - MUST come first for dependency resolution
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
+            // Core React ecosystem - MUST be in the same chunk to prevent dependency issues
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || id.includes('framer-motion')) {
+              return 'react-core';
             }
-            // Animation and motion - depends on React, so keep React available
-            if (id.includes('framer-motion')) {
-              return 'react-vendor'; // Move to react-vendor to ensure React is available
-            }
-            // UI Components
+            // UI Components - depends on React
             if (id.includes('@radix-ui')) {
               return 'ui-vendor';
             }
@@ -132,10 +128,14 @@ export default defineConfig(({ mode }) => ({
     target: 'esnext',
     // Enable CSS code splitting
     cssCodeSplit: true,
-    // Ensure proper module format
+    // Ensure proper module format and MIME types
     modulePreload: {
       polyfill: true,
     },
+    // Ensure proper MIME types for production
+    assetsInlineLimit: 4096,
+    // Better chunk naming for debugging
+    assetsDir: 'assets',
   },
   // Enhanced CSS handling
   css: {
