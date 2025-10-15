@@ -10,6 +10,9 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: true,
     },
+    fs: {
+      strict: false,
+    },
   },
   plugins: [
     react({
@@ -34,6 +37,11 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-tabs',
       '@radix-ui/react-card',
       '@radix-ui/react-toast',
+      '@radix-ui/react-slider',
+      '@radix-ui/react-select',
+      '@radix-ui/react-slot',
+      '@radix-ui/react-separator',
+      '@radix-ui/react-scroll-area',
       '@tanstack/react-query',
       'framer-motion',
       'lucide-react',

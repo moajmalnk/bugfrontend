@@ -16,20 +16,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import * as Skeleton from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
-import { Bug } from "@/types"; // Added Bug import
+import { Bug } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { apiClient } from "@/lib/axios";
-import { AlertCircle, ArrowLeft, Bug as BugIcon, File } from "lucide-react";
+import { 
+  AlertCircle, 
+  ArrowLeft, 
+  Bug as BugIcon, 
+  CheckCircle, 
+  Clock, 
+  File, 
+  FolderOpen, 
+  Save, 
+  User, 
+  X 
+} from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom"; // Added useParams
+import { useNavigate, useParams } from "react-router-dom";
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -256,186 +267,416 @@ const FixBug = () => {
     };
   }, [fixAttachments]);
 
-  // Render logic based on loading and error states
-  if (isLoading && showSkeleton) {
-    return (
-      <div className="space-y-6 max-w-4xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex items-center">
-          <Button variant="ghost" disabled>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </div>
-        <Card>
-          <CardHeader>
-            <Skeleton.Skeleton className="h-7 w-48" />
-            <Skeleton.Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Skeleton.Skeleton className="h-4 w-24" />
-              <Skeleton.Skeleton className="h-10 w-full" />
-            </div>
-            <div className="space-y-2">
-              <Skeleton.Skeleton className="h-4 w-24" />
-              <Skeleton.Skeleton className="h-[150px] w-full" />
-            </div>
-            <div className="space-y-2">
-              <Skeleton.Skeleton className="h-4 w-24" />
-              <Skeleton.Skeleton className="h-10 w-full" />
-            </div>
-            <div className="space-y-4">
-              <Skeleton.Skeleton className="h-4 w-24" />
-              <div className="grid gap-4 md:grid-cols-2">
-                <Skeleton.Skeleton className="h-24 w-full" />
-                <Skeleton.Skeleton className="h-24 w-full" />
+  // Enhanced skeleton component for loading state
+  const LoadingSkeleton = () => (
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        {/* Header Skeleton */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-green-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20"></div>
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-12 w-12 rounded-xl" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-8 w-64" />
+                    <Skeleton className="h-1 w-20" />
+                  </div>
+                </div>
+                <Skeleton className="h-5 w-96" />
+              </div>
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-12 w-32" />
               </div>
             </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Skeleton.Skeleton className="h-10 w-20" />
-            <Skeleton.Skeleton className="h-10 w-32" />
-          </CardFooter>
-        </Card>
-      </div>
-    ); // Show skeleton only if still loading within the initial window
+          </div>
+        </div>
+
+        {/* Form Skeleton */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+            <div className="space-y-6">
+              {/* Bug Info Skeleton */}
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-[150px] w-full" />
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-[100px] w-full" />
+              </div>
+
+              {/* Action Buttons Skeleton */}
+              <div className="flex justify-between pt-6">
+                <Skeleton className="h-11 w-24" />
+                <Skeleton className="h-11 w-40" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+
+  // Render logic based on loading and error states
+  if (isLoading && showSkeleton) {
+    return <LoadingSkeleton />;
   }
 
   if (error || !bug) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 text-center">
-        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <h3 className="text-xl font-semibold mb-2">Error Loading Bug</h3>
-        <p className="text-muted-foreground mb-6">
-          {error?.message || "Could not fetch bug details."}
-        </p>
-        <Button onClick={() => navigate(-1)}>Go Back</Button>
-      </div>
-    ); // Show error if there's an error or no bug data fetched
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-50/50 via-orange-50/30 to-yellow-50/50 dark:from-red-950/20 dark:via-orange-950/10 dark:to-yellow-950/20 rounded-2xl"></div>
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-red-500 to-orange-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                <AlertCircle className="h-10 w-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Error Loading Bug</h3>
+              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                {error?.message || "Could not fetch bug details. Please try again later."}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button 
+                  onClick={() => navigate(-1)}
+                  variant="outline"
+                  size="lg"
+                  className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 text-gray-700 dark:text-gray-300 hover:text-red-700 dark:hover:text-red-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                >
+                  <ArrowLeft className="mr-2 h-5 w-5" />
+                  Go Back
+                </Button>
+                <Button 
+                  onClick={() => window.location.reload()}
+                  size="lg"
+                  className="h-12 px-6 bg-gradient-to-r from-red-600 to-orange-700 hover:from-red-700 hover:to-orange-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (
-    <div className="space-y-6 w-full max-w-4xl mx-auto px-2 sm:px-4 py-4">
-      <div className="flex items-center justify-between">
-        <Button
-          variant="ghost"
-          className="flex items-center text-muted-foreground hover:text-foreground"
-          onClick={() => navigate(-1)}
-          disabled={isSubmitting}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
-            <BugIcon className="h-6 w-6 text-primary" />
-            Fixing Bug: {bug.title} ({bug.id})
-          </CardTitle>
-          <CardDescription className="text-sm sm:text-base">
-            Update the status and provide details for the bug fix.
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6 p-4 sm:p-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Bug Name</Label>
-              <Input
-                id="name"
-                value={bug.title}
-                readOnly // Make title read-only
-                disabled // Visually indicate it's disabled
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={bug.description}
-                readOnly // Make description read-only
-                disabled // Visually indicate it's disabled
-                className="min-h-[150px]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="project">Project</Label>
-              <Input
-                id="project"
-                value={bug.project_name || "Loading..."}
-                readOnly
-                disabled
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="priority">Priority</Label>
-              <Input
-                id="priority"
-                value={bug.priority}
-                readOnly // Make priority read-only
-                disabled
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={status}
-                onValueChange={(value: Bug["status"]) => setStatus(value)}
-                disabled={isSubmitting}
-              >
-                <SelectTrigger id="status" className="text-sm sm:text-base">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Only allow relevant statuses for fixing */}
-                  <SelectItem value="fixed">Fixed</SelectItem>
-                  <SelectItem value="declined">Declined</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>{" "}
-                  {/* Keep pending option */}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fixDescription">Fix Details / Notes</Label>
-              <Textarea
-                id="fixDescription"
-                placeholder="Provide details about the fix, steps taken, etc."
-                className="min-h-[100px]"
-                value={fixDescription}
-                onChange={(e) => setFixDescription(e.target.value)}
-                disabled={isSubmitting}
-              />
-              {status === 'fixed' && fixDescription === DEFAULT_FIX_DESCRIPTION && (
-                <p className="text-sm text-muted-foreground">
-                  💡 Default message provided. You can edit this to add more specific details about the fix.
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        {/* Professional Header */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-green-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20"></div>
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-green-600 rounded-xl shadow-lg">
+                    <CheckCircle className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                      Fix Bug
+                    </h1>
+                    <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-green-600 rounded-full mt-2"></div>
+                  </div>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                  Update the status and provide details for bug resolution
                 </p>
-              )}
+              </div>
+              
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <Button
+                  variant="outline"
+                  className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                  onClick={() => navigate(-1)}
+                  disabled={isSubmitting}
+                >
+                  <ArrowLeft className="mr-2 h-5 w-5" />
+                  Back
+                </Button>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-950/30 dark:to-green-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
+                    <div className="p-1.5 bg-blue-500 rounded-lg">
+                      <BugIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                        {bug.id}
+                      </div>
+                      <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        Bug ID
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate(-1)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting || !bugId}>
-              {isSubmitting ? "Submitting..." : "Update Bug Status"}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-    </div>
+          </div>
+        </div>
+
+        {/* Enhanced Form */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+            <div className="space-y-6">
+              {/* Bug Information Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 bg-blue-500 rounded-lg">
+                    <BugIcon className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Bug Information</h3>
+                </div>
+                
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Bug Title */}
+                  <div className="space-y-2">
+                    <Label htmlFor="title" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Bug Title
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="title"
+                        value={bug.title}
+                        readOnly
+                        disabled
+                        className="h-11 bg-gray-50/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-medium cursor-not-allowed"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        <BugIcon className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bug ID */}
+                  <div className="space-y-2">
+                    <Label htmlFor="bugId" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Bug ID
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="bugId"
+                        value={bug.id}
+                        readOnly
+                        disabled
+                        className="h-11 bg-gray-50/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-mono font-medium cursor-not-allowed"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Description
+                  </Label>
+                  <div className="relative group">
+                    <Textarea
+                      id="description"
+                      value={bug.description}
+                      readOnly
+                      disabled
+                      className="min-h-[120px] bg-gray-50/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white cursor-not-allowed resize-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Project */}
+                  <div className="space-y-2">
+                    <Label htmlFor="project" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Project
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="project"
+                        value={bug.project_name || "Loading..."}
+                        readOnly
+                        disabled
+                        className="h-11 bg-gray-50/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-medium cursor-not-allowed"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        <FolderOpen className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Priority */}
+                  <div className="space-y-2">
+                    <Label htmlFor="priority" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Priority
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="priority"
+                        value={bug.priority}
+                        readOnly
+                        disabled
+                        className="h-11 bg-gray-50/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-medium cursor-not-allowed capitalize"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        <div className={`w-2 h-2 rounded-full ${
+                          bug.priority === 'high' ? 'bg-red-500' : 
+                          bug.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Section */}
+              <div className="border-t border-gray-200/50 dark:border-gray-700/50 pt-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-green-500 rounded-lg">
+                      <CheckCircle className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Update Status</h3>
+                  </div>
+                  
+                  {/* Status Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="status" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Status
+                    </Label>
+                    <div className="relative group">
+                      <Select
+                        value={status}
+                        onValueChange={(value: Bug["status"]) => setStatus(value)}
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger 
+                          id="status" 
+                          className="h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+                        >
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[60]">
+                          <SelectItem value="fixed" className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            Fixed
+                          </SelectItem>
+                          <SelectItem value="in_progress" className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-blue-500" />
+                            In Progress
+                          </SelectItem>
+                          <SelectItem value="declined" className="flex items-center gap-2">
+                            <X className="h-4 w-4 text-orange-500" />
+                            Declined
+                          </SelectItem>
+                          <SelectItem value="rejected" className="flex items-center gap-2">
+                            <X className="h-4 w-4 text-red-500" />
+                            Rejected
+                          </SelectItem>
+                          <SelectItem value="pending" className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-gray-500" />
+                            Pending
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Fix Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="fixDescription" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Fix Details / Notes
+                    </Label>
+                    <div className="relative group">
+                      <Textarea
+                        id="fixDescription"
+                        placeholder="Provide details about the fix, steps taken, etc."
+                        className="min-h-[120px] bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 resize-none"
+                        value={fixDescription}
+                        onChange={(e) => setFixDescription(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    {status === 'fixed' && fixDescription === DEFAULT_FIX_DESCRIPTION && (
+                      <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                          💡 Default message provided. You can edit this to add more specific details about the fix.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="border-t border-gray-200/50 dark:border-gray-700/50 pt-6">
+                <form onSubmit={handleSubmit}>
+                  <div className="flex flex-col sm:flex-row justify-between gap-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate(-1)}
+                      disabled={isSubmitting}
+                      className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                    >
+                      <ArrowLeft className="mr-2 h-5 w-5" />
+                      Cancel
+                    </Button>
+                    
+                    <Button 
+                      type="submit" 
+                      disabled={isSubmitting || !bugId}
+                      className="h-12 px-8 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-5 w-5" />
+                          Update Bug Status
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 };
 
