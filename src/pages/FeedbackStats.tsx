@@ -302,7 +302,8 @@ export default function FeedbackStats() {
               
               <div className="space-y-6">
                 {[5, 4, 3, 2, 1].map((rating) => {
-                  const count = parseInt(String(statistics[`${rating}_star_count` as keyof typeof statistics])) || 0;
+                  const countKey = `${rating === 5 ? 'five' : rating === 4 ? 'four' : rating === 3 ? 'three' : rating === 2 ? 'two' : 'one'}_star_count` as keyof typeof statistics;
+                  const count = parseInt(String(statistics[countKey])) || 0;
                   const percentage = totalSubmissions > 0 ? (count / totalSubmissions) * 100 : 0;
                   
                   return (

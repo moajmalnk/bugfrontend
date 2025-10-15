@@ -430,10 +430,7 @@ const FixBug = () => {
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                        {bug.id}
-                      </div>
-                      <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                        Bug ID
+                        {bug.priority}
                       </div>
                     </div>
                   </div>
