@@ -31,6 +31,7 @@ import axios from "axios";
 import { apiClient } from "@/lib/axios";
 import {
   ArrowLeft,
+  Bug,
   File,
   FileImage,
   ImagePlus,
@@ -38,6 +39,7 @@ import {
   Paperclip,
   Pause,
   Play,
+  Plus,
   Square,
   Volume2,
   X,
@@ -774,451 +776,589 @@ const NewBug = () => {
   }, [currentAudio]);
 
   return (
-    <div className="space-y-6 w-full max-w-4xl mx-auto px-2 sm:px-4 py-4">
-      <div className="flex items-center justify-between">
-        <Button
-          variant="ghost"
-          className="flex items-center text-muted-foreground hover:text-foreground"
-          onClick={() => navigate(-1)}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Report a Bug</CardTitle>
-          <CardDescription>
-            Fill out the form below to report a new bug
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Bug Name</Label>
-              <Input
-                id="name"
-                placeholder="Enter a descriptive title"
-                value={name}
-                maxLength={TITLE_MAX}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-              <div className="text-xs text-muted-foreground flex justify-between">
-                <span>Keep it concise and specific.</span>
-                <span>
-                  {name.length}/{TITLE_MAX}
-                </span>
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+        {/* Professional Header */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    className="flex items-center text-muted-foreground hover:text-foreground p-2"
+                    onClick={() => navigate(-1)}
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
+                    <Bug className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                      Report Bug
+                    </h1>
+                    <div className="h-1 w-20 bg-gradient-to-r from-orange-500 to-red-600 rounded-full mt-2"></div>
+                  </div>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                  Submit a detailed bug report with attachments and voice notes
+                </p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
+                    <div className="p-1.5 bg-orange-500 rounded-lg">
+                      <Plus className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                        New
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Describe the bug in detail. What were you doing when it happened? What did you expect to happen?"
-                className="min-h-[150px]"
-                value={description}
-                maxLength={DESCRIPTION_MAX}
-                onChange={(e) => setDescription(e.target.value)}
-                required
-              />
-              <div className="text-xs text-muted-foreground flex justify-between">
-                <span>Include steps, expected vs actual, and environment.</span>
-                <span>
-                  {description.length}/{DESCRIPTION_MAX}
-                </span>
-              </div>
-            </div>
+        {/* Professional Form Card */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
+          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardHeader className="p-6 sm:p-8 pb-4">
+                <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+                    <File className="h-5 w-5 text-white" />
+                  </div>
+                  Bug Report Form
+                </CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400 text-base">
+                  Provide comprehensive details to help developers understand and fix the issue
+                </CardDescription>
+              </CardHeader>
+              <form onSubmit={handleSubmit}>
+                <CardContent className="space-y-8 p-6 sm:p-8">
+                  {/* Bug Name Section */}
+                  <div className="space-y-3">
+                    <Label htmlFor="name" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-red-600 rounded-full"></div>
+                      Bug Title
+                    </Label>
+                    <Input
+                      id="name"
+                      placeholder="Enter a descriptive title for the bug"
+                      value={name}
+                      maxLength={TITLE_MAX}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                    />
+                    <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-medium">Keep it concise and specific</span>
+                      <span className={`font-semibold ${name.length > TITLE_MAX * 0.9 ? 'text-orange-600' : ''}`}>
+                        {name.length}/{TITLE_MAX}
+                      </span>
+                    </div>
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="expectedResult">Expected Result (Optional)</Label>
-              <Textarea
-                id="expectedResult"
-                placeholder="What should have happened? Describe the expected behavior..."
-                className="min-h-[100px]"
-                value={expectedResult}
-                maxLength={EXPECTED_RESULT_MAX}
-                onChange={(e) => setExpectedResult(e.target.value)}
-              />
-              <div className="text-xs text-muted-foreground flex justify-between">
-                <span>Describe what you expected to happen.</span>
-                <span>
-                  {expectedResult.length}/{EXPECTED_RESULT_MAX}
-                </span>
-              </div>
-            </div>
+                  {/* Description Section */}
+                  <div className="space-y-3">
+                    <Label htmlFor="description" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"></div>
+                      Description
+                    </Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Describe the bug in detail. What were you doing when it happened? What did you expect to happen?"
+                      className="min-h-[150px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      value={description}
+                      maxLength={DESCRIPTION_MAX}
+                      onChange={(e) => setDescription(e.target.value)}
+                      required
+                    />
+                    <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-medium">Include steps, expected vs actual, and environment</span>
+                      <span className={`font-semibold ${description.length > DESCRIPTION_MAX * 0.9 ? 'text-blue-600' : ''}`}>
+                        {description.length}/{DESCRIPTION_MAX}
+                      </span>
+                    </div>
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="actualResult">Actual Result (Optional)</Label>
-              <Textarea
-                id="actualResult"
-                placeholder="What actually happened? Describe the actual behavior..."
-                className="min-h-[100px]"
-                value={actualResult}
-                maxLength={ACTUAL_RESULT_MAX}
-                onChange={(e) => setActualResult(e.target.value)}
-              />
-              <div className="text-xs text-muted-foreground flex justify-between">
-                <span>Describe what actually happened instead.</span>
-                <span>
-                  {actualResult.length}/{ACTUAL_RESULT_MAX}
-                </span>
-              </div>
-            </div>
+                  {/* Expected Result Section */}
+                  <div className="space-y-3">
+                    <Label htmlFor="expectedResult" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full"></div>
+                      Expected Result
+                      <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(Optional)</span>
+                    </Label>
+                    <Textarea
+                      id="expectedResult"
+                      placeholder="What should have happened? Describe the expected behavior..."
+                      className="min-h-[100px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      value={expectedResult}
+                      maxLength={EXPECTED_RESULT_MAX}
+                      onChange={(e) => setExpectedResult(e.target.value)}
+                    />
+                    <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-medium">Describe what you expected to happen</span>
+                      <span className={`font-semibold ${expectedResult.length > EXPECTED_RESULT_MAX * 0.9 ? 'text-green-600' : ''}`}>
+                        {expectedResult.length}/{EXPECTED_RESULT_MAX}
+                      </span>
+                    </div>
+                  </div>
 
-            {/* Only show project dropdown if no projectId in URL */}
-            {!preSelectedProjectId && (
-              <div className="space-y-2">
-                <Label htmlFor="project">Project</Label>
-                <Select value={projectId} onValueChange={setProjectId} required>
-                  <SelectTrigger id="project">
-                    <SelectValue placeholder="Select a project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isLoading ? (
-                      <SelectItem value="loading" disabled>
-                        Loading projects...
-                      </SelectItem>
-                    ) : error ? (
-                      <SelectItem value="error" disabled>
-                        Error loading projects
-                      </SelectItem>
-                    ) : projects?.length === 0 ? (
-                      <SelectItem value="none" disabled>
-                        No projects available
-                      </SelectItem>
-                    ) : (
-                      projects?.map((project: Project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
+                  {/* Actual Result Section */}
+                  <div className="space-y-3">
+                    <Label htmlFor="actualResult" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-red-500 to-pink-600 rounded-full"></div>
+                      Actual Result
+                      <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(Optional)</span>
+                    </Label>
+                    <Textarea
+                      id="actualResult"
+                      placeholder="What actually happened? Describe the actual behavior..."
+                      className="min-h-[100px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      value={actualResult}
+                      maxLength={ACTUAL_RESULT_MAX}
+                      onChange={(e) => setActualResult(e.target.value)}
+                    />
+                    <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-medium">Describe what actually happened instead</span>
+                      <span className={`font-semibold ${actualResult.length > ACTUAL_RESULT_MAX * 0.9 ? 'text-red-600' : ''}`}>
+                        {actualResult.length}/{ACTUAL_RESULT_MAX}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Project Selection */}
+                  {!preSelectedProjectId && (
+                    <div className="space-y-3">
+                      <Label htmlFor="project" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-violet-600 rounded-full"></div>
+                        Project
+                      </Label>
+                      <Select value={projectId} onValueChange={setProjectId} required>
+                        <SelectTrigger id="project" className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md">
+                          <SelectValue placeholder="Select a project" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[60]">
+                          {isLoading ? (
+                            <SelectItem value="loading" disabled>
+                              Loading projects...
+                            </SelectItem>
+                          ) : error ? (
+                            <SelectItem value="error" disabled>
+                              Error loading projects
+                            </SelectItem>
+                          ) : projects?.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              No projects available
+                            </SelectItem>
+                          ) : (
+                            projects?.map((project: Project) => (
+                              <SelectItem key={project.id} value={project.id}>
+                                {project.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Priority Selection */}
+                  <div className="space-y-3">
+                    <Label htmlFor="priority" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full"></div>
+                      Priority Level
+                    </Label>
+                    <Select
+                      value={priority}
+                      onValueChange={(value) => setPriority(value as BugPriority)}
+                    >
+                      <SelectTrigger id="priority" className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md">
+                        <SelectValue placeholder="Select priority level" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[60]">
+                        <SelectItem value="high">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                            <span>High Priority</span>
+                          </div>
                         </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="priority">Priority</Label>
-              <Select
-                value={priority}
-                onValueChange={(value) => setPriority(value as BugPriority)}
-              >
-                <SelectTrigger id="priority">
-                  <SelectValue placeholder="Select priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Attachments</Label>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Screenshots: {screenshots.length}</span>
-                  <span>Files: {files.length}</span>
-                  <span>Voice notes: {voiceNotes.length}</span>
-                </div>
-              </div>
-
-              {/* Hidden file inputs */}
-              <input
-                type="file"
-                ref={screenshotInputRef}
-                onChange={handleScreenshotChange}
-                accept="image/*"
-                className="hidden"
-                multiple
-              />
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                multiple
-              />
-
-              <div className="grid gap-4 md:grid-cols-3">
-                {/* Screenshots section */}
-                <div
-                  className="space-y-3"
-                  tabIndex={0}
-                  onPaste={handlePasteScreenshot}
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-24 w-full flex flex-col items-center justify-center"
-                    onClick={handleScreenshotClick}
-                  >
-                    <ImagePlus className="h-8 w-8 mb-2 text-muted-foreground" />
-                    <span>Add Screenshots</span>
-                    <span className="text-xs text-muted-foreground mt-1">
-                      (Paste or Upload)
-                    </span>
-                  </Button>
-
-                  {/* Preview of screenshots */}
-                  {screenshots.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">
-                        Screenshots ({screenshots.length})
-                      </Label>
-                      <div className="flex justify-end">
-                        <Button type="button" variant="ghost" size="sm" onClick={clearAllScreenshots}>
-                          Clear
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {screenshots.map((file, index) => (
-                          <div
-                            key={index}
-                            className="relative rounded border p-1 group"
-                          >
-                            {file.preview ? (
-                              <img
-                                src={file.preview}
-                                alt={`Screenshot ${index + 1}`}
-                                className="h-20 w-full object-cover rounded"
-                              />
-                            ) : (
-                              <div className="h-20 w-full flex items-center justify-center bg-muted rounded">
-                                <FileImage className="h-8 w-8 text-muted-foreground" />
-                              </div>
-                            )}
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon"
-                              className="h-6 w-6 absolute top-1 right-1 opacity-70 hover:opacity-100"
-                              onClick={() => removeScreenshot(index)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                            <div className="text-xs truncate mt-1 px-1">
-                              {file.name}
-                            </div>
+                        <SelectItem value="medium">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span>Medium Priority</span>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Files section */}
-                <div className="space-y-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-24 w-full flex flex-col items-center justify-center"
-                    onClick={handleFileClick}
-                  >
-                    <Paperclip className="h-8 w-8 mb-2 text-muted-foreground" />
-                    <span>Attach Files</span>
-                  </Button>
-
-                  {/* Preview of files */}
-                  {files.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">Files ({files.length})</Label>
-                      <div className="flex justify-end">
-                        <Button type="button" variant="ghost" size="sm" onClick={clearAllFiles}>
-                          Clear
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        {files.map((file, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between rounded border p-2 text-sm group"
-                          >
-                            <div className="flex items-center space-x-2 overflow-hidden">
-                              {file.preview ? (
-                                <img
-                                  src={file.preview}
-                                  alt={`File preview ${index + 1}`}
-                                  className="h-8 w-8 object-cover rounded"
-                                />
-                              ) : (
-                                <File className="h-8 w-8 text-muted-foreground" />
-                              )}
-                              <span className="truncate max-w-[120px]">
-                                {file.name}
-                              </span>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-70 hover:opacity-100"
-                              onClick={() => removeFile(index)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                        </SelectItem>
+                        <SelectItem value="low">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span>Low Priority</span>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Voice Notes section */}
-                <div className="space-y-3">
-                  <Button
-                    type="button"
-                    variant={isRecording ? "destructive" : "outline"}
-                    className={`h-24 w-full flex flex-col items-center justify-center transition-all duration-200 ${
-                      isRecording
-                        ? "bg-red-500 hover:bg-red-600 text-white shadow-lg animate-pulse"
-                        : "hover:bg-primary/5 hover:border-primary/30"
-                    }`}
-                    onClick={isRecording ? stopRecording : startRecording}
-                    disabled={isSubmitting}
-                    title={
-                      isRecording
-                        ? "Click to stop recording"
-                        : "Click to start recording"
-                    }
-                  >
-                    {isRecording ? (
-                      <>
-                        <Square className="h-8 w-8 mb-2 text-white" />
-                        <span className="font-medium">Stop Recording</span>
-                        <span className="text-xs text-white/80 mt-1 font-mono">
-                          {formatTime(recordingTime)}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <Mic className="h-8 w-8 mb-2 text-muted-foreground group-hover:text-primary" />
-                        <span>Record Voice Note</span>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          (Click to start)
-                        </span>
-                      </>
-                    )}
-                  </Button>
-
-                  {/* Debug Info */}
-                  {process.env.NODE_ENV === "development" && (
-                    <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded text-xs">
-                      <div>Debug: {voiceNotes.length} voice notes</div>
-                      <div>
-                        Current Audio: {currentAudio ? "Playing" : "None"}
-                      </div>
-                      <div>
-                        Playing IDs:{" "}
-                        {voiceNotes
-                          .filter((vn) => vn.isPlaying)
-                          .map((vn) => vn.id)
-                          .join(", ") || "None"}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Preview of voice notes */}
-                  {voiceNotes.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">
-                        Voice Notes ({voiceNotes.length})
+                  {/* Attachments Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"></div>
+                        Attachments
                       </Label>
-                      <div className="flex justify-end">
-                        <Button type="button" variant="ghost" size="sm" onClick={clearAllVoiceNotes}>
-                          Clear
-                        </Button>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                          <span className="font-medium">Screenshots: {screenshots.length}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                          <span className="font-medium">Files: {files.length}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
+                          <span className="font-medium">Voice: {voiceNotes.length}</span>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        {voiceNotes.map((voiceNote, index) => (
-                          <div
-                            key={voiceNote.id}
-                            className="flex items-center justify-between rounded border p-2 text-sm group hover:bg-muted/50 transition-colors"
-                          >
-                            <div className="flex items-center space-x-2 overflow-hidden">
-                              <Volume2 className="h-8 w-8 text-blue-500 flex-shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate font-medium">
-                                  {voiceNote.name}
-                                </div>
-                                {showDuration && (
-                                  <div className="text-xs text-muted-foreground font-mono">
-                                    {formatTime(voiceNote.duration)}
+                    </div>
+
+                    {/* Hidden file inputs */}
+                    <input
+                      type="file"
+                      ref={screenshotInputRef}
+                      onChange={handleScreenshotChange}
+                      accept="image/*"
+                      className="hidden"
+                      multiple
+                    />
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                      multiple
+                    />
+
+                    <div className="grid gap-6 md:grid-cols-3">
+                      {/* Screenshots section */}
+                      <div
+                        className="space-y-4"
+                        tabIndex={0}
+                        onPaste={handlePasteScreenshot}
+                      >
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-300 rounded-xl group"
+                          onClick={handleScreenshotClick}
+                        >
+                          <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
+                            <ImagePlus className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <span className="font-semibold text-gray-700 dark:text-gray-300">Add Screenshots</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            (Paste or Upload)
+                          </span>
+                        </Button>
+
+                        {/* Preview of screenshots */}
+                        {screenshots.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                Screenshots ({screenshots.length})
+                              </Label>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={clearAllScreenshots}
+                                className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                              >
+                                Clear All
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              {screenshots.map((file, index) => (
+                                <div
+                                  key={index}
+                                  className="relative rounded-xl border border-gray-200 dark:border-gray-700 p-2 group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                                >
+                                  {file.preview ? (
+                                    <img
+                                      src={file.preview}
+                                      alt={`Screenshot ${index + 1}`}
+                                      className="h-24 w-full object-cover rounded-lg"
+                                    />
+                                  ) : (
+                                    <div className="h-24 w-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                      <FileImage className="h-8 w-8 text-gray-400" />
+                                    </div>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="icon"
+                                    className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg"
+                                    onClick={() => removeScreenshot(index)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                  <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">
+                                    {file.name}
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-1 flex-shrink-0">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-primary/10"
-                                onClick={() => {
-                                  console.log(
-                                    "Button clicked, isPlaying:",
-                                    voiceNote.isPlaying
-                                  );
-                                  if (voiceNote.isPlaying) {
-                                    pauseVoiceNote(voiceNote);
-                                  } else {
-                                    playVoiceNote(voiceNote);
-                                  }
-                                }}
-                                title={voiceNote.isPlaying ? "Pause" : "Play"}
-                              >
-                                {voiceNote.isPlaying ? (
-                                  <Pause className="h-3 w-3" />
-                                ) : (
-                                  <Play className="h-3 w-3" />
-                                )}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => removeVoiceNote(index)}
-                                title="Remove voice note"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
+                                </div>
+                              ))}
                             </div>
                           </div>
-                        ))}
+                        )}
+                </div>
+
+                      {/* Files section */}
+                      <div className="space-y-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400 dark:hover:border-green-500 hover:bg-green-50/50 dark:hover:bg-green-950/20 transition-all duration-300 rounded-xl group"
+                          onClick={handleFileClick}
+                        >
+                          <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full mb-3 group-hover:bg-green-200 dark:group-hover:bg-green-800/40 transition-colors">
+                            <Paperclip className="h-6 w-6 text-green-600 dark:text-green-400" />
+                          </div>
+                          <span className="font-semibold text-gray-700 dark:text-gray-300">Attach Files</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            (Documents, logs, etc.)
+                          </span>
+                        </Button>
+
+                        {/* Preview of files */}
+                        {files.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                Files ({files.length})
+                              </Label>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={clearAllFiles}
+                                className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                              >
+                                Clear All
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              {files.map((file, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                                >
+                                  <div className="flex items-center space-x-3 overflow-hidden">
+                                    {file.preview ? (
+                                      <img
+                                        src={file.preview}
+                                        alt={`File preview ${index + 1}`}
+                                        className="h-10 w-10 object-cover rounded-lg"
+                                      />
+                                    ) : (
+                                      <div className="h-10 w-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                        <File className="h-5 w-5 text-gray-400" />
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate font-medium text-gray-700 dark:text-gray-300">
+                                        {file.name}
+                                      </div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        {(file.size / 1024).toFixed(1)} KB
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
+                                    onClick={() => removeFile(index)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Voice Notes section */}
+                      <div className="space-y-4">
+                        <Button
+                          type="button"
+                          variant={isRecording ? "destructive" : "outline"}
+                          className={`h-28 w-full flex flex-col items-center justify-center transition-all duration-300 rounded-xl group ${
+                            isRecording
+                              ? "bg-red-500 hover:bg-red-600 text-white shadow-lg animate-pulse border-red-500"
+                              : "border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-950/20"
+                          }`}
+                          onClick={isRecording ? stopRecording : startRecording}
+                          disabled={isSubmitting}
+                          title={
+                            isRecording
+                              ? "Click to stop recording"
+                              : "Click to start recording"
+                          }
+                        >
+                          {isRecording ? (
+                            <>
+                              <div className="p-3 bg-red-600 rounded-full mb-3 animate-pulse">
+                                <Square className="h-6 w-6 text-white" />
+                              </div>
+                              <span className="font-semibold">Stop Recording</span>
+                              <span className="text-xs text-white/80 mt-1 font-mono">
+                                {formatTime(recordingTime)}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full mb-3 group-hover:bg-purple-200 dark:group-hover:bg-purple-800/40 transition-colors">
+                                <Mic className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                              </div>
+                              <span className="font-semibold text-gray-700 dark:text-gray-300">Record Voice Note</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                (Click to start)
+                              </span>
+                            </>
+                          )}
+                        </Button>
+
+                        {/* Preview of voice notes */}
+                        {voiceNotes.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                Voice Notes ({voiceNotes.length})
+                              </Label>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={clearAllVoiceNotes}
+                                className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                              >
+                                Clear All
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              {voiceNotes.map((voiceNote, index) => (
+                                <div
+                                  key={voiceNote.id}
+                                  className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                                >
+                                  <div className="flex items-center space-x-3 overflow-hidden">
+                                    <div className="h-10 w-10 flex items-center justify-center bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                                      <Volume2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate font-medium text-gray-700 dark:text-gray-300">
+                                        {voiceNote.name}
+                                      </div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                                        {formatTime(voiceNote.duration)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-1 flex-shrink-0">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:text-blue-600 dark:hover:text-blue-400"
+                                      onClick={() => {
+                                        if (voiceNote.isPlaying) {
+                                          pauseVoiceNote(voiceNote);
+                                        } else {
+                                          playVoiceNote(voiceNote);
+                                        }
+                                      }}
+                                      title={voiceNote.isPlaying ? "Pause" : "Play"}
+                                    >
+                                      {voiceNote.isPlaying ? (
+                                        <Pause className="h-4 w-4" />
+                                      ) : (
+                                        <Play className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
+                                      onClick={() => removeVoiceNote(index)}
+                                      title="Remove voice note"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate(-1)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={
-              isSubmitting ||
-              !projectId ||
-              !name.trim() ||
-              !description.trim()
-            }>
-              {isSubmitting ? "Submitting..." : "Submit Bug Report"}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="p-6 sm:p-8 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+                  <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate(-1)}
+                      className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={
+                        isSubmitting ||
+                        !projectId ||
+                        !name.trim() ||
+                        !description.trim()
+                      }
+                      className="h-12 px-8 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Submit Bug Report
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardFooter>
+              </form>
+            </Card>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 };
 
