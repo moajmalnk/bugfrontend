@@ -777,7 +777,7 @@ const NewBug = () => {
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+      <section className="max-w mx-auto space-y-6 sm:space-y-8">
         {/* Professional Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
