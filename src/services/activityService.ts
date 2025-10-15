@@ -15,12 +15,26 @@ export interface Activity {
   id: number;
   type: string;
   description: string;
-  user: User;
-  project: Project;
+  user_id: string;
+  project_id?: string;
+  related_id?: string;
+  username?: string;
+  email?: string;
+  project_name?: string;
   related_title?: string;
   metadata?: Record<string, any>;
   created_at: string;
   time_ago: string;
+  // Structured fields for frontend compatibility
+  user: {
+    id: string;
+    username: string;
+    email: string;
+  };
+  project?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface ActivityPagination {

@@ -79,13 +79,13 @@ const ActivityItem: React.FC<{ activity: Activity; index: number; onDetailsClick
           </div>
         </div>
         
-        {activity.project && (
+        {activity.project?.name && (
           <div className="flex items-center gap-2 mb-3">
             <div className="p-1 bg-purple-500 rounded-lg">
               <FolderOpen className="h-3 w-3 text-white" />
             </div>
             <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-              in <span className="font-semibold text-gray-700 dark:text-gray-300">{activity.project.name}</span>
+              in <span className="font-semibold text-gray-700 dark:text-gray-300">{activity.project?.name}</span>
             </span>
           </div>
         )}
