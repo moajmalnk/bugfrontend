@@ -216,7 +216,7 @@ class ActivityService {
    * Helper method to log project activities
    */
   async logProjectActivity(
-    type: 'project_created' | 'project_updated' | 'member_added' | 'member_removed',
+    type: 'project_created' | 'project_updated' | 'project_deleted' | 'member_added' | 'member_removed',
     projectId: string,
     description: string,
     metadata?: Record<string, any>
@@ -230,19 +230,253 @@ class ActivityService {
   }
 
   /**
+   * Helper method to log task activities
+   */
+  async logTaskActivity(
+    type: 'task_created' | 'task_updated' | 'task_completed' | 'task_deleted' | 'task_assigned',
+    taskId: string,
+    projectId: string,
+    description: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logActivity({
+      type,
+      description,
+      project_id: projectId,
+      related_id: taskId,
+      metadata,
+    });
+  }
+
+  /**
+   * Helper method to log update activities
+   */
+  async logUpdateActivity(
+    type: 'update_created' | 'update_updated' | 'update_deleted',
+    updateId: string,
+    projectId: string,
+    description: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logActivity({
+      type,
+      description,
+      project_id: projectId,
+      related_id: updateId,
+      metadata,
+    });
+  }
+
+  /**
+   * Helper method to log fix activities
+   */
+  async logFixActivity(
+    type: 'fix_created' | 'fix_updated' | 'fix_deleted',
+    fixId: string,
+    projectId: string,
+    description: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logActivity({
+      type,
+      description,
+      project_id: projectId,
+      related_id: fixId,
+      metadata,
+    });
+  }
+
+  /**
+   * Helper method to log user activities
+   */
+  async logUserActivity(
+    type: 'user_created' | 'user_updated' | 'user_deleted' | 'user_role_changed',
+    userId: string,
+    projectId: string,
+    description: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logActivity({
+      type,
+      description,
+      project_id: projectId,
+      related_id: userId,
+      metadata,
+    });
+  }
+
+  /**
+   * Helper method to log feedback activities
+   */
+  async logFeedbackActivity(
+    type: 'feedback_created' | 'feedback_updated' | 'feedback_deleted' | 'feedback_dismissed',
+    feedbackId: string,
+    projectId: string,
+    description: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logActivity({
+      type,
+      description,
+      project_id: projectId,
+      related_id: feedbackId,
+      metadata,
+    });
+  }
+
+  /**
+   * Helper method to log meeting activities
+   */
+  async logMeetingActivity(
+    type: 'meeting_created' | 'meeting_updated' | 'meeting_deleted' | 'meeting_joined' | 'meeting_left',
+    meetingId: string,
+    projectId: string,
+    description: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logActivity({
+      type,
+      description,
+      project_id: projectId,
+      related_id: meetingId,
+      metadata,
+    });
+  }
+
+  /**
+   * Helper method to log message activities
+   */
+  async logMessageActivity(
+    type: 'message_sent' | 'message_updated' | 'message_deleted' | 'message_pinned' | 'message_unpinned',
+    messageId: string,
+    projectId: string,
+    description: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logActivity({
+      type,
+      description,
+      project_id: projectId,
+      related_id: messageId,
+      metadata,
+    });
+  }
+
+  /**
+   * Helper method to log announcement activities
+   */
+  async logAnnouncementActivity(
+    type: 'announcement_created' | 'announcement_updated' | 'announcement_deleted' | 'announcement_broadcast',
+    announcementId: string,
+    projectId: string,
+    description: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logActivity({
+      type,
+      description,
+      project_id: projectId,
+      related_id: announcementId,
+      metadata,
+    });
+  }
+
+  /**
+   * Helper method to log general activities
+   */
+  async logGeneralActivity(
+    type: 'comment_added' | 'comment_updated' | 'comment_deleted' | 'file_uploaded' | 'file_deleted' | 'settings_updated' | 'milestone_reached',
+    projectId: string,
+    description: string,
+    relatedId?: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logActivity({
+      type,
+      description,
+      project_id: projectId,
+      related_id: relatedId,
+      metadata,
+    });
+  }
+
+  /**
    * Get activity type display information
    */
   getActivityTypeInfo(type: string): { icon: string; color: string; label: string } {
     const typeMap: Record<string, { icon: string; color: string; label: string }> = {
+      // Bug Activities
+      'bug_created': { icon: '🐛', color: 'text-red-600', label: 'Bug Created' },
       'bug_reported': { icon: '🐛', color: 'text-red-600', label: 'Bug Reported' },
       'bug_updated': { icon: '📝', color: 'text-yellow-600', label: 'Bug Updated' },
       'bug_fixed': { icon: '✅', color: 'text-green-600', label: 'Bug Fixed' },
       'bug_assigned': { icon: '👤', color: 'text-blue-600', label: 'Bug Assigned' },
+      'bug_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Bug Deleted' },
+      'bug_status_changed': { icon: '🔄', color: 'text-orange-600', label: 'Bug Status Changed' },
+      
+      // Task Activities
+      'task_created': { icon: '📝', color: 'text-blue-600', label: 'Task Created' },
+      'task_updated': { icon: '✏️', color: 'text-yellow-600', label: 'Task Updated' },
+      'task_completed': { icon: '✅', color: 'text-green-600', label: 'Task Completed' },
+      'task_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Task Deleted' },
+      'task_assigned': { icon: '👤', color: 'text-purple-600', label: 'Task Assigned' },
+      
+      // Update Activities
+      'update_created': { icon: '📋', color: 'text-indigo-600', label: 'Update Created' },
+      'update_updated': { icon: '✏️', color: 'text-yellow-600', label: 'Update Updated' },
+      'update_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Update Deleted' },
+      
+      // Fix Activities
+      'fix_created': { icon: '🔧', color: 'text-green-600', label: 'Fix Created' },
+      'fix_updated': { icon: '✏️', color: 'text-yellow-600', label: 'Fix Updated' },
+      'fix_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Fix Deleted' },
+      
+      // Project Activities
       'project_created': { icon: '🎉', color: 'text-purple-600', label: 'Project Created' },
       'project_updated': { icon: '⚡', color: 'text-orange-600', label: 'Project Updated' },
+      'project_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Project Deleted' },
       'member_added': { icon: '👥', color: 'text-blue-600', label: 'Member Added' },
       'member_removed': { icon: '👋', color: 'text-gray-600', label: 'Member Removed' },
+      
+      // User Activities
+      'user_created': { icon: '👤', color: 'text-green-600', label: 'User Created' },
+      'user_updated': { icon: '✏️', color: 'text-yellow-600', label: 'User Updated' },
+      'user_deleted': { icon: '🗑️', color: 'text-red-800', label: 'User Deleted' },
+      'user_role_changed': { icon: '🔄', color: 'text-purple-600', label: 'User Role Changed' },
+      
+      // Feedback Activities
+      'feedback_created': { icon: '💭', color: 'text-blue-600', label: 'Feedback Created' },
+      'feedback_updated': { icon: '✏️', color: 'text-yellow-600', label: 'Feedback Updated' },
+      'feedback_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Feedback Deleted' },
+      'feedback_dismissed': { icon: '❌', color: 'text-gray-600', label: 'Feedback Dismissed' },
+      
+      // Meeting Activities
+      'meeting_created': { icon: '📅', color: 'text-indigo-600', label: 'Meeting Created' },
+      'meeting_updated': { icon: '✏️', color: 'text-yellow-600', label: 'Meeting Updated' },
+      'meeting_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Meeting Deleted' },
+      'meeting_joined': { icon: '🚪', color: 'text-green-600', label: 'Meeting Joined' },
+      'meeting_left': { icon: '🚪', color: 'text-gray-600', label: 'Meeting Left' },
+      
+      // Message Activities
+      'message_sent': { icon: '💬', color: 'text-blue-600', label: 'Message Sent' },
+      'message_updated': { icon: '✏️', color: 'text-yellow-600', label: 'Message Updated' },
+      'message_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Message Deleted' },
+      'message_pinned': { icon: '📌', color: 'text-purple-600', label: 'Message Pinned' },
+      'message_unpinned': { icon: '📌', color: 'text-gray-600', label: 'Message Unpinned' },
+      
+      // Announcement Activities
+      'announcement_created': { icon: '📢', color: 'text-orange-600', label: 'Announcement Created' },
+      'announcement_updated': { icon: '✏️', color: 'text-yellow-600', label: 'Announcement Updated' },
+      'announcement_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Announcement Deleted' },
+      'announcement_broadcast': { icon: '📡', color: 'text-green-600', label: 'Announcement Broadcast' },
+      
+      // General Activities
       'comment_added': { icon: '💬', color: 'text-indigo-600', label: 'Comment Added' },
+      'comment_updated': { icon: '✏️', color: 'text-yellow-600', label: 'Comment Updated' },
+      'comment_deleted': { icon: '🗑️', color: 'text-red-800', label: 'Comment Deleted' },
+      'file_uploaded': { icon: '📁', color: 'text-green-600', label: 'File Uploaded' },
+      'file_deleted': { icon: '🗑️', color: 'text-red-800', label: 'File Deleted' },
+      'settings_updated': { icon: '⚙️', color: 'text-gray-600', label: 'Settings Updated' },
       'milestone_reached': { icon: '🏆', color: 'text-yellow-500', label: 'Milestone Reached' },
     };
 

@@ -14,10 +14,11 @@ import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { UserDetailDialog } from "@/components/users/UserDetailDialog";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { useAuth } from "@/context/AuthContext";
+import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { ENV } from "@/lib/env";
 import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
-import { Bug, Code2, Shield, UserRound } from "lucide-react";
+import { Bug, Code2, Shield, UserRound, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -74,6 +75,25 @@ const Users = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "admins";
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+
+  // Undo delete hook
+  const undoDelete = useUndoDelete({
+    duration: 10,
+    onConfirm: () => {
+      if (userToDelete) {
+        performActualDelete(userToDelete.id);
+        setUserToDelete(null);
+      }
+    },
+    onUndo: () => {
+      setUserToDelete(null);
+      toast({
+        title: "Deletion Cancelled",
+        description: "User deletion has been cancelled.",
+      });
+    },
+  });
 
   const fetchUsers = async () => {
     try {
@@ -222,7 +242,7 @@ const Users = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string, force = false) => {
+  const performActualDelete = async (userId: string, force = false) => {
     try {
       const url = `${ENV.API_URL}/users/delete.php?id=${userId}${
         force ? "&force=true" : ""
@@ -283,6 +303,28 @@ const Users = () => {
         throw error;
       }
     }
+  };
+
+  const handleDeleteUser = async (userId: string, force = false) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+
+    setUserToDelete(user);
+    undoDelete.startCountdown();
+
+    toast({
+      title: "User Deletion Started",
+      description: `${user.username} will be deleted in ${undoDelete.timeLeft} seconds. Click undo to cancel.`,
+      action: (
+        <button
+          onClick={() => undoDelete.cancelCountdown()}
+          className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
+        >
+          <Undo2 className="h-4 w-4" />
+          Undo
+        </button>
+      ),
+    });
   };
 
   const totalFiltered = filteredUsers.length;
@@ -824,12 +866,22 @@ const Users = () => {
                             <UserWorkStats userId={user.id} compact={true} />
                           </TableCell>
                           <TableCell className="w-[20%] px-6 py-5 text-right">
-                            <button
-                              className="h-9 px-4 py-2 rounded-lg text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-                              onClick={() => setSelectedUser(user)}
-                            >
-                              View
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              {userToDelete?.id === user.id && undoDelete.isCountingDown && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                  <span className="text-xs font-medium text-red-700 dark:text-red-300">
+                                    Deleting in {undoDelete.timeLeft}s
+                                  </span>
+                                </div>
+                              )}
+                              <button
+                                className="h-9 px-4 py-2 rounded-lg text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+                                onClick={() => setSelectedUser(user)}
+                              >
+                                View
+                              </button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -886,12 +938,21 @@ const Users = () => {
                     </div>
 
                     {/* Action Button */}
-                    <button
-                      className="w-full h-10 px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200"
-                      onClick={() => setSelectedUser(user)}
-                    >
-                      View
-                    </button>
+                    {userToDelete?.id === user.id && undoDelete.isCountingDown ? (
+                      <div className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                          Deleting in {undoDelete.timeLeft}s
+                        </span>
+                      </div>
+                    ) : (
+                      <button
+                        className="w-full h-10 px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200"
+                        onClick={() => setSelectedUser(user)}
+                      >
+                        View
+                      </button>
+                    )}
                   </div>
                 ))}
             </div>
@@ -1032,7 +1093,7 @@ const Users = () => {
           open={!!selectedUser}
           onOpenChange={(open) => !open && setSelectedUser(null)}
           onUserUpdate={handleUpdateUser}
-          onUserDelete={handleDeleteUser}
+          onUserDelete={performActualDelete}
           onPasswordChange={async (userId: string, newPassword: string) => {
             // You may want to implement this or pass a real handler
             // For now, just show a toast or do nothing

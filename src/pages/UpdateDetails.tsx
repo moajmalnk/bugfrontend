@@ -9,8 +9,9 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
+import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, Undo2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -139,11 +140,28 @@ const UpdateDetails = () => {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
 
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
   const [updateList, setUpdateList] = useState<any[]>([]);
   const [updateListLoading, setUpdateListLoading] = useState(true);
+  const [isDeletingUpdate, setIsDeletingUpdate] = useState(false);
+
+  // Undo delete hook
+  const undoDelete = useUndoDelete({
+    duration: 10,
+    onConfirm: () => {
+      if (updateId) {
+        performActualDelete.mutate();
+      }
+    },
+    onUndo: () => {
+      setIsDeletingUpdate(false);
+      toast({
+        title: "Deletion Cancelled",
+        description: "Update deletion has been cancelled.",
+      });
+    },
+  });
 
   // Check if user came from project page
   const fromProject = searchParams.get("from") === "project";
@@ -206,7 +224,6 @@ const UpdateDetails = () => {
       queryClient.invalidateQueries({ queryKey: ["update", updateId] });
       setShowApproveDialog(false);
       setShowDeclineDialog(false);
-      setShowDeleteDialog(false);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -223,15 +240,40 @@ const UpdateDetails = () => {
     ...mutationOptions,
   });
 
-  const deleteMutation = useMutation({
+  const performActualDelete = useMutation({
     mutationFn: () => fetch(`${API_BASE}/delete.php?id=${updateId}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then(res => res.json().then(data => { if (!data.success) throw new Error(data.message); return "Update deleted successfully."; })),
     onSuccess: (successMessage) => {
+      setIsDeletingUpdate(false);
       toast({ title: "Success", description: successMessage });
       queryClient.invalidateQueries({ queryKey: ["updates"] });
       navigate(currentUser?.role ? `/${currentUser.role}/updates` : '/updates');
     },
-    onError: mutationOptions.onError,
+    onError: (error: Error) => {
+      setIsDeletingUpdate(false);
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
+
+  const handleDeleteUpdate = () => {
+    if (!update) return;
+
+    setIsDeletingUpdate(true);
+    undoDelete.startCountdown();
+
+    toast({
+      title: "Update Deletion Started",
+      description: `"${update.title}" will be deleted in ${undoDelete.timeLeft} seconds. Click undo to cancel.`,
+      action: (
+        <button
+          onClick={() => undoDelete.cancelCountdown()}
+          className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
+        >
+          <Undo2 className="h-4 w-4" />
+          Undo
+        </button>
+      ),
+    });
+  };
   
   const getTypeBadgeStyle = (type: string) => {
     switch (type) {
@@ -348,9 +390,18 @@ const UpdateDetails = () => {
                       type="update_details"
                       size="sm"
                     />
-                    <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
-                      <Trash2 className="mr-2 h-4 w-4"/>Delete
-                    </Button>
+                    {isDeletingUpdate && undoDelete.isCountingDown ? (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                          Deleting in {undoDelete.timeLeft}s
+                        </span>
+                      </div>
+                    ) : (
+                      <Button variant="destructive" size="sm" onClick={handleDeleteUpdate}>
+                        <Trash2 className="mr-2 h-4 w-4"/>Delete
+                      </Button>
+                    )}
                   </>
                 )}
               </div>
@@ -475,7 +526,6 @@ const UpdateDetails = () => {
       {/* Confirmation Dialogs */}
       <ConfirmationDialog open={showApproveDialog} onOpenChange={setShowApproveDialog} onConfirm={() => approveMutation.mutate()} title="Approve Update" description="Are you sure you want to approve this update?" confirmText="Approve" isLoading={approveMutation.isPending} />
       <ConfirmationDialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog} onConfirm={() => declineMutation.mutate()} title="Decline Update" description="Are you sure you want to decline this update? This cannot be undone." confirmText="Decline" isLoading={declineMutation.isPending} variant="destructive" />
-      <ConfirmationDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} onConfirm={() => deleteMutation.mutate()} title="Delete Update" description="Are you sure you want to permanently delete this update? This action cannot be undone." confirmText="Delete" isLoading={deleteMutation.isPending} variant="destructive" />
     </main>
   );
 };
