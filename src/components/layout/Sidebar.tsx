@@ -17,6 +17,7 @@ import {
   FileText,
   ListTodo,
   BarChart3,
+  Activity,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -186,6 +187,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   to="/feedback-stats"
                   icon={<BarChart3 className="h-5 w-5" />}
                   label="Feedbacks"
+                />
+                <NavLink
+                  to="/activity"
+                  icon={<Activity className="h-5 w-5" />}
+                  label="Activities"
                 />
                 <NavLink
                   to="/meet"
