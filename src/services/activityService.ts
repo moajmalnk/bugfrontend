@@ -133,6 +133,50 @@ class ActivityService {
   }
 
   /**
+   * Get user's own activity count (activities created by the current user)
+   */
+  async getUserOwnActivityCount(): Promise<number> {
+    try {
+      // For now, we'll fetch a large number of activities and count them client-side
+      // In the future, this should be a dedicated API endpoint
+      const response = await fetch(
+        `${ENV.API_URL}/activities/project_activities.php?limit=1000&offset=0`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to fetch activities');
+      }
+
+      // Get current user ID from token
+      const token = localStorage.getItem('token');
+      if (!token) return 0;
+      
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const currentUserId = payload.user_id;
+
+      // Count activities created by current user
+      const userOwnActivities = result.data.activities.filter(
+        (activity: Activity) => activity.user.id === currentUserId
+      );
+
+      return userOwnActivities.length;
+    } catch (error) {
+      console.error('Error fetching user own activity count:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Get activity statistics for a project
    */
   async getActivityStats(projectId: string): Promise<ActivityStats> {

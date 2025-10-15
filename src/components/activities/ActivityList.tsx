@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { activityService, Activity, ActivityResponse } from '@/services/activityService';
 import { useToast } from '@/components/ui/use-toast';
-import { Clock, RefreshCw, ChevronLeft, ChevronRight, Activity as ActivityIcon } from 'lucide-react';
+import { Clock, RefreshCw, ChevronLeft, ChevronRight, Activity as ActivityIcon, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ActivityDetailsModal from './ActivityDetailsModal';
 
 interface ActivityListProps {
   projectId?: string;
@@ -35,7 +36,11 @@ const ActivityItemSkeleton = () => (
   </div>
 );
 
-const ActivityItem: React.FC<{ activity: Activity; index: number }> = ({ activity, index }) => {
+const ActivityItem: React.FC<{ 
+  activity: Activity; 
+  index: number; 
+  onShowDetails: (activity: Activity) => void;
+}> = ({ activity, index, onShowDetails }) => {
   const typeInfo = activityService.getActivityTypeInfo(activity.type);
   const formattedDescription = activityService.formatActivityDescription(activity);
 
@@ -70,16 +75,28 @@ const ActivityItem: React.FC<{ activity: Activity; index: number }> = ({ activit
           </p>
         )}
         
-        <div className="flex items-center space-x-2">
-          <Badge variant="secondary" className={`text-xs ${typeInfo.color}`}>
-            {typeInfo.label}
-          </Badge>
-          
-          {activity.metadata && Object.keys(activity.metadata).length > 0 && (
-            <Badge variant="outline" className="text-xs">
-              {Object.keys(activity.metadata).length} detail{Object.keys(activity.metadata).length !== 1 ? 's' : ''}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Badge variant="secondary" className={`text-xs ${typeInfo.color}`}>
+              {typeInfo.label}
             </Badge>
-          )}
+            
+            {activity.metadata && Object.keys(activity.metadata).length > 0 && (
+              <Badge variant="outline" className="text-xs">
+                {Object.keys(activity.metadata).length} detail{Object.keys(activity.metadata).length !== 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onShowDetails(activity)}
+            className="h-6 px-2 text-xs hover:bg-primary/10"
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            Details
+          </Button>
         </div>
       </div>
     </motion.div>
@@ -100,6 +117,8 @@ export const ActivityList: React.FC<ActivityListProps> = ({
   const [currentPage, setCurrentPage] = useState(0);
   const [totalActivities, setTotalActivities] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchActivities = useCallback(async (page: number = 0, showRefresh: boolean = false) => {
@@ -157,6 +176,16 @@ export const ActivityList: React.FC<ActivityListProps> = ({
 
   const handleRefresh = () => {
     fetchActivities(currentPage, true);
+  };
+
+  const handleShowDetails = (activity: Activity) => {
+    setSelectedActivity(activity);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedActivity(null);
   };
 
   const totalPages = Math.ceil(totalActivities / limit);
@@ -233,7 +262,12 @@ export const ActivityList: React.FC<ActivityListProps> = ({
               exit={{ opacity: 0 }}
             >
               {activities.map((activity, index) => (
-                <ActivityItem key={activity.id} activity={activity} index={index} />
+                <ActivityItem 
+                  key={activity.id} 
+                  activity={activity} 
+                  index={index} 
+                  onShowDetails={handleShowDetails}
+                />
               ))}
             </motion.div>
           )}
@@ -271,6 +305,13 @@ export const ActivityList: React.FC<ActivityListProps> = ({
           </div>
         </div>
       )}
+
+      {/* Activity Details Modal */}
+      <ActivityDetailsModal
+        activity={selectedActivity}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+      />
     </Card>
   );
 };

@@ -9,9 +9,10 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2, Undo2 } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { useAuth } from '@/context/AuthContext';
+import { useUndoDelete } from '@/hooks/useUndoDelete';
 import { useSearchParams } from 'react-router-dom';
 import { projectService, Project } from '@/services/projectService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,6 +42,43 @@ export default function MyTasks() {
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [taskToDelete, setTaskToDelete] = useState<UserTask | null>(null);
+  const [sharedTaskToDelete, setSharedTaskToDelete] = useState<SharedTask | null>(null);
+
+  // Undo delete hooks for both personal and shared tasks
+  const undoDeleteTask = useUndoDelete({
+    duration: 10,
+    onConfirm: () => {
+      if (taskToDelete?.id) {
+        performActualDelete(taskToDelete.id);
+        setTaskToDelete(null);
+      }
+    },
+    onUndo: () => {
+      setTaskToDelete(null);
+      toast({
+        title: "Deletion Cancelled",
+        description: "Task deletion has been cancelled.",
+      });
+    },
+  });
+
+  const undoDeleteSharedTask = useUndoDelete({
+    duration: 10,
+    onConfirm: () => {
+      if (sharedTaskToDelete?.id) {
+        performActualDeleteShared(sharedTaskToDelete.id);
+        setSharedTaskToDelete(null);
+      }
+    },
+    onUndo: () => {
+      setSharedTaskToDelete(null);
+      toast({
+        title: "Deletion Cancelled",
+        description: "Shared task deletion has been cancelled.",
+      });
+    },
+  });
 
   async function load() {
     try {
@@ -178,47 +216,7 @@ export default function MyTasks() {
     }
   }
 
-  async function onDelete(id?: number) {
-    if (!id) return;
-    
-    // Create custom confirmation modal
-    const confirmed = await new Promise<boolean>((resolve) => {
-      const modal = document.createElement('div');
-      modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4';
-      modal.innerHTML = `
-        <div class="w-full max-w-md rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700">
-          <div class="px-6 py-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
-                <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Delete Task</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400">This action cannot be undone</p>
-              </div>
-            </div>
-            <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">
-              Are you sure you want to delete this task? This action cannot be undone and all task data will be permanently removed.
-            </p>
-            <div class="flex items-center justify-end gap-3">
-              <button class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors" onclick="this.closest('.fixed').remove(); window.taskDeleteResolve?.(false)">
-                Cancel
-              </button>
-              <button class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors" onclick="this.closest('.fixed').remove(); window.taskDeleteResolve?.(true)">
-                Delete Task
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-      (window as any).taskDeleteResolve = resolve;
-    });
-    
-    if (!confirmed) return;
-    
+  async function performActualDelete(id: number) {
     try {
       await deleteTask(id);
       toast({ title: 'Task deleted successfully' });
@@ -226,6 +224,30 @@ export default function MyTasks() {
     } catch (e: any) {
       setError(e?.message || 'Failed to delete task');
     }
+  }
+
+  async function onDelete(id?: number) {
+    if (!id) return;
+    
+    const task = items.find(t => t.id === id);
+    if (!task) return;
+
+    setTaskToDelete(task);
+    undoDeleteTask.startCountdown();
+
+    toast({
+      title: "Task Deletion Started",
+      description: `"${task.title}" will be deleted in ${undoDeleteTask.timeLeft} seconds. Click undo to cancel.`,
+      action: (
+        <button
+          onClick={() => undoDeleteTask.cancelCountdown()}
+          className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
+        >
+          <Undo2 className="h-4 w-4" />
+          Undo
+        </button>
+      ),
+    });
   }
 
   async function markCompleted(t: UserTask) {
@@ -330,46 +352,7 @@ export default function MyTasks() {
     }
   }
 
-  async function onDeleteShared(id?: number) {
-    if (!id) return;
-    
-    const confirmed = await new Promise<boolean>((resolve) => {
-      const modal = document.createElement('div');
-      modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4';
-      modal.innerHTML = `
-        <div class="w-full max-w-md rounded-xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700">
-          <div class="px-6 py-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
-                <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Delete Shared Task</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400">This action cannot be undone</p>
-              </div>
-            </div>
-            <p class="text-sm text-gray-700 dark:text-gray-300 mb-6">
-              Are you sure you want to delete this shared task?
-            </p>
-            <div class="flex items-center justify-end gap-3">
-              <button class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors" onclick="this.closest('.fixed').remove(); window.sharedTaskDeleteResolve?.(false)">
-                Cancel
-              </button>
-              <button class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors" onclick="this.closest('.fixed').remove(); window.sharedTaskDeleteResolve?.(true)">
-                Delete Task
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-      (window as any).sharedTaskDeleteResolve = resolve;
-    });
-    
-    if (!confirmed) return;
-    
+  async function performActualDeleteShared(id: number) {
     try {
       await sharedTaskService.deleteSharedTask(id);
       toast({ title: 'Shared task deleted successfully' });
@@ -378,6 +361,30 @@ export default function MyTasks() {
       setError(e?.message || 'Failed to delete shared task');
       toast({ title: 'Error', description: e?.message, variant: 'destructive' });
     }
+  }
+
+  async function onDeleteShared(id?: number) {
+    if (!id) return;
+    
+    const task = sharedTasks.find(t => t.id === id);
+    if (!task) return;
+
+    setSharedTaskToDelete(task);
+    undoDeleteSharedTask.startCountdown();
+
+    toast({
+      title: "Shared Task Deletion Started",
+      description: `"${task.title}" will be deleted in ${undoDeleteSharedTask.timeLeft} seconds. Click undo to cancel.`,
+      action: (
+        <button
+          onClick={() => undoDeleteSharedTask.cancelCountdown()}
+          className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
+        >
+          <Undo2 className="h-4 w-4" />
+          Undo
+        </button>
+      ),
+    });
   }
 
   async function markSharedCompleted(t: SharedTask) {
@@ -903,18 +910,27 @@ export default function MyTasks() {
                       <span className="truncate">Edit</span>
                     </span>
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => onDelete(t.id)} 
-                    className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 min-w-0"
-                  >
-                    <span className="hidden sm:inline truncate">Delete</span>
-                    <span className="sm:hidden flex items-center gap-1">
-                      <span>🗑</span>
-                      <span className="truncate">Delete</span>
-                    </span>
-                  </Button>
+                  {taskToDelete?.id === t.id && undoDeleteTask.isCountingDown ? (
+                    <div className="flex items-center justify-center gap-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-8">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-medium text-red-700 dark:text-red-300">
+                        {undoDeleteTask.timeLeft}s
+                      </span>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => onDelete(t.id)} 
+                      className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 min-w-0"
+                    >
+                      <span className="hidden sm:inline truncate">Delete</span>
+                      <span className="sm:hidden flex items-center gap-1">
+                        <span>🗑</span>
+                        <span className="truncate">Delete</span>
+                      </span>
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -1564,14 +1580,23 @@ export default function MyTasks() {
                       </Button>
                     )}
                     {t.created_by === currentUser?.id && (
-                      <Button 
-                        variant="outline"
-                        size="sm" 
-                        onClick={() => onDeleteShared(t.id)} 
-                        className="h-8 w-full text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 min-w-0"
-                      >
-                        <span className="truncate">Delete</span>
-                      </Button>
+                      sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
+                        <div className="flex items-center justify-center gap-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-8 w-full">
+                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                          <span className="text-xs font-medium text-red-700 dark:text-red-300">
+                            {undoDeleteSharedTask.timeLeft}s
+                          </span>
+                        </div>
+                      ) : (
+                        <Button 
+                          variant="outline"
+                          size="sm" 
+                          onClick={() => onDeleteShared(t.id)} 
+                          className="h-8 w-full text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 min-w-0"
+                        >
+                          <span className="truncate">Delete</span>
+                        </Button>
+                      )
                     )}
                   </div>
                 </div>
@@ -1986,16 +2011,25 @@ export default function MyTasks() {
                       </Button>
                     )}
                     {selectedShared.created_by === currentUser?.id && (
-                      <Button 
-                        variant="outline"
-                        onClick={async () => { 
-                          await onDeleteShared(selectedShared.id); 
-                          setSharedDetailOpen(false); 
-                        }} 
-                        className="h-11 px-6 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-                      >
-                        Delete
-                      </Button>
+                      sharedTaskToDelete?.id === selectedShared.id && undoDeleteSharedTask.isCountingDown ? (
+                        <div className="flex items-center justify-center gap-2 px-6 py-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11">
+                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                            Deleting in {undoDeleteSharedTask.timeLeft}s
+                          </span>
+                        </div>
+                      ) : (
+                        <Button 
+                          variant="outline"
+                          onClick={async () => { 
+                            await onDeleteShared(selectedShared.id); 
+                            setSharedDetailOpen(false); 
+                          }} 
+                          className="h-11 px-6 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                        >
+                          Delete
+                        </Button>
+                      )
                     )}
                   </div>
                 </div>

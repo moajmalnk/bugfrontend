@@ -7,11 +7,12 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle } from 'lucide-react';
+import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, Undo2 } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { TimePicker } from '@/components/ui/TimePicker';
 import { HourPicker } from '@/components/ui/HourPicker';
 import { useAuth } from '@/context/AuthContext';
+import { useUndoDelete } from '@/hooks/useUndoDelete';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
@@ -45,8 +46,26 @@ export default function DailyUpdate() {
   const [subsLoading, setSubsLoading] = useState(false);
   const [editingSubmissionId, setEditingSubmissionId] = useState<number | null>(null);
   const [activeMonth, setActiveMonth] = useState<string>(searchParams.get('month') || ''); // YYYY-MM
-  const [deleteConfirm, setDeleteConfirm] = useState<{show: boolean, submission: any | null}>({show: false, submission: null});
   const [isEditingSubmission, setIsEditingSubmission] = useState(false);
+  const [submissionToDelete, setSubmissionToDelete] = useState<any | null>(null);
+
+  // Initialize undo delete hook
+  const undoDelete = useUndoDelete({
+    duration: 10,
+    onConfirm: () => {
+      if (submissionToDelete) {
+        performActualDelete(submissionToDelete);
+      }
+    },
+    onUndo: () => {
+      setSubmissionToDelete(null);
+      toast({
+        title: "Deletion cancelled",
+        description: "The submission has been restored.",
+        variant: "default",
+      });
+    },
+  });
 
   const canSubmit = useMemo(() => {
     const hasDate = !!form.submission_date;
@@ -402,30 +421,43 @@ export default function DailyUpdate() {
     }
   }, [form.submission_date, isEditingSubmission]);
 
-  function showDeleteConfirmation(s: any) {
-    setDeleteConfirm({show: true, submission: s});
+  function handleDeleteSubmission(submission: any) {
+    setSubmissionToDelete(submission);
+    undoDelete.startCountdown();
+    
+    toast({
+      title: "Deleting submission",
+      description: `Daily update for ${submission.submission_date} will be deleted in ${undoDelete.timeLeft} seconds.`,
+      variant: "destructive",
+      action: (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => undoDelete.cancelCountdown()}
+          className="gap-2"
+        >
+          <Undo2 className="h-4 w-4" />
+          Undo
+        </Button>
+      ),
+    });
   }
 
-  async function confirmDelete() {
-    if (!deleteConfirm.submission) return;
-    
+  async function performActualDelete(submission: any) {
     try {
       await deleteSubmission({ 
-        id: deleteConfirm.submission.id, 
-        submission_date: deleteConfirm.submission.submission_date 
+        id: submission.id, 
+        submission_date: submission.submission_date 
       });
-      setSubmissions((prev) => prev.filter((x) => x.id !== deleteConfirm.submission.id));
+      setSubmissions((prev) => prev.filter((x) => x.id !== submission.id));
       toast({ title: 'Submission deleted' });
+      setSubmissionToDelete(null);
     } catch (error) {
       toast({ title: 'Failed to delete submission', variant: 'destructive' });
-    } finally {
-      setDeleteConfirm({show: false, submission: null});
+      setSubmissionToDelete(null);
     }
   }
 
-  function cancelDelete() {
-    setDeleteConfirm({show: false, submission: null});
-  }
 
   async function startEdit(t: UserTask) {
     setEditingTaskId((t.id as number) ?? null);
@@ -838,14 +870,21 @@ export default function DailyUpdate() {
                         >
                           <ClipboardCopy className="h-3 w-3" />
                         </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          onClick={() => showDeleteConfirmation(s)}
-                          className="text-xs"
-                        >
-                          Delete
-                        </Button>
+                        {submissionToDelete?.id === s.id && undoDelete.isCountingDown ? (
+                          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium">
+                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                            Deleting in {undoDelete.timeLeft}s
+                          </div>
+                        ) : (
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => handleDeleteSubmission(s)}
+                            className="text-xs"
+                          >
+                            Delete
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <div className="max-h-48 overflow-y-auto overflow-x-hidden rounded-lg bg-gray-50 dark:bg-gray-800 p-3 no-scrollbar">
@@ -861,53 +900,6 @@ export default function DailyUpdate() {
         </div>
       </section>
 
-      {/* Delete Confirmation Dialog */}
-      {deleteConfirm.show && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl">
-                  <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Delete Submission</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">This action cannot be undone</p>
-                </div>
-              </div>
-              
-              <div className="mb-6">
-                <p className="text-gray-700 dark:text-gray-300">
-                  Are you sure you want to delete the submission for{' '}
-                  <span className="font-semibold text-gray-900 dark:text-white">
-                    {deleteConfirm.submission?.submission_date}
-                  </span>?
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                  This will permanently remove the daily update from your records.
-                </p>
-              </div>
-              
-              <div className="flex gap-3 justify-end">
-                <Button 
-                  variant="outline" 
-                  onClick={cancelDelete}
-                  className="px-6"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  onClick={confirmDelete}
-                  className="px-6"
-                >
-                  Delete
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
