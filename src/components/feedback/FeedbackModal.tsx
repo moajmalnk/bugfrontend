@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: () => void;
+  onSubmit: (rating: number, feedbackText?: string) => Promise<void>;
 }
 
 interface FeedbackData {
@@ -73,68 +73,18 @@ export default function FeedbackModal({ isOpen, onClose, onSubmit }: FeedbackMod
     setIsSubmitting(true);
 
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      const response = await fetch(`${ENV.API_URL}/feedback/submit.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          rating: feedbackData.rating,
-          feedback_text: feedbackData.feedback_text.trim() || null
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        toast({
-          title: "Thank You!",
-          description: "Your feedback has been submitted successfully.",
-        });
-        onSubmit();
-        onClose();
-      } else {
-        throw new Error(data.message || 'Failed to submit feedback');
-      }
+      await onSubmit(feedbackData.rating, feedbackData.feedback_text.trim() || undefined);
+      onClose();
     } catch (error) {
       console.error('Feedback submission error:', error);
-      toast({
-        title: "Submission Failed",
-        description: error instanceof Error ? error.message : "Failed to submit feedback. Please try again.",
-        variant: "destructive",
-      });
+      // Error handling is done in the parent component
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDismiss = async () => {
-    try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      const response = await fetch(`${ENV.API_URL}/feedback/dismiss.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({}), // Send empty body to indicate dismiss action
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Feedback dismiss error:', errorData.message || 'Failed to dismiss feedback');
-      }
-
-      onClose();
-    } catch (error) {
-      console.error('Feedback dismiss error:', error);
-      // Still close the modal even if dismiss fails
-      onClose();
-    }
+  const handleDismiss = () => {
+    onClose();
   };
 
   if (!isOpen) return null;

@@ -219,6 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
     localStorage.removeItem("intendedDestination");
+    localStorage.removeItem("bugricer_feedback_submitted");
     setCurrentUser(null);
     navigate("/login", { replace: true });
   };
@@ -254,6 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Clear session storage (which contains the impersonation token)
     sessionStorage.removeItem("token");
+    localStorage.removeItem("bugricer_feedback_submitted");
     
     // Redirect to admin dashboard
     navigate("/admin/projects", { replace: true });

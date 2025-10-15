@@ -44,6 +44,17 @@ export function useFeedback(): UseFeedbackReturn {
     checkFeedbackStatus();
   }, [checkFeedbackStatus]);
 
+  // Refresh feedback status when user changes
+  useEffect(() => {
+    if (isAuthenticated && currentUser) {
+      checkFeedbackStatus();
+    } else if (!isAuthenticated) {
+      // Clear feedback status when user logs out
+      setShouldShowFeedback(false);
+      setIsModalOpen(false);
+    }
+  }, [isAuthenticated, currentUser, checkFeedbackStatus]);
+
   // Auto-show feedback modal after a delay if user should see it
   useEffect(() => {
     if (shouldShowFeedback && !isModalOpen) {

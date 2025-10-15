@@ -49,11 +49,8 @@ export default function FeedbackWidget() {
       {/* Feedback Modal */}
       <FeedbackModal
         isOpen={isModalOpen}
-        onClose={hideFeedbackModal}
-        onSubmit={() => {
-          // This will be called when feedback is successfully submitted
-          // The useFeedback hook handles the actual submission
-        }}
+        onClose={dismissFeedback}
+        onSubmit={submitFeedback}
       />
     </>
   );
