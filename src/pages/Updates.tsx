@@ -234,7 +234,7 @@ const Updates = () => {
     switch (type) {
       case "feature":
         return "text-blue-500 border-blue-200 bg-blue-50";
-      case "fix":
+      case "updation":
         return "text-green-500 border-green-200 bg-green-50";
       case "maintenance":
         return "text-yellow-500 border-yellow-200 bg-yellow-50";
@@ -352,7 +352,7 @@ const Updates = () => {
                   <SelectContent position="popper" className="z-[60]">
                     <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="feature">Feature</SelectItem>
-                    <SelectItem value="fix">Fix</SelectItem>
+                    <SelectItem value="updation">Updation</SelectItem>
                     <SelectItem value="maintenance">Maintenance</SelectItem>
                   </SelectContent>
                 </Select>

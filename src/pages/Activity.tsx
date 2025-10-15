@@ -156,6 +156,8 @@ const Activity = () => {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userOwnActivityCount, setUserOwnActivityCount] = useState(0);
+  const [hasNewActivities, setHasNewActivities] = useState(false);
+  const [lastActivityCount, setLastActivityCount] = useState(0);
 
   const fetchActivities = useCallback(async (page: number = 0, showRefresh: boolean = false) => {
     try {
@@ -168,9 +170,44 @@ const Activity = () => {
       const offset = page * itemsPerPage;
       const response: ActivityResponse = await activityService.getUserActivities(itemsPerPage, offset);
 
-      setActivities(response.activities);
-      setTotalActivities(response.pagination.total);
-      setHasMore(response.pagination.hasMore);
+      // If this is the first page (page 0), always update the activities
+      // If it's a different page, only update if we're refreshing or it's a new page
+      if (page === 0 || showRefresh) {
+        // Check for new activities
+        if (page === 0 && lastActivityCount > 0 && response.pagination.total > lastActivityCount) {
+          setHasNewActivities(true);
+          const newCount = response.pagination.total - lastActivityCount;
+          toast({
+            title: 'New Activities!',
+            description: `${newCount} new activit${newCount === 1 ? 'y' : 'ies'} detected. Click refresh to see them.`,
+            variant: 'default',
+          });
+        }
+        
+        setActivities(response.activities);
+        setTotalActivities(response.pagination.total);
+        setHasMore(response.pagination.hasMore);
+        
+        // Update last activity count for comparison
+        setLastActivityCount(response.pagination.total);
+      } else {
+        // For pagination, append new activities
+        setActivities(prev => {
+          // Check if we already have activities for this page to avoid duplicates
+          const startIndex = page * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          
+          // If we don't have enough activities, fetch from the beginning
+          if (prev.length <= startIndex) {
+            return response.activities;
+          }
+          
+          // Otherwise, update the specific range
+          const newActivities = [...prev];
+          newActivities.splice(startIndex, itemsPerPage, ...response.activities);
+          return newActivities;
+        });
+      }
       
       // Fetch user's own activity count when loading first page
       if (page === 0) {
@@ -201,15 +238,40 @@ const Activity = () => {
     fetchActivities(0);
   }, [fetchActivities]);
 
-  // Auto refresh
+  // Auto refresh and visibility change detection
   useEffect(() => {
+    // More frequent auto-refresh for real-time updates
     const interval = setInterval(() => {
       if (currentPage === 0) {
         fetchActivities(0, true);
       }
-    }, 30000);
+    }, 10000); // Refresh every 10 seconds instead of 30
 
-    return () => clearInterval(interval);
+    // Refresh when page becomes visible again
+    const handleVisibilityChange = () => {
+      if (!document.hidden && currentPage === 0) {
+        fetchActivities(0, true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentPage, fetchActivities]);
+
+  // Refresh when window regains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      if (currentPage === 0) {
+        fetchActivities(0, true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, [currentPage, fetchActivities]);
 
   const handlePageChange = (newPage: number) => {
@@ -218,6 +280,7 @@ const Activity = () => {
   };
 
   const handleRefresh = () => {
+    setHasNewActivities(false); // Clear new activities indicator
     fetchActivities(currentPage, true);
   };
 
@@ -359,10 +422,17 @@ const Activity = () => {
                     size="lg"
                     onClick={handleRefresh}
                     disabled={isRefreshing}
-                    className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                    className={`h-12 px-6 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 relative ${
+                      hasNewActivities 
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30' 
+                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300'
+                    }`}
                   >
                     <RefreshCw className={`mr-2 h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    Refresh
+                    {hasNewActivities ? 'New Activities!' : 'Refresh'}
+                    {hasNewActivities && (
+                      <div className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
+                    )}
                   </Button>
 
                   <div className="flex items-center gap-4">
@@ -394,6 +464,10 @@ const Activity = () => {
                 p.set("tab", val);
                 return p as any;
               });
+              // Refresh data when switching tabs to ensure fresh data
+              if (currentPage === 0) {
+                fetchActivities(0, true);
+              }
             }}
             className="w-full"
           >

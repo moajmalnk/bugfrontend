@@ -43,7 +43,7 @@ const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  type: z.enum(["feature", "fix", "maintenance"], {
+  type: z.enum(["feature", "updation", "maintenance"], {
     required_error: "Please select an update type",
   }),
   description: z.string().min(1, "Description is required"),
@@ -392,7 +392,7 @@ const NewUpdate = () => {
                               </FormControl>
                               <SelectContent position="popper" className="z-[60]">
                                 <SelectItem value="feature">Feature</SelectItem>
-                                <SelectItem value="fix">Fix</SelectItem>
+                                <SelectItem value="updation">Updation</SelectItem>
                                 <SelectItem value="maintenance">Maintenance</SelectItem>
                               </SelectContent>
                             </Select>
