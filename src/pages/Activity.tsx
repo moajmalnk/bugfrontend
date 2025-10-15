@@ -281,16 +281,9 @@ const Activity = () => {
       return totalActivities;
     }
     
-    // For "my-activities", calculate from current page activities
-    // Note: This is an approximation since we only have current page data
+    // For "my-activities", use the fetched user own activity count
     if (tabType === "my-activities") {
-      const myActivitiesCount = activities.filter((activity) => {
-        return activity.user.id === currentUser?.id;
-      }).length;
-      
-      // If we have activities and we're on the first page, this gives us a good estimate
-      // For a more accurate count, we'd need to fetch all activities or modify the API
-      return myActivitiesCount;
+      return userOwnActivityCount;
     }
 
     return 0;
