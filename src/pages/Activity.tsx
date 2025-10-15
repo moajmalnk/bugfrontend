@@ -98,15 +98,6 @@ const ActivityItem: React.FC<{ activity: Activity; index: number; onDetailsClick
             >
               {typeInfo.label}
             </Badge>
-            
-            {activity.metadata && Object.keys(activity.metadata).length > 0 && (
-              <Badge 
-                variant="outline" 
-                className="text-xs font-medium px-3 py-1.5 rounded-full border-gray-200 dark:border-gray-700"
-              >
-                {Object.keys(activity.metadata).length} detail{Object.keys(activity.metadata).length !== 1 ? 's' : ''}
-              </Badge>
-            )}
           </div>
           
           <Button
@@ -115,7 +106,7 @@ const ActivityItem: React.FC<{ activity: Activity; index: number; onDetailsClick
             onClick={() => onDetailsClick(activity)}
             className="h-8 px-3 text-xs font-medium bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 hover:shadow-md"
           >
-            View Details
+            View
           </Button>
         </div>
       </div>
@@ -142,7 +133,7 @@ const Activity = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [totalActivities, setTotalActivities] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -159,22 +150,22 @@ const Activity = () => {
   const [hasNewActivities, setHasNewActivities] = useState(false);
   const [lastActivityCount, setLastActivityCount] = useState(0);
 
-  const fetchActivities = useCallback(async (page: number = 0, showRefresh: boolean = false) => {
+  const fetchActivities = useCallback(async (page: number = 1, showRefresh: boolean = false) => {
     try {
       if (showRefresh) {
         setIsRefreshing(true);
-      } else if (page === 0) {
+      } else if (page === 1) {
         setIsLoading(true);
       }
 
-      const offset = page * itemsPerPage;
+      const offset = (page - 1) * itemsPerPage;
       const response: ActivityResponse = await activityService.getUserActivities(itemsPerPage, offset);
 
-      // If this is the first page (page 0), always update the activities
+      // If this is the first page (page 1), always update the activities
       // If it's a different page, only update if we're refreshing or it's a new page
-      if (page === 0 || showRefresh) {
+      if (page === 1 || showRefresh) {
         // Check for new activities
-        if (page === 0 && lastActivityCount > 0 && response.pagination.total > lastActivityCount) {
+        if (page === 1 && lastActivityCount > 0 && response.pagination.total > lastActivityCount) {
           setHasNewActivities(true);
           const newCount = response.pagination.total - lastActivityCount;
           toast({
@@ -194,7 +185,7 @@ const Activity = () => {
         // For pagination, append new activities
         setActivities(prev => {
           // Check if we already have activities for this page to avoid duplicates
-          const startIndex = page * itemsPerPage;
+          const startIndex = (page - 1) * itemsPerPage;
           const endIndex = startIndex + itemsPerPage;
           
           // If we don't have enough activities, fetch from the beginning
@@ -210,7 +201,7 @@ const Activity = () => {
       }
       
       // Fetch user's own activity count when loading first page
-      if (page === 0) {
+      if (page === 1) {
         try {
           const ownCount = await activityService.getUserOwnActivityCount();
           setUserOwnActivityCount(ownCount);
@@ -235,22 +226,22 @@ const Activity = () => {
 
   // Initial load
   useEffect(() => {
-    fetchActivities(0);
+    fetchActivities(1);
   }, [fetchActivities]);
 
   // Auto refresh and visibility change detection
   useEffect(() => {
     // More frequent auto-refresh for real-time updates
     const interval = setInterval(() => {
-      if (currentPage === 0) {
-        fetchActivities(0, true);
+      if (currentPage === 1) {
+        fetchActivities(1, true);
       }
     }, 10000); // Refresh every 10 seconds instead of 30
 
     // Refresh when page becomes visible again
     const handleVisibilityChange = () => {
-      if (!document.hidden && currentPage === 0) {
-        fetchActivities(0, true);
+      if (!document.hidden && currentPage === 1) {
+        fetchActivities(1, true);
       }
     };
 
@@ -265,8 +256,8 @@ const Activity = () => {
   // Refresh when window regains focus
   useEffect(() => {
     const handleFocus = () => {
-      if (currentPage === 0) {
-        fetchActivities(0, true);
+      if (currentPage === 1) {
+        fetchActivities(1, true);
       }
     };
 
@@ -274,10 +265,6 @@ const Activity = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, [currentPage, fetchActivities]);
 
-  const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-    fetchActivities(newPage);
-  };
 
   const handleRefresh = () => {
     setHasNewActivities(false); // Clear new activities indicator
@@ -296,7 +283,7 @@ const Activity = () => {
 
   // Reset current page when filters change
   useEffect(() => {
-    setCurrentPage(0);
+    setCurrentPage(1);
   }, [activeTab, searchTerm, typeFilter, createdByFilter]);
 
   // Filter activities based on active tab and search/filter criteria
@@ -310,7 +297,7 @@ const Activity = () => {
         break;
       case "my-activities":
         filtered = activities.filter((activity) => {
-          return activity.user.id === currentUser?.id;
+          return activity.user_id === currentUser?.id;
         });
         break;
       default:
@@ -321,10 +308,10 @@ const Activity = () => {
     return filtered.filter((activity) => {
       const matchesSearch = searchTerm === "" || 
         activity.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (activity.project?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (activity.user?.username || "").toLowerCase().includes(searchTerm.toLowerCase());
+        (activity.project_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (activity.username || "").toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = typeFilter === "all" || activity.type === typeFilter;
-      const matchesCreatedBy = createdByFilter === "all" || activity.user.username === createdByFilter;
+      const matchesCreatedBy = createdByFilter === "all" || activity.username === createdByFilter;
       return matchesSearch && matchesType && matchesCreatedBy;
     });
   }, [activities, activeTab, currentUser?.id, searchTerm, typeFilter, createdByFilter]);
@@ -360,8 +347,8 @@ const Activity = () => {
 
   const totalFiltered = filteredActivities.length;
   const paginatedActivities = filteredActivities.slice(
-    currentPage * itemsPerPage,
-    (currentPage + 1) * itemsPerPage
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
   const totalPages = Math.ceil(totalFiltered / itemsPerPage);
 
@@ -465,8 +452,8 @@ const Activity = () => {
                 return p as any;
               });
               // Refresh data when switching tabs to ensure fresh data
-              if (currentPage === 0) {
-                fetchActivities(0, true);
+              if (currentPage === 1) {
+                fetchActivities(1, true);
               }
             }}
             className="w-full"
@@ -562,7 +549,7 @@ const Activity = () => {
                               <SelectContent position="popper" className="z-[60]">
                                 <SelectItem value="all">All Users</SelectItem>
                                 {activities
-                                  .map((activity) => activity.user.username)
+                                  .map((activity) => activity.username)
                                   .filter((creator, index, arr) => arr.indexOf(creator) === index)
                                   .sort()
                                   .map((creator) => (
@@ -596,7 +583,7 @@ const Activity = () => {
                 </div>
               )}
 
-              {/* Professional Responsive Pagination Controls - Only show if there are multiple pages */}
+              {/* Professional Responsive Pagination Controls - Only show if there are multiple pages and activities */}
               {!isLoading && filteredActivities.length > 0 && totalPages > 1 && (
                 <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   {/* Top Row - Results Info and Items Per Page */}
@@ -606,11 +593,11 @@ const Activity = () => {
                       <span className="text-sm sm:text-base text-foreground font-semibold">
                         Showing{" "}
                         <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                          {currentPage * itemsPerPage + 1}
+                          {(currentPage - 1) * itemsPerPage + 1}
                         </span>
                         -
                         <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                          {Math.min((currentPage + 1) * itemsPerPage, totalFiltered)}
+                          {Math.min(currentPage * itemsPerPage, totalFiltered)}
                         </span>{" "}
                         of{" "}
                         <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
@@ -630,11 +617,13 @@ const Activity = () => {
                         <select
                           id="items-per-page"
                           value={itemsPerPage}
-                          onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                          onChange={(e) =>
+                            setItemsPerPage(Number(e.target.value))
+                          }
                           className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
                           aria-label="Items per page"
                         >
-                          {[10, 20, 50].map((n) => (
+                          {[10, 25, 50].map((n) => (
                             <option key={n} value={n}>
                               {n}
                             </option>
@@ -660,13 +649,13 @@ const Activity = () => {
                   </div>
 
                   {/* Bottom Row - Pagination Navigation */}
-                  <div className="flex flex-col sm:flex-row md:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 md:pt-0 border-t border-border/30">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
                     {/* Page Info for Mobile */}
                     <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
                       <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
                       Page{" "}
                       <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                        {currentPage + 1}
+                        {currentPage}
                       </span>{" "}
                       of{" "}
                       <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
@@ -674,18 +663,20 @@ const Activity = () => {
                       </span>
                     </div>
 
-                    {/* Enhanced Pagination Controls */}
-                    <div className="flex items-center justify-center gap-2 w-full sm:w-auto md:w-auto">
+                    {/* Pagination Controls */}
+                    <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
                       {/* Previous Button */}
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 0}
-                        className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                       >
                         <svg
-                          className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                          className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -705,16 +696,16 @@ const Activity = () => {
                       <div className="flex items-center gap-1.5">
                         {/* Always show first page on larger screens */}
                         <Button
-                          variant={currentPage === 0 ? "default" : "outline"}
+                          variant={currentPage === 1 ? "default" : "outline"}
                           size="sm"
-                          onClick={() => handlePageChange(0)}
+                          onClick={() => setCurrentPage(1)}
                           className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                         >
                           1
                         </Button>
 
                         {/* Show ellipsis if needed on larger screens */}
-                        {currentPage > 3 && (
+                        {currentPage > 4 && (
                           <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
                             •••
                           </span>
@@ -723,11 +714,11 @@ const Activity = () => {
                         {/* Dynamic page numbers based on current page - show more on larger screens */}
                         {(() => {
                           const pages = [];
-                          const start = Math.max(1, currentPage - 1);
-                          const end = Math.min(totalPages - 2, currentPage + 1);
+                          const start = Math.max(2, currentPage - 1);
+                          const end = Math.min(totalPages - 1, currentPage + 1);
 
                           for (let i = start; i <= end; i++) {
-                            if (i > 0 && i < totalPages - 1) {
+                            if (i > 1 && i < totalPages) {
                               pages.push(i);
                             }
                           }
@@ -735,18 +726,20 @@ const Activity = () => {
                           return pages.map((page) => (
                             <Button
                               key={page}
-                              variant={currentPage === page ? "default" : "outline"}
+                              variant={
+                                currentPage === page ? "default" : "outline"
+                              }
                               size="sm"
-                              onClick={() => handlePageChange(page)}
+                              onClick={() => setCurrentPage(page)}
                               className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                             >
-                              {page + 1}
+                              {page}
                             </Button>
                           ));
                         })()}
 
                         {/* Show ellipsis if needed on larger screens */}
-                        {currentPage < totalPages - 4 && (
+                        {currentPage < totalPages - 3 && (
                           <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
                             •••
                           </span>
@@ -755,9 +748,11 @@ const Activity = () => {
                         {/* Always show last page if more than 1 page on larger screens */}
                         {totalPages > 1 && (
                           <Button
-                            variant={currentPage === totalPages - 1 ? "default" : "outline"}
+                            variant={
+                              currentPage === totalPages ? "default" : "outline"
+                            }
                             size="sm"
-                            onClick={() => handlePageChange(totalPages - 1)}
+                            onClick={() => setCurrentPage(totalPages)}
                             className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                           >
                             {totalPages}
@@ -767,8 +762,10 @@ const Activity = () => {
                         {/* Mobile-friendly page selector */}
                         <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
                           <select
-                            value={currentPage + 1}
-                            onChange={(e) => handlePageChange(Number(e.target.value) - 1)}
+                            value={currentPage}
+                            onChange={(e) =>
+                              setCurrentPage(Number(e.target.value))
+                            }
                             className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
                             aria-label="Go to page"
                           >
@@ -791,14 +788,16 @@ const Activity = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage >= totalPages - 1}
-                        className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={currentPage === totalPages}
+                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                       >
                         <span className="hidden sm:inline">Next</span>
                         <span className="sm:hidden text-lg">›</span>
                         <svg
-                          className="w-4 h-4 ml-1 sm:ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                          className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -818,7 +817,7 @@ const Activity = () => {
                       <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
                       Page{" "}
                       <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                        {currentPage + 1}
+                        {currentPage}
                       </span>{" "}
                       of{" "}
                       <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
@@ -829,7 +828,7 @@ const Activity = () => {
                 </div>
               )}
 
-              {/* Simple results info when no pagination needed */}
+              {/* Simple results info when no pagination needed - only show if there are activities */}
               {!isLoading && filteredActivities.length > 0 && totalPages <= 1 && (
                 <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   <div className="flex items-center gap-2">
@@ -853,11 +852,13 @@ const Activity = () => {
                       <select
                         id="items-per-page-simple"
                         value={itemsPerPage}
-                        onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                        onChange={(e) =>
+                          setItemsPerPage(Number(e.target.value))
+                        }
                         className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
                         aria-label="Items per page"
                       >
-                        {[10, 20, 50].map((n) => (
+                        {[10, 25, 50].map((n) => (
                           <option key={n} value={n}>
                             {n}
                           </option>

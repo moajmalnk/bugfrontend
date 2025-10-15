@@ -1014,20 +1014,7 @@ const NewBug = () => {
                         <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"></div>
                         Attachments
                       </Label>
-                      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                          <span className="font-medium">Screenshots: {screenshots.length}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                          <span className="font-medium">Files: {files.length}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
-                          <span className="font-medium">Voice: {voiceNotes.length}</span>
-                        </div>
-                      </div>
+                      
                     </div>
 
                     {/* Hidden file inputs */}
