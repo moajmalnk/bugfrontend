@@ -9,13 +9,14 @@ import {
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from '@/context/ThemeContext';
-import { Laptop, Moon, Sun, Folder, Bug, CheckSquare, Users, Settings, User as UserIcon, RefreshCw, Lock, Bell, Rss, PlusSquare } from 'lucide-react';
+import { Laptop, Moon, Sun, Folder, Bug, CheckSquare, Users, Settings, User as UserIcon, RefreshCw, Lock, Bell, Rss, PlusSquare, ClipboardCopy, ClipboardPaste, Scissors } from 'lucide-react';
 
 interface ContextMenuItem {
     label: string;
     action: () => void;
     shortcut?: string;
     icon?: React.ReactNode;
+    disabled?: boolean;
 }
 
 interface ContextMenuProps {
@@ -29,13 +30,121 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
     const navigate = useNavigate();
     const { toggleTheme, theme } = useTheme();
 
+    // Utilities for clipboard and editable detection
+    const getActiveEditable = () => {
+        const active = document.activeElement as HTMLElement | null;
+        if (!active) return null;
+        if (active instanceof HTMLInputElement && (active.type === 'text' || active.type === 'search' || active.type === 'url' || active.type === 'tel' || active.type === 'password' || active.type === 'email')) return active;
+        if (active instanceof HTMLTextAreaElement) return active;
+        if (active.isContentEditable) return active;
+        return null;
+    };
+
+    const getSelectedText = (): string => {
+        const editable = getActiveEditable();
+        if (editable instanceof HTMLInputElement || editable instanceof HTMLTextAreaElement) {
+            const start = editable.selectionStart ?? 0;
+            const end = editable.selectionEnd ?? 0;
+            return editable.value.substring(start, end);
+        }
+        const sel = window.getSelection();
+        return sel && sel.rangeCount > 0 && !sel.isCollapsed ? sel.toString() : '';
+    };
+
+    const canCopy = () => getSelectedText().length > 0;
+    const canCut = () => {
+        const editable = getActiveEditable();
+        return !!editable && getSelectedText().length > 0;
+    };
+    const canPaste = () => !!getActiveEditable();
+
+    const copyAction = async () => {
+        const text = getSelectedText();
+        try {
+            if (text) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                document.execCommand('copy');
+            }
+        } catch {
+            document.execCommand('copy');
+        } finally {
+            onClose();
+        }
+    };
+
+    const cutAction = async () => {
+        const editable = getActiveEditable();
+        if (!editable) return onClose();
+        const text = getSelectedText();
+        try {
+            if (text) await navigator.clipboard.writeText(text);
+        } catch {
+            // ignore, we'll still attempt to cut
+        }
+        if (editable instanceof HTMLInputElement || editable instanceof HTMLTextAreaElement) {
+            const start = editable.selectionStart ?? 0;
+            const end = editable.selectionEnd ?? 0;
+            const before = editable.value.slice(0, start);
+            const after = editable.value.slice(end);
+            editable.value = before + after;
+            const caret = start;
+            editable.setSelectionRange(caret, caret);
+            editable.dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+            document.execCommand('cut');
+        }
+        onClose();
+    };
+
+    const insertTextAtCursor = (text: string) => {
+        const editable = getActiveEditable();
+        if (!editable) return;
+        if (editable instanceof HTMLInputElement || editable instanceof HTMLTextAreaElement) {
+            const start = editable.selectionStart ?? editable.value.length;
+            const end = editable.selectionEnd ?? editable.value.length;
+            const before = editable.value.slice(0, start);
+            const after = editable.value.slice(end);
+            editable.value = before + text + after;
+            const caret = start + text.length;
+            editable.setSelectionRange(caret, caret);
+            editable.dispatchEvent(new Event('input', { bubbles: true }));
+            editable.focus();
+        } else {
+            // contenteditable
+            if (!document.execCommand('insertText', false, text)) {
+                const sel = window.getSelection();
+                if (!sel) return;
+                const range = sel.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(document.createTextNode(text));
+                range.collapse(false);
+            }
+        }
+    };
+
+    const pasteAction = async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            if (text) insertTextAtCursor(text);
+        } catch {
+            // Fallback: attempt execCommand paste (may be blocked by browser)
+            document.execCommand('paste');
+        } finally {
+            onClose();
+        }
+    };
+
     // Define menu items based on user role
     const getMenuItems = (role: User['role'] | undefined): ContextMenuItem[] => {
         const commonItems: ContextMenuItem[] = [
+            { label: 'Copy', action: copyAction, icon: <ClipboardCopy className="h-4 w-4" />, shortcut: 'Ctrl+C', disabled: !canCopy() },
+            { label: 'Cut', action: cutAction, icon: <Scissors className="h-4 w-4" />, shortcut: 'Ctrl+X', disabled: !canCut() },
+            { label: 'Paste', action: pasteAction, icon: <ClipboardPaste className="h-4 w-4" />, shortcut: 'Ctrl+V', disabled: !canPaste() },
+            { label: 'Privacy Mode', action: () => { /* TODO: Implement privacy mode toggle */ onClose(); }, shortcut: 'Ctrl+Space', icon: <Lock className="h-4 w-4" /> },
             { label: 'Profile', action: () => { navigate(`/${role}/profile`); onClose(); }, icon: <UserIcon className="h-4 w-4" />, shortcut: 'Ctrl+Shift+P' },
             { label: 'Refresh', action: () => { window.location.reload(); onClose(); }, icon: <RefreshCw className="h-4 w-4" />, shortcut: 'Ctrl+R' },
             { label: 'Dark or Light', action: () => { toggleTheme(); onClose(); }, shortcut: 'Shift+Space', icon: theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" /> },
-            { label: 'Privacy Mode', action: () => { /* TODO: Implement privacy mode toggle */ onClose(); }, shortcut: 'Ctrl+Space', icon: <Lock className="h-4 w-4" /> },
         ];
 
         if (role === 'admin') {
@@ -132,11 +241,14 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                 onContextMenu={(e) => e.preventDefault()}
             >
                 {menuItems.map((item, index) => (
-                    <DropdownMenuItem key={index} onClick={item.action}>
-                        {item.icon && <span className="mr-2 flex h-4 w-4 items-center justify-center">{item.icon}</span>}
-                        {item.label}
-                        {item.shortcut && <span className="ml-auto text-xs text-muted-foreground">{item.shortcut}</span>}
-                    </DropdownMenuItem>
+                    <React.Fragment key={index}>
+                        <DropdownMenuItem onClick={item.action} disabled={item.disabled}>
+                            {item.icon && <span className="mr-2 flex h-4 w-4 items-center justify-center">{item.icon}</span>}
+                            {item.label}
+                            {item.shortcut && <span className="ml-auto text-xs text-muted-foreground">{item.shortcut}</span>}
+                        </DropdownMenuItem>
+                        {index === 2 && <DropdownMenuSeparator />}
+                    </React.Fragment>
                 ))}
             </DropdownMenuContent>
         </DropdownMenu>

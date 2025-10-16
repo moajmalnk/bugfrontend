@@ -479,39 +479,100 @@ const Login = () => {
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Company Information</h3>
           <p><strong>BugRicer AI Innovations</strong></p>
-          <p>Malappuram, Kerala, India</p>
+          <p>Website: https://bugricer.com</p>
+          <p>Email: info@bugricer.com</p>
           <p>Phone: +91 8086995559</p>
-          <p>Email: bugricer@gmail.com</p>
+          <p>Address: Malappuram, Kerala, India</p>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Information We Collect</h3>
           <ul class="list-disc list-inside space-y-1">
-            <li>Account information (username, email, phone number)</li>
-            <li>Authentication data (passwords, OTP verification)</li>
-            <li>Usage data and analytics</li>
-            <li>Device information and IP addresses</li>
+            <li><strong>Account Information:</strong> Username, email address, phone number, role (admin, developer, tester)</li>
+            <li><strong>Authentication Data:</strong> Passwords (encrypted), OTP verification codes, JWT tokens</li>
+            <li><strong>Project Data:</strong> Bug reports, project details, status updates, priority levels</li>
+            <li><strong>Media Content:</strong> Screenshots, file attachments, voice notes, meeting recordings</li>
+            <li><strong>Communication Data:</strong> Chat messages, email notifications, WhatsApp messages</li>
+            <li><strong>Meeting Data:</strong> Video/audio streams, meeting recordings, participant information</li>
+            <li><strong>Activity Logs:</strong> User actions, system interactions, audit trails</li>
+            <li><strong>Device Information:</strong> IP addresses, browser details, device identifiers</li>
+            <li><strong>Notification Preferences:</strong> FCM tokens, notification settings, communication preferences</li>
+            <li><strong>Usage Analytics:</strong> Platform usage patterns, feature interactions, performance data</li>
           </ul>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">How We Use Your Information</h3>
           <ul class="list-disc list-inside space-y-1">
-            <li>Provide and maintain our services</li>
-            <li>Authenticate users and prevent fraud</li>
-            <li>Send important notifications and updates</li>
-            <li>Improve our platform and user experience</li>
+            <li><strong>Service Provision:</strong> Provide bug tracking, project management, and collaboration tools</li>
+            <li><strong>Authentication & Security:</strong> Verify user identity, prevent unauthorized access, secure communications</li>
+            <li><strong>Real-time Communication:</strong> Enable instant messaging, video meetings, and notifications</li>
+            <li><strong>File Management:</strong> Process, store, and deliver uploaded files, screenshots, and voice notes</li>
+            <li><strong>Notification Services:</strong> Send email, WhatsApp, and browser notifications about bug updates</li>
+            <li><strong>Meeting Features:</strong> Facilitate video conferencing, screen sharing, and meeting recordings</li>
+            <li><strong>Activity Tracking:</strong> Monitor user actions for audit purposes and system optimization</li>
+            <li><strong>Platform Improvement:</strong> Analyze usage patterns to enhance user experience and feature development</li>
+            <li><strong>Support Services:</strong> Provide customer support and troubleshoot technical issues</li>
+            <li><strong>Compliance:</strong> Meet legal obligations and maintain service quality standards</li>
           </ul>
         </div>
         
         <div>
-          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Data Security</h3>
-          <p>We implement industry-standard security measures to protect your personal information. All data is encrypted and stored securely.</p>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Data Sharing and Disclosure</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Team Members:</strong> Share project data, bug reports, and updates with authorized team members</li>
+            <li><strong>Communication Services:</strong> Use third-party services for email delivery and WhatsApp messaging</li>
+            <li><strong>Cloud Storage:</strong> Store files and media content on secure cloud infrastructure</li>
+            <li><strong>Legal Requirements:</strong> Disclose information when required by law or legal process</li>
+            <li><strong>Service Providers:</strong> Share data with trusted third-party service providers for platform operations</li>
+            <li><strong>Emergency Situations:</strong> May disclose information to protect user safety or platform security</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Data Security Measures</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Encryption:</strong> All data transmission encrypted using SSL/TLS protocols</li>
+            <li><strong>Secure Storage:</strong> Database and file storage protected with industry-standard encryption</li>
+            <li><strong>Access Controls:</strong> Role-based access permissions and authentication requirements</li>
+            <li><strong>Regular Audits:</strong> Periodic security assessments and vulnerability testing</li>
+            <li><strong>Backup Systems:</strong> Regular data backups with secure off-site storage</li>
+            <li><strong>Incident Response:</strong> Comprehensive security incident response procedures</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Your Rights and Choices</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Access:</strong> Request access to your personal data and account information</li>
+            <li><strong>Correction:</strong> Update or correct inaccurate personal information</li>
+            <li><strong>Deletion:</strong> Request deletion of your account and associated data</li>
+            <li><strong>Portability:</strong> Export your data in a machine-readable format</li>
+            <li><strong>Communication Preferences:</strong> Control notification settings and communication methods</li>
+            <li><strong>Data Retention:</strong> Understand our data retention policies and request data purging</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Data Retention</h3>
+          <p>We retain your data for as long as your account is active and as needed to provide our services. Project data, bug reports, and communications may be retained for extended periods for audit and compliance purposes. You may request data deletion at any time, subject to legal and operational requirements.</p>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">International Data Transfers</h3>
+          <p>Your data may be processed and stored on servers located outside your country of residence. We ensure appropriate safeguards are in place for international data transfers and comply with applicable data protection laws.</p>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Contact Us</h3>
-          <p>For any privacy-related questions or concerns, please contact us at bugricer@gmail.com or +91 8086995559.</p>
+          <p>For any privacy-related questions, data access requests, or concerns, please contact us at:</p>
+          <ul class="list-disc list-inside space-y-1 mt-2">
+            <li>Website: https://bugricer.com</li>
+            <li>Email: info@bugricer.com</li>
+            <li>Phone: +91 8086995559</li>
+            <li>Address: Malappuram, Kerala, India</li>
+          </ul>
+          <p class="mt-2">We will respond to your privacy inquiries within 30 days of receipt.</p>
         </div>
       </div>
     </div>
@@ -528,49 +589,157 @@ const Login = () => {
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Company Information</h3>
           <p><strong>BugRicer AI Innovations</strong></p>
-          <p>Malappuram, Kerala, India</p>
+          <p>Website: https://bugricer.com</p>
+          <p>Email: info@bugricer.com</p>
           <p>Phone: +91 8086995559</p>
-          <p>Email: bugricer@gmail.com</p>
+          <p>Address: Malappuram, Kerala, India</p>
         </div>
         
         <div>
-          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Acceptance of Terms</h3>
-          <p>By using BugRicer, you agree to be bound by these Terms of Use. If you do not agree to these terms, please do not use our service.</p>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Company Information</h3>
+          <p><strong>BugRicer AI Innovations</strong></p>
+          <p>Website: https://bugricer.com</p>
+          <p>Email: info@bugricer.com</p>
+          <p>Phone: +91 8086995559</p>
+          <p>Address: Malappuram, Kerala, India</p>
         </div>
         
         <div>
-          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Service Description</h3>
-          <p>BugRicer is a bug tracking and project management platform designed to help teams efficiently manage software development projects and track issues.</p>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">User Accounts and Authentication</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Account Creation:</strong> You must provide accurate and complete information during registration</li>
+            <li><strong>Authentication Methods:</strong> Username/password, email/password, or OTP-based login via email/WhatsApp</li>
+            <li><strong>Account Security:</strong> You are responsible for maintaining the confidentiality of your credentials</li>
+            <li><strong>Role Assignment:</strong> User roles (Admin, Developer, Tester) determine access permissions</li>
+            <li><strong>Account Termination:</strong> We reserve the right to suspend or terminate accounts for violations</li>
+          </ul>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">User Responsibilities</h3>
           <ul class="list-disc list-inside space-y-1">
-            <li>Provide accurate and complete information</li>
-            <li>Maintain the security of your account credentials</li>
-            <li>Use the service in compliance with applicable laws</li>
-            <li>Respect other users and maintain professional conduct</li>
+            <li><strong>Accurate Information:</strong> Provide truthful and up-to-date account information</li>
+            <li><strong>Professional Conduct:</strong> Maintain respectful and professional communication with team members</li>
+            <li><strong>Content Responsibility:</strong> Ensure all uploaded files and messages comply with applicable laws</li>
+            <li><strong>Security Compliance:</strong> Follow security best practices and report security concerns</li>
+            <li><strong>Resource Usage:</strong> Use platform resources responsibly and avoid system abuse</li>
+            <li><strong>Intellectual Property:</strong> Respect intellectual property rights of others</li>
+            <li><strong>Legal Compliance:</strong> Use the service in compliance with all applicable laws and regulations</li>
           </ul>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Prohibited Activities</h3>
           <ul class="list-disc list-inside space-y-1">
-            <li>Unauthorized access to other users' accounts</li>
-            <li>Sharing of inappropriate or harmful content</li>
-            <li>Attempting to disrupt or damage our services</li>
-            <li>Violation of intellectual property rights</li>
+            <li><strong>Unauthorized Access:</strong> Attempting to access other users' accounts or restricted areas</li>
+            <li><strong>Malicious Content:</strong> Uploading viruses, malware, or other harmful files</li>
+            <li><strong>Inappropriate Content:</strong> Sharing offensive, discriminatory, or inappropriate material</li>
+            <li><strong>System Interference:</strong> Attempting to disrupt, damage, or overload our services</li>
+            <li><strong>Data Violations:</strong> Unauthorized data scraping, mining, or extraction</li>
+            <li><strong>Privacy Breaches:</strong> Sharing or misusing other users' personal information</li>
+            <li><strong>Commercial Use:</strong> Using the platform for unauthorized commercial purposes</li>
+            <li><strong>False Reporting:</strong> Creating false bug reports or misleading information</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Content and Data Ownership</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>User Content:</strong> You retain ownership of content you upload but grant us usage rights</li>
+            <li><strong>Platform Data:</strong> Bug reports, project data, and communications belong to your organization</li>
+            <li><strong>Meeting Recordings:</strong> Video/audio recordings are stored securely and accessible to authorized users</li>
+            <li><strong>File Storage:</strong> Uploaded files are stored securely and accessible based on user permissions</li>
+            <li><strong>Data Export:</strong> You may export your data in standard formats upon request</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Communication and Notification Services</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Email Notifications:</strong> You may receive email updates about bug status changes and project activities</li>
+            <li><strong>WhatsApp Messages:</strong> Optional WhatsApp notifications for important updates</li>
+            <li><strong>Browser Notifications:</strong> Real-time browser notifications for immediate updates</li>
+            <li><strong>In-app Messaging:</strong> Internal chat system for team communication</li>
+            <li><strong>Communication Preferences:</strong> You can customize notification settings in your account</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Video Conferencing and Meetings</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Meeting Features:</strong> Video calls, screen sharing, meeting recordings, and participant management</li>
+            <li><strong>Recording Consent:</strong> Participants are notified when meetings are being recorded</li>
+            <li><strong>Meeting Security:</strong> Meeting rooms may be locked and access controlled by hosts</li>
+            <li><strong>Data Privacy:</strong> Meeting data is processed securely and accessed only by authorized participants</li>
+            <li><strong>Technical Requirements:</strong> Users must have compatible devices and stable internet connection</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Service Availability and Limitations</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Uptime:</strong> We strive for high availability but cannot guarantee uninterrupted service</li>
+            <li><strong>Maintenance:</strong> Scheduled maintenance may temporarily affect service availability</li>
+            <li><strong>Technical Limits:</strong> File size limits, storage quotas, and usage restrictions may apply</li>
+            <li><strong>Browser Compatibility:</strong> Service requires modern web browsers with JavaScript enabled</li>
+            <li><strong>Mobile Access:</strong> Optimized for mobile devices but some features may be limited</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Privacy and Data Protection</h3>
+          <p>Your privacy is important to us. Please review our Privacy Policy to understand how we collect, use, and protect your information. By using our service, you consent to our data practices as described in the Privacy Policy.</p>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Intellectual Property Rights</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Platform Rights:</strong> BugRicer platform, software, and trademarks are our intellectual property</li>
+            <li><strong>User Content:</strong> You retain rights to content you create but grant us necessary usage rights</li>
+            <li><strong>Third-party Content:</strong> Respect intellectual property rights of third parties</li>
+            <li><strong>License Grant:</strong> You grant us a license to use your content for service provision</li>
           </ul>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Limitation of Liability</h3>
-          <p>BugRicer AI Innovations shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of our service.</p>
+          <p>BugRicer AI Innovations shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of our service, including but not limited to data loss, business interruption, or security breaches. Our total liability shall not exceed the amount you paid for the service in the 12 months preceding the claim.</p>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Indemnification</h3>
+          <p>You agree to indemnify and hold harmless BugRicer AI Innovations from any claims, damages, or expenses arising from your use of the service, violation of these terms, or infringement of any rights of another party.</p>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Termination</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>User Termination:</strong> You may terminate your account at any time</li>
+            <li><strong>Service Termination:</strong> We may suspend or terminate accounts for terms violations</li>
+            <li><strong>Data Retention:</strong> Some data may be retained for legal and operational purposes</li>
+            <li><strong>Effect of Termination:</strong> Access to the service will cease upon account termination</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Modifications to Terms</h3>
+          <p>We reserve the right to modify these Terms of Use at any time. Changes will be effective upon posting on our platform. Your continued use of the service constitutes acceptance of modified terms.</p>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Governing Law and Dispute Resolution</h3>
+          <p>These terms are governed by the laws of India. Any disputes arising from these terms or your use of the service shall be resolved through binding arbitration in accordance with Indian arbitration laws.</p>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Contact Information</h3>
-          <p>For questions about these terms, please contact us at bugricer@gmail.com or +91 8086995559.</p>
+          <p>For questions about these terms, please contact us at:</p>
+          <ul class="list-disc list-inside space-y-1 mt-2">
+            <li>Website: https://bugricer.com</li>
+            <li>Email: info@bugricer.com</li>
+            <li>Phone: +91 8086995559</li>
+            <li>Address: Malappuram, Kerala, India</li>
+          </ul>
         </div>
       </div>
     </div>
@@ -1278,7 +1447,7 @@ const Login = () => {
             </button>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            © 2025 BugRicer. All rights reserved.
+            © 2025 BugRicer | CODO AI Innovations
           </p>
         </div>
       </div>
