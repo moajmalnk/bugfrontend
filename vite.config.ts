@@ -80,6 +80,10 @@ export default defineConfig(({ mode }) => ({
           }
           return `assets/[name]-[hash].${ext}`;
         },
+        // Ensure proper module format
+        format: 'es',
+        // Add proper module type
+        banner: mode === 'production' ? '/* BugRicer Meeting Room - Production Build */' : undefined,
       },
     },
     chunkSizeWarningLimit: 3000,
@@ -90,6 +94,10 @@ export default defineConfig(({ mode }) => ({
     },
     assetsInlineLimit: 4096,
     assetsDir: 'assets',
+    // Ensure proper module handling
+    commonjsOptions: {
+      include: [/node_modules/],
+    },
   },
   css: {
     devSourcemap: mode === 'development',

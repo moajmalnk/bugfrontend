@@ -797,15 +797,24 @@ export default function MeetRoom() {
       }
       
       // Google Meet-style video setup with enhanced debugging
+      let retryCount = 0;
+      const maxRetries = 50; // Maximum 5 seconds of retries (50 * 100ms)
+      
       const setupLocalVideo = () => {
         const videoElement = localVideoRef.current;
         console.log('=== setupLocalVideo called ===');
         console.log('Video element:', videoElement);
         console.log('Stream:', stream);
         console.log('Stream tracks:', stream.getTracks());
+        console.log('Retry count:', retryCount);
         
         if (!videoElement) {
-          console.log('⚠️ Video element not ready yet, retrying...');
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.error('❌ Failed to setup local video after maximum retries. Video element not found.');
+            return;
+          }
+          console.log(`⚠️ Video element not ready yet, retrying... (${retryCount}/${maxRetries})`);
           setTimeout(setupLocalVideo, 100);
           return;
         }
@@ -960,17 +969,43 @@ export default function MeetRoom() {
     } else if (localStream && !localVideoRef.current) {
       // If we have a stream but no video element yet, wait a bit and try again
       console.log('Stream available but video element not ready, retrying...');
+      let retryCount = 0;
+      const maxRetries = 30; // Maximum 3 seconds of retries (30 * 100ms)
+      
       const retrySetVideo = () => {
+        retryCount++;
         if (localVideoRef.current && localStream) {
           localVideoRef.current.srcObject = localStream;
           safePlayVideo(localVideoRef.current);
           console.log('Video element set after retry');
-        } else {
+        } else if (retryCount < maxRetries) {
+          console.log(`Retrying video setup... (${retryCount}/${maxRetries})`);
           setTimeout(retrySetVideo, 100);
+        } else {
+          console.error('❌ Failed to setup video element after maximum retries');
         }
       };
       setTimeout(retrySetVideo, 100);
     }
+  }, [localStream, safePlayVideo]);
+
+  // Ensure video element is ready after component mounts
+  useEffect(() => {
+    const checkVideoElement = () => {
+      if (localVideoRef.current && localStream) {
+        console.log('✅ Video element found and stream available, setting up...');
+        localVideoRef.current.srcObject = localStream;
+        safePlayVideo(localVideoRef.current);
+      }
+    };
+
+    // Check immediately
+    checkVideoElement();
+    
+    // Also check after a short delay to ensure DOM is fully rendered
+    const timeoutId = setTimeout(checkVideoElement, 200);
+    
+    return () => clearTimeout(timeoutId);
   }, [localStream, safePlayVideo]);
 
   // Close device settings when clicking outside

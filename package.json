@@ -15,6 +15,7 @@
     "deploy:safe": "node scripts/deploy-safe.js",
     "deploy:vercel": "vercel --prod --yes",
     "deploy:mime-fix": "node scripts/deploy-mime-fix.js",
+    "deploy:fix-mime": "node scripts/fix-production-mime.js",
     "optimize": "node scripts/optimize-build.js",
     "lighthouse": "lighthouse http://localhost:8080 --output html --output-path ./lighthouse-report.html",
     "perf:audit": "npm run build && npm run lighthouse"
