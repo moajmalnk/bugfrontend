@@ -1443,11 +1443,6 @@ const Projects = () => {
                           userProjectsCount
                         )}
                       </div>
-                      {skeletonLoading && (
-                        <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
-                          Loading projects...
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>

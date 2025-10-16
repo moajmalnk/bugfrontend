@@ -156,49 +156,36 @@ const Activity = () => {
         setIsRefreshing(true);
       } else if (page === 1) {
         setIsLoading(true);
+      } else {
+        // Show loading state when navigating to different pages
+        setIsLoading(true);
       }
 
-      const offset = (page - 1) * itemsPerPage;
-      const response: ActivityResponse = await activityService.getUserActivities(itemsPerPage, offset);
+      // For "My Activities" tab, we need to load more activities to get all user's activities
+      // For "All Activities" tab, use normal pagination
+      const limit = activeTab === "my-activities" ? 1000 : itemsPerPage; // Load more for filtering
+      const offset = activeTab === "my-activities" ? 0 : (page - 1) * itemsPerPage;
+      
+      const response: ActivityResponse = await activityService.getUserActivities(limit, offset);
 
-      // If this is the first page (page 1), always update the activities
-      // If it's a different page, only update if we're refreshing or it's a new page
-      if (page === 1 || showRefresh) {
-        // Check for new activities
-        if (page === 1 && lastActivityCount > 0 && response.pagination.total > lastActivityCount) {
-          setHasNewActivities(true);
-          const newCount = response.pagination.total - lastActivityCount;
-          toast({
-            title: 'New Activities!',
-            description: `${newCount} new activit${newCount === 1 ? 'y' : 'ies'} detected. Click refresh to see them.`,
-            variant: 'default',
-          });
-        }
-        
-        setActivities(response.activities);
-        setTotalActivities(response.pagination.total);
-        setHasMore(response.pagination.hasMore);
-        
-        // Update last activity count for comparison
-        setLastActivityCount(response.pagination.total);
-      } else {
-        // For pagination, append new activities
-        setActivities(prev => {
-          // Check if we already have activities for this page to avoid duplicates
-          const startIndex = (page - 1) * itemsPerPage;
-          const endIndex = startIndex + itemsPerPage;
-          
-          // If we don't have enough activities, fetch from the beginning
-          if (prev.length <= startIndex) {
-            return response.activities;
-          }
-          
-          // Otherwise, update the specific range
-          const newActivities = [...prev];
-          newActivities.splice(startIndex, itemsPerPage, ...response.activities);
-          return newActivities;
+      // Always update activities when fetching a new page
+      setActivities(response.activities);
+      setTotalActivities(response.pagination.total);
+      setHasMore(response.pagination.hasMore);
+      
+      // Check for new activities only on first page
+      if (page === 1 && lastActivityCount > 0 && response.pagination.total > lastActivityCount) {
+        setHasNewActivities(true);
+        const newCount = response.pagination.total - lastActivityCount;
+        toast({
+          title: 'New Activities!',
+          description: `${newCount} new activit${newCount === 1 ? 'y' : 'ies'} detected. Click refresh to see them.`,
+          variant: 'default',
         });
       }
+      
+      // Update last activity count for comparison
+      setLastActivityCount(response.pagination.total);
       
       // Fetch user's own activity count when loading first page
       if (page === 1) {
@@ -228,6 +215,18 @@ const Activity = () => {
   useEffect(() => {
     fetchActivities(1);
   }, [fetchActivities]);
+
+  // Fetch activities when page changes (only for "All Activities" tab)
+  useEffect(() => {
+    if (currentPage !== 1 && activeTab === "all-activities") {
+      fetchActivities(currentPage);
+    }
+  }, [currentPage, fetchActivities, activeTab]);
+
+  // Fetch activities when tab changes
+  useEffect(() => {
+    fetchActivities(1);
+  }, [activeTab, fetchActivities]);
 
   // Auto refresh and visibility change detection
   useEffect(() => {
@@ -346,11 +345,21 @@ const Activity = () => {
   }, [searchParams]);
 
   const totalFiltered = filteredActivities.length;
-  const paginatedActivities = filteredActivities.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+  
+  // For "All Activities": use server-side pagination (activities are already paginated)
+  // For "My Activities": use client-side pagination (filter then paginate)
+  const paginatedActivities = activeTab === "all-activities" 
+    ? filteredActivities 
+    : filteredActivities.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+      );
+  
+  // Use appropriate total count based on active tab
+  // For "all-activities": use server total count
+  // For "my-activities": use filtered count since we're doing client-side filtering
+  const totalForPagination = activeTab === "all-activities" ? totalActivities : totalFiltered;
+  const totalPages = Math.ceil(totalForPagination / itemsPerPage);
 
   const renderEmptyState = () => {
     return (
@@ -502,6 +511,8 @@ const Activity = () => {
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
                       </div>
                       
+                      
+                      
                       <div className="flex flex-col lg:flex-row gap-4">
                         {/* Search Bar */}
                         <div className="flex-1 relative group">
@@ -583,8 +594,8 @@ const Activity = () => {
                 </div>
               )}
 
-              {/* Professional Responsive Pagination Controls - Only show if there are multiple pages and activities */}
-              {!isLoading && filteredActivities.length > 0 && totalPages > 1 && (
+              {/* Professional Responsive Pagination Controls - Only show if there are activities */}
+              {!isLoading && filteredActivities.length > 0 && (
                 <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   {/* Top Row - Results Info and Items Per Page */}
                   <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
@@ -597,11 +608,11 @@ const Activity = () => {
                         </span>
                         -
                         <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                          {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                          {Math.min(currentPage * itemsPerPage, totalForPagination)}
                         </span>{" "}
                         of{" "}
                         <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                          {totalFiltered}
+                          {totalForPagination}
                         </span>{" "}
                         activities
                       </span>
@@ -828,7 +839,7 @@ const Activity = () => {
                 </div>
               )}
 
-              {/* Simple results info when no pagination needed - only show if there are activities */}
+              {/* Simple results info when no pagination needed - only show if there are activities and only one page */}
               {!isLoading && filteredActivities.length > 0 && totalPages <= 1 && (
                 <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   <div className="flex items-center gap-2">
@@ -836,7 +847,7 @@ const Activity = () => {
                     <span className="text-sm sm:text-base text-foreground font-semibold">
                       Showing{" "}
                       <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                        {totalFiltered}
+                        {totalForPagination}
                       </span>{" "}
                       activities
                     </span>
