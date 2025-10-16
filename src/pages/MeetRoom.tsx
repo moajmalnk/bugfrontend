@@ -152,9 +152,22 @@ export default function MeetRoom() {
   const playPromiseRef = useRef<Promise<void> | null>(null);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
   const meetingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const performanceMonitorRef = useRef<{ [key: string]: number }>({});
 
   const wsUrl = useMemo(() => {
     return WS_URL;
+  }, []);
+
+  // Professional performance monitoring
+  const monitorPerformance = useCallback((operation: string) => {
+    const now = Date.now();
+    const lastTime = performanceMonitorRef.current[operation];
+    
+    if (lastTime && now - lastTime < 100) { // Less than 100ms between operations
+      console.warn(`⚠️ Performance issue detected: ${operation} called too frequently (${now - lastTime}ms)`);
+    }
+    
+    performanceMonitorRef.current[operation] = now;
   }, []);
 
   // Debug video element state
@@ -251,7 +264,7 @@ export default function MeetRoom() {
       ],
       iceCandidatePoolSize: 10,
       iceTransportPolicy: 'all',
-      bundlePolicy: 'max-bundle',
+      bundlePolicy: 'balanced',
       rtcpMuxPolicy: 'require'
     });
 
@@ -279,7 +292,7 @@ export default function MeetRoom() {
       // Professional video element setup with enhanced retry mechanism
       const setRemoteVideo = (retries = 10) => {
         const videoElement = remoteVideoRefs.current[peerId];
-        if (videoElement) {
+        if (videoElement && videoElement.srcObject !== remoteStream) {
           console.log(`🎥 Setting professional remote video for ${peerId}`);
           videoElement.srcObject = remoteStream;
           
@@ -298,9 +311,11 @@ export default function MeetRoom() {
                 }, 500);
               });
           }
-        } else if (retries > 0) {
+        } else if (retries > 0 && !videoElement) {
           console.log(`🔄 Remote video element not ready for ${peerId}, retrying... (${retries} left)`);
           setTimeout(() => setRemoteVideo(retries - 1), 200);
+        } else if (videoElement && videoElement.srcObject === remoteStream) {
+          console.log(`✅ Remote video already set for ${peerId}`);
         } else {
           console.error(`❌ Failed to set remote video for ${peerId} after all retries`);
         }
@@ -339,13 +354,22 @@ export default function MeetRoom() {
 
       // Only clean up on closed state, not on failed/disconnected
       if (pc.connectionState === 'closed') {
-        console.log(`Cleaning up peer connection for ${peerId}`);
+        console.log(`🧹 Professional cleanup for peer connection ${peerId}`);
+        
+        // Clean up video element reference
+        if (remoteVideoRefs.current[peerId]) {
+          delete remoteVideoRefs.current[peerId];
+        }
+        
+        // Clean up peer connection
         delete peersRef.current[peerId];
         setPeers(prev => {
           const newPeers = { ...prev };
           delete newPeers[peerId];
           return newPeers;
         });
+        
+        console.log(`✅ Cleanup completed for peer ${peerId}`);
       }
     };
 
@@ -430,24 +454,47 @@ export default function MeetRoom() {
                   [peerId]: peerConnection
                 }));
                 
-                // Create and send offer immediately
+                // Create and send offer with professional error handling
                 try {
-                  const offer = await pc.createOffer();
+                  const offer = await pc.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true
+              });
+                  
                   await pc.setLocalDescription(offer);
+                  
                   ws.send(JSON.stringify({
                     type: 'signal',
                     code,
                     payload: { to: peerId, signal: { sdp: offer } }
                   }));
+                  
+                  console.log(`✅ Professional offer created and sent to ${peerId}`);
                 } catch (err) {
-                  console.error(`Error creating offer for ${peerId}:`, err);
-                  // Clean up failed peer connection
-                  delete peersRef.current[peerId];
-                  setPeers(prev => {
-                    const newPeers = { ...prev };
-                    delete newPeers[peerId];
-                    return newPeers;
-                  });
+                  console.error(`❌ Error creating offer for ${peerId}:`, err);
+                  
+                  // Professional cleanup with retry mechanism
+                  setTimeout(() => {
+                    if (peersRef.current[peerId]) {
+                      console.log(`🔄 Retrying peer connection for ${peerId}`);
+                      try {
+                        const retryPc = createPeerConnection(peerId);
+                        peersRef.current[peerId] = { pc: retryPc, isConnected: false };
+                        setPeers(prev => ({
+                          ...prev,
+                          [peerId]: { pc: retryPc, isConnected: false }
+                        }));
+                      } catch (retryErr) {
+                        console.error(`❌ Retry failed for ${peerId}:`, retryErr);
+                        delete peersRef.current[peerId];
+                        setPeers(prev => {
+                          const newPeers = { ...prev };
+                          delete newPeers[peerId];
+                          return newPeers;
+                        });
+                      }
+                    }
+                  }, 1000);
                 }
               }
             }
@@ -478,24 +525,47 @@ export default function MeetRoom() {
                 [peerId]: peerConnection
               }));
               
-              // Create and send offer immediately
+              // Create and send offer with professional error handling
               try {
-                const offer = await pc.createOffer();
+                const offer = await pc.createOffer({
+                  offerToReceiveAudio: true,
+                  offerToReceiveVideo: true
+                });
+                
                 await pc.setLocalDescription(offer);
+                
                 ws.send(JSON.stringify({
                   type: 'signal',
                   code,
                   payload: { to: peerId, signal: { sdp: offer } }
                 }));
+                
+                console.log(`✅ Professional offer created for new peer ${peerId}`);
               } catch (err) {
-                console.error(`Error creating offer for ${peerId}:`, err);
-                // Clean up failed peer connection
-                delete peersRef.current[peerId];
-                setPeers(prev => {
-                  const newPeers = { ...prev };
-                  delete newPeers[peerId];
-                  return newPeers;
-                });
+                console.error(`❌ Error creating offer for new peer ${peerId}:`, err);
+                
+                // Professional cleanup with retry mechanism
+                setTimeout(() => {
+                  if (peersRef.current[peerId]) {
+                    console.log(`🔄 Retrying new peer connection for ${peerId}`);
+                    try {
+                      const retryPc = createPeerConnection(peerId);
+                      peersRef.current[peerId] = { pc: retryPc, isConnected: false };
+                      setPeers(prev => ({
+                        ...prev,
+                        [peerId]: { pc: retryPc, isConnected: false }
+                      }));
+                    } catch (retryErr) {
+                      console.error(`❌ Retry failed for new peer ${peerId}:`, retryErr);
+                      delete peersRef.current[peerId];
+                      setPeers(prev => {
+                        const newPeers = { ...prev };
+                        delete newPeers[peerId];
+                        return newPeers;
+                      });
+                    }
+                  }
+                }, 1000);
               }
             }
           }
@@ -1522,96 +1592,170 @@ export default function MeetRoom() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
-      {/* Header */}
-      <div className="bg-gray-800/95 backdrop-blur-sm border-b border-gray-700/50 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600/20 rounded-lg">
-                <Video className="h-5 w-5 text-blue-400" />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-white">BugMeet</h1>
-                <p className="text-sm text-gray-400">Meeting {code}</p>
-              </div>
-            </div>
-            
-            <div className="hidden md:flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg">
-                <Users className="h-4 w-4 text-gray-300" />
-                <span className="text-gray-200 font-medium">
-                  {Object.keys(peers).length + 1} participant{(Object.keys(peers).length + 1) !== 1 ? 's' : ''}
-                </span>
+    <>
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        {/* Header */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8">
+            {/* Mobile Layout */}
+            <div className="block lg:hidden space-y-4">
+              {/* Top Row - Logo and Title */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg">
+                    <Video className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">BugMeet</h1>
+                    <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-1"></div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyMeetingCode}
+                    className="border-border text-foreground hover:bg-muted/50 hover:border-border/80 transition-all duration-200 px-2"
+                  >
+                    {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                    <span className="ml-1 font-mono text-xs hidden xs:inline">{code}</span>
+                  </Button>
+                </div>
               </div>
               
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg">
-                <Clock className="h-4 w-4 text-gray-300" />
-                <span className="text-gray-200 font-medium font-mono">
-                  {formatMeetingTime(meetingTimer)}
-                </span>
+              {/* Meeting Code Row */}
+              <div className="flex items-center justify-center">
+                <p className="text-xs sm:text-sm text-muted-foreground">Meeting {code}</p>
               </div>
               
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                <span className="text-gray-200 font-medium">
-                  {isConnected ? 'Connected' : 'Disconnected'}
-                </span>
-                {connectionQuality !== 'unknown' && (
-                  <div className="flex items-center gap-1 ml-2">
-                    {connectionQuality === 'good' ? (
-                      <Wifi className="h-3 w-3 text-green-400" />
-                    ) : (
-                      <WifiOff className="h-3 w-3 text-yellow-400" />
-                    )}
-                    <span className="text-xs text-gray-400 capitalize">{connectionQuality}</span>
+              {/* Status Row - Compact */}
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-muted/20 to-muted/30 rounded-md border border-border/50">
+                  <Users className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs font-medium text-foreground">
+                    {Object.keys(peers).length + 1}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-muted/20 to-muted/30 rounded-md border border-border/50">
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs font-medium font-mono text-foreground">
+                    {formatMeetingTime(meetingTimer)}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-muted/20 to-muted/30 rounded-md border border-border/50">
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                  <span className="text-xs font-medium text-foreground">
+                    {isConnected ? 'Online' : 'Offline'}
+                  </span>
+                </div>
+                
+                {raisedHands.size > 0 && (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-yellow-50 dark:bg-yellow-600/10 rounded-md border border-yellow-300/60 dark:border-yellow-500/30">
+                    <Hand className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
+                    <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
+                      {raisedHands.size}
+                    </span>
+                  </div>
+                )}
+                
+                {isMeetingLocked && (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-600/10 rounded-md border border-red-300/60 dark:border-red-500/30">
+                    <Lock className="h-3 w-3 text-red-600 dark:text-red-400" />
+                    <span className="text-xs font-medium text-red-700 dark:text-red-300">Locked</span>
                   </div>
                 )}
               </div>
-              
-              {raisedHands.size > 0 && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-600/20 rounded-lg border border-yellow-500/30">
-                  <Hand className="h-4 w-4 text-yellow-400" />
-                  <span className="text-yellow-200 font-medium">
-                    {raisedHands.size} hand{raisedHands.size !== 1 ? 's' : ''} raised
-                  </span>
+            </div>
+            
+            {/* Desktop Layout */}
+            <div className="hidden lg:block">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg">
+                      <Video className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">BugMeet</h1>
+                      <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
+                      <p className="text-sm text-muted-foreground mt-2">Meeting {code}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg border border-border/50">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-foreground">
+                        {Object.keys(peers).length + 1}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg border border-border/50">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium font-mono text-foreground">
+                        {formatMeetingTime(meetingTimer)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg border border-border/50">
+                      <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                      <span className="font-medium text-foreground">
+                        {isConnected ? 'Connected' : 'Disconnected'}
+                      </span>
+                      {connectionQuality !== 'unknown' && (
+                        <div className="flex items-center gap-1 ml-2">
+                          {connectionQuality === 'good' ? (
+                            <Wifi className="h-3 w-3 text-green-500" />
+                          ) : (
+                            <WifiOff className="h-3 w-3 text-yellow-500" />
+                          )}
+                          <span className="text-xs text-muted-foreground capitalize">{connectionQuality}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {raisedHands.size > 0 && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 dark:bg-yellow-600/10 rounded-lg border border-yellow-300/60 dark:border-yellow-500/30">
+                        <Hand className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                        <span className="font-medium text-yellow-700 dark:text-yellow-300">
+                          {raisedHands.size} hand{raisedHands.size !== 1 ? 's' : ''} raised
+                        </span>
+                      </div>
+                    )}
+                    
+                    {isMeetingLocked && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-600/10 rounded-lg border border-red-300/60 dark:border-red-500/30">
+                        <Lock className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        <span className="font-medium text-red-700 dark:text-red-300">Meeting Locked</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              
-              {isMeetingLocked && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 rounded-lg border border-red-500/30">
-                  <Lock className="h-4 w-4 text-red-400" />
-                  <span className="text-red-200 font-medium">Meeting Locked</span>
+                
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyMeetingCode}
+                    className="border-border text-foreground hover:bg-muted/50 hover:border-border/80 transition-all duration-200"
+                  >
+                    {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                    <span className="ml-2 font-mono text-sm">{code}</span>
+                  </Button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={copyMeetingCode}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500 transition-all duration-200"
-            >
-              {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-              <span className="ml-2 font-mono text-sm">{code}</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/admin/meet')}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500 transition-all duration-200"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
-      </div>
 
-      {/* Video Grid */}
-      <div className={`flex-1 p-6 pb-24 transition-all duration-300 ${isChatOpen ? 'pr-0' : ''}`}>
-        <div className="max-w-7xl mx-auto flex gap-6">
+        {/* Video Grid */}
+        <div className={`p-0 sm:p-0 transition-all duration-300 ${isChatOpen ? 'pr-0' : ''}`}>
+          <div className="max-w-7xl mx-auto flex gap-6">
           {/* Main video area */}
           <div className={`flex-1 transition-all duration-300 ${isChatOpen ? 'max-w-4xl' : ''}`}>
             <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] lg:[grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
@@ -1721,9 +1865,10 @@ export default function MeetRoom() {
               >
                 <video
                   ref={(el) => {
-                    if (el) {
+                    if (el && !remoteVideoRefs.current[peerId]) {
+                      monitorPerformance(`remoteVideoRef_${peerId}`);
                       remoteVideoRefs.current[peerId] = el;
-                      console.log(`Remote video element set for ${peerId}`);
+                      console.log(`✅ Remote video element initialized for ${peerId}`);
                     }
                   }}
                   autoPlay
@@ -1863,347 +2008,353 @@ export default function MeetRoom() {
         </div>
       </div>
 
-      {/* Controls - Enhanced 3 zone footer */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700/50 py-4">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between gap-4">
-          {/* Left: meeting info */}
-          <div className="hidden md:flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-700/50 rounded-lg">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span className="text-gray-200 font-medium">
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
-            </div>
+        {/* Controls - Center-aligned and Responsive */}
+        <div className="sticky bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-4">
+          <div className="max-w-7xl mx-auto flex flex-col items-center gap-4">
             
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-700/50 rounded-lg">
-              <Users className="h-4 w-4 text-gray-300" />
-              <span className="text-gray-200 font-medium">
-                {Object.keys(peers).length + 1} participant{(Object.keys(peers).length + 1) !== 1 ? 's' : ''}
-              </span>
-            </div>
-            
-            {connectionQuality !== 'unknown' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-700/50 rounded-lg">
-                {connectionQuality === 'good' ? (
-                  <Wifi className="h-4 w-4 text-green-400" />
-                ) : (
-                  <WifiOff className="h-4 w-4 text-yellow-400" />
-                )}
-                <span className="text-gray-200 font-medium capitalize">{connectionQuality}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Center: primary controls */}
-          <div className="flex items-center justify-center gap-3">
-            <Button
-              onClick={toggleAudio}
-              variant={isAudioEnabled ? 'default' : 'destructive'}
-              size="lg"
-              className={`rounded-full w-14 h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                isAudioEnabled 
-                  ? 'bg-gray-600 hover:bg-gray-500 shadow-lg hover:shadow-xl' 
-                  : 'bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25'
-              }`}
-              title={isAudioEnabled ? 'Mute microphone' : 'Unmute microphone'}
-            >
-              {isAudioEnabled ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
-            </Button>
-            
-            <Button
-              onClick={toggleVideo}
-              variant={isVideoEnabled ? 'default' : 'destructive'}
-              size="lg"
-              className={`rounded-full w-14 h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                isVideoEnabled 
-                  ? 'bg-gray-600 hover:bg-gray-500 shadow-lg hover:shadow-xl' 
-                  : 'bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25'
-              }`}
-              title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
-            >
-              {isVideoEnabled ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
-            </Button>
-            
-            <Button
-              onClick={toggleScreenShare}
-              variant={isScreenSharing ? 'default' : 'outline'}
-              size="lg"
-              className={`rounded-full w-14 h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                isScreenSharing 
-                  ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-blue-500/25' 
-                  : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
-              }`}
-              title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
-            >
-              {isScreenSharing ? <MonitorOff className="h-6 w-6" /> : <Monitor className="h-6 w-6" />}
-            </Button>
-            
-            <Button
-              onClick={toggleRecording}
-              variant={isRecording ? 'destructive' : 'outline'}
-              size="lg"
-              className={`rounded-full w-14 h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                isRecording 
-                  ? 'bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25' 
-                  : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
-              }`}
-              title={isRecording ? 'Stop recording' : 'Start recording'}
-            >
-              {isRecording ? <Square className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
-            </Button>
-            
-            <Button
-              onClick={toggleHandRaise}
-              variant={isHandRaised ? 'default' : 'outline'}
-              size="lg"
-              className={`rounded-full w-14 h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                isHandRaised 
-                  ? 'bg-yellow-600 hover:bg-yellow-700 shadow-lg hover:shadow-yellow-500/25' 
-                  : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
-              }`}
-              title={isHandRaised ? 'Lower hand' : 'Raise hand'}
-            >
-              {isHandRaised ? <Hand className="h-6 w-6 fill-current" /> : <Hand className="h-6 w-6" />}
-            </Button>
-            
-            <Button
-              onClick={() => setIsChatOpen(!isChatOpen)}
-              variant={isChatOpen ? 'default' : 'outline'}
-              size="lg"
-              className={`rounded-full w-14 h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
-                isChatOpen 
-                  ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-blue-500/25' 
-                  : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
-              }`}
-              title={isChatOpen ? 'Close chat' : 'Open chat'}
-            >
-              {isChatOpen ? <MessageSquareOff className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
-            </Button>
-          </div>
-
-          {/* Right: actions */}
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={copyMeetingCode}
-              className="w-12 h-12 border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500 transition-all duration-200 hover:scale-105 active:scale-95"
-              title="Copy meeting code"
-            >
-              {copied ? <Check className="h-5 w-5 text-green-400" /> : <Copy className="h-5 w-5" />}
-            </Button>
-            
-            <div className="relative" data-device-settings>
-              <Button
-                onClick={() => setShowDeviceSettings(!showDeviceSettings)}
-                variant="outline"
-                size="icon"
-                className="w-12 h-12 border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500 transition-all duration-200 hover:scale-105 active:scale-95"
-                title="Device settings"
-              >
-                <Settings className="h-5 w-5" />
-              </Button>
-              
-              {showDeviceSettings && (
-                <div className="absolute bottom-16 right-0 bg-gray-800/95 backdrop-blur-sm rounded-xl p-6 min-w-80 shadow-2xl border border-gray-700/50 max-h-96 overflow-y-auto">
-                  <h3 className="text-lg font-semibold text-white mb-4">Device Settings</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Camera</label>
-                      <select
-                        value={selectedVideoDevice}
-                        onChange={(e) => switchVideoDevice(e.target.value)}
-                        className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      >
-                        {availableDevices
-                          .filter(device => device.kind === 'videoinput')
-                          .map(device => (
-                            <option key={device.deviceId} value={device.deviceId}>
-                              {device.label || `Camera ${device.deviceId.slice(0, 8)}`}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Microphone</label>
-                      <select
-                        value={selectedAudioDevice}
-                        onChange={(e) => switchAudioDevice(e.target.value)}
-                        className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      >
-                        {availableDevices
-                          .filter(device => device.kind === 'audioinput')
-                          .map(device => (
-                            <option key={device.deviceId} value={device.deviceId}>
-                              {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                    
-                    {/* Audio Processing Settings */}
-                    <div className="border-t border-gray-600/50 pt-4">
-                      <h4 className="text-sm font-medium text-gray-300 mb-3">Audio Processing</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-300">Noise Suppression</span>
-                          <Button
-                            onClick={() => {
-                              setIsNoiseSuppression(!isNoiseSuppression);
-                              updateAudioSettings();
-                            }}
-                            variant={isNoiseSuppression ? "default" : "outline"}
-                            size="sm"
-                            className="text-xs"
-                          >
-                            {isNoiseSuppression ? "On" : "Off"}
-                          </Button>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-300">Echo Cancellation</span>
-                          <Button
-                            onClick={() => {
-                              setIsEchoCancellation(!isEchoCancellation);
-                              updateAudioSettings();
-                            }}
-                            variant={isEchoCancellation ? "default" : "outline"}
-                            size="sm"
-                            className="text-xs"
-                          >
-                            {isEchoCancellation ? "On" : "Off"}
-                          </Button>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-300">Auto Gain Control</span>
-                          <Button
-                            onClick={() => {
-                              setIsAutoGainControl(!isAutoGainControl);
-                              updateAudioSettings();
-                            }}
-                            variant={isAutoGainControl ? "default" : "outline"}
-                            size="sm"
-                            className="text-xs"
-                          >
-                            {isAutoGainControl ? "On" : "Off"}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Video Quality Settings */}
-                    <div className="border-t border-gray-600/50 pt-4">
-                      <h4 className="text-sm font-medium text-gray-300 mb-3">Video Quality</h4>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-300">HD Video</span>
-                        <Button
-                          onClick={() => {
-                            setIsHDVideo(!isHDVideo);
-                            updateAudioSettings();
-                          }}
-                          variant={isHDVideo ? "default" : "outline"}
-                          size="sm"
-                          className="text-xs"
-                        >
-                          {isHDVideo ? "On" : "Off"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+            {/* Connection Status - Mobile Only */}
+            <div className="flex md:hidden items-center gap-2 text-sm">
+              {connectionQuality !== 'unknown' && (
+                <div className="flex items-center gap-2 px-2 py-1 bg-gray-700/50 rounded-lg">
+                  {connectionQuality === 'good' ? (
+                    <Wifi className="h-3 w-3 text-green-400" />
+                  ) : (
+                    <WifiOff className="h-3 w-3 text-yellow-400" />
+                  )}
+                  <span className="text-gray-200 font-medium text-xs capitalize">{connectionQuality}</span>
                 </div>
               )}
             </div>
-            
-            <Button
-              onClick={handleLeaveMeeting}
-              variant="destructive"
-              className="w-12 h-12 bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25 transition-all duration-200 hover:scale-105 active:scale-95"
-              title="Leave meeting"
-            >
-              <PhoneOff className="h-5 w-5" />
-            </Button>
+
+            {/* Primary Controls - Center Aligned */}
+            <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
+              {/* Core Controls */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Button
+                  onClick={toggleAudio}
+                  variant={isAudioEnabled ? 'default' : 'destructive'}
+                  size="lg"
+                  className={`rounded-full w-12 h-12 sm:w-14 sm:h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                    isAudioEnabled 
+                      ? 'bg-gray-600 hover:bg-gray-500 shadow-lg hover:shadow-xl' 
+                      : 'bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25'
+                  }`}
+                  title={isAudioEnabled ? 'Mute microphone' : 'Unmute microphone'}
+                >
+                  {isAudioEnabled ? <Mic className="h-5 w-5 sm:h-6 sm:w-6" /> : <MicOff className="h-5 w-5 sm:h-6 sm:w-6" />}
+                </Button>
+                
+                <Button
+                  onClick={toggleVideo}
+                  variant={isVideoEnabled ? 'default' : 'destructive'}
+                  size="lg"
+                  className={`rounded-full w-12 h-12 sm:w-14 sm:h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                    isVideoEnabled 
+                      ? 'bg-gray-600 hover:bg-gray-500 shadow-lg hover:shadow-xl' 
+                      : 'bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25'
+                  }`}
+                  title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+                >
+                  {isVideoEnabled ? <Video className="h-5 w-5 sm:h-6 sm:w-6" /> : <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" />}
+                </Button>
+                
+                <Button
+                  onClick={toggleScreenShare}
+                  variant={isScreenSharing ? 'default' : 'outline'}
+                  size="lg"
+                  className={`rounded-full w-12 h-12 sm:w-14 sm:h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                    isScreenSharing 
+                      ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-blue-500/25' 
+                      : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+                  }`}
+                  title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
+                >
+                  {isScreenSharing ? <MonitorOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />}
+                </Button>
+              </div>
+
+              {/* Secondary Controls */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Button
+                  onClick={toggleRecording}
+                  variant={isRecording ? 'destructive' : 'outline'}
+                  size="lg"
+                  className={`rounded-full w-12 h-12 sm:w-14 sm:h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                    isRecording 
+                      ? 'bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25' 
+                      : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+                  }`}
+                  title={isRecording ? 'Stop recording' : 'Start recording'}
+                >
+                  {isRecording ? <Square className="h-5 w-5 sm:h-6 sm:w-6" /> : <Circle className="h-5 w-5 sm:h-6 sm:w-6" />}
+                </Button>
+                
+                <Button
+                  onClick={toggleHandRaise}
+                  variant={isHandRaised ? 'default' : 'outline'}
+                  size="lg"
+                  className={`rounded-full w-12 h-12 sm:w-14 sm:h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                    isHandRaised 
+                      ? 'bg-yellow-600 hover:bg-yellow-700 shadow-lg hover:shadow-yellow-500/25' 
+                      : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+                  }`}
+                  title={isHandRaised ? 'Lower hand' : 'Raise hand'}
+                >
+                  {isHandRaised ? <Hand className="h-5 w-5 sm:h-6 sm:w-6 fill-current" /> : <Hand className="h-5 w-5 sm:h-6 sm:w-6" />}
+                </Button>
+                
+                <Button
+                  onClick={() => setIsChatOpen(!isChatOpen)}
+                  variant={isChatOpen ? 'default' : 'outline'}
+                  size="lg"
+                  className={`rounded-full w-12 h-12 sm:w-14 sm:h-14 transition-all duration-200 hover:scale-105 active:scale-95 ${
+                    isChatOpen 
+                      ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-blue-500/25' 
+                      : 'border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500'
+                  }`}
+                  title={isChatOpen ? 'Close chat' : 'Open chat'}
+                >
+                  {isChatOpen ? <MessageSquareOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6" />}
+                </Button>
+              </div>
+
+              {/* Action Controls */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={copyMeetingCode}
+                  className="w-10 h-10 sm:w-12 sm:h-12 border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500 transition-all duration-200 hover:scale-105 active:scale-95"
+                  title="Copy meeting code"
+                >
+                  {copied ? <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-400" /> : <Copy className="h-4 w-4 sm:h-5 sm:w-5" />}
+                </Button>
+                
+                <div className="relative" data-device-settings>
+                  <Button
+                    onClick={() => setShowDeviceSettings(!showDeviceSettings)}
+                    variant="outline"
+                    size="icon"
+                    className="w-10 h-10 sm:w-12 sm:h-12 border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500 transition-all duration-200 hover:scale-105 active:scale-95"
+                    title="Device settings"
+                  >
+                    <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
+                  
+                  {showDeviceSettings && (
+                    <div className="absolute bottom-14 sm:bottom-16 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-0 sm:transform-none bg-gray-800/95 backdrop-blur-sm rounded-xl p-4 sm:p-6 w-80 sm:min-w-80 shadow-2xl border border-gray-700/50 max-h-80 sm:max-h-96 overflow-y-auto">
+                      <h3 className="text-lg font-semibold text-white mb-4">Device Settings</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">Camera</label>
+                          <select
+                            value={selectedVideoDevice}
+                            onChange={(e) => switchVideoDevice(e.target.value)}
+                            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          >
+                            {availableDevices
+                              .filter(device => device.kind === 'videoinput')
+                              .map(device => (
+                                <option key={device.deviceId} value={device.deviceId}>
+                                  {device.label || `Camera ${device.deviceId.slice(0, 8)}`}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">Microphone</label>
+                          <select
+                            value={selectedAudioDevice}
+                            onChange={(e) => switchAudioDevice(e.target.value)}
+                            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          >
+                            {availableDevices
+                              .filter(device => device.kind === 'audioinput')
+                              .map(device => (
+                                <option key={device.deviceId} value={device.deviceId}>
+                                  {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                        
+                        {/* Audio Processing Settings */}
+                        <div className="border-t border-gray-600/50 pt-4">
+                          <h4 className="text-sm font-medium text-gray-300 mb-3">Audio Processing</h4>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-300">Noise Suppression</span>
+                              <Button
+                                onClick={() => {
+                                  setIsNoiseSuppression(!isNoiseSuppression);
+                                  updateAudioSettings();
+                                }}
+                                variant={isNoiseSuppression ? "default" : "outline"}
+                                size="sm"
+                                className="text-xs"
+                              >
+                                {isNoiseSuppression ? "On" : "Off"}
+                              </Button>
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-300">Echo Cancellation</span>
+                              <Button
+                                onClick={() => {
+                                  setIsEchoCancellation(!isEchoCancellation);
+                                  updateAudioSettings();
+                                }}
+                                variant={isEchoCancellation ? "default" : "outline"}
+                                size="sm"
+                                className="text-xs"
+                              >
+                                {isEchoCancellation ? "On" : "Off"}
+                              </Button>
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-300">Auto Gain Control</span>
+                              <Button
+                                onClick={() => {
+                                  setIsAutoGainControl(!isAutoGainControl);
+                                  updateAudioSettings();
+                                }}
+                                variant={isAutoGainControl ? "default" : "outline"}
+                                size="sm"
+                                className="text-xs"
+                              >
+                                {isAutoGainControl ? "On" : "Off"}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Video Quality Settings */}
+                        <div className="border-t border-gray-600/50 pt-4">
+                          <h4 className="text-sm font-medium text-gray-300 mb-3">Video Quality</h4>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-300">HD Video</span>
+                            <Button
+                              onClick={() => {
+                                setIsHDVideo(!isHDVideo);
+                                updateAudioSettings();
+                              }}
+                              variant={isHDVideo ? "default" : "outline"}
+                              size="sm"
+                              className="text-xs"
+                            >
+                              {isHDVideo ? "On" : "Off"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <Button
+                  onClick={handleLeaveMeeting}
+                  variant="destructive"
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-red-500/25 transition-all duration-200 hover:scale-105 active:scale-95"
+                  title="Leave meeting"
+                >
+                  <PhoneOff className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Connection Status - Desktop Only */}
+            <div className="hidden md:flex items-center gap-4 text-sm">
+              {connectionQuality !== 'unknown' && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-700/50 rounded-lg">
+                  {connectionQuality === 'good' ? (
+                    <Wifi className="h-4 w-4 text-green-400" />
+                  ) : (
+                    <WifiOff className="h-4 w-4 text-yellow-400" />
+                  )}
+                  <span className="text-gray-200 font-medium capitalize">{connectionQuality}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
         {/* Recording Timer */}
         {isRecording && (
-          <div className="absolute left-1/2 -translate-x-1/2 -top-4">
+          <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-50">
             <div className="bg-red-600 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg animate-pulse">
               <Circle className="h-3 w-3 fill-current" />
               <span className="font-medium">Recording {formatRecordingTime(recordingTime)}</span>
             </div>
           </div>
         )}
-      </div>
-      
-      {/* Enhanced Save recording dialog */}
-      {showSaveRecording && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full sm:max-w-lg bg-gray-800/95 backdrop-blur-sm border border-gray-700/50 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
-            <div className="p-6 border-b border-gray-700/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-600/20 rounded-lg">
-                  <Circle className="h-5 w-5 text-red-400" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-white">Recording Complete</h3>
-                  <p className="text-sm text-gray-400">Your meeting recording is ready</p>
-                </div>
+      </section>
+    </main>
+    
+    {/* Enhanced Save recording dialog */}
+    {showSaveRecording && (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="w-full sm:max-w-lg bg-gray-800/95 backdrop-blur-sm border border-gray-700/50 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+          <div className="p-6 border-b border-gray-700/50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-600/20 rounded-lg">
+                <Circle className="h-5 w-5 text-red-400" />
               </div>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div className="bg-gray-700/30 rounded-lg p-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-300">Duration:</span>
-                  <span className="text-white font-medium">{formatRecordingTime(recordingTime)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mt-2">
-                  <span className="text-gray-300">Format:</span>
-                  <span className="text-white font-medium">WebM (VP9)</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mt-2">
-                  <span className="text-gray-300">Size:</span>
-                  <span className="text-white font-medium">{formatBytes(recordingSize)}</span>
-                </div>
+              <div>
+                <h3 className="text-xl font-semibold text-white">Recording Complete</h3>
+                <p className="text-sm text-gray-400">Your meeting recording is ready</p>
               </div>
-              
-              <p className="text-sm text-gray-300 text-center">
-                Would you like to download your recording now?
-              </p>
-            </div>
-            
-            <div className="p-6 pt-0 flex flex-col sm:flex-row gap-3">
-              <Button
-                onClick={discardRecording}
-                variant="outline"
-                className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500 transition-all duration-200"
-              >
-                Discard Recording
-              </Button>
-              <Button
-                onClick={() => {
-                  downloadRecording();
-                  setShowSaveRecording(false);
-                  // Revoke after closing dialog to free memory
-                  setTimeout(() => {
-                    if (recordingUrl) URL.revokeObjectURL(recordingUrl);
-                    setRecordingUrl('');
-                    setRecordingSize(0);
-                  }, 300);
-                }}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 hover:scale-105 active:scale-95"
-              >
-                Download Recording
-              </Button>
             </div>
           </div>
+          
+          <div className="p-6 space-y-4">
+            <div className="bg-gray-700/30 rounded-lg p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-300">Duration:</span>
+                <span className="text-white font-medium">{formatRecordingTime(recordingTime)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm mt-2">
+                <span className="text-gray-300">Format:</span>
+                <span className="text-white font-medium">WebM (VP9)</span>
+              </div>
+              <div className="flex items-center justify-between text-sm mt-2">
+                <span className="text-gray-300">Size:</span>
+                <span className="text-white font-medium">{formatBytes(recordingSize)}</span>
+              </div>
+            </div>
+            
+            <p className="text-sm text-gray-300 text-center">
+              Would you like to download your recording now?
+            </p>
+          </div>
+          
+          <div className="p-6 pt-0 flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={discardRecording}
+              variant="outline"
+              className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500 transition-all duration-200"
+            >
+              Discard Recording
+            </Button>
+            <Button
+              onClick={() => {
+                downloadRecording();
+                setShowSaveRecording(false);
+                // Revoke after closing dialog to free memory
+                setTimeout(() => {
+                  if (recordingUrl) URL.revokeObjectURL(recordingUrl);
+                  setRecordingUrl('');
+                  setRecordingSize(0);
+                }, 300);
+              }}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 hover:scale-105 active:scale-95"
+            >
+              Download Recording
+            </Button>
+          </div>
         </div>
-      )}
-    </div>
+      </div>
+    )}
+    </>
   );
 }
-
-
