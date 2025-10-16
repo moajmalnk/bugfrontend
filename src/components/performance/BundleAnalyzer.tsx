@@ -130,48 +130,49 @@ export const BundleAnalyzer: React.FC<BundleAnalyzerProps> = ({
   if (!enabled || bundles.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 bg-black/90 text-white p-4 rounded-lg max-w-md max-h-96 overflow-y-auto">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-bold text-sm">Bundle Analyzer</h3>
-        <button
-          onClick={() => setIsVisible(!isVisible)}
-          className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
-        >
-          {isVisible ? 'Hide' : 'Show'}
-        </button>
-      </div>
+    // <div className="fixed bottom-4 left-4 z-50 bg-black/90 text-white p-4 rounded-lg max-w-md max-h-96 overflow-y-auto">
+    //   <div className="flex items-center justify-between mb-3">
+    //     <h3 className="font-bold text-sm">Bundle Analyzer</h3>
+    //     <button
+    //       onClick={() => setIsVisible(!isVisible)}
+    //       className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+    //     >
+    //       {isVisible ? 'Hide' : 'Show'}
+    //     </button>
+    //   </div>
       
-      <div className="text-xs mb-3">
-        <div>Total Size: <span className="font-mono">{formatSize(totalSize)}</span></div>
-        <div>Resources: <span className="font-mono">{bundles.length}</span></div>
-      </div>
+    //   <div className="text-xs mb-3">
+    //     <div>Total Size: <span className="font-mono">{formatSize(totalSize)}</span></div>
+    //     <div>Resources: <span className="font-mono">{bundles.length}</span></div>
+    //   </div>
 
-      {isVisible && (
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {bundles
-            .sort((a, b) => b.size - a.size)
-            .slice(0, 20) // Show top 20 largest resources
-            .map((bundle, index) => (
-              <div key={index} className="flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-2 flex-1 min-w-0">
-                  <span>{getTypeIcon(bundle.type)}</span>
-                  <span className="truncate" title={bundle.name}>
-                    {bundle.name}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2 ml-2">
-                  <span className={`font-mono ${getPriorityColor(bundle.priority)}`}>
-                    {formatSize(bundle.size)}
-                  </span>
-                  <span className="text-gray-400 text-xs">
-                    {bundle.priority}
-                  </span>
-                </div>
-              </div>
-            ))}
-        </div>
-      )}
-    </div>
+    //   {isVisible && (
+    //     <div className="space-y-2 max-h-64 overflow-y-auto">
+    //       {bundles
+    //         .sort((a, b) => b.size - a.size)
+    //         .slice(0, 20) // Show top 20 largest resources
+    //         .map((bundle, index) => (
+    //           <div key={index} className="flex items-center justify-between text-xs">
+    //             <div className="flex items-center space-x-2 flex-1 min-w-0">
+    //               <span>{getTypeIcon(bundle.type)}</span>
+    //               <span className="truncate" title={bundle.name}>
+    //                 {bundle.name}
+    //               </span>
+    //             </div>
+    //             <div className="flex items-center space-x-2 ml-2">
+    //               <span className={`font-mono ${getPriorityColor(bundle.priority)}`}>
+    //                 {formatSize(bundle.size)}
+    //               </span>
+    //               <span className="text-gray-400 text-xs">
+    //                 {bundle.priority}
+    //               </span>
+    //             </div>
+    //           </div>
+    //         ))}
+    //     </div>
+    //   )}
+    // </div>
+    <div></div>
   );
 };
 

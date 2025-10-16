@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { joinMeeting, leaveMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { WS_URL } from "@/lib/env";
+import { useAuth } from "@/context/AuthContext";
 import { 
   Video, 
   VideoOff, 
@@ -72,6 +73,7 @@ interface PeerConnection {
 export default function MeetRoom() {
   const { code } = useParams();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [peers, setPeers] = useState<Record<string, PeerConnection>>({});
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
@@ -115,6 +117,22 @@ export default function MeetRoom() {
   const [participantNames, setParticipantNames] = useState<Record<string, string>>({});
   const [showParticipants, setShowParticipants] = useState(false);
   const [meetingStartTime] = useState(new Date());
+
+  // Function to get participant display name
+  const getParticipantName = useCallback((peerId: string) => {
+    // Check if we have a stored name for this participant
+    if (participantNames[peerId]) {
+      return participantNames[peerId];
+    }
+    
+    // For now, use the current user's name if available, otherwise fall back to generic name
+    if (currentUser?.name || currentUser?.username) {
+      return currentUser.name || currentUser.username;
+    }
+    
+    // Fallback to generic participant name
+    return `Participant ${peerId.slice(-4)}`;
+  }, [participantNames, currentUser]);
   
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -156,85 +174,85 @@ export default function MeetRoom() {
     });
   }, []);
 
-  // Safe video play function to prevent AbortError
+  // Google Meet-style video play function with enhanced debugging
   const safePlayVideo = useCallback(async (videoElement: HTMLVideoElement) => {
-    if (isPlayingRef.current || playPromiseRef.current) {
-      console.log('Video play already in progress, skipping...');
+    console.log('=== safePlayVideo called ===');
+    console.log('Video element:', videoElement);
+    console.log('srcObject:', videoElement?.srcObject);
+    console.log('Video paused:', videoElement?.paused);
+    console.log('Video readyState:', videoElement?.readyState);
+    
+    if (!videoElement || !videoElement.srcObject) {
+      console.log('❌ Video element or srcObject not available');
       return;
     }
 
-    if (!videoElement) {
-      console.log('Video element not found, skipping play...');
+    // If already playing, don't interfere
+    if (!videoElement.paused) {
+      console.log('✅ Video already playing');
+      setIsVideoPlaying(true);
       return;
     }
 
-    // Debug video element state
-    debugVideoElement(videoElement, 'safePlayVideo');
-
-    // Wait for video to be ready with retries
-    const waitForVideoReady = (retries = 10) => {
-      return new Promise<boolean>((resolve) => {
-        if (videoElement.readyState >= 2) {
-          resolve(true);
-          return;
-        }
-        
-        if (retries <= 0) {
-          console.log('Video not ready after retries, forcing play...');
-          resolve(false);
-          return;
-        }
-
-        console.log(`Video not ready (readyState: ${videoElement.readyState}), waiting... (${retries} retries left)`);
-        
-        const handleReady = () => {
-          console.log('Video became ready, readyState:', videoElement.readyState);
-          resolve(true);
-        };
-        
-        videoElement.addEventListener('loadedmetadata', handleReady, { once: true });
-        videoElement.addEventListener('canplay', handleReady, { once: true });
-        videoElement.addEventListener('loadeddata', handleReady, { once: true });
-        
-        setTimeout(() => {
-          videoElement.removeEventListener('loadedmetadata', handleReady);
-          videoElement.removeEventListener('canplay', handleReady);
-          videoElement.removeEventListener('loadeddata', handleReady);
-          waitForVideoReady(retries - 1).then(resolve);
-        }, 300);
-      });
-    };
-
+    console.log('🚀 Starting video play sequence...');
+    
     try {
-      const isReady = await waitForVideoReady();
-      if (!isReady) {
-        console.log('Video still not ready, attempting to play anyway...');
+      // Google Meet approach: play immediately and handle events
+      const playPromise = videoElement.play();
+      
+      // Handle the play promise
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('✅ Video play promise resolved successfully');
+            setIsVideoPlaying(true);
+          })
+          .catch((error) => {
+            console.log('❌ Video play promise rejected:', error.name);
+            if (error.name === 'NotAllowedError') {
+              console.log('⚠️ Video play blocked by browser policy - user interaction required');
+            } else if (error.name === 'AbortError') {
+              console.log('⚠️ Video play was aborted');
+            } else {
+              console.error('❌ Video play error:', error);
+            }
+          });
       }
-
-      isPlayingRef.current = true;
-      playPromiseRef.current = videoElement.play();
-      await playPromiseRef.current;
-      console.log('Video played successfully');
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.log('Video play was aborted (expected)');
-      } else {
-        console.error('Error playing video:', error);
-      }
-    } finally {
-      isPlayingRef.current = false;
-      playPromiseRef.current = null;
+    } catch (error) {
+      console.error('❌ Error starting video play:', error);
     }
   }, []);
 
   const createPeerConnection = useCallback((peerId: string): RTCPeerConnection => {
     const pc = new RTCPeerConnection({
       iceServers: [
+        // Primary STUN servers
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' }
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        // Professional TURN servers for NAT traversal
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
       ],
-      iceCandidatePoolSize: 10
+      iceCandidatePoolSize: 10,
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
     });
 
     // Add local stream tracks
@@ -244,9 +262,9 @@ export default function MeetRoom() {
       });
     }
 
-    // Handle remote stream
+    // Handle remote stream - Professional stream management
     pc.ontrack = (event) => {
-      console.log(`Received remote stream from ${peerId}`);
+      console.log(`✅ Professional remote stream received from ${peerId}`);
       const [remoteStream] = event.streams;
       
       setPeers(prev => ({
@@ -258,13 +276,37 @@ export default function MeetRoom() {
         }
       }));
 
-      // Set video element source
-      setTimeout(() => {
+      // Professional video element setup with enhanced retry mechanism
+      const setRemoteVideo = (retries = 10) => {
         const videoElement = remoteVideoRefs.current[peerId];
         if (videoElement) {
+          console.log(`🎥 Setting professional remote video for ${peerId}`);
           videoElement.srcObject = remoteStream;
+          
+          // Enhanced play handling with promise management
+          const playPromise = videoElement.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log(`✅ Professional remote video playing for ${peerId}`);
+              })
+              .catch(err => {
+                console.log(`⚠️ Remote video play error for ${peerId}:`, err.name);
+                // Retry play after a short delay
+                setTimeout(() => {
+                  videoElement.play().catch(console.error);
+                }, 500);
+              });
+          }
+        } else if (retries > 0) {
+          console.log(`🔄 Remote video element not ready for ${peerId}, retrying... (${retries} left)`);
+          setTimeout(() => setRemoteVideo(retries - 1), 200);
+        } else {
+          console.error(`❌ Failed to set remote video for ${peerId} after all retries`);
         }
-      }, 100);
+      };
+      
+      setRemoteVideo();
     };
 
     // Handle ICE candidates
@@ -281,15 +323,17 @@ export default function MeetRoom() {
       }
     };
 
-    // Handle connection state changes
+    // Handle connection state changes - Professional ICE-based connection detection
     pc.onconnectionstatechange = () => {
       console.log(`Peer ${peerId} connection state: ${pc.connectionState}`);
+      
+      const isConnected = pc.connectionState === 'connected' || pc.connectionState === 'connecting';
       
       setPeers(prev => ({
         ...prev,
         [peerId]: {
           ...prev[peerId],
-          isConnected: pc.connectionState === 'connected'
+          isConnected
         }
       }));
 
@@ -305,14 +349,28 @@ export default function MeetRoom() {
       }
     };
 
-    // Handle ICE connection state changes
+    // Handle ICE connection state changes - Professional connection quality monitoring
     pc.oniceconnectionstatechange = () => {
       console.log(`Peer ${peerId} ICE connection state: ${pc.iceConnectionState}`);
       
+      const isConnected = pc.iceConnectionState === 'connected' || 
+                         pc.iceConnectionState === 'completed' ||
+                         pc.iceConnectionState === 'checking';
+      
+      setPeers(prev => ({
+        ...prev,
+        [peerId]: {
+          ...prev[peerId],
+          isConnected
+        }
+      }));
+      
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         setConnectionQuality('good');
+        console.log(`✅ Professional connection established with ${peerId}`);
       } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
         setConnectionQuality('poor');
+        console.log(`⚠️ Connection issues with ${peerId}`);
       }
     };
 
@@ -339,7 +397,15 @@ export default function MeetRoom() {
         setIsConnecting(false);
         setError(null);
         reconnectAttempts.current = 0; // Reset reconnection attempts
-        ws.send(JSON.stringify({ type: 'join', code }));
+        ws.send(JSON.stringify({ 
+          type: 'join', 
+          code,
+          user: {
+            name: currentUser?.name || currentUser?.username || 'Anonymous',
+            username: currentUser?.username || 'anonymous',
+            role: currentUser?.role || 'participant'
+          }
+        }));
         toast.success('Connected to meeting');
       };
       
@@ -389,11 +455,21 @@ export default function MeetRoom() {
           
           if (msg.type === 'peer-joined') {
             const peerId = msg.peerId;
+            const userInfo = msg.user;
+            
             setParticipantCount(prev => prev + 1);
+            
+            // Store participant name if provided
+            if (userInfo?.name || userInfo?.username) {
+              setParticipantNames(prev => ({
+                ...prev,
+                [peerId]: userInfo.name || userInfo.username
+              }));
+            }
             
             // Only create peer connection if we don't already have one
             if (!peersRef.current[peerId]) {
-              console.log(`New peer joined: ${peerId}`);
+              console.log(`New peer joined: ${peerId}`, userInfo ? `(${userInfo.name || userInfo.username})` : '');
               const pc = createPeerConnection(peerId);
               const peerConnection = { pc, isConnected: false };
               peersRef.current[peerId] = peerConnection;
@@ -434,7 +510,7 @@ export default function MeetRoom() {
           if (msg.type === 'chat') {
             const message = {
               id: Date.now().toString(),
-              user: `Participant ${msg.from?.slice(-4) || 'Unknown'}`,
+              user: getParticipantName(msg.from || 'Unknown'),
               message: msg.message || '',
               timestamp: new Date()
             };
@@ -511,36 +587,50 @@ export default function MeetRoom() {
         console.log(`Handling ${desc.type} from peer ${fromId}, current state: ${pc.signalingState}`);
         
         if (desc.type === 'offer') {
-          // Handle offer - only reset if we're in a bad state
+          // Professional offer handling - only reset if in conflicting state
+          console.log(`Handling offer from ${fromId}, current state: ${pc.signalingState}`);
+          
           let currentPc = pc;
-          if (pc.signalingState === 'have-local-offer' || pc.signalingState === 'have-remote-offer') {
-            console.log(`Resetting peer connection for ${fromId} before handling offer (state: ${pc.signalingState})`);
+          
+          // Only reset if we're in a conflicting signaling state
+          if (pc.signalingState !== 'stable' && pc.signalingState !== 'closed') {
+            console.log(`⚠️ Signaling conflict detected, resetting connection for ${fromId}`);
             pc.close();
-            const newPc = createPeerConnection(fromId);
+            currentPc = createPeerConnection(fromId);
             setPeers(prev => ({
               ...prev,
-              [fromId]: { pc: newPc, isConnected: false }
+              [fromId]: { pc: currentPc, isConnected: false }
             }));
-            peersRef.current[fromId] = { pc: newPc, isConnected: false };
-            currentPc = newPc;
+            peersRef.current[fromId] = { pc: currentPc, isConnected: false };
           }
           
-          await currentPc.setRemoteDescription(desc);
-          const answer = await currentPc.createAnswer();
-          await currentPc.setLocalDescription(answer);
-          
-          wsRef.current?.send(JSON.stringify({
-            type: 'signal',
-            code,
-            payload: { to: fromId, signal: { sdp: answer } }
-          }));
+          try {
+            await currentPc.setRemoteDescription(desc);
+            const answer = await currentPc.createAnswer();
+            await currentPc.setLocalDescription(answer);
+            
+            wsRef.current?.send(JSON.stringify({
+              type: 'signal',
+              code,
+              payload: { to: fromId, signal: { sdp: answer } }
+            }));
+            console.log(`✅ Professional answer sent to ${fromId}`);
+          } catch (error) {
+            console.error(`❌ Error handling offer from ${fromId}:`, error);
+          }
         } else if (desc.type === 'answer') {
-          // Handle answer - only if we're expecting one
+          // Professional answer handling - only process if we're expecting it
+          console.log(`Handling answer from ${fromId}, current state: ${pc.signalingState}`);
+          
           if (pc.signalingState === 'have-local-offer') {
-            await pc.setRemoteDescription(desc);
-            console.log(`Answer processed for ${fromId}`);
+            try {
+              await pc.setRemoteDescription(desc);
+              console.log(`✅ Professional answer processed for ${fromId}`);
+            } catch (error) {
+              console.error(`❌ Error handling answer from ${fromId}:`, error);
+            }
           } else {
-            console.log(`Skipping answer from ${fromId}, not in have-local-offer state: ${pc.signalingState}`);
+            console.log(`⚠️ Skipping answer from ${fromId} - not in have-local-offer state: ${pc.signalingState}`);
           }
         }
       } else if (signal.candidate) {
@@ -598,61 +688,124 @@ export default function MeetRoom() {
       });
       
       setLocalStream(stream);
-      console.log('Local stream created:', stream);
+      console.log('=== LOCAL STREAM CREATED ===');
+      console.log('Stream object:', stream);
+      console.log('Stream active:', stream.active);
+      console.log('Stream id:', stream.id);
       console.log('Video tracks:', stream.getVideoTracks());
       console.log('Audio tracks:', stream.getAudioTracks());
       
-      // Set local video source with retry mechanism
-      const setVideoSource = (retries = 5) => {
-        if (localVideoRef.current) {
-          console.log('Setting video source...');
-          debugVideoElement(localVideoRef.current, 'before setVideoSource');
-          localVideoRef.current.srcObject = stream;
-          debugVideoElement(localVideoRef.current, 'after setVideoSource');
-          
-          // Add event listeners to ensure video plays when ready
-          const videoElement = localVideoRef.current;
-          
-          const handleLoadedMetadata = () => {
-            console.log('Video metadata loaded, readyState:', videoElement.readyState);
-            safePlayVideo(videoElement);
-          };
-          
-          const handleCanPlay = () => {
-            console.log('Video can play, readyState:', videoElement.readyState);
-            safePlayVideo(videoElement);
-          };
-          
-          // Remove existing listeners to avoid duplicates
-          videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
-          videoElement.removeEventListener('canplay', handleCanPlay);
-          
-          // Add new listeners
-          videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
-          videoElement.addEventListener('canplay', handleCanPlay);
-          
-          console.log('Video element srcObject set successfully');
-          
-          // Try to play immediately as well
-          safePlayVideo(videoElement);
-          
-          // Fallback: Force play after a delay if video still not playing
-          setTimeout(() => {
-            if (videoElement.paused && videoElement.srcObject) {
-              console.log('Fallback: Forcing video play after delay');
-              safePlayVideo(videoElement);
-            }
-          }, 2000);
-        } else if (retries > 0) {
-          console.log(`Video element not ready, retrying... (${retries} attempts left)`);
-          setTimeout(() => setVideoSource(retries - 1), 100);
-        } else {
-          console.error('Video element still not available after all retries');
+      // Check each video track
+      stream.getVideoTracks().forEach((track, index) => {
+        console.log(`Video track ${index}:`, {
+          id: track.id,
+          kind: track.kind,
+          label: track.label,
+          enabled: track.enabled,
+          muted: track.muted,
+          readyState: track.readyState
+        });
+      });
+      
+      // Add video track event listeners for better state management
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.onended = () => {
+          console.log('Video track ended');
+          setIsVideoPlaying(false);
+        };
+        
+        videoTrack.onmute = () => {
+          console.log('Video track muted');
+          setIsVideoPlaying(false);
+        };
+        
+        videoTrack.onunmute = () => {
+          console.log('Video track unmuted');
+          // Video will start playing when track becomes available
+        };
+      }
+      
+      // Google Meet-style video setup with enhanced debugging
+      const setupLocalVideo = () => {
+        const videoElement = localVideoRef.current;
+        console.log('=== setupLocalVideo called ===');
+        console.log('Video element:', videoElement);
+        console.log('Stream:', stream);
+        console.log('Stream tracks:', stream.getTracks());
+        
+        if (!videoElement) {
+          console.log('⚠️ Video element not ready yet, retrying...');
+          setTimeout(setupLocalVideo, 100);
+          return;
         }
+
+        console.log('🚀 Setting up local video with stream:', stream);
+        console.log('Stream video tracks:', stream.getVideoTracks());
+        console.log('Stream audio tracks:', stream.getAudioTracks());
+        
+        // Set the stream source
+        videoElement.srcObject = stream;
+        console.log('✅ Stream assigned to video element');
+        
+        // Set up event listeners for proper state management
+        const handleLoadedMetadata = () => {
+          console.log('📹 Video metadata loaded, attempting play');
+          console.log('Video readyState after metadata:', videoElement.readyState);
+          safePlayVideo(videoElement);
+        };
+        
+        const handleCanPlay = () => {
+          console.log('▶️ Video can play, attempting play');
+          console.log('Video readyState after canplay:', videoElement.readyState);
+          safePlayVideo(videoElement);
+        };
+        
+        const handlePlay = () => {
+          console.log('🎥 Video started playing successfully!');
+          setIsVideoPlaying(true);
+        };
+        
+        const handlePause = () => {
+          console.log('⏸️ Video paused');
+          setIsVideoPlaying(false);
+        };
+        
+        const handleError = (e: Event) => {
+          console.error('❌ Video element error:', e);
+          console.error('Video error details:', videoElement.error);
+        };
+        
+        // Remove any existing listeners
+        videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        videoElement.removeEventListener('canplay', handleCanPlay);
+        videoElement.removeEventListener('play', handlePlay);
+        videoElement.removeEventListener('pause', handlePause);
+        videoElement.removeEventListener('error', handleError);
+        
+        // Add new listeners
+        videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+        videoElement.addEventListener('canplay', handleCanPlay);
+        videoElement.addEventListener('play', handlePlay);
+        videoElement.addEventListener('pause', handlePause);
+        videoElement.addEventListener('error', handleError);
+        
+        // Try to play immediately
+        safePlayVideo(videoElement);
+        
+        // Fallback: Try again after a short delay if not playing
+        setTimeout(() => {
+          if (videoElement.paused && videoElement.srcObject) {
+            console.log('Video still paused after setup, attempting play again');
+            safePlayVideo(videoElement);
+          }
+        }, 500);
+        
+        console.log('Local video setup complete');
       };
       
-      // Try to set video source immediately, then with retries
-      setVideoSource();
+      // Setup the video
+      setupLocalVideo();
       
       // Setup audio level monitoring
       setupAudioLevelMonitoring(stream);
@@ -792,6 +945,25 @@ export default function MeetRoom() {
       chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages, isChatOpen]);
+
+  // Add user interaction handler for video autoplay
+  const handleUserInteraction = useCallback(() => {
+    if (localVideoRef.current && localVideoRef.current.paused && localVideoRef.current.srcObject) {
+      console.log('User interaction detected, attempting video play');
+      safePlayVideo(localVideoRef.current);
+    }
+  }, [safePlayVideo]);
+
+  // Global click handler for video autoplay (Google Meet style)
+  useEffect(() => {
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+    
+    return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, [handleUserInteraction]);
 
 
   const handleLeaveMeeting = async () => {
@@ -1313,15 +1485,6 @@ export default function MeetRoom() {
           <Loader2 className="h-12 w-12 animate-spin text-white mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-white mb-2">Joining Meeting</h2>
           <p className="text-gray-300">Setting up your video call...</p>
-          {/* Hidden video element for stream setup */}
-          <video
-            ref={localVideoRef}
-            autoPlay
-            muted
-            playsInline
-            className="hidden"
-            style={{ display: 'none', position: 'absolute', top: '-9999px' }}
-          />
         </div>
       </div>
     );
@@ -1453,35 +1616,19 @@ export default function MeetRoom() {
           <div className={`flex-1 transition-all duration-300 ${isChatOpen ? 'max-w-4xl' : ''}`}>
             <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))] lg:[grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
             {/* Local Video */}
-            <div className="group relative aspect-video bg-gray-800/50 rounded-2xl overflow-hidden border border-gray-600/50 hover:border-blue-500/50 transition-all duration-300 shadow-2xl hover:shadow-blue-500/10">
+            <div className="group relative aspect-video bg-gray-800/50 rounded-2xl overflow-hidden border border-gray-600/50 hover:border-blue-500/50 transition-all duration-500 shadow-2xl hover:shadow-blue-500/10 hover:scale-[1.02] transform">
               <video
                 ref={localVideoRef}
                 autoPlay
                 muted
                 playsInline
+                preload="metadata"
                 className="w-full h-full object-cover"
                 style={{ 
                   backgroundColor: '#1f2937',
                   display: 'block',
                   visibility: 'visible',
                   opacity: 1
-                }}
-                onLoadedMetadata={() => {
-                  console.log('Local video loaded');
-                  debugVideoElement(localVideoRef.current!, 'onLoadedMetadata');
-                }}
-                onError={(e) => console.error('Local video error:', e)}
-                onPlay={() => {
-                  console.log('Local video started playing');
-                  setIsVideoPlaying(true);
-                }}
-                onPause={() => {
-                  console.log('Local video paused');
-                  setIsVideoPlaying(false);
-                }}
-                onCanPlay={() => {
-                  console.log('Local video can play');
-                  debugVideoElement(localVideoRef.current!, 'onCanPlay');
                 }}
               />
               
@@ -1537,22 +1684,29 @@ export default function MeetRoom() {
                 </div>
               )}
               
-              {isVideoEnabled && localStream && !isVideoPlaying && (
-                <div className="absolute inset-0 bg-gray-800/90 flex items-center justify-center">
+              {/* Only show loading state if video is truly not playing and we have a stream */}
+              {isVideoEnabled && localStream && !isVideoPlaying && localVideoRef.current?.paused && (
+                <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-sm flex items-center justify-center">
                   <div className="text-center">
-                    <Loader2 className="h-10 w-10 animate-spin text-blue-400 mx-auto mb-3" />
-                    <p className="text-gray-300 font-medium mb-3">Starting video...</p>
+                    <div className="relative mb-6">
+                      <div className="w-16 h-16 border-4 border-blue-500/30 rounded-full"></div>
+                      <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2 text-white">Starting your video</h3>
+                    <p className="text-sm text-gray-300 mb-6 max-w-xs mx-auto">
+                      Video stream is ready, starting playback...
+                    </p>
                     <Button
                       onClick={() => {
                         if (localVideoRef.current) {
-                          console.log('Manual play attempt, readyState:', localVideoRef.current.readyState);
+                          console.log('=== MANUAL VIDEO START TRIGGERED ===');
                           safePlayVideo(localVideoRef.current);
                         }
                       }}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
                       size="sm"
                     >
-                      Click to play
+                      Start Video
                     </Button>
                   </div>
                 </div>
@@ -1563,15 +1717,32 @@ export default function MeetRoom() {
             {Object.entries(peers).map(([peerId, peer]) => (
               <div
                 key={peerId}
-                className="group relative aspect-video bg-gray-800/50 rounded-2xl overflow-hidden border border-gray-600/50 hover:border-blue-500/50 transition-all duration-300 shadow-2xl hover:shadow-blue-500/10"
+                className="group relative aspect-video bg-gray-800/50 rounded-2xl overflow-hidden border border-gray-600/50 hover:border-blue-500/50 transition-all duration-500 shadow-2xl hover:shadow-blue-500/10 hover:scale-[1.02] transform"
               >
                 <video
                   ref={(el) => {
-                    if (el) remoteVideoRefs.current[peerId] = el;
+                    if (el) {
+                      remoteVideoRefs.current[peerId] = el;
+                      console.log(`Remote video element set for ${peerId}`);
+                    }
                   }}
                   autoPlay
                   playsInline
+                  muted
+                  preload="metadata"
                   className="w-full h-full object-cover"
+                  onLoadedMetadata={() => {
+                    console.log(`Remote video metadata loaded for ${peerId}`);
+                  }}
+                  onCanPlay={() => {
+                    console.log(`Remote video can play for ${peerId}`);
+                  }}
+                  onPlay={() => {
+                    console.log(`Remote video started playing for ${peerId}`);
+                  }}
+                  onError={(e) => {
+                    console.error(`Remote video error for ${peerId}:`, e);
+                  }}
                 />
                 
                 {/* Gradient overlay */}
@@ -1580,7 +1751,7 @@ export default function MeetRoom() {
                 {/* Top-left label */}
                 <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 shadow-lg">
                   <div className={`w-2 h-2 rounded-full ${peer.isConnected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
-                  <span className="font-medium text-white">Participant {peerId.slice(-4)}</span>
+                  <span className="font-medium text-white">{getParticipantName(peerId)}</span>
                   {peer.isConnected ? (
                     <span className="inline-flex items-center gap-1 text-green-300 bg-green-500/20 px-2 py-0.5 rounded">
                       <Wifi className="h-3 w-3" /> Connected
@@ -1592,13 +1763,28 @@ export default function MeetRoom() {
                   )}
                 </div>
                 
-                {!peer.stream && (
-                  <div className="absolute inset-0 bg-gray-900/90 flex items-center justify-center">
+                {!peer.stream && peer.isConnected && (
+                  <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-sm flex items-center justify-center">
                     <div className="text-center">
-                      <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Users className="h-8 w-8 text-gray-400" />
+                      <div className="relative mb-4">
+                        <div className="w-12 h-12 border-3 border-green-500/30 rounded-full"></div>
+                        <div className="absolute top-0 left-0 w-12 h-12 border-3 border-green-500 border-t-transparent rounded-full animate-spin"></div>
                       </div>
-                      <p className="text-gray-300 font-medium">Connecting...</p>
+                      <p className="text-white font-medium text-sm">Connected</p>
+                      <p className="text-gray-400 text-xs mt-1">Waiting for video stream</p>
+                    </div>
+                  </div>
+                )}
+                
+                {!peer.stream && !peer.isConnected && (
+                  <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-sm flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="relative mb-4">
+                        <div className="w-12 h-12 border-3 border-blue-500/30 rounded-full"></div>
+                        <div className="absolute top-0 left-0 w-12 h-12 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                      <p className="text-white font-medium text-sm">Connecting...</p>
+                      <p className="text-gray-400 text-xs mt-1">Establishing connection</p>
                     </div>
                   </div>
                 )}

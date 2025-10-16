@@ -204,6 +204,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   label="Settings"
                 />
               </div>
+              <Separator className="my-4" />
             </>
           )}
         </div>

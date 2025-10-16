@@ -315,7 +315,7 @@ export default function Profile() {
                       size="lg"
                       className="h-12 px-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                     >
-                      Edit Profile
+                      Edit
                     </Button>
                   }
                 />

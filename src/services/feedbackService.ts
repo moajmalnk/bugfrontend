@@ -104,18 +104,71 @@ class FeedbackService {
    * Get feedback statistics (admin only)
    */
   async getFeedbackStats(): Promise<FeedbackStats> {
-    const response = await fetch(`${this.baseUrl}/stats.php`, {
+    let response = await fetch(`${this.baseUrl}/stats.php`, {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
 
-    const data = await response.json();
+    let data = await response.json();
+
+    // If we get a 403 with role mismatch, try to refresh the token
+    if (!response.ok && data.message && data.message.includes('JWT role:') && data.message.includes('DB role:')) {
+      console.log('Detected role mismatch, attempting to refresh token...');
+      
+      try {
+        await this.refreshToken();
+        // Retry the request with the new token
+        response = await fetch(`${this.baseUrl}/stats.php`, {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        });
+        data = await response.json();
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
+        // Continue with the original error
+      }
+    }
 
     if (!response.ok || !data.success) {
       throw new Error(data.message || 'Failed to get feedback statistics');
     }
 
     return data.data;
+  }
+
+  /**
+   * Refresh JWT token to get updated role information
+   */
+  private async refreshToken(): Promise<void> {
+    const response = await fetch(`${ENV.API_URL}/auth/refresh_token.php`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('Failed to parse refresh token response:', jsonError);
+      const responseText = await response.text();
+      console.error('Response text:', responseText);
+      throw new Error(`Failed to parse refresh token response: ${responseText}`);
+    }
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Failed to refresh token');
+    }
+
+    // Update stored token
+    const newToken = data.data.token;
+    
+    if (localStorage.getItem('token')) {
+      localStorage.setItem('token', newToken);
+    } else if (sessionStorage.getItem('token')) {
+      sessionStorage.setItem('token', newToken);
+    }
+
+    console.log('Token refreshed successfully');
   }
 
   /**

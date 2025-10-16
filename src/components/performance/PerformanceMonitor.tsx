@@ -160,20 +160,24 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   // Log metrics in development with throttling
   useEffect(() => {
     if (enabled && process.env.NODE_ENV === 'development') {
-      // Throttle console logging to avoid spam
-      const timeoutId = setTimeout(() => {
-        console.group('🚀 Performance Metrics');
-        console.log('First Contentful Paint (FCP):', metrics.fcp ? `${metrics.fcp.toFixed(2)}ms` : 'Not available');
-        console.log('Largest Contentful Paint (LCP):', metrics.lcp ? `${metrics.lcp.toFixed(2)}ms` : 'Not available');
-        console.log('First Input Delay (FID):', metrics.fid ? `${metrics.fid.toFixed(2)}ms` : 'Not available');
-        console.log('Cumulative Layout Shift (CLS):', metrics.cls !== null ? metrics.cls.toFixed(4) : 'Not available');
-        console.log('Time to First Byte (TTFB):', metrics.ttfb ? `${metrics.ttfb.toFixed(2)}ms` : 'Not available');
-        console.log('First Meaningful Paint (FMP):', metrics.fmp ? `${metrics.fmp.toFixed(2)}ms` : 'Not available');
-        console.log('Time to Interactive (TTI):', metrics.tti ? `${metrics.tti.toFixed(2)}ms` : 'Not available');
-        console.groupEnd();
-      }, 500);
+      // Throttle console logging to avoid spam - only log once per session
+      const hasLogged = sessionStorage.getItem('performance-metrics-logged');
+      if (!hasLogged) {
+        const timeoutId = setTimeout(() => {
+          console.group('🚀 Performance Metrics');
+          console.log('First Contentful Paint (FCP):', metrics.fcp ? `${metrics.fcp.toFixed(2)}ms` : 'Not available');
+          console.log('Largest Contentful Paint (LCP):', metrics.lcp ? `${metrics.lcp.toFixed(2)}ms` : 'Not available');
+          console.log('First Input Delay (FID):', metrics.fid ? `${metrics.fid.toFixed(2)}ms` : 'Not available');
+          console.log('Cumulative Layout Shift (CLS):', metrics.cls !== null ? metrics.cls.toFixed(4) : 'Not available');
+          console.log('Time to First Byte (TTFB):', metrics.ttfb ? `${metrics.ttfb.toFixed(2)}ms` : 'Not available');
+          console.log('First Meaningful Paint (FMP):', metrics.fmp ? `${metrics.fmp.toFixed(2)}ms` : 'Not available');
+          console.log('Time to Interactive (TTI):', metrics.tti ? `${metrics.tti.toFixed(2)}ms` : 'Not available');
+          console.groupEnd();
+          sessionStorage.setItem('performance-metrics-logged', 'true');
+        }, 1000); // Increased delay to 1 second
 
-      return () => clearTimeout(timeoutId);
+        return () => clearTimeout(timeoutId);
+      }
     }
   }, [metrics, enabled]);
 
@@ -200,47 +204,48 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   if (!enabled) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 bg-black/90 text-white p-3 rounded-lg text-xs font-mono max-w-xs border border-gray-700">
-      <div className="font-bold mb-2 text-cyan-400">Performance Metrics</div>
-      <div className="space-y-1">
-        <div className="flex justify-between">
-          <span>FCP:</span>
-          <span className={getPerformanceColor('fcp', metrics.fcp)}>
-            {metrics.fcp ? `${metrics.fcp.toFixed(0)}ms` : '...'}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span>LCP:</span>
-          <span className={getPerformanceColor('lcp', metrics.lcp)}>
-            {metrics.lcp ? `${metrics.lcp.toFixed(0)}ms` : '...'}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span>FID:</span>
-          <span className={getPerformanceColor('fid', metrics.fid)}>
-            {metrics.fid ? `${metrics.fid.toFixed(0)}ms` : '...'}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span>CLS:</span>
-          <span className={getPerformanceColor('cls', metrics.cls)}>
-            {metrics.cls !== null ? metrics.cls.toFixed(3) : '...'}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span>TTFB:</span>
-          <span className={getPerformanceColor('ttfb', metrics.ttfb)}>
-            {metrics.ttfb ? `${metrics.ttfb.toFixed(0)}ms` : '...'}
-          </span>
-        </div>
-      </div>
-      <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-400">
-        <div className="flex justify-between">
-          <span>TTI:</span>
-          <span>{metrics.tti ? `${metrics.tti.toFixed(0)}ms` : '...'}</span>
-        </div>
-      </div>
-    </div>
+    // <div className="fixed bottom-4 right-4 z-50 bg-black/90 text-white p-3 rounded-lg text-xs font-mono max-w-xs border border-gray-700">
+    //   <div className="font-bold mb-2 text-cyan-400">Performance Metrics</div>
+    //   <div className="space-y-1">
+    //     <div className="flex justify-between">
+    //       <span>FCP:</span>
+    //       <span className={getPerformanceColor('fcp', metrics.fcp)}>
+    //         {metrics.fcp ? `${metrics.fcp.toFixed(0)}ms` : '...'}
+    //       </span>
+    //     </div>
+    //     <div className="flex justify-between">
+    //       <span>LCP:</span>
+    //       <span className={getPerformanceColor('lcp', metrics.lcp)}>
+    //         {metrics.lcp ? `${metrics.lcp.toFixed(0)}ms` : '...'}
+    //       </span>
+    //     </div>
+    //     <div className="flex justify-between">
+    //       <span>FID:</span>
+    //       <span className={getPerformanceColor('fid', metrics.fid)}>
+    //         {metrics.fid ? `${metrics.fid.toFixed(0)}ms` : '...'}
+    //       </span>
+    //     </div>
+    //     <div className="flex justify-between">
+    //       <span>CLS:</span>
+    //       <span className={getPerformanceColor('cls', metrics.cls)}>
+    //         {metrics.cls !== null ? metrics.cls.toFixed(3) : '...'}
+    //       </span>
+    //     </div>
+    //     <div className="flex justify-between">
+    //       <span>TTFB:</span>
+    //       <span className={getPerformanceColor('ttfb', metrics.ttfb)}>
+    //         {metrics.ttfb ? `${metrics.ttfb.toFixed(0)}ms` : '...'}
+    //       </span>
+    //     </div>
+    //   </div>
+    //   <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-400">
+    //     <div className="flex justify-between">
+    //       <span>TTI:</span>
+    //       <span>{metrics.tti ? `${metrics.tti.toFixed(0)}ms` : '...'}</span>
+    //     </div>
+    //   </div>
+    // </div>
+    <div>Performance Monitor</div>
   );
 };
 

@@ -28,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User } from "lucide-react";
+import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
@@ -447,8 +447,8 @@ const NewUpdate = () => {
                           </>
                         ) : (
                           <>
-                            <Plus className="mr-2 h-5 w-5" />
-                            Create Update
+                            <Send className="mr-2 h-5 w-5" />
+                            Submit
                           </>
                         )}
                       </Button>
