@@ -796,95 +796,12 @@ export default function MeetRoom() {
         };
       }
       
-      // Google Meet-style video setup with enhanced debugging
-      let retryCount = 0;
-      const maxRetries = 50; // Maximum 5 seconds of retries (50 * 100ms)
-      
-      const setupLocalVideo = () => {
-        const videoElement = localVideoRef.current;
-        console.log('=== setupLocalVideo called ===');
-        console.log('Video element:', videoElement);
-        console.log('Stream:', stream);
-        console.log('Stream tracks:', stream.getTracks());
-        console.log('Retry count:', retryCount);
-        
-        if (!videoElement) {
-          retryCount++;
-          if (retryCount >= maxRetries) {
-            console.error('❌ Failed to setup local video after maximum retries. Video element not found.');
-            return;
-          }
-          console.log(`⚠️ Video element not ready yet, retrying... (${retryCount}/${maxRetries})`);
-          setTimeout(setupLocalVideo, 100);
-          return;
-        }
+      // Store the stream for later setup when component mounts
+      console.log('Local stream created, will setup video when component mounts');
 
-        console.log('🚀 Setting up local video with stream:', stream);
-        console.log('Stream video tracks:', stream.getVideoTracks());
-        console.log('Stream audio tracks:', stream.getAudioTracks());
-        
-        // Set the stream source
-        videoElement.srcObject = stream;
-        console.log('✅ Stream assigned to video element');
-        
-        // Set up event listeners for proper state management
-        const handleLoadedMetadata = () => {
-          console.log('📹 Video metadata loaded, attempting play');
-          console.log('Video readyState after metadata:', videoElement.readyState);
-          safePlayVideo(videoElement);
-        };
-        
-        const handleCanPlay = () => {
-          console.log('▶️ Video can play, attempting play');
-          console.log('Video readyState after canplay:', videoElement.readyState);
-          safePlayVideo(videoElement);
-        };
-        
-        const handlePlay = () => {
-          console.log('🎥 Video started playing successfully!');
-          setIsVideoPlaying(true);
-        };
-        
-        const handlePause = () => {
-          console.log('⏸️ Video paused');
-          setIsVideoPlaying(false);
-        };
-        
-        const handleError = (e: Event) => {
-          console.error('❌ Video element error:', e);
-          console.error('Video error details:', videoElement.error);
-        };
-        
-        // Remove any existing listeners
-        videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        videoElement.removeEventListener('canplay', handleCanPlay);
-        videoElement.removeEventListener('play', handlePlay);
-        videoElement.removeEventListener('pause', handlePause);
-        videoElement.removeEventListener('error', handleError);
-        
-        // Add new listeners
-        videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
-        videoElement.addEventListener('canplay', handleCanPlay);
-        videoElement.addEventListener('play', handlePlay);
-        videoElement.addEventListener('pause', handlePause);
-        videoElement.addEventListener('error', handleError);
-        
-        // Try to play immediately
-        safePlayVideo(videoElement);
-        
-        // Fallback: Try again after a short delay if not playing
-        setTimeout(() => {
-          if (videoElement.paused && videoElement.srcObject) {
-            console.log('Video still paused after setup, attempting play again');
-            safePlayVideo(videoElement);
-          }
-        }, 500);
-        
-        console.log('Local video setup complete');
-      };
       
-      // Setup the video
-      setupLocalVideo();
+      // Don't setup video immediately - wait for component to mount
+      // setupLocalVideo();
       
       // Setup audio level monitoring
       setupAudioLevelMonitoring(stream);
@@ -991,22 +908,114 @@ export default function MeetRoom() {
 
   // Ensure video element is ready after component mounts
   useEffect(() => {
-    const checkVideoElement = () => {
-      if (localVideoRef.current && localStream) {
-        console.log('✅ Video element found and stream available, setting up...');
-        localVideoRef.current.srcObject = localStream;
-        safePlayVideo(localVideoRef.current);
+    if (!localStream) return;
+
+    const setupVideoWhenReady = () => {
+      const videoElement = localVideoRef.current;
+      
+      if (!videoElement) {
+        console.log('Video element not ready yet, will retry...');
+        return false;
       }
+
+      console.log('✅ Video element found and stream available, setting up...');
+      console.log('Setting up video with stream:', localStream);
+      
+      // Set the stream source
+      videoElement.srcObject = localStream;
+      
+      // Set up event listeners for proper state management
+      const handleLoadedMetadata = () => {
+        console.log('📹 Video metadata loaded, attempting play');
+        safePlayVideo(videoElement);
+      };
+      
+      const handleCanPlay = () => {
+        console.log('▶️ Video can play, attempting play');
+        safePlayVideo(videoElement);
+      };
+      
+      const handlePlay = () => {
+        console.log('🎥 Video started playing successfully!');
+        setIsVideoPlaying(true);
+      };
+      
+      const handlePause = () => {
+        console.log('⏸️ Video paused');
+        setIsVideoPlaying(false);
+      };
+      
+      const handleError = (e: Event) => {
+        console.error('❌ Video element error:', e);
+        console.error('Video error details:', videoElement.error);
+      };
+      
+      // Remove any existing listeners
+      videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      videoElement.removeEventListener('canplay', handleCanPlay);
+      videoElement.removeEventListener('play', handlePlay);
+      videoElement.removeEventListener('pause', handlePause);
+      videoElement.removeEventListener('error', handleError);
+      
+      // Add new listeners
+      videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+      videoElement.addEventListener('canplay', handleCanPlay);
+      videoElement.addEventListener('play', handlePlay);
+      videoElement.addEventListener('pause', handlePause);
+      videoElement.addEventListener('error', handleError);
+      
+      // Try to play immediately
+      safePlayVideo(videoElement);
+      
+      // Fallback: Try again after a short delay if not playing
+      setTimeout(() => {
+        if (videoElement.paused && videoElement.srcObject) {
+          console.log('Video still paused after setup, attempting play again');
+          safePlayVideo(videoElement);
+        }
+      }, 500);
+      
+      return true;
     };
 
     // Check immediately
-    checkVideoElement();
-    
-    // Also check after a short delay to ensure DOM is fully rendered
-    const timeoutId = setTimeout(checkVideoElement, 200);
-    
-    return () => clearTimeout(timeoutId);
+    if (!setupVideoWhenReady()) {
+      // If not ready, retry with exponential backoff
+      let retryCount = 0;
+      const maxRetries = 20;
+      
+      const retrySetup = () => {
+        retryCount++;
+        if (setupVideoWhenReady()) {
+          console.log('✅ Video setup completed successfully');
+          return;
+        }
+        
+        if (retryCount < maxRetries) {
+          const delay = Math.min(100 * Math.pow(1.5, retryCount), 1000);
+          console.log(`Retrying video setup... (${retryCount}/${maxRetries}) in ${delay}ms`);
+          setTimeout(retrySetup, delay);
+        } else {
+          console.error('❌ Failed to setup video after maximum retries');
+        }
+      };
+      
+      setTimeout(retrySetup, 100);
+    }
   }, [localStream, safePlayVideo]);
+
+  // Trigger video setup when component transitions from loading to ready
+  useEffect(() => {
+    if (!isConnecting && localStream && localVideoRef.current) {
+      console.log('🎯 Component ready and video element available, setting up video');
+      // Force a re-run of the video setup
+      const videoElement = localVideoRef.current;
+      if (videoElement && !videoElement.srcObject) {
+        videoElement.srcObject = localStream;
+        safePlayVideo(videoElement);
+      }
+    }
+  }, [isConnecting, localStream, safePlayVideo]);
 
   // Close device settings when clicking outside
   useEffect(() => {
