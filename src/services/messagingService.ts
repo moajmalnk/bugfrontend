@@ -273,4 +273,177 @@ export class MessagingService {
   static isValidEmoji(emoji: string): boolean {
     return emoji.length <= 10 && /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(emoji);
   }
+
+  // WhatsApp-like Features
+  
+  // Media Upload
+  static async uploadMedia(file: File, groupId: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('group_id', groupId);
+
+    const response = await axiosInstance.post<{ data: any }>(`${MESSAGING_API_BASE}/upload_media.php`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data.data;
+  }
+
+  // Star Messages
+  static async starMessage(messageId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/star_message.php`, {
+      message_id: messageId
+    });
+  }
+
+  static async unstarMessage(messageId: string): Promise<void> {
+    await axiosInstance.delete(`${MESSAGING_API_BASE}/unstar_message.php`, {
+      params: { message_id: messageId }
+    });
+  }
+
+  static async getStarredMessages(groupId: string): Promise<ChatMessage[]> {
+    const response = await axiosInstance.get<{ data: ChatMessage[] }>(`${MESSAGING_API_BASE}/get_starred_messages.php`, {
+      params: { group_id: groupId }
+    });
+    return response.data.data;
+  }
+
+  // Message Search
+  static async searchMessages(groupId: string, query: string): Promise<ChatMessage[]> {
+    const response = await axiosInstance.get<{ data: ChatMessage[] }>(`${MESSAGING_API_BASE}/search_messages.php`, {
+      params: { 
+        group_id: groupId,
+        query
+      }
+    });
+    return response.data.data;
+  }
+
+  // Forward Messages
+  static async forwardMessage(messageId: string, targetGroupIds: string[]): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/forward_message.php`, {
+      message_id: messageId,
+      target_group_ids: targetGroupIds
+    });
+  }
+
+  // Edit Message
+  static async editMessage(messageId: string, newContent: string): Promise<ChatMessage> {
+    const response = await axiosInstance.put<{ data: ChatMessage }>(`${MESSAGING_API_BASE}/edit_message.php`, {
+      message_id: messageId,
+      content: newContent
+    });
+    return response.data.data;
+  }
+
+  // Message Info (delivery status)
+  static async getMessageInfo(messageId: string): Promise<any> {
+    const response = await axiosInstance.get<{ data: any }>(`${MESSAGING_API_BASE}/get_message_info.php`, {
+      params: { message_id: messageId }
+    });
+    return response.data.data;
+  }
+
+  // Archive/Unarchive Group
+  static async archiveGroup(groupId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/archive_group.php`, {
+      group_id: groupId
+    });
+  }
+
+  static async unarchiveGroup(groupId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/unarchive_group.php`, {
+      group_id: groupId
+    });
+  }
+
+  // Mute/Unmute Group
+  static async muteGroup(groupId: string, duration?: number): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/mute_group.php`, {
+      group_id: groupId,
+      duration // duration in seconds, null for until unmuted
+    });
+  }
+
+  static async unmuteGroup(groupId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/unmute_group.php`, {
+      group_id: groupId
+    });
+  }
+
+  // Online Status
+  static async updateOnlineStatus(isOnline: boolean): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/update_online_status.php`, {
+      is_online: isOnline
+    });
+  }
+
+  static async getUserOnlineStatus(userId: string): Promise<{ is_online: boolean; last_seen: string | null }> {
+    const response = await axiosInstance.get<{ data: any }>(`${MESSAGING_API_BASE}/get_online_status.php`, {
+      params: { user_id: userId }
+    });
+    return response.data.data;
+  }
+
+  // Profile Picture
+  static async updateProfilePicture(file: File): Promise<{ profile_picture_url: string }> {
+    const formData = new FormData();
+    formData.append('profile_picture', file);
+
+    const response = await axiosInstance.post<{ data: any }>(`${MESSAGING_API_BASE}/update_profile_picture.php`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data.data;
+  }
+
+  static async updateGroupPicture(groupId: string, file: File): Promise<{ group_picture_url: string }> {
+    const formData = new FormData();
+    formData.append('group_picture', file);
+    formData.append('group_id', groupId);
+
+    const response = await axiosInstance.post<{ data: any }>(`${MESSAGING_API_BASE}/update_group_picture.php`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data.data;
+  }
+
+  // Delivery Status
+  static async markMessageAsDelivered(messageId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/mark_delivered.php`, {
+      message_id: messageId
+    });
+  }
+
+  static async markMessageAsRead(messageId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/mark_read.php`, {
+      message_id: messageId
+    });
+  }
+
+  // Block/Unblock User
+  static async blockUser(userId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/block_user.php`, {
+      user_id: userId
+    });
+  }
+
+  static async unblockUser(userId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/unblock_user.php`, {
+      user_id: userId
+    });
+  }
+
+  static async getBlockedUsers(): Promise<any[]> {
+    const response = await axiosInstance.get<{ data: any[] }>(`${MESSAGING_API_BASE}/get_blocked_users.php`);
+    return response.data.data;
+  }
 } 
