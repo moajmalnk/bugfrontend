@@ -431,6 +431,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const handlePinMessage = async (message: ChatMessage) => {
     try {
       await MessagingService.pinMessage(message.id);
+      // Trigger pinned messages refresh
+      setPinnedMessagesKey(prev => prev + 1);
       toast({
         title: "Success",
         description: "Message pinned successfully",
@@ -631,6 +633,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Pinned Messages - Fixed below header */}
       <div className="flex-shrink-0">
         <PinnedMessages
+          key={pinnedMessagesKey}
           groupId={selectedGroup.id}
           onMessageClick={handleMessageClick}
         />
