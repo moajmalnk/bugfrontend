@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "NODE_ENV=production node scripts/optimize-build.js",
-    "vercel-build": "vite build",
+    "build": "vite build",
+    "build:custom": "NODE_ENV=production node scripts/optimize-build.js",
     "build:dev": "NODE_ENV=development node scripts/optimize-build.js",
     "build:analyze": "NODE_ENV=production node scripts/optimize-build.js --analyze",
     "build:simple": "vite build",
