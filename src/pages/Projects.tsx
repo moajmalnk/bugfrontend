@@ -167,7 +167,7 @@ const Projects = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || (currentUser?.role === "admin" ? "all-projects" : "overview");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(12);
   const [showUndoNotification, setShowUndoNotification] = useState(false);
   const [projectToUndo, setProjectToUndo] = useState<Project | null>(null);
 
@@ -916,7 +916,7 @@ const Projects = () => {
                     className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
                     aria-label="Items per page"
                   >
-                    {[10, 25, 50].map((n) => (
+                    {[12, 25, 50].map((n) => (
                       <option key={n} value={n}>
                         {n}
                       </option>
@@ -1146,7 +1146,7 @@ const Projects = () => {
                   className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
                   aria-label="Items per page"
                 >
-                  {[10, 25, 50].map((n) => (
+                  {[12, 25, 50].map((n) => (
                     <option key={n} value={n}>
                       {n}
                     </option>
