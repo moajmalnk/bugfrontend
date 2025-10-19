@@ -34,13 +34,13 @@ export function ImpersonateBanner() {
   };
 
   return (
-    <div className="bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 text-white border-b border-purple-500/20 shadow-lg relative z-50 animate-in slide-in-from-top duration-300">
+    <div className="bg-gradient-to-r from-orange-600 via-red-600 to-orange-600 text-white border-b border-orange-500/30 shadow-lg relative z-50 animate-in slide-in-from-top duration-300">
       <div className="max-w-7xl mx-auto px-4 py-4">
         {/* Mobile Layout - Center aligned, single row */}
         <div className="flex flex-col sm:hidden items-center justify-center gap-4">
           <div className="flex items-center justify-center gap-4 w-full">
             {/* Warning badge */}
-            <div className="flex items-center gap-2 bg-amber-500 text-amber-900 px-3 py-2 rounded-lg font-semibold shadow-sm border border-amber-400">
+            <div className="flex items-center gap-2 bg-white text-orange-600 px-3 py-2 rounded-lg font-semibold shadow-sm border border-orange-200">
               <AlertTriangle className="h-4 w-4" />
               <span className="text-sm font-bold">IMPERSONATE MODE</span>
             </div>
@@ -63,7 +63,7 @@ export function ImpersonateBanner() {
           {/* Left side - Warning and user info */}
           <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 w-full lg:w-auto">
             {/* Warning badge */}
-            <div className="flex items-center gap-2 bg-amber-500 text-amber-900 px-3 py-2 rounded-lg font-semibold shadow-sm border border-amber-400 flex-shrink-0">
+            <div className="flex items-center gap-2 bg-white text-orange-600 px-3 py-2 rounded-lg font-semibold shadow-sm border border-orange-200 flex-shrink-0">
               <AlertTriangle className="h-4 w-4 flex-shrink-0" />
               <span className="text-sm font-bold whitespace-nowrap">IMPERSONATE MODE</span>
             </div>
@@ -74,7 +74,7 @@ export function ImpersonateBanner() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
                 {/* User avatar and name */}
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center shadow-sm flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-red-400 flex items-center justify-center shadow-sm flex-shrink-0 border-2 border-white/20">
                     <User className="h-4 w-4 text-white" />
                   </div>
                   <div className="flex flex-col min-w-0">
@@ -82,8 +82,8 @@ export function ImpersonateBanner() {
                       {currentUser?.name || currentUser?.username}
                     </span>
                     <div className="flex items-center gap-1">
-                      <Mail className="h-3 w-3 text-slate-400 flex-shrink-0" />
-                      <span className="text-xs text-slate-300 truncate">
+                      <Mail className="h-3 w-3 text-orange-100 flex-shrink-0" />
+                      <span className="text-xs text-orange-100 truncate">
                         {currentUser?.email}
                       </span>
                     </div>
