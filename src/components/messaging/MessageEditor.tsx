@@ -82,19 +82,19 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-w-[95vw] max-h-[90vh] overflow-y-auto custom-scrollbar">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Edit className="h-5 w-5" />
-              Edit Message
+              <Edit className="h-5 w-5 flex-shrink-0" />
+              <span className="truncate">Edit Message</span>
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             {/* Original Message */}
-            <div className="p-3 bg-muted/50 rounded-lg">
+            <div className="p-3 bg-muted/50 rounded-lg overflow-hidden">
               <p className="text-xs text-muted-foreground mb-1">Original:</p>
-              <p className="text-sm">{message.content}</p>
+              <p className="text-sm break-words whitespace-pre-wrap overflow-wrap-anywhere">{message.content}</p>
             </div>
 
             {/* Edit Textarea */}
@@ -107,6 +107,7 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
                 disabled={isSaving}
                 maxLength={2000}
                 autoFocus
+                className="resize-none min-h-[100px] max-h-[300px] w-full break-words"
               />
               <p className="text-xs text-muted-foreground text-right">
                 {editedContent.length}/2000
@@ -114,12 +115,12 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
             </div>
 
             {/* Warning */}
-            <div className="text-xs text-muted-foreground bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
+            <div className="text-xs text-muted-foreground bg-yellow-500/10 border border-yellow-500/30 rounded p-2 break-words">
               ⚠️ Edited messages will show an "edited" indicator
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -127,6 +128,7 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
                   setIsOpen(false);
                 }}
                 disabled={isSaving}
+                className="w-full sm:w-auto"
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
@@ -138,6 +140,7 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
                   editedContent.trim() === message.content?.trim() ||
                   isSaving
                 }
+                className="w-full sm:w-auto"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {isSaving ? "Saving..." : "Save"}

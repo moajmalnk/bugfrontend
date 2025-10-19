@@ -80,6 +80,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [editMessage, setEditMessage] = useState<ChatMessage | null>(null);
   const [messageInfo, setMessageInfo] = useState<ChatMessage | null>(null);
   const [availableGroups, setAvailableGroups] = useState<ChatGroup[]>([]);
+  const [pinnedMessagesKey, setPinnedMessagesKey] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
