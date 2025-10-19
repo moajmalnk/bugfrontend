@@ -23,7 +23,7 @@ import { ENV } from "@/lib/env";
 import { MessagingService } from "@/services/messagingService";
 import { projectService } from "@/services/projectService";
 import { userService } from "@/services/userService";
-import { ChatGroup, Project } from "@/types";
+import type { ChatGroup, Project } from "@/types";
 import {
   Edit,
   MessageCircle,
@@ -65,7 +65,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     groupName: string;
   } | null>(null);
   const [deletedGroups, setDeletedGroups] = useState<{
-    [key: string]: { group: ChatGroup; timestamp: number };
+    [key: string]: { group: ChatGroup; timestamp: number; timeoutId?: NodeJS.Timeout };
   }>({});
   const [undoCountdown, setUndoCountdown] = useState<{
     [key: string]: number;
@@ -84,6 +84,16 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   const [selectedExistingMembers, setSelectedExistingMembers] = useState<
     string[]
   >([]);
+  const [editDialog, setEditDialog] = useState<{
+    isOpen: boolean;
+    groupId: string;
+    groupName: string;
+    groupDescription: string;
+  } | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+  });
 
   const isAdmin = currentUser?.role === "admin";
 
@@ -117,6 +127,17 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
+  }, [deletedGroups]);
+
+  // Cleanup pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(deletedGroups).forEach((deleted) => {
+        if (deleted.timeoutId) {
+          clearTimeout(deleted.timeoutId);
+        }
+      });
+    };
   }, [deletedGroups]);
 
   useEffect(() => {
@@ -211,82 +232,97 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     const groupToDelete = groups.find((g) => g.id === groupId);
     if (!groupToDelete) return;
 
-    setIsLoading(true);
-    try {
-      // Store the group for potential undo
-      setDeletedGroups((prev) => ({
-        ...prev,
-        [groupId]: {
-          group: groupToDelete,
-          timestamp: Date.now(),
-        },
-      }));
+    // Remove from UI immediately
+    setGroups((prev) => prev.filter((g) => g.id !== groupId));
 
-      // Start countdown
-      setUndoCountdown((prev) => ({
-        ...prev,
-        [groupId]: 10,
-      }));
+    if (selectedGroup?.id === groupId) {
+      onGroupSelect(null);
+    }
 
-      // Remove from UI immediately
-      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+    // Close dialog
+    setDeleteDialog(null);
 
-      if (selectedGroup?.id === groupId) {
-        onGroupSelect(null);
-      }
+    // Start countdown
+    setUndoCountdown((prev) => ({
+      ...prev,
+      [groupId]: 10,
+    }));
 
-      // Close dialog
-      setDeleteDialog(null);
+    // Show success toast with undo option
+    toast({
+      title: "Chat group deleted",
+      description: "You can undo this action within 10 seconds",
+      action: (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => undoDeleteGroup(groupId)}
+          className="ml-2"
+        >
+          Undo (10s)
+        </Button>
+      ),
+    });
 
-      // Show success toast with undo option
-      toast({
-        title: "Chat group deleted",
-        description: `You can undo this action within ${
-          undoCountdown[groupId] || 10
-        } seconds`,
-        action: (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => undoDeleteGroup(groupId)}
-            className="ml-2"
-            disabled={!undoCountdown[groupId]}
-          >
-            Undo ({undoCountdown[groupId] || 10}s)
-          </Button>
-        ),
-      });
-
-      // Actually delete from server
-      await MessagingService.deleteGroup(groupId);
-
-      // Remove from deleted groups after successful server deletion
-      setTimeout(() => {
+    // Schedule server deletion after 10 seconds
+    const timeoutId = setTimeout(async () => {
+      try {
+        // Delete from server after timeout
+        await MessagingService.deleteGroup(groupId);
+        
+        // Remove from deleted groups after successful deletion
         setDeletedGroups((prev) => {
           const newState = { ...prev };
           delete newState[groupId];
           return newState;
         });
-      }, 10000); // 10 seconds
-    } catch (error) {
-      console.error("Error deleting group:", error);
 
-      // Restore the group if server deletion failed
-      setGroups((prev) => [...prev, groupToDelete]);
+        // Clear countdown
+        setUndoCountdown((prev) => {
+          const newState = { ...prev };
+          delete newState[groupId];
+          return newState;
+        });
+      } catch (error) {
+        console.error("Error deleting group from server:", error);
+        
+        // Restore the group if server deletion failed
+        setGroups((prev) => [...prev, groupToDelete]);
+        
+        // Remove from deleted groups
+        setDeletedGroups((prev) => {
+          const newState = { ...prev };
+          delete newState[groupId];
+          return newState;
+        });
 
-      toast({
-        title: "Error",
-        description: "Failed to delete chat group",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+        toast({
+          title: "Error",
+          description: "Failed to delete chat group",
+          variant: "destructive",
+        });
+      }
+    }, 10000); // 10 seconds
+
+    // Store the group and timeout ID for potential undo
+    setDeletedGroups((prev) => ({
+      ...prev,
+      [groupId]: {
+        group: groupToDelete,
+        timestamp: Date.now(),
+        timeoutId,
+      },
+    }));
   };
 
   const undoDeleteGroup = (groupId: string) => {
     const deletedGroup = deletedGroups[groupId];
     if (!deletedGroup) return;
+
+    // Cancel the scheduled deletion
+    if (deletedGroup.timeoutId) {
+      clearTimeout(deletedGroup.timeoutId);
+    }
 
     // Restore the group
     setGroups((prev) => [...prev, deletedGroup.group]);
@@ -309,6 +345,79 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       title: "Undo successful",
       description: "Chat group has been restored",
     });
+  };
+
+  const handleEditGroup = (group: ChatGroup) => {
+    setEditDialog({
+      isOpen: true,
+      groupId: group.id,
+      groupName: group.name,
+      groupDescription: group.description || "",
+    });
+    setEditForm({
+      name: group.name,
+      description: group.description || "",
+    });
+  };
+
+  const handleUpdateGroup = async () => {
+    if (!editDialog) return;
+
+    if (!editForm.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Group name cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await MessagingService.updateGroup(editDialog.groupId, {
+        name: editForm.name.trim(),
+        description: editForm.description.trim(),
+      });
+
+      // Update local state
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === editDialog.groupId
+            ? {
+                ...g,
+                name: editForm.name.trim(),
+                description: editForm.description.trim(),
+              }
+            : g
+        )
+      );
+
+      // Update selected group if it's the one being edited
+      if (selectedGroup?.id === editDialog.groupId) {
+        onGroupSelect({
+          ...selectedGroup,
+          name: editForm.name.trim(),
+          description: editForm.description.trim(),
+        });
+      }
+
+      toast({
+        title: "Success",
+        description: "Chat group updated successfully",
+      });
+
+      setEditDialog(null);
+      setEditForm({ name: "", description: "" });
+    } catch (error: any) {
+      console.error("Error updating group:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to update chat group",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const cancelDeleteGroup = () => {
@@ -778,10 +887,11 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        // TODO: Implement edit functionality
+                        handleEditGroup(group);
                       }}
                       tabIndex={-1}
                       className="h-6 w-6 p-0 hover:bg-primary/10"
+                      title="Edit group"
                     >
                       <Edit className="h-3 w-3" />
                     </Button>
@@ -1132,6 +1242,74 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                   disabled={isLoadingMembers || isLoadingExistingMembers}
                 >
                   Close
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Group Dialog */}
+      {isAdmin && editDialog && (
+        <Dialog
+          open={editDialog.isOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditDialog(null);
+              setEditForm({ name: "", description: "" });
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Chat Group</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-group-name">Group Name *</Label>
+                <Input
+                  id="edit-group-name"
+                  placeholder="Enter group name"
+                  value={editForm.name}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, name: e.target.value })
+                  }
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-group-description">Description</Label>
+                <Textarea
+                  id="edit-group-description"
+                  placeholder="Enter group description (optional)"
+                  value={editForm.description}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, description: e.target.value })
+                  }
+                  disabled={isLoading}
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditDialog(null);
+                    setEditForm({ name: "", description: "" });
+                  }}
+                  disabled={isLoading}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateGroup} disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update Group"
+                  )}
                 </Button>
               </div>
             </div>

@@ -64,7 +64,9 @@ export interface User {
 }
 
 // Messaging System Types
-export type MessageType = 'text' | 'voice' | 'reply';
+export type MessageType = 'text' | 'voice' | 'reply' | 'image' | 'video' | 'document' | 'audio' | 'location' | 'contact';
+export type MediaType = 'image' | 'video' | 'document' | 'audio';
+export type DeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed';
 
 export interface ChatGroup {
   id: string;
@@ -79,6 +81,10 @@ export interface ChatGroup {
   last_message_at?: string;
   is_member: boolean;
   projectName?: string;
+  // WhatsApp features
+  group_picture?: string;
+  is_archived?: boolean;
+  archived_at?: string;
 }
 
 export interface ChatMessage {
@@ -87,23 +93,44 @@ export interface ChatMessage {
   sender_id: string;
   message_type: MessageType;
   content?: string;
+  // Voice message fields
   voice_file_path?: string;
   voice_duration?: number;
+  // Media fields (images, videos, documents)
+  media_type?: MediaType;
+  media_file_path?: string;
+  media_file_name?: string;
+  media_file_size?: number;
+  media_thumbnail?: string;
+  media_duration?: number;
+  // Reply fields
   reply_to_message_id?: string;
+  reply_content?: string;
+  reply_type?: MessageType;
+  reply_sender_name?: string;
+  // Status fields
   is_deleted: boolean;
   deleted_at?: string;
   is_pinned: boolean;
   pinned_at?: string;
   pinned_by?: string;
   pinned_by_name?: string;
+  // WhatsApp features
+  is_starred?: boolean;
+  starred_at?: string;
+  starred_by?: string;
+  is_forwarded?: boolean;
+  original_message_id?: string;
+  is_edited?: boolean;
+  edited_at?: string;
+  delivery_status?: DeliveryStatus;
+  // Metadata
   created_at: string;
   updated_at: string;
   sender_name: string;
   sender_email: string;
   sender_role: string;
-  reply_content?: string;
-  reply_type?: MessageType;
-  reply_sender_name?: string;
+  // Relations
   reactions?: MessageReaction[];
   mentions?: MessageMention[];
   read_status?: MessageReadStatus[];

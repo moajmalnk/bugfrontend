@@ -11,12 +11,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { MessagingService } from "@/services/messagingService";
-import { ChatGroup, ChatMessage, TypingIndicator } from "@/types";
+import { projectService } from "@/services/projectService";
+import type { ChatGroup, ChatMessage, TypingIndicator } from "@/types";
 import {
   Check,
   CheckCheck,
   Clock,
   Copy,
+  Edit,
+  FileText,
+  Forward,
+  Image as ImageIcon,
+  Info,
   MessageCircle,
   Mic,
   MicOff,
@@ -26,11 +32,22 @@ import {
   Play,
   Reply,
   Send,
+  Star,
   Trash2,
+  Video,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
+import { AudioWaveform } from "./AudioWaveform";
+import { EmojiPicker } from "./EmojiPicker";
+import { ForwardMessage } from "./ForwardMessage";
+import { MediaUploader } from "./MediaUploader";
+import { MessageEditor } from "./MessageEditor";
+import { MessageInfo } from "./MessageInfo";
 import { MessageReactions } from "./MessageReactions";
+import { MessageSearch } from "./MessageSearch";
+import { MessageStatus } from "./MessageStatus";
 import { PinnedMessages } from "./PinnedMessages";
+import { StarredMessages } from "./StarredMessages";
 
 interface ChatInterfaceProps {
   selectedGroup: ChatGroup | null;
@@ -59,6 +76,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(
     null
   );
+  const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
+  const [editMessage, setEditMessage] = useState<ChatMessage | null>(null);
+  const [messageInfo, setMessageInfo] = useState<ChatMessage | null>(null);
+  const [availableGroups, setAvailableGroups] = useState<ChatGroup[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -75,6 +96,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (selectedGroup) {
       loadMessages();
       startPolling();
+      loadAvailableGroups();
     } else {
       setMessages([]);
       setCurrentPage(1);
@@ -90,6 +112,21 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       }
     };
   }, [selectedGroup]);
+
+  const loadAvailableGroups = async () => {
+    try {
+      // Load all projects and their groups for forwarding
+      const allProjects = await projectService.getProjects();
+      let allGroups: ChatGroup[] = [];
+      for (const project of allProjects) {
+        const groups = await MessagingService.getGroupsByProject(project.id);
+        allGroups = allGroups.concat(groups);
+      }
+      setAvailableGroups(allGroups.filter(g => g.id !== selectedGroup?.id));
+    } catch (error) {
+      console.error("Error loading available groups:", error);
+    }
+  };
 
   useEffect(() => {
     scrollToBottom();
@@ -125,6 +162,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         page
       );
 
+      console.log("📨 Loaded messages:", response.messages);
+      console.log("📨 First message sender_name:", response.messages[0]?.sender_name);
+
       if (append) {
         setMessages((prev) => [...response.messages, ...prev]);
       } else {
@@ -151,6 +191,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     pollingCleanupRef.current = MessagingService.startMessagePolling(
       selectedGroup.id,
       (newMessage) => {
+        console.log("🔔 New message from polling:", newMessage);
+        console.log("🔔 New message sender_name:", newMessage.sender_name);
         setMessages((prev) => {
           // Check if message already exists
           if (prev.find((m) => m.id === newMessage.id)) {
@@ -358,46 +400,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const playVoiceMessage = async (message: ChatMessage) => {
     if (!message.voice_file_path) return;
 
-    try {
-      if (isPlaying === message.id) {
-        // Stop playing
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-        }
-        setIsPlaying(null);
-        return;
-      }
-
-      // Stop any currently playing audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-
-      // Create new audio element
-      const audio = new Audio(message.voice_file_path);
-
-      audio.onended = () => setIsPlaying(null);
-      audio.onerror = () => {
-        setIsPlaying(null);
-        toast({
-          title: "Error",
-          description: "Failed to play voice message",
-          variant: "destructive",
-        });
-      };
-
-      audioRef.current = audio;
-      setIsPlaying(message.id);
-      await audio.play();
-    } catch (error) {
-      console.error("Error playing voice message:", error);
+    // Toggle play/pause state - AudioWaveform handles the actual playback
+    if (isPlaying === message.id) {
       setIsPlaying(null);
-      toast({
-        title: "Error",
-        description: "Failed to play voice message",
-        variant: "destructive",
-      });
+    } else {
+      // Stop any other playing audio
+      setIsPlaying(message.id);
     }
   };
 
@@ -487,6 +495,62 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  const handleStarMessage = async (messageId: string, isStarred: boolean) => {
+    try {
+      if (isStarred) {
+        await MessagingService.unstarMessage(messageId);
+        toast({
+          title: "Message unstarred",
+          description: "Removed from starred messages",
+        });
+      } else {
+        await MessagingService.starMessage(messageId);
+        toast({
+          title: "Message starred",
+          description: "Added to starred messages",
+        });
+      }
+      // Update local state
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, is_starred: !isStarred } : m
+        )
+      );
+    } catch (error) {
+      console.error("Error starring message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to star message",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMediaUploadSuccess = async (mediaData: any) => {
+    try {
+      const sentMessage = await MessagingService.sendMessage(mediaData);
+      setMessages((prev) => [...prev, sentMessage]);
+      toast({
+        title: "Success",
+        description: "Media sent successfully",
+      });
+    } catch (error) {
+      console.error("Error sending media:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send media",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return "Unknown size";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
   if (!selectedGroup) {
     return (
       <div className="flex flex-1 items-center justify-center min-h-0">
@@ -499,46 +563,80 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-background">
-      {/* Desktop Header - Only show on desktop */}
-      <div className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-6 py-4">
+    <div className="flex flex-col h-full overflow-hidden bg-background hide-scrollbar">
+      {/* Header - Fixed/Sticky */}
+      <div className="flex-shrink-0 z-20 bg-[#202c33] dark:bg-[#202c33] border-b border-[#2a3942] dark:border-[#2a3942] px-4 py-3">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-lg font-semibold">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* Back button for mobile */}
+            {onBackToChatList && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onBackToChatList}
+                className="md:hidden h-9 w-9 text-[#aebac1] hover:bg-[#2a3942]"
+              >
+                <Reply className="h-5 w-5 rotate-180" />
+              </Button>
+            )}
+            
+            {/* Group Avatar */}
+            <Avatar className="h-10 w-10 flex-shrink-0">
+              <AvatarFallback className="bg-[#00a884] text-white font-semibold">
+                {selectedGroup.name.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            
+            {/* Group Info */}
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-base font-medium text-[#e9edef] dark:text-[#e9edef] truncate">
                 {selectedGroup.name}
               </CardTitle>
-              <span className="text-xs text-muted-foreground">
-                ({selectedGroup.member_count} members)
-              </span>
-            </div>
-            {typingUsers.length > 0 && (
-              <div className="text-primary text-xs mt-1 animate-pulse">
-                {typingUsers.map((u) => u.user_name).join(", ")} typing...
+              <div className="text-xs text-[#8696a0] dark:text-[#8696a0]">
+                {typingUsers.length > 0 ? (
+                  <span className="text-[#00a884] animate-pulse">
+                    {typingUsers.map((u) => u.user_name).join(", ")} typing...
+                  </span>
+                ) : (
+                  <span>{selectedGroup.member_count} members</span>
+                )}
               </div>
-            )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          
+          {/* Header Actions */}
+          <div className="flex items-center gap-1">
+            <MessageSearch
+              groupId={selectedGroup.id}
+              onMessageClick={handleMessageClick}
+            />
+            <StarredMessages
+              groupId={selectedGroup.id}
+              onMessageClick={handleMessageClick}
+            />
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => setShowReadReceipts(!showReadReceipts)}
-              className="text-xs"
+              className="h-9 w-9 text-[#aebac1] hover:bg-[#2a3942]"
+              title={showReadReceipts ? "Hide Read Receipts" : "Show Read Receipts"}
             >
-              {showReadReceipts ? "Hide" : "Show"} Read Receipts
+              {showReadReceipts ? <CheckCheck className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Pinned Messages */}
-      <PinnedMessages
-        groupId={selectedGroup.id}
-        onMessageClick={handleMessageClick}
-      />
+      {/* Pinned Messages - Fixed below header */}
+      <div className="flex-shrink-0">
+        <PinnedMessages
+          groupId={selectedGroup.id}
+          onMessageClick={handleMessageClick}
+        />
+      </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-1 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar">
+      {/* Messages Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-1 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar">
         {hasMoreMessages && (
           <div className="flex justify-center mb-2">
             <Button
@@ -626,33 +724,82 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                         {/* Message content */}
                         {message.message_type === "voice" ? (
-                          <div className="flex items-center space-x-2 min-w-[120px]">
+                          <AudioWaveform
+                            audioUrl={message.voice_file_path || ""}
+                            duration={message.voice_duration}
+                            isPlaying={isPlaying === message.id}
+                            onPlayPause={() => playVoiceMessage(message)}
+                          />
+                        ) : message.message_type === "image" ? (
+                          <div>
+                            <img
+                              src={message.media_file_path}
+                              alt={message.media_file_name || "Image"}
+                              className="max-w-full rounded-lg max-h-96 object-contain"
+                              loading="lazy"
+                            />
+                            {message.content && (
+                              <div className="mt-2 text-sm">{message.content}</div>
+                            )}
+                          </div>
+                        ) : message.message_type === "video" ? (
+                          <div>
+                            <video
+                              src={message.media_file_path}
+                              controls
+                              className="max-w-full rounded-lg max-h-96"
+                            />
+                            {message.content && (
+                              <div className="mt-2 text-sm">{message.content}</div>
+                            )}
+                          </div>
+                        ) : message.message_type === "document" ? (
+                          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+                            <FileText className="h-8 w-8 text-primary flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {message.media_file_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(message.media_file_size)}
+                              </p>
+                            </div>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => playVoiceMessage(message)}
-                              className="h-8 w-8 p-0 bg-primary/10 hover:bg-primary/20"
+                              onClick={() => window.open(message.media_file_path, '_blank')}
+                              className="flex-shrink-0"
                             >
-                              {isPlaying === message.id ? (
-                                <Pause className="h-4 w-4" />
-                              ) : (
-                                <Play className="h-4 w-4" />
-                              )}
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             </Button>
-                            <div className="text-sm flex-1">
-                              {message.voice_duration &&
-                                MessagingService.formatVoiceDuration(
-                                  message.voice_duration
-                                )}
+                          </div>
+                        ) : message.is_forwarded ? (
+                          <div>
+                            <div className="flex items-center gap-1 mb-1 text-xs text-muted-foreground italic">
+                              <Forward className="h-3 w-3" />
+                              <span>Forwarded</span>
                             </div>
+                            <div
+                              className="text-sm leading-relaxed break-all word-break-all overflow-wrap-anywhere"
+                              dangerouslySetInnerHTML={{
+                                __html: formatMentions(message.content || ""),
+                              }}
+                            />
                           </div>
                         ) : (
-                          <div
-                            className="text-sm leading-relaxed break-all word-break-all overflow-wrap-anywhere"
-                            dangerouslySetInnerHTML={{
-                              __html: formatMentions(message.content || ""),
-                            }}
-                          />
+                          <div>
+                            <div
+                              className="text-sm leading-relaxed break-all word-break-all overflow-wrap-anywhere"
+                              dangerouslySetInnerHTML={{
+                                __html: formatMentions(message.content || ""),
+                              }}
+                            />
+                            {message.is_edited && (
+                              <span className="text-xs text-muted-foreground italic ml-1">
+                                (edited)
+                              </span>
+                            )}
+                          </div>
                         )}
                       </>
                     )}
@@ -681,7 +828,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     <span>
                       {MessagingService.formatMessageTime(message.created_at)}
                     </span>
-                    {getReadReceipts(message)}
+                    {isOwnMessage && !isDeleted && (
+                      <MessageStatus
+                        status={message.delivery_status || "sent"}
+                        size="sm"
+                      />
+                    )}
                     {!isDeleted && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
@@ -704,6 +856,42 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
+                            {/* Star */}
+                            <DropdownMenuItem
+                              onClick={() => handleStarMessage(message.id, message.is_starred || false)}
+                            >
+                              <Star className={`h-3 w-3 mr-2 ${message.is_starred ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                              {message.is_starred ? "Unstar" : "Star"}
+                            </DropdownMenuItem>
+                            
+                            {/* Forward */}
+                            <DropdownMenuItem
+                              onClick={() => setForwardMessage(message)}
+                            >
+                              <Forward className="h-3 w-3 mr-2" />
+                              Forward
+                            </DropdownMenuItem>
+                            
+                            {/* Edit - only for own text messages */}
+                            {isOwnMessage && message.message_type === "text" && !message.is_edited && (
+                              <DropdownMenuItem
+                                onClick={() => setEditMessage(message)}
+                              >
+                                <Edit className="h-3 w-3 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            
+                            {/* Message Info - only for own messages */}
+                            {isOwnMessage && (
+                              <DropdownMenuItem
+                                onClick={() => setMessageInfo(message)}
+                              >
+                                <Info className="h-3 w-3 mr-2" />
+                                Message Info
+                              </DropdownMenuItem>
+                            )}
+                            
                             <DropdownMenuItem
                               onClick={() => copyMessage(message.content || "")}
                             >
@@ -740,92 +928,155 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Reply Preview */}
-      {replyToMessage && (
-        <div className="sticky bottom-16 z-10 p-3 bg-muted/70 border-b flex items-center justify-between">
-          <div className="text-sm flex-1 min-w-0">
-            <span className="font-medium">
-              Replying to {replyToMessage.sender_name}
-            </span>
-            <div className="text-muted-foreground truncate">
-              {replyToMessage.message_type === "voice"
-                ? "🎤 Voice message"
-                : replyToMessage.content}
+      {/* Footer - Fixed/Sticky */}
+      <div className="flex-shrink-0 z-20 bg-[#202c33] dark:bg-[#202c33] border-t border-[#2a3942] dark:border-[#2a3942]">
+        {/* Reply Preview */}
+        {replyToMessage && (
+          <div className="px-4 py-2 bg-[#2a3942] dark:bg-[#2a3942] border-b border-[#3b4a54] flex items-center justify-between">
+            <div className="text-sm flex-1 min-w-0">
+              <span className="font-medium text-[#00a884]">
+                Replying to {replyToMessage.sender_name}
+              </span>
+              <div className="text-[#8696a0] text-xs truncate">
+                {replyToMessage.message_type === "voice"
+                  ? "🎤 Voice message"
+                  : replyToMessage.content}
+              </div>
             </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setReplyToMessage(null)}
-            className="h-6 w-6 p-0 flex-shrink-0"
-          >
-            ×
-          </Button>
-        </div>
-      )}
-
-      {/* Input Area */}
-      <div className="sticky bottom-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t px-2 sm:px-3 md:px-4 py-2 sm:py-3">
-        <div className="flex items-end gap-2">
-          <div className="flex-1 min-w-0">
-            <Textarea
-              ref={textareaRef}
-              value={newMessage}
-              onChange={(e) => handleTyping(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type a message..."
-              className="min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border-0 bg-muted/50 focus:bg-background transition-colors text-sm"
-              rows={1}
-            />
-          </div>
-          <div className="flex items-center gap-1 sm:gap-2">
-            {/* Voice Recording Button - More Prominent */}
             <Button
-              variant={isRecording ? "destructive" : "secondary"}
+              variant="ghost"
               size="icon"
-              onClick={handleMicClick}
-              onMouseDown={handleMicMouseDown}
-              onMouseUp={handleMicMouseUp}
-              onTouchStart={handleMicMouseDown}
-              onTouchEnd={handleMicMouseUp}
-              className={`h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 transition-all duration-200 ${
-                isRecording
-                  ? "bg-red-500 text-white hover:bg-red-600 animate-pulse shadow-lg"
-                  : "hover:bg-primary/10 hover:scale-105 active:scale-95"
-              }`}
-              title={
-                isRecording
-                  ? "Stop recording (2 min max)"
-                  : "Record voice message (tap or long press to start)"
-              }
+              onClick={() => setReplyToMessage(null)}
+              className="h-8 w-8 text-[#8696a0] hover:bg-[#3b4a54]"
             >
-              {isRecording ? (
-                <MicOff className="h-4 w-4 sm:h-5 sm:w-5" />
-              ) : (
-                <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
-              )}
+              ×
             </Button>
-            {/* Send Button */}
-            <Button
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim() || isLoading}
-              size="icon"
-              className="h-9 w-9 sm:h-10 sm:w-10 bg-primary text-primary-foreground hover:bg-primary/90 flex-shrink-0 transition-all duration-200 hover:scale-105"
-              title="Send message"
-            >
-              <Send className="h-4 w-4 sm:h-5 sm:w-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Recording Indicator */}
-        {isRecording && (
-          <div className="mt-2 flex items-center justify-center gap-2 text-xs text-red-500 animate-pulse">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
-            <span>Recording... Tap microphone to stop</span>
           </div>
         )}
+
+        {/* Input Area */}
+        <div className="px-2 sm:px-3 md:px-4 py-2 sm:py-3">
+          <div className="flex items-end gap-2">
+            <div className="flex-1 min-w-0">
+              <Textarea
+                ref={textareaRef}
+                value={newMessage}
+                onChange={(e) => handleTyping(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type a message..."
+                className="min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-[#3b4a54] bg-[#2a3942] dark:bg-[#2a3942] text-[#e9edef] placeholder:text-[#8696a0] focus:bg-[#2a3942] focus:border-[#00a884] transition-colors text-sm"
+                rows={1}
+              />
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Emoji Picker */}
+              <EmojiPicker
+                onEmojiSelect={(emoji) => {
+                  setNewMessage((prev) => prev + emoji);
+                  textareaRef.current?.focus();
+                }}
+                size="md"
+              />
+              
+              {/* Media Uploader */}
+              <MediaUploader
+                groupId={selectedGroup.id}
+                onUploadSuccess={handleMediaUploadSuccess}
+              />
+              
+              {/* Voice Recording Button */}
+              <Button
+                variant={isRecording ? "destructive" : "ghost"}
+                size="icon"
+                onClick={handleMicClick}
+                onMouseDown={handleMicMouseDown}
+                onMouseUp={handleMicMouseUp}
+                onTouchStart={handleMicMouseDown}
+                onTouchEnd={handleMicMouseUp}
+                className={`h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 transition-all duration-200 ${
+                  isRecording
+                    ? "bg-red-500 text-white hover:bg-red-600 animate-pulse shadow-lg"
+                    : "text-[#8696a0] hover:bg-[#3b4a54] hover:text-[#aebac1]"
+                }`}
+                title={
+                  isRecording
+                    ? "Stop recording (2 min max)"
+                    : "Record voice message (tap or long press to start)"
+                }
+              >
+                {isRecording ? (
+                  <MicOff className="h-4 w-4 sm:h-5 sm:w-5" />
+                ) : (
+                  <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
+                )}
+              </Button>
+              
+              {/* Send Button */}
+              <Button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || isLoading}
+                size="icon"
+                className="h-9 w-9 sm:h-10 sm:w-10 bg-[#00a884] text-white hover:bg-[#06cf9c] flex-shrink-0 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                title="Send message"
+              >
+                <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Recording Indicator */}
+          {isRecording && (
+            <div className="mt-2 flex items-center justify-center gap-2 text-xs text-red-500 animate-pulse">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+              <span>Recording... Tap microphone to stop</span>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Forward Message Dialog */}
+      {forwardMessage && (
+        <ForwardMessage
+          message={forwardMessage}
+          availableGroups={availableGroups}
+          onForwardSuccess={() => {
+            setForwardMessage(null);
+            toast({
+              title: "Success",
+              description: "Message forwarded successfully",
+            });
+          }}
+        />
+      )}
+
+      {/* Edit Message Dialog */}
+      {editMessage && (
+        <MessageEditor
+          message={editMessage}
+          onEditSuccess={(updatedContent) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === editMessage.id
+                  ? { ...m, content: updatedContent, is_edited: true, edited_at: new Date().toISOString() }
+                  : m
+              )
+            );
+            setEditMessage(null);
+            toast({
+              title: "Success",
+              description: "Message edited successfully",
+            });
+          }}
+        />
+      )}
+
+      {/* Message Info Dialog */}
+      {messageInfo && (
+        <MessageInfo
+          message={messageInfo}
+          groupMemberCount={selectedGroup.member_count}
+        />
+      )}
     </div>
   );
 };

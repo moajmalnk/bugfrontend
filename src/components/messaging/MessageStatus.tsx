@@ -18,38 +18,33 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({
     switch (status) {
       case "sent":
         return (
-          <Check
-            className={`${iconSize} text-muted-foreground`}
-            title="Sent"
-          />
+          <span title="Sent">
+            <Check className={`${iconSize} text-muted-foreground`} />
+          </span>
         );
       case "delivered":
         return (
-          <CheckCheck
-            className={`${iconSize} text-muted-foreground`}
-            title="Delivered"
-          />
+          <span title="Delivered">
+            <CheckCheck className={`${iconSize} text-muted-foreground`} />
+          </span>
         );
       case "read":
         return (
-          <CheckCheck
-            className={`${iconSize} text-blue-500`}
-            title="Read"
-          />
+          <span title="Read">
+            <CheckCheck className={`${iconSize} text-blue-500`} />
+          </span>
         );
       case "failed":
         return (
-          <XCircle
-            className={`${iconSize} text-destructive`}
-            title="Failed"
-          />
+          <span title="Failed">
+            <XCircle className={`${iconSize} text-destructive`} />
+          </span>
         );
       default:
         return (
-          <Clock
-            className={`${iconSize} text-muted-foreground`}
-            title="Sending"
-          />
+          <span title="Sending">
+            <Clock className={`${iconSize} text-muted-foreground`} />
+          </span>
         );
     }
   };

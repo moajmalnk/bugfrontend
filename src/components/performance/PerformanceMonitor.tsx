@@ -50,30 +50,74 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
         newMetrics.fcp = fcpEntry.startTime;
       }
 
-      // Largest Contentful Paint (LCP)
-      const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
-      if (lcpEntries.length > 0) {
-        newMetrics.lcp = lcpEntries[lcpEntries.length - 1].startTime;
-      }
-
-      // First Input Delay (FID)
-      const fidEntries = performance.getEntriesByType('first-input');
-      if (fidEntries.length > 0) {
-        const fidEntry = fidEntries[0] as PerformanceEventTiming;
-        newMetrics.fid = fidEntry.processingStart - fidEntry.startTime;
-      }
-
-      // Cumulative Layout Shift (CLS)
-      let clsValue = 0;
-      const clsEntries = performance.getEntriesByType('layout-shift');
-      for (const entry of clsEntries) {
-        const layoutShiftEntry = entry as PerformanceEntry & { value: number; hadRecentInput: boolean };
-        if (!layoutShiftEntry.hadRecentInput) {
-          clsValue += layoutShiftEntry.value;
+      // Largest Contentful Paint (LCP) - Using PerformanceObserver
+      try {
+        const lcpObserver = new PerformanceObserver((entryList) => {
+          const entries = entryList.getEntries();
+          if (entries.length > 0) {
+            const lastEntry = entries[entries.length - 1];
+            newMetrics.lcp = lastEntry.startTime;
+            setMetrics(prev => ({ ...prev, lcp: lastEntry.startTime }));
+          }
+        });
+        lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+      } catch (e) {
+        // Fallback for browsers that don't support PerformanceObserver
+        const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
+        if (lcpEntries.length > 0) {
+          newMetrics.lcp = lcpEntries[lcpEntries.length - 1].startTime;
         }
       }
-      newMetrics.cls = clsValue;
-      clsValueRef.current = clsValue;
+
+      // First Input Delay (FID) - Using PerformanceObserver
+      try {
+        const fidObserver = new PerformanceObserver((entryList) => {
+          const entries = entryList.getEntries();
+          if (entries.length > 0) {
+            const fidEntry = entries[0] as PerformanceEventTiming;
+            const fid = fidEntry.processingStart - fidEntry.startTime;
+            newMetrics.fid = fid;
+            setMetrics(prev => ({ ...prev, fid }));
+          }
+        });
+        fidObserver.observe({ type: 'first-input', buffered: true });
+      } catch (e) {
+        // Fallback for browsers that don't support PerformanceObserver
+        const fidEntries = performance.getEntriesByType('first-input');
+        if (fidEntries.length > 0) {
+          const fidEntry = fidEntries[0] as PerformanceEventTiming;
+          newMetrics.fid = fidEntry.processingStart - fidEntry.startTime;
+        }
+      }
+
+      // Cumulative Layout Shift (CLS) - Using PerformanceObserver
+      let clsValue = 0;
+      try {
+        const clsObserver = new PerformanceObserver((entryList) => {
+          const entries = entryList.getEntries();
+          for (const entry of entries) {
+            const layoutShiftEntry = entry as PerformanceEntry & { value: number; hadRecentInput: boolean };
+            if (!layoutShiftEntry.hadRecentInput) {
+              clsValue += layoutShiftEntry.value;
+            }
+          }
+          newMetrics.cls = clsValue;
+          clsValueRef.current = clsValue;
+          setMetrics(prev => ({ ...prev, cls: clsValue }));
+        });
+        clsObserver.observe({ type: 'layout-shift', buffered: true });
+      } catch (e) {
+        // Fallback for browsers that don't support PerformanceObserver
+        const clsEntries = performance.getEntriesByType('layout-shift');
+        for (const entry of clsEntries) {
+          const layoutShiftEntry = entry as PerformanceEntry & { value: number; hadRecentInput: boolean };
+          if (!layoutShiftEntry.hadRecentInput) {
+            clsValue += layoutShiftEntry.value;
+          }
+        }
+        newMetrics.cls = clsValue;
+        clsValueRef.current = clsValue;
+      }
 
       // Time to First Byte (TTFB)
       const navigationEntry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
@@ -245,7 +289,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     //     </div>
     //   </div>
     // </div>
-    <div>Performance Monitor</div>
+    null
   );
 };
 

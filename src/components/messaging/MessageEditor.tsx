@@ -8,7 +8,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { MessagingService } from "@/services/messagingService";
-import { ChatMessage } from "@/types";
+import type { ChatMessage } from "@/types";
 import { Edit, Save, X } from "lucide-react";
 import React, { useState } from "react";
 

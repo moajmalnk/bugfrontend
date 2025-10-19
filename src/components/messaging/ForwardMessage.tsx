@@ -9,7 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { MessagingService } from "@/services/messagingService";
-import { ChatGroup, ChatMessage } from "@/types";
+import type { ChatGroup, ChatMessage } from "@/types";
 import { Forward, Search, Send } from "lucide-react";
 import React, { useEffect, useState } from "react";
 

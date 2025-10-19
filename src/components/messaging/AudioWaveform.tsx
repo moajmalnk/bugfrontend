@@ -24,10 +24,12 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
   const [audioData, setAudioData] = useState<number[]>([]);
 
   useEffect(() => {
+    console.log("🎵 Loading audio from URL:", audioUrl);
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
 
     audio.addEventListener("loadedmetadata", () => {
+      console.log("✅ Audio loaded successfully, duration:", audio.duration);
       setAudioDuration(audio.duration);
       setIsLoading(false);
       generateWaveformData(audio);
@@ -41,6 +43,17 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
       setCurrentTime(0);
       if (onPlayPause) onPlayPause();
     });
+
+    audio.addEventListener("error", (e) => {
+      console.error("❌ Audio loading error:", e);
+      console.error("Audio URL:", audioUrl);
+      console.error("Audio error details:", audio.error);
+      setIsLoading(false);
+    });
+
+    // Try to preload the audio
+    audio.preload = "metadata";
+    audio.load();
 
     return () => {
       audio.pause();
@@ -66,7 +79,12 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
 
   useEffect(() => {
     if (isPlaying && audioRef.current) {
-      audioRef.current.play();
+      audioRef.current.play().catch((error) => {
+        console.error("Error playing audio:", error);
+        console.error("Audio URL:", audioUrl);
+        // If autoplay fails, user interaction is required
+        if (onPlayPause) onPlayPause(); // Toggle back to paused state
+      });
     } else if (audioRef.current) {
       audioRef.current.pause();
     }

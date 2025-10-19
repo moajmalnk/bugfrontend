@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { MessagingService } from "@/services/messagingService";
-import { ChatMessage } from "@/types";
+import type { ChatMessage } from "@/types";
 import { Star, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 

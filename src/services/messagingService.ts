@@ -187,20 +187,38 @@ export class MessagingService {
     onTypingUpdate: (typingUsers: TypingIndicator[]) => void,
     interval: number = 3000
   ): () => void {
-    let lastMessageId: string | null = null;
+    let lastPollTimestamp: Date | null = null;
     let isPolling = true;
 
     const poll = async () => {
       if (!isPolling) return;
 
       try {
-        // Get latest messages
-        const messageResponse = await this.getMessages(groupId, 1, 10);
-        const latestMessage = messageResponse.messages[messageResponse.messages.length - 1];
+        // Get latest messages (increased to 50 to catch more new messages)
+        const messageResponse = await this.getMessages(groupId, 1, 50);
+        const messages = messageResponse.messages;
         
-        if (latestMessage && latestMessage.id !== lastMessageId) {
-          onNewMessage(latestMessage);
-          lastMessageId = latestMessage.id;
+        if (messages.length > 0) {
+          // If this is the first poll, just set the timestamp
+          if (!lastPollTimestamp) {
+            const latestMessage = messages[messages.length - 1];
+            lastPollTimestamp = new Date(latestMessage.created_at);
+          } else {
+            // Find all new messages since last poll
+            const newMessages = messages.filter(msg => {
+              const msgDate = new Date(msg.created_at);
+              return msgDate > lastPollTimestamp!;
+            });
+            
+            // Send new messages to the callback (in order)
+            newMessages.forEach(msg => onNewMessage(msg));
+            
+            // Update timestamp to the latest message
+            if (newMessages.length > 0) {
+              const latestNewMessage = newMessages[newMessages.length - 1];
+              lastPollTimestamp = new Date(latestNewMessage.created_at);
+            }
+          }
         }
 
         // Get typing indicators
