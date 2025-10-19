@@ -379,9 +379,12 @@ export const BugHeader = ({
                   variant="default"
                   size="sm"
                   className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap"
-                  onClick={() =>
-                    navigate(`/${authUser?.role || "tester"}/bugs/${bug.id}/fix`)
-                  }
+                  onClick={() => {
+                    // Preserve the from parameter when navigating to fix page
+                    const fixUrl = `/${authUser?.role || "tester"}/bugs/${bug.id}/fix`;
+                    const redirectUrl = isFromProject ? `${fixUrl}?from=project` : fixUrl;
+                    navigate(redirectUrl);
+                  }}
                 >
                   <CheckSquare className="mr-0 h-4 w-4" />
                 </Button>

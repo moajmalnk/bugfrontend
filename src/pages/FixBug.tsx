@@ -40,7 +40,7 @@ import {
   X 
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -58,11 +58,15 @@ const FixBug = () => {
   const { bugId } = useParams<{ bugId: string }>(); // Get bugId from URL
   const { currentUser } = useAuth();
   const queryClient = useQueryClient(); // Get query client
+  const [searchParams] = useSearchParams(); // Get search params to check navigation context
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bug, setBug] = useState<Bug | null>(null); // State to hold bug details
   const [fixDescription, setFixDescription] = useState(""); // Added field for fix description
   const [status, setStatus] = useState<Bug["status"]>("fixed"); // Status defaults to 'fixed'
+  
+  // Check if user came from project page
+  const fromProject = searchParams.get("from") === "project";
   
   // Default fix description for better UX
   const DEFAULT_FIX_DESCRIPTION = "Fixed, Can U check Now";
@@ -200,12 +204,15 @@ const FixBug = () => {
         // Invalidate the bug details query to force refetch on the details page
         queryClient.invalidateQueries({ queryKey: ["bug", bugId] });
 
-        // Redirect back to the bug details page or bugs list
-        navigate(
-          currentUser?.role
-            ? `/${currentUser.role}/bugs/${bugId}`
-            : `/bugs/${bugId}`
-        );
+        // Redirect back to the bug details page, preserving the navigation context
+        const bugDetailsUrl = currentUser?.role
+          ? `/${currentUser.role}/bugs/${bugId}`
+          : `/bugs/${bugId}`;
+        
+        // Add the from parameter if user came from project page
+        const redirectUrl = fromProject ? `${bugDetailsUrl}?from=project` : bugDetailsUrl;
+        
+        navigate(redirectUrl);
       } else {
         throw new Error(data.message || "Failed to update bug status");
       }
@@ -416,7 +423,14 @@ const FixBug = () => {
                 <Button
                   variant="outline"
                   className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
-                  onClick={() => navigate(-1)}
+                  onClick={() => {
+                    // Navigate back to bug details with the same context
+                    const bugDetailsUrl = currentUser?.role
+                      ? `/${currentUser.role}/bugs/${bugId}`
+                      : `/bugs/${bugId}`;
+                    const redirectUrl = fromProject ? `${bugDetailsUrl}?from=project` : bugDetailsUrl;
+                    navigate(redirectUrl);
+                  }}
                   disabled={isSubmitting}
                 >
                   <ArrowLeft className="mr-2 h-5 w-5" />
@@ -641,7 +655,14 @@ const FixBug = () => {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => navigate(-1)}
+                      onClick={() => {
+                        // Navigate back to bug details with the same context
+                        const bugDetailsUrl = currentUser?.role
+                          ? `/${currentUser.role}/bugs/${bugId}`
+                          : `/bugs/${bugId}`;
+                        const redirectUrl = fromProject ? `${bugDetailsUrl}?from=project` : bugDetailsUrl;
+                        navigate(redirectUrl);
+                      }}
                       disabled={isSubmitting}
                       className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                     >
