@@ -487,11 +487,14 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
         const audioBlob = new Blob(chunks, { type: mimeType || "audio/webm" });
         const audioUrl = URL.createObjectURL(audioBlob);
 
+        // Calculate total voice notes including existing ones
+        const existingVoiceNotesCount = existingAttachments.filter(att => att.file_type.startsWith("audio/")).length;
+        
         const voiceNote: VoiceNote = {
           id: Date.now().toString(),
           blob: audioBlob,
           duration: finalRecordingTime > 0 ? finalRecordingTime : 1,
-          name: `Voice Note ${voiceNotes.length + 1}`,
+          name: `Voice Note ${existingVoiceNotesCount + voiceNotes.length + 1}`,
           isPlaying: false,
           audioUrl: audioUrl,
         };
@@ -1093,17 +1096,17 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                           </Label>
                         </div>
                         <div className="space-y-2">
-                          {voiceNoteAttachments.map((attachment) => (
+                          {voiceNoteAttachments.map((attachment, index) => (
                             <div key={attachment.id} className="flex items-center gap-3 rounded-lg border border-purple-200 dark:border-purple-800 p-3 bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/50 dark:hover:bg-purple-900/30 transition-colors">
                               <div className="h-12 w-12 flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 rounded-lg flex-shrink-0">
                                 <Volume2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                                  {attachment.file_name}
+                                  Voice Note {index + 1}
                                 </div>
                                 <div className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">
-                                  Voice Note
+                                  {attachment.file_name}
                                 </div>
                               </div>
                               <div className="flex items-center gap-1 flex-shrink-0">
