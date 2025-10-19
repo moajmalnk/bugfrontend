@@ -700,7 +700,7 @@ export default function MyTasks() {
                   <span className="hidden sm:inline">My Tasks</span>
                   <span className="sm:hidden">My</span>
                   <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
-                    {items.length}
+                    {pendingTasksCount}
                   </span>
                 </TabsTrigger>
                 <TabsTrigger
