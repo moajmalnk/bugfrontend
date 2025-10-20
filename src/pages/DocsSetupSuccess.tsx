@@ -74,7 +74,7 @@ const DocsSetupSuccess = () => {
       sessionStorage.removeItem('bugdocs_return_bug_id');
       navigate(`/${role}/bugs/${returnBugId}`);
     } else {
-      navigate(`/${role}/dashboard`);
+      navigate(`/${role}/projects`);
     }
   };
 

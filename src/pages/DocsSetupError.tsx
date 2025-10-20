@@ -13,7 +13,7 @@ const DocsSetupError = () => {
 
   const handleGoHome = () => {
     const role = currentUser?.role || "admin";
-    navigate(`/${role}/dashboard`);
+    navigate(`/${role}/projects`);
   };
 
   const handleTryAgain = () => {
