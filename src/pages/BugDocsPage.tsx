@@ -34,6 +34,7 @@ import {
   RefreshCw,
   Clock,
   FolderOpen,
+  Link as LinkIcon,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -44,6 +45,8 @@ const BugDocsPage = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   
   // Delete confirmation state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -59,13 +62,39 @@ const BugDocsPage = () => {
 
   const loadData = async () => {
     setIsLoading(true);
+    setIsCheckingConnection(true);
     try {
-      await Promise.all([loadDocuments(), loadTemplates()]);
+      // Check connection first
+      await checkConnection();
+      // Only load documents and templates if connected
+      if (isConnected) {
+        await Promise.all([loadDocuments(), loadTemplates()]);
+      }
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
       setIsLoading(false);
+      setIsCheckingConnection(false);
     }
+  };
+
+  const checkConnection = async () => {
+    try {
+      const connected = await googleDocsService.checkConnection();
+      setIsConnected(connected);
+    } catch (error) {
+      console.error('Failed to check Google Docs connection:', error);
+      setIsConnected(false);
+    }
+  };
+
+  const handleConnectGoogleDocs = () => {
+    // Get JWT token to pass as state parameter
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    // Navigate to Google OAuth with JWT token as state
+    const authUrl = googleDocsService.getAuthUrl(token);
+    window.location.href = authUrl;
   };
 
   const loadDocuments = async () => {
@@ -206,87 +235,137 @@ const BugDocsPage = () => {
             Manage your Google Docs documents
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadDocuments}
-            disabled={isLoading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <Button onClick={() => setIsCreateModalOpen(true)} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            New Document
-          </Button>
-        </div>
+        {isConnected && (
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadDocuments}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button onClick={() => setIsCreateModalOpen(true)} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              New Document
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Statistics */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
-            <FolderOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{documents.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Templates Available</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{templates.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {documents.length > 0
-                ? formatDistanceToNow(new Date(documents[0].created_at), {
-                    addSuffix: true,
-                  })
-                : "No activity"}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {isConnected && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
+              <FolderOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{documents.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Templates Available</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{templates.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {documents.length > 0
+                  ? formatDistanceToNow(new Date(documents[0].created_at), {
+                      addSuffix: true,
+                    })
+                  : "No activity"}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Documents List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Documents</CardTitle>
-          <CardDescription>
-            Click on a document to view and edit it in Google Docs
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading documents...</span>
-            </div>
-          ) : documents.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No documents yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first document to get started
+      {/* Connection Status */}
+      {!isConnected && !isCheckingConnection && (
+        <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
+          <CardHeader>
+            <CardTitle className="text-orange-800 dark:text-orange-200">Google Docs Not Connected</CardTitle>
+            <CardDescription className="text-orange-700 dark:text-orange-300">
+              Connect your Google account to create and manage documents
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="relative mb-6">
+                <LinkIcon className="h-16 w-16 text-orange-500" />
+                <div className="absolute -top-2 -right-2 h-6 w-6 bg-orange-400 rounded-full border-2 border-white animate-pulse"></div>
+              </div>
+              <h3 className="text-xl font-semibold mb-2 text-orange-800 dark:text-orange-200">
+                Connect Google Docs
+              </h3>
+              <p className="text-orange-700 dark:text-orange-300 mb-6 max-w-md">
+                Link your Google account to create, manage, and collaborate on documents directly from BugRicer.
               </p>
-              <Button onClick={() => setIsCreateModalOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Document
+              <Button
+                onClick={handleConnectGoogleDocs}
+                className="
+                  h-12 px-8 py-3 rounded-xl font-semibold text-sm
+                  bg-gradient-to-r from-orange-500 via-orange-600 to-orange-700 
+                  hover:from-orange-600 hover:via-orange-700 hover:to-orange-800 
+                  text-white border-0 shadow-lg hover:shadow-xl
+                  transition-all duration-300 ease-in-out
+                  transform hover:scale-[1.02] active:scale-[0.98]
+                  relative overflow-hidden
+                "
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                <div className="relative flex items-center space-x-3">
+                  <LinkIcon className="h-5 w-5" />
+                  <span>Connect Google Account</span>
+                  <ExternalLink className="h-4 w-4" />
+                </div>
               </Button>
             </div>
-          ) : (
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Documents List */}
+      {isConnected && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Documents</CardTitle>
+            <CardDescription>
+              Click on a document to view and edit it in Google Docs
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading documents...</span>
+              </div>
+            ) : documents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No documents yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create your first document to get started
+                </p>
+                <Button onClick={() => setIsCreateModalOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Document
+                </Button>
+              </div>
+            ) : (
             <div className="space-y-3">
               {documents.map((doc) => (
                 <div
@@ -339,9 +418,11 @@ const BugDocsPage = () => {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Create Document Modal */}
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+      {isConnected && (
+        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Create New Document</DialogTitle>
@@ -426,6 +507,7 @@ const BugDocsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
