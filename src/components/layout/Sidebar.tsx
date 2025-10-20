@@ -186,6 +186,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   label="BugMessage"
                 />
                 <NavLink
+                  to="/bugdocs"
+                  icon={<FileText className="h-5 w-5" />}
+                  label="BugDocs"
+                />
+                <NavLink
                   to="/whatsapp-messages"
                   icon={<MessageCircle className="h-5 w-5" />}
                   label="WhatsApp"
