@@ -78,6 +78,8 @@ const WhatsAppMessages = lazy(() => import("@/pages/WhatsAppMessages"));
 const MyTasks = lazy(() => import("@/pages/MyTasks"));
 const DailyUpdate = lazy(() => import("@/pages/DailyUpdate"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
+const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
+const DocsSetupError = lazy(() => import("@/pages/DocsSetupError"));
 
 // Component to handle role-neutral bug redirects
 const BugRedirect = () => {
@@ -130,6 +132,24 @@ const RouteConfig = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+
+      {/* Google Docs OAuth callback routes */}
+      <Route
+        path="/docs-setup-success"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <DocsSetupSuccess />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/docs-setup-error"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <DocsSetupError />
+          </Suspense>
+        }
+      />
 
       {/* Dashboard route - accessible via token */}
       <Route

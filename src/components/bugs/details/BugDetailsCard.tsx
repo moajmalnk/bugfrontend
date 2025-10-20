@@ -17,6 +17,7 @@ import { whatsappService } from "@/services/whatsappService";
 import { Bug, BugStatus, Project } from "@/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { GoogleDocsButton } from "./GoogleDocsButton";
 
 interface BugDetailsCardProps {
   bug: Bug;
@@ -229,6 +230,12 @@ export const BugDetailsCard = ({
                   </div>
                 )}
             </div>
+          </div>
+
+          {/* Google Docs Integration */}
+          <div className="space-y-2 py-3 border-t border-border">
+            <Label className="text-xs sm:text-sm font-medium">BugDocs</Label>
+            <GoogleDocsButton bugId={bug.id} />
           </div>
         </CardContent>
       </Card>

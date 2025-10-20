@@ -10,6 +10,7 @@ import {
   FolderKanban,
   Menu,
   MessageCircle,
+  MessageSquare,
   Video,
   Settings,
   Users,
@@ -18,6 +19,7 @@ import {
   ListTodo,
   BarChart3,
   Activity,
+  Mic,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -177,6 +179,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   to="/users"
                   icon={<Users className="h-5 w-5" />}
                   label="Users"
+                />
+                <NavLink
+                  to="/messages"
+                  icon={<MessageSquare className="h-5 w-5" />}
+                  label="BugMessage"
                 />
                 <NavLink
                   to="/whatsapp-messages"
