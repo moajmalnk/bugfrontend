@@ -20,6 +20,7 @@ import {
   BarChart3,
   Activity,
   Mic,
+  Calendar,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -147,7 +148,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               label="Updates"
             />
             
-            {/* Daily Update & My Tasks - Only for Admins and Developers */}
+            {/* Daily Update, My Tasks & BugDocs - Only for Admins and Developers */}
             {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
               <>
                <NavLink
@@ -157,8 +158,13 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 />
                 <NavLink
                   to="/daily-update"
-                  icon={<FileText className="h-5 w-5" />}
+                  icon={<Calendar className="h-5 w-5" />}
                   label="Daily Update"
+                />
+                <NavLink
+                  to="/bugdocs"
+                  icon={<FileText className="h-5 w-5" />}
+                  label="BugDocs"
                 />
                 
               </>
@@ -184,11 +190,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   to="/messages"
                   icon={<MessageSquare className="h-5 w-5" />}
                   label="BugMessage"
-                />
-                <NavLink
-                  to="/bugdocs"
-                  icon={<FileText className="h-5 w-5" />}
-                  label="BugDocs"
                 />
                 <NavLink
                   to="/whatsapp-messages"

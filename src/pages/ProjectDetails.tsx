@@ -1,6 +1,7 @@
 import { ActivityList } from "@/components/activities/ActivityList";
 import { BugCard } from "@/components/bugs/BugCard";
 import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
+import ProjectUpdates from "@/components/updates/ProjectUpdates";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +36,7 @@ import {
 import { motion } from "framer-motion";
 import {
   AlertCircle,
+  Bell,
   Bug,
   CheckCircle2,
   ChevronLeft,
@@ -737,14 +739,19 @@ const ProjectDetails = () => {
         <div className="relative mb-4">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-            <TabsList className="flex gap-2 md:gap-4 p-1 bg-transparent">
-              <TabsTrigger value="overview" className="flex-1 min-w-[100px] font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
+            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 p-1 bg-transparent">
+              <TabsTrigger value="overview" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="bugs" className="flex-1 min-w-[100px] font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
+              <TabsTrigger value="bugs" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
                 Bugs
               </TabsTrigger>
-              <TabsTrigger value="members" className="flex-1 min-w-[100px] font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
+              <TabsTrigger value="updates" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
+                <Bell className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Updates</span>
+                <span className="sm:hidden">Updates</span>
+              </TabsTrigger>
+              <TabsTrigger value="members" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
                 Members
               </TabsTrigger>
             </TabsList>
@@ -984,6 +991,14 @@ const ProjectDetails = () => {
               })()}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="updates">
+          <ProjectUpdates 
+            projectId={projectId!} 
+            projectName={project.name}
+            showCreateButton={true}
+          />
         </TabsContent>
 
         <TabsContent value="members">
