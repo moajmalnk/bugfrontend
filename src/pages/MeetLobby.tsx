@@ -294,13 +294,29 @@ export default function MeetLobby() {
                   </div>
                 </div>
                 <Button
-                  onClick={() => {
-                    // Check if we're in production or local
-                    const isProduction = window.location.hostname !== 'localhost';
-                    const reauthUrl = isProduction 
-                      ? 'https://bugbackend.bugricer.com/api/oauth/production-reauth.php'
-                      : 'http://localhost/BugRicer/backend/api/oauth/admin-reauth.php';
-                    window.open(reauthUrl, '_blank');
+                  onClick={async () => {
+                    try {
+                      // Get current user ID from JWT token
+                      const token = localStorage.getItem("token");
+                      if (!token) {
+                        toast.error("Please log in first");
+                        return;
+                      }
+                      
+                      // Decode JWT to get user ID
+                      const payload = JSON.parse(atob(token.split('.')[1]));
+                      const userId = payload.user_id;
+                      
+                      // Check if we're in production or local
+                      const isProduction = window.location.hostname !== 'localhost';
+                      const reauthUrl = isProduction 
+                        ? `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${userId}`
+                        : `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php`;
+                      window.open(reauthUrl, '_blank');
+                    } catch (error) {
+                      console.error('Error getting user ID:', error);
+                      toast.error("Error getting user information");
+                    }
                   }}
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                 >
