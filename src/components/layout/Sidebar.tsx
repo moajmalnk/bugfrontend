@@ -159,12 +159,18 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 <NavLink
                   to="/daily-update"
                   icon={<Calendar className="h-5 w-5" />}
-                  label="Daily Update"
+                  label="BugUpdate"
                 />
                 <NavLink
                   to="/bugdocs"
                   icon={<FileText className="h-5 w-5" />}
                   label="BugDocs"
+                />
+                {/* BugMeet */}
+                <NavLink
+                  to="/meet"
+                  icon={<Video className="h-5 w-5" />}
+                  label="BugMeet"
                 />
                 
               </>
@@ -205,11 +211,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   to="/activity"
                   icon={<Activity className="h-5 w-5" />}
                   label="Activities"
-                />
-                <NavLink
-                  to="/meet"
-                  icon={<Video className="h-5 w-5" />}
-                  label="BugMeet"
                 />
                 <NavLink
                   to="/settings"

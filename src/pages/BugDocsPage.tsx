@@ -60,31 +60,55 @@ const BugDocsPage = () => {
     loadData();
   }, []);
 
+  // Load documents when connection status changes to true
+  useEffect(() => {
+    if (isConnected && documents.length === 0 && !isLoading) {
+      console.log('🔄 Connection became true, refreshing documents...');
+      refreshDocuments();
+    }
+  }, [isConnected]);
+
+  // Debug document count changes
+  useEffect(() => {
+    console.log('📊 Document count changed:', documents.length);
+  }, [documents.length]);
+
   const loadData = async () => {
+    console.log('🔄 Starting loadData...');
     setIsLoading(true);
     setIsCheckingConnection(true);
     try {
       // Check connection first
-      await checkConnection();
-      // Only load documents and templates if connected
-      if (isConnected) {
+      const connected = await checkConnection();
+      console.log('🔗 Connection result:', connected);
+      // Load documents and templates if connected
+      if (connected) {
+        console.log('📄 Loading documents and templates...');
         await Promise.all([loadDocuments(), loadTemplates()]);
+        console.log('✅ Documents and templates loaded');
+      } else {
+        console.log('❌ Not connected, skipping document load');
       }
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("❌ Error loading data:", error);
     } finally {
       setIsLoading(false);
       setIsCheckingConnection(false);
+      console.log('🏁 loadData completed');
     }
   };
 
   const checkConnection = async () => {
     try {
+      console.log('Checking Google Docs connection...');
       const connected = await googleDocsService.checkConnection();
+      console.log('Connection status:', connected);
       setIsConnected(connected);
+      return connected;
     } catch (error) {
       console.error('Failed to check Google Docs connection:', error);
       setIsConnected(false);
+      return false;
     }
   };
 
@@ -101,7 +125,9 @@ const BugDocsPage = () => {
     try {
       const docs = await googleDocsService.listGeneralDocuments();
       setDocuments(docs);
+      console.log(`Loaded ${docs.length} documents`);
     } catch (error: any) {
+      console.error("Error loading documents:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to load documents",
@@ -120,6 +146,15 @@ const BugDocsPage = () => {
         description: error.message || "Failed to load templates",
         variant: "destructive",
       });
+    }
+  };
+
+  const refreshDocuments = async () => {
+    console.log('🔄 Refreshing documents, isConnected:', isConnected);
+    if (isConnected) {
+      await loadDocuments();
+    } else {
+      console.log('❌ Not connected, cannot refresh documents');
     }
   };
 
@@ -153,7 +188,7 @@ const BugDocsPage = () => {
       googleDocsService.openDocument(result.document_url);
 
       // Reload documents list
-      await loadDocuments();
+      await refreshDocuments();
 
       // Reset form and close modal
       setDocTitle("");
@@ -188,7 +223,7 @@ const BugDocsPage = () => {
       });
 
       // Reload documents list
-      await loadDocuments();
+      await refreshDocuments();
       
       // Close dialog
       setIsDeleteDialogOpen(false);
@@ -240,7 +275,7 @@ const BugDocsPage = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={loadDocuments}
+              onClick={loadData}
               disabled={isLoading}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
@@ -293,50 +328,126 @@ const BugDocsPage = () => {
         </div>
       )}
 
-      {/* Connection Status */}
-      {!isConnected && !isCheckingConnection && (
-        <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
-          <CardHeader>
-            <CardTitle className="text-orange-800 dark:text-orange-200">Google Docs Not Connected</CardTitle>
-            <CardDescription className="text-orange-700 dark:text-orange-300">
-              Connect your Google account to create and manage documents
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="relative mb-6">
-                <LinkIcon className="h-16 w-16 text-orange-500" />
-                <div className="absolute -top-2 -right-2 h-6 w-6 bg-orange-400 rounded-full border-2 border-white animate-pulse"></div>
-              </div>
-              <h3 className="text-xl font-semibold mb-2 text-orange-800 dark:text-orange-200">
-                Connect Google Docs
-              </h3>
-              <p className="text-orange-700 dark:text-orange-300 mb-6 max-w-md">
-                Link your Google account to create, manage, and collaborate on documents directly from BugRicer.
-              </p>
-              <Button
-                onClick={handleConnectGoogleDocs}
-                className="
-                  h-12 px-8 py-3 rounded-xl font-semibold text-sm
-                  bg-gradient-to-r from-orange-500 via-orange-600 to-orange-700 
-                  hover:from-orange-600 hover:via-orange-700 hover:to-orange-800 
-                  text-white border-0 shadow-lg hover:shadow-xl
-                  transition-all duration-300 ease-in-out
-                  transform hover:scale-[1.02] active:scale-[0.98]
-                  relative overflow-hidden
-                "
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                <div className="relative flex items-center space-x-3">
-                  <LinkIcon className="h-5 w-5" />
-                  <span>Connect Google Account</span>
-                  <ExternalLink className="h-4 w-4" />
-                </div>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+       {/* Connection Status */}
+       {!isConnected && !isCheckingConnection && (
+         <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
+           <CardHeader>
+             <CardTitle className="text-orange-800 dark:text-orange-200">Google Docs Not Connected</CardTitle>
+             <CardDescription className="text-orange-700 dark:text-orange-300">
+               Connect your Google account to create and manage documents
+             </CardDescription>
+           </CardHeader>
+           <CardContent>
+             <div className="flex flex-col items-center justify-center py-8 text-center">
+               <div className="relative mb-6">
+                 <LinkIcon className="h-16 w-16 text-orange-500" />
+                 <div className="absolute -top-2 -right-2 h-6 w-6 bg-orange-400 rounded-full border-2 border-white animate-pulse"></div>
+               </div>
+               <h3 className="text-xl font-semibold mb-2 text-orange-800 dark:text-orange-200">
+                 Connect Google Docs
+               </h3>
+               <p className="text-orange-700 dark:text-orange-300 mb-6 max-w-md">
+                 Link your Google account to create, manage, and collaborate on documents directly from BugRicer.
+               </p>
+               <div className="flex flex-col gap-3">
+                 <Button
+                   onClick={handleConnectGoogleDocs}
+                   className="
+                     h-12 px-8 py-3 rounded-xl font-semibold text-sm
+                     bg-gradient-to-r from-orange-500 via-orange-600 to-orange-700 
+                     hover:from-orange-600 hover:via-orange-700 hover:to-orange-800 
+                     text-white border-0 shadow-lg hover:shadow-xl
+                     transition-all duration-300 ease-in-out
+                     transform hover:scale-[1.02] active:scale-[0.98]
+                     relative overflow-hidden
+                   "
+                 >
+                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                   <div className="relative flex items-center space-x-3">
+                     <LinkIcon className="h-5 w-5" />
+                     <span>Connect Google Account</span>
+                     <ExternalLink className="h-4 w-4" />
+                   </div>
+                 </Button>
+                 
+                 {/* Debug buttons */}
+                 <div className="flex gap-2 mt-4">
+                   <Button 
+                     variant="outline" 
+                     size="sm"
+                     onClick={async () => {
+                       try {
+                         console.log('🔍 Debug: Checking current user...');
+                         const response = await fetch('http://localhost/BugRicer/backend/debug-current-user-tokens.php', {
+                           headers: {
+                             'Authorization': `Bearer ${localStorage.getItem('token')}`
+                           }
+                         });
+                         const data = await response.json();
+                         console.log('🔍 Current user data:', data);
+                       } catch (error) {
+                         console.error('🔍 Debug error:', error);
+                       }
+                     }}
+                   >
+                     Check User
+                   </Button>
+                   <Button 
+                     variant="outline" 
+                     size="sm"
+                     onClick={async () => {
+                       try {
+                         console.log('🔍 Debug: Checking connection status...');
+                         const response = await fetch('http://localhost/BugRicer/backend/debug-connection-status.php', {
+                           headers: {
+                             'Authorization': `Bearer ${localStorage.getItem('token')}`
+                           }
+                         });
+                         const data = await response.json();
+                         console.log('🔍 Connection status:', data);
+                       } catch (error) {
+                         console.error('🔍 Debug error:', error);
+                       }
+                     }}
+                   >
+                     Check Connection
+                   </Button>
+                   <Button 
+                     variant="outline" 
+                     size="sm"
+                     onClick={async () => {
+                       try {
+                         console.log('🔧 Manual Fix: Linking Google account...');
+                         const response = await fetch('http://localhost/BugRicer/backend/manual-link-google.php', {
+                           method: 'POST',
+                           headers: {
+                             'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                             'Content-Type': 'application/json'
+                           },
+                           body: JSON.stringify({
+                             google_user_id: '110481653354659898559', // From the debug output
+                             email: 'ajmalnk04@gmail.com'
+                           })
+                         });
+                         const data = await response.json();
+                         console.log('🔧 Manual link result:', data);
+                         if (data.success) {
+                           // Refresh the page to check connection
+                           window.location.reload();
+                         }
+                       } catch (error) {
+                         console.error('🔧 Manual link error:', error);
+                       }
+                     }}
+                   >
+                     Fix Connection
+                   </Button>
+                 </div>
+               </div>
+             </div>
+           </CardContent>
+         </Card>
+       )}
 
       {/* Documents List */}
       {isConnected && (

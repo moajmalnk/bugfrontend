@@ -53,14 +53,18 @@ class GoogleDocsService {
    */
   async checkConnection(): Promise<boolean> {
     try {
+      console.log('🔍 Checking Google Docs connection...');
       const response = await apiClient.get<{
         success: boolean;
         data: GoogleDocsConnectionStatus;
       }>('/docs/check-connection.php');
       
-      return response.data.data?.connected || false;
+      const connected = response.data.data?.connected || false;
+      console.log('🔗 Connection check result:', connected);
+      console.log('🔍 Debug info:', response.data);
+      return connected;
     } catch (error) {
-      console.error('Failed to check Google Docs connection:', error);
+      console.error('❌ Failed to check Google Docs connection:', error);
       return false;
     }
   }
@@ -163,7 +167,13 @@ class GoogleDocsService {
     docType: string = 'general'
   ): Promise<{ success: boolean; id: number; document_url: string; document_title: string }> {
     try {
-      const response = await apiClient.post('/docs/create-general-doc.php', {
+      const response = await apiClient.post<{
+        success: boolean;
+        message?: string;
+        id: number;
+        document_url: string;
+        document_title: string;
+      }>('/docs/create-general-doc.php', {
         doc_title: docTitle,
         template_id: templateId,
         doc_type: docType,
@@ -185,19 +195,24 @@ class GoogleDocsService {
    */
   async listGeneralDocuments(includeArchived: boolean = false): Promise<UserDocument[]> {
     try {
+      console.log('🔍 Fetching general documents, includeArchived:', includeArchived);
       const response = await apiClient.get<{
         success: boolean;
         documents: UserDocument[];
         count: number;
       }>(`/docs/list-general-docs.php?include_archived=${includeArchived}`);
 
+      console.log('📄 API response:', response.data);
+
       if (!response.data.success) {
         throw new Error('Failed to fetch documents');
       }
 
-      return response.data.documents || [];
+      const documents = response.data.documents || [];
+      console.log('📊 Returning documents:', documents.length);
+      return documents;
     } catch (error: any) {
-      console.error('Failed to list general documents:', error);
+      console.error('❌ Failed to list general documents:', error);
       return [];
     }
   }
@@ -207,7 +222,10 @@ class GoogleDocsService {
    */
   async deleteDocument(documentId: number): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await apiClient.delete(`/docs/delete-general-doc.php?id=${documentId}`);
+      const response = await apiClient.delete<{
+        success: boolean;
+        message: string;
+      }>(`/docs/delete-general-doc.php?id=${documentId}`);
 
       if (!response.data.success) {
         throw new Error(response.data.message || 'Failed to delete document');
