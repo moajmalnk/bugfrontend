@@ -151,9 +151,19 @@ export default function MeetLobby() {
         setCompletedMeets(data.completedMeetings || []);
       } else {
         console.error("Failed to fetch running meets:", data?.error);
+        // Check if it's a scope issue
+        if (data?.error?.includes?.('insufficient authentication scopes') || 
+            data?.error?.includes?.('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
+          setError("Please re-authorize your Google account to access calendar features. Your current token doesn't have the required permissions.");
+        }
       }
     } catch (err: any) {
       console.error("Error fetching running meets:", err?.message);
+      // Check if it's a scope issue from the error response
+      if (err?.response?.data?.error?.includes?.('insufficient authentication scopes') ||
+          err?.response?.data?.error?.includes?.('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
+        setError("Please re-authorize your Google account to access calendar features. Your current token doesn't have the required permissions.");
+      }
     } finally {
       setLoadingMeets(false);
     }
@@ -256,7 +266,8 @@ export default function MeetLobby() {
         )}
 
         {/* Google Connection Status */}
-        {error && error.includes("Please connect your Google account") && (
+        {error && (error.includes("Please connect your Google account") || 
+                  error.includes("re-authorize your Google account")) && (
           <div className="relative overflow-hidden mb-6">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-2xl"></div>
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/50 rounded-2xl p-6 sm:p-8">
@@ -271,15 +282,29 @@ export default function MeetLobby() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Google Account Required</h3>
-                    <p className="text-gray-600 dark:text-gray-400">Connect your Google account to create and manage meetings</p>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {error.includes("re-authorize") ? "Google Account Re-authorization Required" : "Google Account Required"}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {error.includes("re-authorize") 
+                        ? "Re-authorize your Google account to access calendar features for meeting management"
+                        : "Connect your Google account to create and manage meetings"
+                      }
+                    </p>
                   </div>
                 </div>
                 <Button
-                  onClick={() => window.open('http://localhost/BugRicer/backend/api/oauth/admin-reauth.php', '_blank')}
+                  onClick={() => {
+                    // Check if we're in production or local
+                    const isProduction = window.location.hostname !== 'localhost';
+                    const reauthUrl = isProduction 
+                      ? 'https://bugbackend.bugricer.com/api/oauth/production-reauth.php'
+                      : 'http://localhost/BugRicer/backend/api/oauth/admin-reauth.php';
+                    window.open(reauthUrl, '_blank');
+                  }}
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                 >
-                  Connect Google Account
+                  {error.includes("re-authorize") ? "Re-authorize Google Account" : "Connect Google Account"}
                 </Button>
               </div>
             </div>
