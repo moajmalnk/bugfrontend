@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createMeeting, getMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar } from "lucide-react";
+import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { ENV } from "@/lib/env";
 import axios from "axios";
@@ -46,6 +48,51 @@ interface RunningMeetsResponse {
   error?: string;
 }
 
+// Team member interfaces
+interface TeamMember {
+  email: string;
+  role: 'admin' | 'developer' | 'tester';
+}
+
+interface TeamMembersResponse {
+  success: boolean;
+  emails: string[];
+  error?: string;
+}
+
+// Skeleton Loading Components
+const MeetingSkeleton = () => (
+  <div className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm animate-pulse">
+    <div className="relative p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start space-x-4 flex-1 min-w-0">
+          <div className="w-8 h-8 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+          <div className="flex-1 min-w-0 space-y-3">
+            <div className="h-5 bg-gray-300 dark:bg-gray-700 rounded w-3/4"></div>
+            <div className="flex items-center gap-4">
+              <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-24"></div>
+              <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-20"></div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-20"></div>
+              <div className="h-6 w-6 bg-gray-300 dark:bg-gray-700 rounded"></div>
+            </div>
+          </div>
+        </div>
+        <div className="h-8 bg-gray-300 dark:bg-gray-700 rounded w-16"></div>
+      </div>
+    </div>
+  </div>
+);
+
+const TabSkeleton = () => (
+  <div className="flex items-center gap-2 animate-pulse">
+    <div className="h-4 w-4 bg-gray-300 dark:bg-gray-700 rounded"></div>
+    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-16"></div>
+    <div className="h-5 w-5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+  </div>
+);
+
 export default function MeetLobby() {
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
@@ -56,11 +103,39 @@ export default function MeetLobby() {
   const [completedMeets, setCompletedMeets] = useState<RunningMeeting[]>([]);
   const [loadingMeets, setLoadingMeets] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [activeTab, setActiveTab] = useState("my-meets");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<"create" | "join">("create");
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [activeRoleTab, setActiveRoleTab] = useState<"all" | "admin" | "developer" | "tester">("all");
   const navigate = useNavigate();
 
   const handleCreate = async () => {
     setLoading(true);
     setError(null);
+    
+    // Optimistic UI update - immediately show the meeting in the list
+    const optimisticMeeting: RunningMeeting = {
+      id: `temp-${Date.now()}`,
+      title: title || "BugMeet Session",
+      description: "Creating meeting...",
+      meetingUri: "",
+      meetingCode: "Loading...",
+      startTime: new Date().toISOString(),
+      endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour from now
+      isActive: true,
+      creator: "You",
+      attendees: []
+    };
+
+    // Add optimistic meeting to the list immediately
+    setRunningMeets(prev => [optimisticMeeting, ...prev]);
+    
     try {
       // Get the JWT token from localStorage
       const token = localStorage.getItem("token");
@@ -68,6 +143,7 @@ export default function MeetLobby() {
         throw new Error("Please log in to create meetings");
       }
 
+      console.log("🔄 Creating new meeting...");
       // Call the Google Meet API endpoint
       const response = await axios.post(
         `${ENV.API_URL}/meet/create-space.php`,
@@ -83,14 +159,29 @@ export default function MeetLobby() {
       );
 
       const data = response.data as GoogleMeetResponse;
+      console.log("📊 Create meeting response:", data);
+      
       if (data?.success && data?.meetingUri) {
         toast.success("Google Meet created successfully!");
+        console.log("✅ Meeting created successfully, refreshing meetings list...");
+        
+        // Clear the title input and close modal
+        setTitle("");
+        setIsModalOpen(false);
+        
         // Open the Google Meet link in a new tab
         window.open(data.meetingUri, '_blank');
+        
+        // Refresh the meetings list immediately to get the real data
+        fetchRunningMeets(true);
       } else {
+        // Remove optimistic meeting on failure
+        setRunningMeets(prev => prev.filter(meeting => meeting.id !== optimisticMeeting.id));
         setError(data?.error || "Failed to create Google Meet");
       }
     } catch (err: any) {
+      // Remove optimistic meeting on failure
+      setRunningMeets(prev => prev.filter(meeting => meeting.id !== optimisticMeeting.id));
       const errorMessage = err?.response?.data?.error || err?.message || "Failed to create Google Meet";
       setError(errorMessage);
       toast.error(errorMessage);
@@ -110,6 +201,9 @@ export default function MeetLobby() {
       // Construct the Google Meet URL from the code
       const joinUrl = `https://meet.google.com/${code.toUpperCase()}`;
       toast.success("Redirecting to Google Meet...");
+      // Clear the code input and close modal
+      setCode("");
+      setIsModalOpen(false);
       // Redirect the current window to the Google Meet URL
       window.location.href = joinUrl;
     } catch (err: any) {
@@ -127,14 +221,54 @@ export default function MeetLobby() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const fetchRunningMeets = async () => {
+  // Cache for API responses
+  const [cache, setCache] = useState<{
+    data: RunningMeetsResponse | null;
+    timestamp: number;
+  }>({ data: null, timestamp: 0 });
+
+  // Request deduplication
+  const [pendingRequest, setPendingRequest] = useState<Promise<any> | null>(null);
+
+  const fetchRunningMeets = useCallback(async (forceRefresh = false) => {
+    // Check cache first (5 minute cache)
+    const now = Date.now();
+    const cacheAge = now - cache.timestamp;
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+    if (!forceRefresh && cache.data && cacheAge < CACHE_DURATION) {
+      console.log("🚀 Using cached data");
+      setRunningMeets(cache.data.runningMeetings || []);
+      setCompletedMeets(cache.data.completedMeetings || []);
+      setIsInitialLoad(false);
+      return;
+    }
+
+    // Prevent multiple simultaneous requests
+    if (pendingRequest && !forceRefresh) {
+      console.log("⏳ Waiting for existing request...");
+      try {
+        await pendingRequest;
+        return;
+      } catch (error) {
+        console.log("❌ Pending request failed, proceeding with new request");
+      }
+    }
+
+    if (loadingMeets && !forceRefresh) {
+      console.log("Already loading meets, skipping duplicate request");
+      return;
+    }
+
     setLoadingMeets(true);
+    const requestPromise = (async () => {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("Please log in to view meetings");
       }
 
+        console.log("🔄 Fetching running meets...");
       const response = await axios.get(
         `${ENV.API_URL}/meet/get-running-meets.php`,
         {
@@ -146,11 +280,27 @@ export default function MeetLobby() {
       );
 
       const data = response.data as RunningMeetsResponse;
+        console.log("📊 API Response:", data);
+        
       if (data?.success) {
-        setRunningMeets(data.runningMeetings || []);
-        setCompletedMeets(data.completedMeetings || []);
+          const runningMeetings = data.runningMeetings || [];
+          const completedMeetings = data.completedMeetings || [];
+          
+          console.log(`✅ Loaded ${runningMeetings.length} running meetings and ${completedMeetings.length} completed meetings`);
+          
+          // Update cache
+          setCache({ data, timestamp: now });
+          
+          setRunningMeets(runningMeetings);
+          setCompletedMeets(completedMeetings);
+          setIsInitialLoad(false);
+          
+          // Clear any previous errors on successful fetch
+          if (error && error.includes("Failed to fetch meetings")) {
+            setError(null);
+          }
       } else {
-        console.error("Failed to fetch running meets:", data?.error);
+          console.error("❌ Failed to fetch running meets:", data?.error);
         // Check if it's a scope issue
         if (data?.error?.includes?.('insufficient authentication scopes') || 
             data?.error?.includes?.('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
@@ -160,16 +310,24 @@ export default function MeetLobby() {
         }
       }
     } catch (err: any) {
-      console.error("Error fetching running meets:", err?.message);
+        console.error("❌ Error fetching running meets:", err?.message);
       // Check if it's a scope issue from the error response
       if (err?.response?.data?.error?.includes?.('insufficient authentication scopes') ||
           err?.response?.data?.error?.includes?.('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
         setError("Please re-authorize your Google account to access calendar features. Your current token doesn't have the required permissions.");
+        } else {
+          setError("Failed to fetch meetings. Please try again.");
       }
+        throw err;
     } finally {
       setLoadingMeets(false);
-    }
-  };
+        setPendingRequest(null);
+      }
+    })();
+
+    setPendingRequest(requestPromise);
+    return requestPromise;
+  }, [cache, loadingMeets, error]);
 
   const joinRunningMeet = (meetingUri: string) => {
     window.open(meetingUri, '_blank');
@@ -204,6 +362,71 @@ export default function MeetLobby() {
     }
   };
 
+  // Optimized filtered meetings with useMemo - sorted by latest first
+  const filteredMeetings = useMemo(() => {
+    let filtered = [...runningMeets, ...completedMeets];
+    
+    // Filter by tab
+    if (activeTab === "my-meets") {
+      filtered = runningMeets;
+    } else if (activeTab === "shared-meets") {
+      filtered = completedMeets;
+    }
+    
+    // Apply search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(meeting => 
+        meeting.title.toLowerCase().includes(searchLower) ||
+        meeting.meetingCode.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== "all") {
+      if (statusFilter === "live") {
+        filtered = filtered.filter(meeting => meeting.isActive);
+      } else if (statusFilter === "completed") {
+        filtered = filtered.filter(meeting => !meeting.isActive);
+      }
+    }
+    
+    // Sort by latest first (newest meetings at the top)
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.startTime);
+      const dateB = new Date(b.startTime);
+      return dateB.getTime() - dateA.getTime(); // Descending order (latest first)
+    });
+  }, [runningMeets, completedMeets, activeTab, searchTerm, statusFilter]);
+
+  // Get tab counts with better reliability
+  const getTabCount = (tabType: string) => {
+    const runningCount = runningMeets?.length || 0;
+    const completedCount = completedMeets?.length || 0;
+    
+    console.log(`📊 Tab counts - Running: ${runningCount}, Completed: ${completedCount}`);
+    
+    switch (tabType) {
+      case "my-meets":
+        return runningCount;
+      case "shared-meets":
+        return completedCount;
+      default:
+        return 0;
+    }
+  };
+
+  // Debug function to log current state
+  const debugState = () => {
+    console.log("🔍 Current Meeting State:", {
+      runningMeets: runningMeets.length,
+      completedMeets: completedMeets.length,
+      loadingMeets,
+      error,
+      activeTab
+    });
+  };
+
   // Check for OAuth success/error parameters
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -227,14 +450,203 @@ export default function MeetLobby() {
     }
   }, []);
 
-  // Fetch running meets on component mount
+  // Fetch running meets on component mount with progressive loading
   useEffect(() => {
+    console.log("🚀 Component mounted, fetching initial meetings...");
+    
+    // Immediate fetch for fast loading
     fetchRunningMeets();
     
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchRunningMeets, 30000);
-    return () => clearInterval(interval);
+    // Background refresh every 30 seconds (reduced frequency for better performance)
+    const interval = setInterval(() => {
+      console.log("🔄 Background refresh...");
+      fetchRunningMeets();
+    }, 60000); // Increased to 1 minute for better performance
+    
+    return () => {
+      console.log("🧹 Cleaning up meeting refresh interval");
+      clearInterval(interval);
+    };
+  }, [fetchRunningMeets]);
+
+  // Fetch team members from all three endpoints
+  const fetchTeamMembers = useCallback(async () => {
+    setLoadingUsers(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Please log in to view team members");
+      }
+
+      console.log("🔄 Fetching team members...");
+      
+      // Fetch all three types of users in parallel
+      const [adminsResponse, developersResponse, testersResponse] = await Promise.all([
+        axios.get(`${ENV.API_URL}/get_all_admins.php`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }),
+        axios.get(`${ENV.API_URL}/get_all_developers.php`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }),
+        axios.get(`${ENV.API_URL}/get_all_testers.php`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        })
+      ]);
+
+      const adminsData = adminsResponse.data as TeamMembersResponse;
+      const developersData = developersResponse.data as TeamMembersResponse;
+      const testersData = testersResponse.data as TeamMembersResponse;
+
+      console.log("📊 Team members response:", { adminsData, developersData, testersData });
+
+      // Combine all team members with their roles
+      const allTeamMembers: TeamMember[] = [
+        ...(adminsData.emails || []).map(email => ({ email, role: 'admin' as const })),
+        ...(developersData.emails || []).map(email => ({ email, role: 'developer' as const })),
+        ...(testersData.emails || []).map(email => ({ email, role: 'tester' as const }))
+      ];
+
+      setTeamMembers(allTeamMembers);
+      console.log(`✅ Loaded ${allTeamMembers.length} team members (${adminsData.emails?.length || 0} admins, ${developersData.emails?.length || 0} developers, ${testersData.emails?.length || 0} testers)`);
+    } catch (err: any) {
+      console.error("❌ Error fetching team members:", err?.message);
+      // Fallback to empty array on error
+      setTeamMembers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
   }, []);
+
+  // Fetch team members when create modal opens
+  useEffect(() => {
+    if (isModalOpen && modalType === "create" && teamMembers.length === 0) {
+      fetchTeamMembers();
+    }
+  }, [isModalOpen, modalType, teamMembers.length, fetchTeamMembers]);
+
+  // Add a manual refresh function that can be called from the UI
+  const handleRefresh = () => {
+    console.log("🔄 Manual refresh triggered");
+    fetchRunningMeets(true);
+  };
+
+  // Modal handlers
+  const openCreateModal = () => {
+    setModalType("create");
+    setIsModalOpen(true);
+    setError(null);
+  };
+
+  const openJoinModal = () => {
+    setModalType("join");
+    setIsModalOpen(true);
+    setError(null);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setTitle("");
+    setCode("");
+    setSelectedUsers([]);
+    setActiveRoleTab("all");
+    setError(null);
+  };
+
+  // Helper functions for user selection
+  const toggleUserSelection = (email: string) => {
+    setSelectedUsers(prev => 
+      prev.includes(email) 
+        ? prev.filter(e => e !== email)
+        : [...prev, email]
+    );
+  };
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return <Shield className="h-4 w-4" />;
+      case 'developer':
+        return <Code className="h-4 w-4" />;
+      case 'tester':
+        return <TestTube className="h-4 w-4" />;
+      default:
+        return <User className="h-4 w-4" />;
+    }
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'developer':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'tester':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
+    }
+  };
+
+  const getSelectedUsers = () => {
+    return teamMembers.filter(member => selectedUsers.includes(member.email));
+  };
+
+  // Filter team members by role
+  const getFilteredTeamMembers = () => {
+    if (activeRoleTab === "all") {
+      return teamMembers;
+    }
+    return teamMembers.filter(member => member.role === activeRoleTab);
+  };
+
+  // Get role counts
+  const getRoleCounts = () => {
+    return {
+      all: teamMembers.length,
+      admin: teamMembers.filter(m => m.role === 'admin').length,
+      developer: teamMembers.filter(m => m.role === 'developer').length,
+      tester: teamMembers.filter(m => m.role === 'tester').length
+    };
+  };
+
+  // Debug state changes
+  useEffect(() => {
+    console.log("📊 Meeting state changed:", {
+      runningMeets: runningMeets.length,
+      completedMeets: completedMeets.length,
+      loadingMeets,
+      error: error ? error.substring(0, 50) + "..." : null
+    });
+  }, [runningMeets, completedMeets, loadingMeets, error]);
+
+  // Add window focus listener to refresh data when user returns to tab (optimized)
+  useEffect(() => {
+    let focusTimeout: NodeJS.Timeout;
+    
+    const handleFocus = () => {
+      // Debounce focus events to prevent multiple rapid refreshes
+      clearTimeout(focusTimeout);
+      focusTimeout = setTimeout(() => {
+        console.log("👁️ Window focused, refreshing meetings...");
+        fetchRunningMeets(true);
+      }, 1000); // 1 second delay to prevent rapid refreshes
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearTimeout(focusTimeout);
+    };
+  }, [fetchRunningMeets]);
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
@@ -261,6 +673,24 @@ export default function MeetLobby() {
                 </p>
               </div>
               
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <Button
+                  onClick={openCreateModal}
+                  className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Meet
+                </Button>
+                
+                <Button
+                  onClick={openJoinModal}
+                  variant="outline"
+                  className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 dark:hover:border-green-700 text-gray-700 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                >
+                  <Users className="h-5 w-5 mr-2" />
+                  Join
+                </Button>
+              
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
                   <div className="p-1.5 bg-blue-500 rounded-lg">
@@ -268,7 +698,8 @@ export default function MeetLobby() {
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                      Live
+                        {runningMeets.length + completedMeets.length}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -352,164 +783,184 @@ export default function MeetLobby() {
           </div>
         )}
 
-        {/* Currently Running Meets */}
-        {runningMeets.length > 0 && (
-          <div className="relative overflow-hidden mb-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-2xl"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-green-200/50 dark:border-green-700/50 rounded-2xl p-6 sm:p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
-                    <Calendar className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Currently Running Meets</h3>
-                    <p className="text-gray-600 dark:text-gray-400">{runningMeets.length} active meeting{runningMeets.length !== 1 ? 's' : ''}</p>
-                  </div>
-                </div>
-                <Button
-                  onClick={fetchRunningMeets}
-                  disabled={loadingMeets}
-                  variant="outline"
-                  size="sm"
-                  className="border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20"
+        {/* Meetings Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
+            <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
+              <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
+                <TabsTrigger
+                  value="my-meets"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
                 >
-                  {loadingMeets ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                  <Video className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">My Meets</span>
+                  <span className="sm:hidden">My</span>
+                  {loadingMeets && isInitialLoad ? (
+                    <div className="ml-2 h-5 w-5 bg-gray-300 dark:bg-gray-700 rounded-full animate-pulse"></div>
                   ) : (
-                    <Clock className="h-4 w-4" />
+                    <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
+                      {getTabCount("my-meets")}
+                    </span>
                   )}
-                </Button>
-              </div>
-              
-              <div className="grid gap-4">
-                {runningMeets.map((meeting) => (
-                  <div key={meeting.id} className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/50 dark:border-gray-700/50 rounded-xl p-4 hover:shadow-md transition-all duration-300">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-semibold text-gray-900 dark:text-white truncate">
-                            {meeting.title}
-                          </h4>
-                          {meeting.isActive && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300">
-                              <div className="w-2 h-2 bg-red-500 rounded-full mr-1.5 animate-pulse"></div>
-                              Live
+                </TabsTrigger>
+                <TabsTrigger
+                  value="shared-meets"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">Shared Meets</span>
+                  <span className="sm:hidden">Shared</span>
+                  {loadingMeets && isInitialLoad ? (
+                    <div className="ml-2 h-5 w-5 bg-gray-300 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                  ) : (
+                    <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
+                      {getTabCount("shared-meets")}
                             </span>
                           )}
-                        </div>
-                        
-                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {formatMeetingTime(meeting.startTime, meeting.endTime)}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Users className="h-4 w-4" />
-                            {meeting.attendees.length} attendee{meeting.attendees.length !== 1 ? 's' : ''}
+                </TabsTrigger>
+              </TabsList>
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-2">
-                          <code className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-mono">
-                            {meeting.meetingCode}
-                          </code>
-                          <Button
-                            onClick={() => copyMeetCode(meeting.meetingCode)}
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
+          <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
+            {/* Search and Filter Controls */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 bg-blue-500 rounded-lg">
+                    <Search className="h-4 w-4 text-white" />
+                          </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                          </div>
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Search Bar */}
+                  <div className="flex-1 relative group">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input
+                      type="text"
+                      placeholder="Search meetings by title or code..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                    />
                         </div>
+                        
+                  {/* Filter Controls */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Status Filter */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                        <Filter className="h-4 w-4 text-white" />
+                      </div>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 px-3 text-sm font-medium"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="live">Live</option>
+                        <option value="completed">Completed</option>
+                      </select>
                       </div>
                       
-                      <div className="flex items-center gap-2 ml-4">
+                    {/* Clear Filters Button */}
+                    {(searchTerm || statusFilter !== "all") && (
                         <Button
-                          onClick={() => joinRunningMeet(meeting.meetingUri)}
+                        variant="outline"
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          Join
+                        onClick={() => {
+                          setSearchTerm("");
+                          setStatusFilter("all");
+                        }}
+                        className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                      >
+                        Clear
                         </Button>
+                    )}
                       </div>
                     </div>
                   </div>
-                ))}
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* Completed Meets */}
-        {completedMeets.length > 0 && (
-          <div className="relative overflow-hidden mb-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-slate-50/50 dark:from-gray-950/20 dark:to-slate-950/20 rounded-2xl"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-gradient-to-br from-gray-500 to-slate-600 rounded-xl shadow-lg">
-                    <Calendar className="h-6 w-6 text-white" />
+            {/* Meetings Content */}
+            <div className="space-y-4">
+              {loadingMeets && isInitialLoad ? (
+                <div className="space-y-4">
+                  <MeetingSkeleton />
+                  <MeetingSkeleton />
+                  <MeetingSkeleton />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Completed Meets</h3>
-                    <p className="text-gray-600 dark:text-gray-400">{completedMeets.length} completed meeting{completedMeets.length !== 1 ? 's' : ''} in the last 7 days</p>
+              ) : loadingMeets ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-5 w-5 animate-spin text-blue-500" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Updating meetings...</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+              ) : filteredMeetings.length === 0 ? (
+                <div className="relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                  <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                    <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                      <Video className="h-10 w-10 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                      {activeTab === "my-meets" ? "No meetings found" : "No shared meetings"}
+                    </h3>
+                    <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                      {activeTab === "my-meets"
+                        ? "You don't have any meetings yet. Create your first meeting to get started."
+                        : "There are no shared meetings available right now."}
+                    </p>
+                    {activeTab === "my-meets" && (
+                      <div className="flex flex-col sm:flex-row gap-3">
                   <Button
-                    onClick={() => setShowCompleted(!showCompleted)}
-                    variant="outline"
-                    size="sm"
-                    className="border-gray-600 text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-950/20"
-                  >
-                    {showCompleted ? 'Hide' : 'Show'} Details
+                          onClick={handleCreate}
+                          disabled={loading}
+                          className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                        >
+                          <Plus className="h-5 w-5 mr-2" />
+                          Create Meeting
                   </Button>
                   <Button
-                    onClick={fetchRunningMeets}
+                          onClick={handleRefresh}
                     disabled={loadingMeets}
                     variant="outline"
-                    size="sm"
-                    className="border-gray-600 text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-950/20"
-                  >
-                    {loadingMeets ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Clock className="h-4 w-4" />
-                    )}
+                          className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                        >
+                          <Clock className={`h-5 w-5 mr-2 ${loadingMeets ? "animate-spin" : ""}`} />
+                          Refresh
                   </Button>
                 </div>
+                    )}
               </div>
-              
-              {showCompleted && (
-                <div className="grid gap-3 max-h-96 overflow-y-auto">
-                  {completedMeets.slice(0, 10).map((meeting) => (
-                    <div key={meeting.id} className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/50 dark:border-gray-700/50 rounded-lg p-4 hover:shadow-sm transition-all duration-300">
-                      <div className="flex items-start justify-between">
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {filteredMeetings.map((meeting) => (
+                    <div key={meeting.id} className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-purple-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-purple-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="relative p-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start space-x-4 flex-1 min-w-0">
+                            <div className="text-3xl">{meeting.isActive ? "🔴" : "📹"}</div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                              <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
                               {meeting.title}
-                            </h4>
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                              Completed
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
+                              </h3>
+                              <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                <span className="flex items-center">
+                                  <Clock className="h-4 w-4 mr-1" />
                               {formatMeetingTime(meeting.startTime, meeting.endTime)}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Users className="h-4 w-4" />
+                                </span>
+                                <span className="flex items-center">
+                                  <Users className="h-4 w-4 mr-1" />
                               {meeting.attendees.length} attendee{meeting.attendees.length !== 1 ? 's' : ''}
+                            </span>
                             </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 mt-3">
                             <code className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-mono">
                               {meeting.meetingCode}
                             </code>
@@ -523,171 +974,279 @@ export default function MeetLobby() {
                             </Button>
                           </div>
                         </div>
-                        
-                        <div className="flex items-center gap-2 ml-4">
+                          </div>
+                          <div className="flex items-center gap-2">
                           <Button
                             onClick={() => joinRunningMeet(meeting.meetingUri)}
                             size="sm"
-                            variant="outline"
-                            className="border-gray-600 text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-950/20"
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             <ExternalLink className="h-4 w-4 mr-1" />
-                            View
+                              {meeting.isActive ? "Join" : "View"}
                           </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   ))}
-                  
-                  {completedMeets.length > 10 && (
-                    <div className="text-center py-2 text-sm text-gray-500 dark:text-gray-400">
-                      Showing 10 of {completedMeets.length} completed meetings
                     </div>
                   )}
                 </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Professional Modal for Create/Join Meeting */}
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto mx-4 sm:mx-0">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <div className={`p-2 rounded-xl ${modalType === "create" ? "bg-gradient-to-br from-blue-500 to-blue-600" : "bg-gradient-to-br from-green-500 to-emerald-600"}`}>
+                  {modalType === "create" ? (
+                    <Video className="h-5 w-5 text-white" />
+                  ) : (
+                    <Users className="h-5 w-5 text-white" />
               )}
             </div>
-          </div>
-        )}
-
-        <div className="grid md:grid-cols-2 gap-6 sm:gap-8">
-          {/* Create Meeting */}
-          <div className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-indigo-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-indigo-950/20 rounded-2xl"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="flex items-center mb-6">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg mr-4">
-                  <Video className="h-6 w-6 text-white" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">Start a new meeting</h2>
-              </div>
+                <span className="text-xl font-semibold">
+                  {modalType === "create" ? "Start a meet" : "Join with code"}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {error && (
+                <Alert className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+                  <AlertDescription className="text-red-800 dark:text-red-300">
+                    {error}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Meeting Title
+                    {modalType === "create" ? "Meeting Title" : "Meeting Code"}
                   </label>
                   <Input 
-                    placeholder="Enter meeting title" 
-                    value={title} 
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
-                  />
-                </div>
-                <Button 
-                  onClick={handleCreate} 
-                  disabled={loading}
-                  className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-5 w-5" />
-                      Create Meeting
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Join Meeting */}
-          <div className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-transparent to-emerald-50/50 dark:from-green-950/20 dark:via-transparent dark:to-emerald-950/20 rounded-2xl"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="flex items-center mb-6">
-                <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg mr-4">
-                  <Users className="h-6 w-6 text-white" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">Join with code</h2>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Meeting Code
-                  </label>
-                  <Input 
-                    placeholder="Enter meeting code" 
-                    value={code} 
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    placeholder={modalType === "create" ? "Enter meeting title" : "Enter meeting code"} 
+                    value={modalType === "create" ? title : code} 
+                    onChange={(e) => {
+                      if (modalType === "create") {
+                        setTitle(e.target.value);
+                      } else {
+                        setCode(e.target.value.toUpperCase());
+                      }
+                    }}
                     className="w-full h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-mono text-center text-lg tracking-wider"
                   />
                 </div>
+
+                {/* Team Member Selection - Only for Create Modal */}
+                {modalType === "create" && (
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Invite Team Members
+                    </label>
+                    
+                    {loadingUsers ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="flex items-center gap-3">
+                          <Clock className="h-5 w-5 animate-spin text-blue-500" />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Loading team members...</span>
+                        </div>
+                      </div>
+                    ) : teamMembers.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No team members found</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {/* Role Tabs - Responsive Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                          <button
+                            onClick={() => setActiveRoleTab("all")}
+                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
+                              activeRoleTab === "all"
+                                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                            }`}
+                          >
+                            <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">All</span>
+                            <span className="sm:hidden">All</span>
+                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-xs">
+                              {getRoleCounts().all}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setActiveRoleTab("admin")}
+                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
+                              activeRoleTab === "admin"
+                                ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 shadow-sm"
+                                : "text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                            }`}
+                          >
+                            <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Admins</span>
+                            <span className="sm:hidden">Admin</span>
+                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-300 rounded-full text-xs">
+                              {getRoleCounts().admin}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setActiveRoleTab("developer")}
+                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
+                              activeRoleTab === "developer"
+                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 shadow-sm"
+                                : "text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                            }`}
+                          >
+                            <Code className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Devs</span>
+                            <span className="sm:hidden">Dev</span>
+                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-full text-xs">
+                              {getRoleCounts().developer}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setActiveRoleTab("tester")}
+                            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
+                              activeRoleTab === "tester"
+                                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 shadow-sm"
+                                : "text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400"
+                            }`}
+                          >
+                            <TestTube className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Testers</span>
+                            <span className="sm:hidden">Test</span>
+                            <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-green-200 dark:bg-green-800 text-green-700 dark:text-green-300 rounded-full text-xs">
+                              {getRoleCounts().tester}
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Team Members List */}
+                        <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-200 dark:border-gray-700 rounded-xl p-3 bg-gray-50 dark:bg-gray-800/50">
+                          {getFilteredTeamMembers().map((member) => (
+                          <div
+                            key={member.email}
+                            onClick={() => toggleUserSelection(member.email)}
+                            className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                              selectedUsers.includes(member.email)
+                                ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-700'
+                                : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            <div className="flex-shrink-0">
+                              <div className={`p-1.5 sm:p-2 rounded-lg ${getRoleColor(member.role)}`}>
+                                {getRoleIcon(member.role)}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1 sm:gap-2">
+                                <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 flex-shrink-0" />
+                                <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate">
+                                  {member.email}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 mt-1">
+                                <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${getRoleColor(member.role)}`}>
+                                  {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0">
+                              <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center ${
+                                selectedUsers.includes(member.email)
+                                  ? 'bg-blue-500 border-blue-500'
+                                  : 'border-gray-300 dark:border-gray-600'
+                              }`}>
+                                {selectedUsers.includes(member.email) && (
+                                  <Check className="h-2 w-2 sm:h-3 sm:w-3 text-white" />
+                                )}
+              </div>
+            </div>
+          </div>
+                        ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Selected Users Summary - Responsive */}
+                    {selectedUsers.length > 0 && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-2 sm:p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                          <span className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-300">
+                            {selectedUsers.length} member{selectedUsers.length !== 1 ? 's' : ''} selected
+                          </span>
+                </div>
+                        <div className="flex flex-wrap gap-1">
+                          {getSelectedUsers().map((member) => (
+                            <span
+                              key={member.email}
+                              className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-800/30 text-blue-800 dark:text-blue-300 rounded-md text-xs"
+                            >
+                              {getRoleIcon(member.role)}
+                              <span className="truncate max-w-[120px] sm:max-w-none">
+                                {member.email}
+                              </span>
+                            </span>
+                          ))}
+              </div>
+                </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <Button 
-                  variant="outline" 
-                  onClick={handleJoin} 
-                  disabled={loading || !code.trim()}
-                  className="w-full h-12 bg-white dark:bg-gray-800 border-green-600 dark:border-green-700 text-green-600 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/20 hover:border-green-700 dark:hover:border-green-600 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                    onClick={modalType === "create" ? handleCreate : handleJoin} 
+                    disabled={loading || (modalType === "join" && !code.trim())}
+                    className={`flex-1 h-10 sm:h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
+                      modalType === "create" 
+                        ? "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white" 
+                        : "bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white"
+                    }`}
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Joining...
+                      <Loader2 className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                        <span className="text-sm sm:text-base">
+                          {modalType === "create" ? "Creating..." : "Joining..."}
+                        </span>
                     </>
                   ) : (
                     <>
-                      <Users className="mr-2 h-5 w-5" />
-                      Join Meeting
+                        {modalType === "create" ? (
+                          <>
+                            <Plus className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                            <span className="text-sm sm:text-base">Create Meeting</span>
+                    </>
+                  ) : (
+                    <>
+                      <Users className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="text-sm sm:text-base">Join Meeting</span>
+                          </>
+                        )}
                     </>
                   )}
                 </Button>
-              </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={closeModal}
+                    className="h-10 sm:h-12 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                  >
+                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
             </div>
-          </div>
-        </div>
+                  </div>
+                </div>
+          </DialogContent>
+        </Dialog>
 
-        {/* Enhanced Features Section */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
-          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
-                Professional Meeting Features
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl mx-auto">
-                Everything you need for productive team collaboration
-              </p>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 via-transparent to-blue-50/50 dark:from-purple-950/20 dark:via-transparent dark:to-blue-950/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 text-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                  <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl w-fit mx-auto mb-4 shadow-lg">
-                    <Video className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2 text-lg">HD Video Quality</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Crystal clear video quality for seamless communication</p>
-                </div>
-              </div>
-              
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 text-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                  <div className="p-3 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl w-fit mx-auto mb-4 shadow-lg">
-                    <Users className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2 text-lg">Team Collaboration</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Work together seamlessly with your development team</p>
-                </div>
-              </div>
-              
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-transparent to-emerald-50/50 dark:from-green-950/20 dark:via-transparent dark:to-emerald-950/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 text-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                  <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl w-fit mx-auto mb-4 shadow-lg">
-                    <Copy className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2 text-lg">Easy Sharing</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Share meeting codes instantly with your team members</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </section>
     </main>
   );
