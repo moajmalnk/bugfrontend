@@ -692,6 +692,17 @@ export default function MyTasks() {
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
             <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
               <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
+              <TabsTrigger
+                  value="shared-tasks"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">Shared Tasks</span>
+                  <span className="sm:hidden">Shared</span>
+                  <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
+                    {sharedTasks.length}
+                  </span>
+                </TabsTrigger>
                 <TabsTrigger
                   value="my-tasks"
                   className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
@@ -701,17 +712,6 @@ export default function MyTasks() {
                   <span className="sm:hidden">My</span>
                   <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
                     {pendingTasksCount}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="shared-tasks"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Shared Tasks</span>
-                  <span className="sm:hidden">Shared</span>
-                  <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
-                    {sharedTasks.length}
                   </span>
                 </TabsTrigger>
               </TabsList>

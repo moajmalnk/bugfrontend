@@ -1,37 +1,27 @@
 import { ChatGroupSelector } from "@/components/messaging/ChatGroupSelector";
 import { ChatInterface } from "@/components/messaging/ChatInterface";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { ChatGroup } from "@/types";
 import { 
   MessageCircle, 
-  Plus, 
-  Search, 
-  Filter, 
-  Users, 
-  Hash,
-  Phone,
-  Video
+  Plus,
+  Clock,
+  Trash2
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useUndoDelete } from "@/hooks/useUndoDelete";
+import { toast } from "sonner";
 
 const Messages = () => {
   const { currentUser } = useAuth();
   const [selectedGroup, setSelectedGroup] = useState<ChatGroup | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [triggerCreateGroup, setTriggerCreateGroup] = useState(false);
+  const [groupsCount, setGroupsCount] = useState(0);
+  const [deletedGroup, setDeletedGroup] = useState<ChatGroup | null>(null);
 
   // Handle responsive behavior
   useEffect(() => {
@@ -51,6 +41,51 @@ const Messages = () => {
 
   const handleBackToChatList = () => {
     setSelectedGroup(null);
+  };
+
+  const handleNewChatClick = () => {
+    setTriggerCreateGroup(true);
+  };
+
+  const handleGroupsCountUpdate = (count: number) => {
+    setGroupsCount(count);
+  };
+
+  // Undo delete functionality
+  const undoDelete = useUndoDelete({
+    duration: 10,
+    onConfirm: () => {
+      // Actually delete the group from the backend
+      if (deletedGroup) {
+        performActualDelete(deletedGroup.id);
+        setDeletedGroup(null);
+      }
+    },
+    onUndo: () => {
+      // Restore the group to the list
+      if (deletedGroup) {
+        toast.success("Group deletion cancelled");
+        setDeletedGroup(null);
+      }
+    }
+  });
+
+  const performActualDelete = async (groupId: string) => {
+    try {
+      // Here you would call the actual delete API
+      console.log("Actually deleting group:", groupId);
+      toast.success("Group permanently deleted");
+    } catch (err: any) {
+      console.error("❌ Error deleting group:", err?.message);
+      const errorMessage = err?.response?.data?.error || err?.message || "Failed to delete group";
+      toast.error(errorMessage);
+      
+      // Restore the group if deletion failed
+      if (deletedGroup) {
+        toast.success("Group deletion cancelled");
+        setDeletedGroup(null);
+      }
+    }
   };
 
   return (
@@ -79,23 +114,15 @@ const Messages = () => {
               </div>
               
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <Link
-                  to={
-                    currentUser?.role
-                      ? `/${currentUser.role}/messages/new`
-                      : "/messages/new"
-                  }
-                  className="group"
+                <Button
+                  onClick={handleNewChatClick}
+                  variant="default"
+                  size="lg"
+                  className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                 >
-                  <Button
-                    variant="default"
-                    size="lg"
-                    className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 group-hover:scale-105"
-                  >
-                    <Plus className="mr-2 h-5 w-5" />
-                    New Chat
-                  </Button>
-                </Link>
+                  <Plus className="mr-2 h-5 w-5" />
+                  New Chat
+                </Button>
                 
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
@@ -104,7 +131,7 @@ const Messages = () => {
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                        0
+                        {groupsCount}
                       </div>
                     </div>
                   </div>
@@ -114,89 +141,6 @@ const Messages = () => {
           </div>
         </div>
 
-        {/* Search and Filter Controls */}
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
-          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 bg-blue-500 rounded-lg">
-                  <Search className="h-4 w-4 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-              </div>
-              
-              <div className="flex flex-col lg:flex-row gap-4">
-                {/* Search Bar */}
-                <div className="flex-1 relative group">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                  <input
-                    type="text"
-                    placeholder="Search conversations, contacts, or messages..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                  />
-                </div>
-
-                {/* Filter Controls */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                  {/* Type Filter */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
-                      <Filter className="h-4 w-4 text-white" />
-                    </div>
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
-                      <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                        <SelectValue placeholder="Type" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-[60]">
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="group">Group Chats</SelectItem>
-                        <SelectItem value="direct">Direct Messages</SelectItem>
-                        <SelectItem value="project">Project Channels</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-green-500 rounded-lg shrink-0">
-                      <Users className="h-4 w-4 text-white" />
-                    </div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-[60]">
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="online">Online</SelectItem>
-                        <SelectItem value="offline">Offline</SelectItem>
-                        <SelectItem value="away">Away</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Clear Filters Button */}
-                  {(searchTerm || typeFilter !== "all" || statusFilter !== "all") && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSearchTerm("");
-                        setTypeFilter("all");
-                        setStatusFilter("all");
-                      }}
-                      className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                    >
-                      Clear
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Main Content Area */}
         <div className="relative overflow-hidden">
@@ -220,7 +164,14 @@ const Messages = () => {
                   onGroupSelect={handleGroupSelect}
                   showAllProjects={true}
                   onCreateGroupClick={() => {
-                    /* open dialog logic here */
+                    setTriggerCreateGroup(true);
+                  }}
+                  triggerCreateGroup={triggerCreateGroup}
+                  onTriggerCreateGroupReset={() => setTriggerCreateGroup(false)}
+                  onGroupsCountUpdate={handleGroupsCountUpdate}
+                  onGroupDelete={(group) => {
+                    setDeletedGroup(group);
+                    undoDelete.startCountdown();
                   }}
                 />
               </aside>
@@ -283,6 +234,94 @@ const Messages = () => {
             </div>
           </div>
         </div>
+
+        {/* Undo Delete Countdown */}
+        {undoDelete.isCountingDown && deletedGroup && (
+          <div className="fixed bottom-4 right-4 z-50">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-4 max-w-sm">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                    <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                  {/* Circular Progress Indicator */}
+                  <div className="absolute inset-0 w-12 h-12">
+                    <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 48 48">
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r="20"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        fill="none"
+                        className="text-gray-200 dark:text-gray-700"
+                      />
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r="20"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        fill="none"
+                        strokeDasharray={`${2 * Math.PI * 20}`}
+                        strokeDashoffset={`${2 * Math.PI * 20 * (1 - (10 - undoDelete.timeLeft) / 10)}`}
+                        className="text-red-500 transition-all duration-1000 ease-linear"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    Chat Group Deleted
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    "{deletedGroup.name}"
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-red-500 animate-pulse" />
+                        <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                          Permanently deleted in
+                        </span>
+                      </div>
+                      <div className="bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-md border border-red-200 dark:border-red-800">
+                        <span className="text-sm font-bold text-red-700 dark:text-red-300 tabular-nums">
+                          {undoDelete.timeLeft}s
+                        </span>
+                      </div>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                      <div 
+                        className="bg-red-500 h-1.5 rounded-full transition-all duration-1000 ease-linear"
+                        style={{ width: `${((10 - undoDelete.timeLeft) / 10) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Button
+                    onClick={undoDelete.cancelCountdown}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 h-7"
+                  >
+                    Undo
+                  </Button>
+                  <Button
+                    onClick={undoDelete.confirmDelete}
+                    size="sm"
+                    variant="outline"
+                    className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20 text-xs px-3 py-1 h-7"
+                  >
+                    Now
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );

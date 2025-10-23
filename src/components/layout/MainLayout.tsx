@@ -26,6 +26,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     () => localStorage.getItem("privacyMode") === "true"
   );
 
+  // Check if we're in impersonate mode
+  const isImpersonating = currentUser?.admin_id && currentUser.admin_id !== currentUser.id;
+
   useEffect(() => {
     if (!isLoading && !currentUser) {
       navigate("/login", { replace: true });
@@ -63,11 +66,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
   return (
     <NotificationProvider>
-      <div className="flex flex-col h-screen min-w-0 bg-background">
+      <div className="flex h-screen min-w-0 bg-background">
         <ImpersonateBanner />
-        <div className="flex flex-1 min-w-0">
         {/* Sidebar for desktop */}
-        <div className="hidden lg:block w-72 min-w-0">
+        <div className={`hidden lg:block w-72 min-w-0 ${isImpersonating ? 'pt-16' : ''}`}>
           <Sidebar />
         </div>
 
@@ -96,7 +98,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className={`flex-1 flex flex-col min-w-0 ${isImpersonating ? 'pt-16' : ''}`}>
           {/* Top bar with menu button on mobile/tablet */}
           <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm sticky top-0 z-40">
             <div className="flex items-center gap-3">
@@ -150,7 +152,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               </footer>
             </div>
           </main>
-        </div>
         </div>
       </div>
       <AnnouncementPopup />

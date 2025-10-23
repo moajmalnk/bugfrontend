@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { googleDocsService, UserDocument, Template } from "@/services/googleDocsService";
 import {
@@ -35,6 +37,11 @@ import {
   Clock,
   FolderOpen,
   Link as LinkIcon,
+  Search,
+  Filter,
+  Calendar,
+  User,
+  X,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -55,6 +62,14 @@ const BugDocsPage = () => {
   // Form state
   const [docTitle, setDocTitle] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("0");
+
+  // Tab and filter state
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || "all-docs";
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
 
   useEffect(() => {
     loadData();
@@ -260,6 +275,101 @@ const BugDocsPage = () => {
     }
   };
 
+  // Filtered documents with useMemo - sorted by latest first
+  const filteredDocuments = useMemo(() => {
+    let filtered = [...documents];
+    
+    // Filter by tab
+    if (activeTab === "my-docs") {
+      // For now, show all documents in both tabs
+      // In the future, this could filter by user ownership
+      filtered = documents;
+    } else if (activeTab === "all-docs") {
+      filtered = documents;
+    }
+    
+    // Apply search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(doc => 
+        doc.doc_title.toLowerCase().includes(searchLower) ||
+        doc.template_name?.toLowerCase().includes(searchLower) ||
+        doc.doc_type.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Apply type filter
+    if (typeFilter !== "all") {
+      filtered = filtered.filter(doc => doc.doc_type === typeFilter);
+    }
+    
+    // Apply date filter
+    if (dateFilter !== "all") {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const thisWeek = new Date(today);
+      thisWeek.setDate(thisWeek.getDate() - 7);
+      const thisMonth = new Date(today);
+      thisMonth.setMonth(thisMonth.getMonth() - 1);
+      
+      filtered = filtered.filter(doc => {
+        const docDate = new Date(doc.created_at);
+        switch (dateFilter) {
+          case "today":
+            return docDate >= today;
+          case "yesterday":
+            return docDate >= yesterday && docDate < today;
+          case "this-week":
+            return docDate >= thisWeek;
+          case "this-month":
+            return docDate >= thisMonth;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Sort by latest first (newest documents at the top)
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at);
+      const dateB = new Date(b.created_at);
+      return dateB.getTime() - dateA.getTime(); // Descending order (latest first)
+    });
+  }, [documents, activeTab, searchTerm, typeFilter, dateFilter]);
+
+  // Get unique document types for filter
+  const uniqueTypes = useMemo(() => {
+    const types = documents
+      .map(doc => doc.doc_type)
+      .filter(Boolean)
+      .filter((type, index, arr) => arr.indexOf(type) === index);
+    return types.sort();
+  }, [documents]);
+
+  // Get tab counts
+  const getTabCount = (tabType: string) => {
+    const allCount = documents?.length || 0;
+    const myCount = documents?.length || 0; // For now, same as all
+    
+    switch (tabType) {
+      case "all-docs":
+        return allCount;
+      case "my-docs":
+        return myCount;
+      default:
+        return 0;
+    }
+  };
+
+  // Keep tab in sync with URL changes (back/forward navigation)
+  useEffect(() => {
+    const urlTab = searchParams.get("tab") || "all-docs";
+    if (urlTab !== activeTab) setActiveTab(urlTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
@@ -318,50 +428,6 @@ const BugDocsPage = () => {
           </div>
         </div>
 
-        {/* Statistics */}
-        {isConnected && (
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="bg-gray-800 dark:bg-gray-900 rounded-2xl p-4 sm:p-6 border border-gray-700 dark:border-gray-600">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm font-medium text-gray-400 dark:text-gray-500 truncate">Total Documents</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-white dark:text-white">{documents.length}</p>
-                </div>
-                <div className="p-2 sm:p-3 bg-blue-500 rounded-xl flex-shrink-0">
-                  <FolderOpen className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-800 dark:bg-gray-900 rounded-2xl p-4 sm:p-6 border border-gray-700 dark:border-gray-600">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm font-medium text-gray-400 dark:text-gray-500 truncate">Templates Available</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-white dark:text-white">{templates.length}</p>
-                </div>
-                <div className="p-2 sm:p-3 bg-green-500 rounded-xl flex-shrink-0">
-                  <FileText className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-800 dark:bg-gray-900 rounded-2xl p-4 sm:p-6 border border-gray-700 dark:border-gray-600 sm:col-span-2 lg:col-span-1">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm font-medium text-gray-400 dark:text-gray-500 truncate">Recent Activity</p>
-                  <p className="text-lg sm:text-2xl lg:text-3xl font-bold text-white dark:text-white truncate">
-                    {documents.length > 0
-                      ? formatDistanceToNow(new Date(documents[0].created_at), {
-                          addSuffix: true,
-                        })
-                      : "No activity"}
-                  </p>
-                </div>
-                <div className="p-2 sm:p-3 bg-orange-500 rounded-xl flex-shrink-0">
-                  <Clock className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Connection Status */}
         {!isConnected && !isCheckingConnection && (
@@ -387,107 +453,231 @@ const BugDocsPage = () => {
           </div>
         )}
 
-        {/* Documents List */}
+        {/* Documents Tabs */}
         {isConnected && (
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
-            <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="p-1.5 bg-orange-500 rounded-lg">
-                  <FileText className="h-4 w-4 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Your Documents</h3>
+          <Tabs 
+            value={activeTab} 
+            onValueChange={(val) => {
+              setActiveTab(val);
+              setSearchParams((prev) => {
+                const p = new URLSearchParams(prev);
+                p.set("tab", val);
+                return p as any;
+              });
+            }} 
+            className="w-full"
+          >
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-orange-50/50 dark:from-gray-800/50 dark:to-orange-900/50 rounded-2xl"></div>
+              <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
+                <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
+                  <TabsTrigger
+                    value="all-docs"
+                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                  >
+                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    <span className="hidden sm:inline">All Docs</span>
+                    <span className="sm:hidden">All</span>
+                    <span className="ml-2 px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-bold">
+                      {getTabCount("all-docs")}
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="my-docs"
+                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                  >
+                    <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    <span className="hidden sm:inline">My Docs</span>
+                    <span className="sm:hidden">My</span>
+                    <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
+                      {getTabCount("my-docs")}
+                    </span>
+                  </TabsTrigger>
+                </TabsList>
               </div>
-              
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Loading documents...</span>
-                </div>
-              ) : documents.length === 0 ? (
-                <div className="relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
-                  <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-                    <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-                      <FileText className="h-10 w-10 text-white" />
+            </div>
+            
+            <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
+              {/* Search and Filter Controls */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
+                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-orange-500 rounded-lg">
+                      <Search className="h-4 w-4 text-white" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Documents Yet</h3>
-                    <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                      Create your first document to get started with BugDocs
-                    </p>
-                    <Button 
-                      onClick={() => setIsCreateModalOpen(true)}
-                      className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                    >
-                      <Plus className="h-5 w-5 mr-2" />
-                      Create Document
-                    </Button>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                  </div>
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    {/* Search Bar */}
+                    <div className="flex-1 relative group">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                      <input
+                        type="text"
+                        placeholder="Search documents by title, template, or type..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      />
+                    </div>
+                    
+                    {/* Filter Controls */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      {/* Type Filter */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                          <Filter className="h-4 w-4 text-white" />
+                        </div>
+                        <Select value={typeFilter} onValueChange={setTypeFilter}>
+                          <SelectTrigger className="w-full sm:w-[140px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All Types</SelectItem>
+                            {uniqueTypes.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Date Filter */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                          <Calendar className="h-4 w-4 text-white" />
+                        </div>
+                        <Select value={dateFilter} onValueChange={setDateFilter}>
+                          <SelectTrigger className="w-full sm:w-[140px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Date" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All Dates</SelectItem>
+                            <SelectItem value="today">Today</SelectItem>
+                            <SelectItem value="yesterday">Yesterday</SelectItem>
+                            <SelectItem value="this-week">This Week</SelectItem>
+                            <SelectItem value="this-month">This Month</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {/* Clear Filters Button */}
+                      {(searchTerm || typeFilter !== "all" || dateFilter !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearchTerm("");
+                            setTypeFilter("all");
+                            setDateFilter("all");
+                          }}
+                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {documents.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300"
-                    >
-                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-red-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-red-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <div className="relative p-4 sm:p-6">
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                          <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
-                            <div className="text-2xl sm:text-3xl flex-shrink-0">{getDocTypeIcon(doc.doc_type)}</div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-700 dark:group-hover:text-orange-300 transition-colors truncate">
-                                {doc.doc_title}
-                              </h3>
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                {doc.template_name && (
+              </div>
+
+              {/* Documents Content */}
+              <div className="space-y-4">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading documents...</span>
+                  </div>
+                ) : filteredDocuments.length === 0 ? (
+                  <div className="relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                    <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                      <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                        <FileText className="h-10 w-10 text-white" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                        {activeTab === "all-docs" ? "No documents found" : "No documents found"}
+                      </h3>
+                      <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                        {activeTab === "all-docs"
+                          ? "No documents available. Create your first document to get started."
+                          : "No documents available. Create your first document to get started."}
+                      </p>
+                      <Button 
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                      >
+                        <Plus className="h-5 w-5 mr-2" />
+                        Create Document
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300"
+                      >
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-red-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-red-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <div className="relative p-4 sm:p-6">
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                            <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
+                              <div className="text-2xl sm:text-3xl flex-shrink-0">{getDocTypeIcon(doc.doc_type)}</div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-700 dark:group-hover:text-orange-300 transition-colors truncate">
+                                  {doc.doc_title}
+                                </h3>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                  {doc.template_name && (
+                                    <span className="flex items-center">
+                                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                                      <span className="truncate">{doc.template_name}</span>
+                                    </span>
+                                  )}
                                   <span className="flex items-center">
-                                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                                    <span className="truncate">{doc.template_name}</span>
+                                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                                    <span className="truncate">Created {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}</span>
                                   </span>
-                                )}
-                                <span className="flex items-center">
-                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
-                                  <span className="truncate">Created {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}</span>
-                                </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2 sm:gap-2 flex-shrink-0">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewDocument(doc)}
-                              className="h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
-                            >
-                              <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                              <span className="hidden sm:inline">View</span>
-                              <span className="sm:hidden">View</span>
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDeleteClick(doc)}
-                              disabled={isDeleting === doc.id}
-                              className="h-9 sm:h-10 w-9 sm:w-auto px-2 sm:px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
-                            >
-                              {isDeleting === doc.id ? (
-                                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              )}
-                              <span className="hidden sm:inline ml-1">Delete</span>
-                            </Button>
+                            <div className="flex items-center gap-2 sm:gap-2 flex-shrink-0">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewDocument(doc)}
+                                className="h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
+                              >
+                                <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                <span className="hidden sm:inline">View</span>
+                                <span className="sm:hidden">View</span>
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteClick(doc)}
+                                disabled={isDeleting === doc.id}
+                                className="h-9 sm:h-10 w-9 sm:w-auto px-2 sm:px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                              >
+                                {isDeleting === doc.id ? (
+                                  <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                )}
+                                <span className="hidden sm:inline ml-1">Delete</span>
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
 
       {/* Create Document Modal */}

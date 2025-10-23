@@ -37,9 +37,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
   const location = useLocation();
   const role = currentUser?.role;
-  
-  // Debug logging
-  console.log('Sidebar rendering:', { currentUser, role, isImpersonating: currentUser?.admin_id && currentUser.admin_id !== currentUser.id });
 
   const isActive = (path: string) => {
     if (!role) return false;
@@ -160,11 +157,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   label="BugToDo"
                 />
                 <NavLink
-                  to="/daily-update"
-                  icon={<Calendar className="h-5 w-5" />}
-                  label="BugUpdate"
-                />
-                <NavLink
                   to="/bugdocs"
                   icon={<FileText className="h-5 w-5" />}
                   label="BugDocs"
@@ -174,6 +166,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   to="/meet"
                   icon={<Video className="h-5 w-5" />}
                   label="BugMeet"
+                />
+                                <NavLink
+                  to="/daily-update"
+                  icon={<Calendar className="h-5 w-5" />}
+                  label="BugUpdate"
                 />
                 
               </>
@@ -229,21 +226,13 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
 
       {/* User Profile */}
       <div className="flex-shrink-0 p-3 border-t border-border/50 bg-muted/30 relative z-10">
-        <button
-          className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition-all duration-200 group relative z-10 pointer-events-auto cursor-pointer w-full text-left border-0 bg-transparent"
-          style={{ zIndex: 9999 }}
+        <Link
+          to={role ? `/${role}/profile` : "/profile"}
+          className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition-all duration-200 group relative z-10 pointer-events-auto"
           onClick={(e) => {
-            console.log('Profile button clicked', { role, currentUser, isImpersonating: currentUser?.admin_id && currentUser.admin_id !== currentUser.id });
-            e.preventDefault();
-            e.stopPropagation();
+            console.log('Profile button clicked', { role, currentUser });
             closeSidebar?.();
-            // Force navigation
-            const profilePath = role ? `/${role}/profile` : "/profile";
-            console.log('Navigating to:', profilePath);
-            window.location.href = profilePath;
           }}
-          onMouseEnter={() => console.log('Profile button hover')}
-          onMouseDown={() => console.log('Profile button mouse down')}
         >
           <div className="relative flex-shrink-0">
             <img
@@ -261,7 +250,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               {currentUser?.role || "BugRicer"}
             </p>
           </div>
-        </button>
+        </Link>
       </div>
     </nav>
   );

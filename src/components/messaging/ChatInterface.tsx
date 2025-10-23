@@ -35,6 +35,10 @@ import {
   Star,
   Trash2,
   Video,
+  ArrowLeft,
+  Search,
+  Filter,
+  Users,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { AudioWaveform } from "./AudioWaveform";
@@ -567,65 +571,65 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background hide-scrollbar">
-      {/* Header - Fixed/Sticky */}
-      <div className="flex-shrink-0 z-20 bg-[#202c33] dark:bg-[#202c33] border-b border-[#2a3942] dark:border-[#2a3942] px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            {/* Back button for mobile */}
-            {onBackToChatList && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onBackToChatList}
-                className="md:hidden h-9 w-9 text-[#aebac1] hover:bg-[#2a3942]"
-              >
-                <Reply className="h-5 w-5 rotate-180" />
-              </Button>
-            )}
-            
-            {/* Group Avatar */}
-            <Avatar className="h-10 w-10 flex-shrink-0">
-              <AvatarFallback className="bg-[#00a884] text-white font-semibold">
-                {selectedGroup.name.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            
-            {/* Group Info */}
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-base font-medium text-[#e9edef] dark:text-[#e9edef] truncate">
-                {selectedGroup.name}
-              </CardTitle>
-              <div className="text-xs text-[#8696a0] dark:text-[#8696a0]">
-                {typingUsers.length > 0 ? (
-                  <span className="text-[#00a884] animate-pulse">
-                    {typingUsers.map((u) => u.user_name).join(", ")} typing...
-                  </span>
-                ) : (
-                  <span>{selectedGroup.member_count} members</span>
-                )}
+      {/* Professional Header - Fixed/Sticky */}
+      <div className="relative overflow-hidden flex-shrink-0 z-20">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"></div>
+        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              {/* Back button for mobile */}
+              {onBackToChatList && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onBackToChatList}
+                  className="md:hidden h-9 w-9 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              )}
+              
+              {/* Group Avatar */}
+              <div className="relative">
+                <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-blue-500/20 shadow-lg">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-semibold">
+                    {selectedGroup.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900"></div>
+              </div>
+              
+              {/* Group Info */}
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                  {selectedGroup.name}
+                </CardTitle>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  {typingUsers.length > 0 ? (
+                    <span className="text-blue-600 dark:text-blue-400 animate-pulse font-medium">
+                      {typingUsers.map((u) => u.user_name).join(", ")} typing...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {selectedGroup.member_count} members
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-          
-          {/* Header Actions */}
-          <div className="flex items-center gap-1">
-            <MessageSearch
-              groupId={selectedGroup.id}
-              onMessageClick={handleMessageClick}
-            />
-            <StarredMessages
-              groupId={selectedGroup.id}
-              onMessageClick={handleMessageClick}
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowReadReceipts(!showReadReceipts)}
-              className="h-9 w-9 text-[#aebac1] hover:bg-[#2a3942]"
-              title={showReadReceipts ? "Hide Read Receipts" : "Show Read Receipts"}
-            >
-              {showReadReceipts ? <CheckCheck className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
-            </Button>
+            
+            {/* Header Actions */}
+            <div className="flex items-center gap-1">
+              <MessageSearch
+                groupId={selectedGroup.id}
+                onMessageClick={handleMessageClick}
+              />
+              <StarredMessages
+                groupId={selectedGroup.id}
+                onMessageClick={handleMessageClick}
+              />
+            </div>
           </div>
         </div>
       </div>

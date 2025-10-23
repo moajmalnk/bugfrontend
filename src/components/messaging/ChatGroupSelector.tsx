@@ -39,6 +39,10 @@ interface ChatGroupSelectorProps {
   onGroupSelect: (group: ChatGroup) => void;
   showAllProjects?: boolean;
   onCreateGroupClick?: () => void;
+  triggerCreateGroup?: boolean;
+  onTriggerCreateGroupReset?: () => void;
+  onGroupsCountUpdate?: (count: number) => void;
+  onGroupDelete?: (group: ChatGroup) => void;
 }
 
 export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
@@ -46,6 +50,10 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   onGroupSelect,
   showAllProjects = false,
   onCreateGroupClick,
+  triggerCreateGroup = false,
+  onTriggerCreateGroupReset,
+  onGroupsCountUpdate,
+  onGroupDelete,
 }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -96,6 +104,21 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   });
 
   const isAdmin = currentUser?.role === "admin";
+
+  // Handle external trigger to open create group dialog
+  useEffect(() => {
+    if (triggerCreateGroup && onTriggerCreateGroupReset) {
+      setIsCreateDialogOpen(true);
+      onTriggerCreateGroupReset();
+    }
+  }, [triggerCreateGroup, onTriggerCreateGroupReset]);
+
+  // Notify parent component when groups count changes
+  useEffect(() => {
+    if (onGroupsCountUpdate) {
+      onGroupsCountUpdate(groups.length);
+    }
+  }, [groups.length, onGroupsCountUpdate]);
 
   // Countdown effect for undo functionality
   useEffect(() => {
@@ -231,6 +254,13 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     const { groupId } = deleteDialog;
     const groupToDelete = groups.find((g) => g.id === groupId);
     if (!groupToDelete) return;
+
+    // Use the new onGroupDelete prop for undo delete functionality
+    if (onGroupDelete) {
+      onGroupDelete(groupToDelete);
+      setDeleteDialog(null);
+      return;
+    }
 
     // Remove from UI immediately
     setGroups((prev) => prev.filter((g) => g.id !== groupId));
@@ -698,43 +728,59 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-background overflow-hidden">
-      {/* Header with plus button */}
-      <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-        <h2 className="text-base sm:text-lg font-semibold">Chat Groups</h2>
-        {isAdmin && (
-          <Button
-            size="icon"
-            variant={
-              filteredGroups.length === 0 && !searchQuery
-                ? "default"
-                : "outline"
-            }
-            onClick={() => setIsCreateDialogOpen(true)}
-            className={`h-8 w-8 sm:h-9 sm:w-9 ${
-              filteredGroups.length === 0 && !searchQuery
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : ""
-            }`}
-            title={
-              filteredGroups.length === 0 && !searchQuery
-                ? "Create your first group"
-                : "Create new group"
-            }
-          >
-            <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-          </Button>
-        )}
-      </div>
-      {/* Search Bar - Mobile */}
-      <div className="md:hidden sticky top-16 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-3 sm:px-4 py-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search chats..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-muted/50 border-0 focus:bg-background text-sm"
-          />
+      {/* Professional Header */}
+      {/* <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"></div>
+        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-3 sticky top-0 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg">
+                <MessageCircle className="h-4 w-4 text-white" />
+              </div>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Chat Groups</h2>
+            </div>
+            {isAdmin && (
+              <Button
+                size="icon"
+                variant={
+                  filteredGroups.length === 0 && !searchQuery
+                    ? "default"
+                    : "outline"
+                }
+                onClick={() => setIsCreateDialogOpen(true)}
+                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl transition-all duration-200 ${
+                  filteredGroups.length === 0 && !searchQuery
+                    ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg"
+                    : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                }`}
+                title={
+                  filteredGroups.length === 0 && !searchQuery
+                    ? "Create your first group"
+                    : "Create new group"
+                }
+              >
+                <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div> */}
+      
+      {/* Professional Search Bar - Mobile */}
+      <div className="md:hidden sticky top-16 z-10">
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30"></div>
+          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search chats..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm transition-all duration-300"
+              />
+            </div>
+          </div>
         </div>
       </div>
       {/* Scrollable Groups List */}

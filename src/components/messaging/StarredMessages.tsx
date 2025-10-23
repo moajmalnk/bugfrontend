@@ -81,7 +81,6 @@ export const StarredMessages: React.FC<StarredMessagesProps> = ({
         className="gap-2"
       >
         <Star className="h-4 w-4" />
-        Starred Messages
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

@@ -175,7 +175,7 @@ const MemberCard = ({
       transition={{ duration: 0.3 }}
     >
       <Card className="shadow-sm hover:shadow transition-shadow duration-200 border h-full">
-        <CardContent className="p-3 sm:p-4 lg:p-5 h-full">
+        <CardContent className="p-3 sm:p-4 h-full">
           <div className="flex justify-between items-start h-full">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
               <div
@@ -739,19 +739,19 @@ const ProjectDetails = () => {
         <div className="relative mb-4">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 p-1 bg-transparent">
-              <TabsTrigger value="overview" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
+            <TabsList className="flex w-full overflow-x-auto hide-scrollbar gap-1 sm:gap-2 md:gap-4 p-1 bg-transparent">
+              <TabsTrigger value="overview" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap min-w-fit">
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="bugs" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
+              <TabsTrigger value="bugs" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap min-w-fit">
                 Bugs
               </TabsTrigger>
-              <TabsTrigger value="updates" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
+              <TabsTrigger value="updates" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap min-w-fit">
                 <Bell className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Updates</span>
                 <span className="sm:hidden">Updates</span>
               </TabsTrigger>
-              <TabsTrigger value="members" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300">
+              <TabsTrigger value="members" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap min-w-fit">
                 Members
               </TabsTrigger>
             </TabsList>
@@ -760,7 +760,7 @@ const ProjectDetails = () => {
 
         <TabsContent value="overview">
           {/* Stats Cards - Responsive grid that works on all screen sizes */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <Card className="flex-1 min-w-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -790,7 +790,7 @@ const ProjectDetails = () => {
               </CardContent>
             </Card>
 
-            <Card className="flex-1 min-w-0 xs:col-span-2 lg:col-span-1">
+            <Card className="flex-1 min-w-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                   Fixed Bugs
@@ -853,8 +853,8 @@ const ProjectDetails = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-3 w-full">
-                <div className="relative flex-1 min-w-[220px]">
+              <div className="flex flex-col gap-3 w-full">
+                <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <input
                     type="text"
@@ -864,30 +864,32 @@ const ProjectDetails = () => {
                     className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-sm"
                   />
                 </div>
-                <Select value={bugStatus} onValueChange={setBugStatus}>
-                  <SelectTrigger className="w-full sm:w-[160px] h-10 text-sm">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="fixed">Fixed</SelectItem>
-                    <SelectItem value="declined">Declined</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={bugPriority} onValueChange={setBugPriority}>
-                  <SelectTrigger className="w-full sm:w-[160px] h-10 text-sm">
-                    <SelectValue placeholder="Priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Priorities</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Select value={bugStatus} onValueChange={setBugStatus}>
+                    <SelectTrigger className="w-full sm:w-[160px] h-10 text-sm">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="fixed">Fixed</SelectItem>
+                      <SelectItem value="declined">Declined</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={bugPriority} onValueChange={setBugPriority}>
+                    <SelectTrigger className="w-full sm:w-[160px] h-10 text-sm">
+                      <SelectValue placeholder="Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Priorities</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* List */}
@@ -942,47 +944,49 @@ const ProjectDetails = () => {
 
                     {/* Pagination */}
                     {total > bugPageSize && (
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                        <div className="text-sm text-muted-foreground">
+                      <div className="flex flex-col gap-3 pt-2">
+                        <div className="text-sm text-muted-foreground text-center sm:text-left">
                           Showing {Math.min(pageStart + 1, total)}-
                           {Math.min(pageEnd, total)} of {total}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              setBugPage((p) => Math.max(1, p - 1))
-                            }
-                            disabled={bugPage === 1}
-                          >
-                            Previous
-                          </Button>
-                          <Select
-                            value={String(bugPageSize)}
-                            onValueChange={(v) => setBugPageSize(Number(v))}
-                          >
-                            <SelectTrigger className="w-[110px] h-9">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="10">10 / page</SelectItem>
-                              <SelectItem value="25">25 / page</SelectItem>
-                              <SelectItem value="50">50 / page</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              setBugPage((p) =>
-                                Math.min(Math.ceil(total / bugPageSize), p + 1)
-                              )
-                            }
-                            disabled={bugPage >= Math.ceil(total / bugPageSize)}
-                          >
-                            Next
-                          </Button>
+                        <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setBugPage((p) => Math.max(1, p - 1))
+                              }
+                              disabled={bugPage === 1}
+                            >
+                              Previous
+                            </Button>
+                            <Select
+                              value={String(bugPageSize)}
+                              onValueChange={(v) => setBugPageSize(Number(v))}
+                            >
+                              <SelectTrigger className="w-[110px] h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="10">10 / page</SelectItem>
+                                <SelectItem value="25">25 / page</SelectItem>
+                                <SelectItem value="50">50 / page</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setBugPage((p) =>
+                                  Math.min(Math.ceil(total / bugPageSize), p + 1)
+                                )
+                              }
+                              disabled={bugPage >= Math.ceil(total / bugPageSize)}
+                            >
+                              Next
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1153,27 +1157,27 @@ const ProjectDetails = () => {
             </CardHeader>
 
             <CardContent className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-stretch gap-3 w-full">
-                <div className="relative flex-1 min-w-[240px]">
+              <div className="flex flex-col gap-3 w-full">
+                <div className="relative flex-1">
                   <input
                     type="text"
                     placeholder="Search members..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-9 sm:h-10 border border-border rounded-md pl-9 sm:pl-10 pr-10 sm:pr-12 py-2 
+                    className="w-full h-10 border border-border rounded-md pl-10 pr-10 py-2 
                     focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none 
                     shadow-sm hover:border-primary/50 transition-all duration-200 
-                    bg-background/50 backdrop-blur-sm text-sm sm:text-base"
+                    bg-background/50 backdrop-blur-sm text-sm"
                   />
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-2.5 sm:pl-3 pointer-events-none text-muted-foreground">
-                    <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">
+                    <Search className="h-4 w-4" />
                   </div>
                   {searchQuery && (
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 sm:pr-3">
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-5 w-5 sm:h-6 sm:w-6 p-0 rounded-full opacity-70 hover:opacity-100"
+                        className="h-6 w-6 p-0 rounded-full opacity-70 hover:opacity-100"
                         onClick={() => setSearchQuery("")}
                       >
                         <X className="h-3 w-3" />
@@ -1182,7 +1186,7 @@ const ProjectDetails = () => {
                     </div>
                   )}
                 </div>
-                <div className="relative w-full sm:w-[220px] sm:ml-auto">
+                <div className="relative w-full sm:w-[220px]">
                   <select
                     aria-label="Filter by role"
                     value={roleFilter}
@@ -1226,7 +1230,7 @@ const ProjectDetails = () => {
                   </p>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-3">
                   {filteredAdmins.map((admin) => (
                     <MemberCard key={admin.id} member={admin} isAdmin={true} />
                   ))}
@@ -1242,7 +1246,7 @@ const ProjectDetails = () => {
                   </p>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-3">
                   {filteredMembers.map((member) => (
                     <MemberCard
                       key={member.id}
