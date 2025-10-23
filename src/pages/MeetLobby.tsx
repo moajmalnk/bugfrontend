@@ -1,15 +1,18 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createMeeting, getMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer } from "lucide-react";
+import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ENV } from "@/lib/env";
 import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
+import { useUndoDelete } from "@/hooks/useUndoDelete";
 
 // Type definitions for Google Meet API response
 interface GoogleMeetResponse {
@@ -100,6 +103,14 @@ interface MeetingDetailsResponse {
   error?: string;
 }
 
+interface DeleteMeetingResponse {
+  success: boolean;
+  message?: string;
+  deletedMeetingId?: string;
+  timestamp?: string;
+  error?: string;
+}
+
 // Skeleton Loading Components
 const MeetingSkeleton = () => (
   <div className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm animate-pulse">
@@ -134,6 +145,7 @@ const TabSkeleton = () => (
 );
 
 export default function MeetLobby() {
+  const { currentUser } = useAuth();
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -143,9 +155,13 @@ export default function MeetLobby() {
   const [completedMeets, setCompletedMeets] = useState<RunningMeeting[]>([]);
   const [loadingMeets, setLoadingMeets] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
-  const [activeTab, setActiveTab] = useState("my-meets");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || "my-meets";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [creatorFilter, setCreatorFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<"create" | "join">("create");
@@ -157,7 +173,33 @@ export default function MeetLobby() {
   const [meetingDetails, setMeetingDetails] = useState<MeetingDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+  const [deletingMeetingId, setDeletingMeetingId] = useState<string | null>(null);
+  const [deletedMeeting, setDeletedMeeting] = useState<RunningMeeting | null>(null);
   const navigate = useNavigate();
+
+  // Undo delete functionality
+  const undoDelete = useUndoDelete({
+    duration: 10,
+    onConfirm: () => {
+      // Actually delete the meeting from Google Calendar
+      if (deletedMeeting) {
+        performActualDelete(deletedMeeting.id);
+        setDeletedMeeting(null);
+      }
+    },
+    onUndo: () => {
+      // Restore the meeting to the list
+      if (deletedMeeting) {
+        if (deletedMeeting.isActive) {
+          setRunningMeets(prev => [deletedMeeting, ...prev]);
+        } else {
+          setCompletedMeets(prev => [deletedMeeting, ...prev]);
+        }
+        setDeletedMeeting(null);
+        toast.success("Meeting deletion cancelled");
+      }
+    }
+  });
 
   const handleCreate = async () => {
     setLoading(true);
@@ -429,6 +471,77 @@ export default function MeetLobby() {
     setSelectedMeetingId(null);
   };
 
+  const deleteMeeting = async (meetingId: string) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      toast.error("Only admins can delete meetings");
+      return;
+    }
+
+    // Find the meeting to delete
+    const meetingToDelete = [...runningMeets, ...completedMeets].find(meeting => meeting.id === meetingId);
+    if (!meetingToDelete) {
+      toast.error("Meeting not found");
+      return;
+    }
+
+    // Store the meeting for potential undo
+    setDeletedMeeting(meetingToDelete);
+    
+    // Remove from UI immediately (optimistic update)
+    setRunningMeets(prev => prev.filter(meeting => meeting.id !== meetingId));
+    setCompletedMeets(prev => prev.filter(meeting => meeting.id !== meetingId));
+    
+    // Start the countdown (toast removed for cleaner UX)
+    
+    // Start the countdown
+    undoDelete.startCountdown();
+  };
+
+  const performActualDelete = async (meetingId: string) => {
+    setDeletingMeetingId(meetingId);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Please log in to delete meetings");
+      }
+
+      console.log("🔄 Actually deleting meeting with ID:", meetingId);
+      const response = await axios.delete(
+        `${ENV.API_URL}/meet/delete-meeting.php?meeting_id=${meetingId}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      const data = response.data as DeleteMeetingResponse;
+      console.log("📊 Delete meeting response:", data);
+      
+      if (data?.success) {
+        toast.success("Meeting permanently deleted");
+      } else {
+        throw new Error(data?.error || "Failed to delete meeting");
+      }
+    } catch (err: any) {
+      console.error("❌ Error deleting meeting:", err?.message);
+      const errorMessage = err?.response?.data?.error || err?.message || "Failed to delete meeting";
+      toast.error(errorMessage);
+      
+      // Restore the meeting if deletion failed
+      if (deletedMeeting) {
+        if (deletedMeeting.isActive) {
+          setRunningMeets(prev => [deletedMeeting, ...prev]);
+        } else {
+          setCompletedMeets(prev => [deletedMeeting, ...prev]);
+        }
+      }
+    } finally {
+      setDeletingMeetingId(null);
+    }
+  };
+
   const formatMeetingTime = (startTime: string, endTime: string) => {
     const start = new Date(startTime);
     const end = new Date(endTime);
@@ -470,7 +583,8 @@ export default function MeetLobby() {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(meeting => 
         meeting.title.toLowerCase().includes(searchLower) ||
-        meeting.meetingCode.toLowerCase().includes(searchLower)
+        meeting.meetingCode.toLowerCase().includes(searchLower) ||
+        meeting.creator.toLowerCase().includes(searchLower)
       );
     }
     
@@ -483,13 +597,56 @@ export default function MeetLobby() {
       }
     }
     
+    // Apply creator filter
+    if (creatorFilter !== "all") {
+      filtered = filtered.filter(meeting => meeting.creator === creatorFilter);
+    }
+    
+    // Apply date filter
+    if (dateFilter !== "all") {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const thisWeek = new Date(today);
+      thisWeek.setDate(thisWeek.getDate() - 7);
+      const thisMonth = new Date(today);
+      thisMonth.setMonth(thisMonth.getMonth() - 1);
+      
+      filtered = filtered.filter(meeting => {
+        const meetingDate = new Date(meeting.startTime);
+        switch (dateFilter) {
+          case "today":
+            return meetingDate >= today;
+          case "yesterday":
+            return meetingDate >= yesterday && meetingDate < today;
+          case "this-week":
+            return meetingDate >= thisWeek;
+          case "this-month":
+            return meetingDate >= thisMonth;
+          default:
+            return true;
+        }
+      });
+    }
+    
     // Sort by latest first (newest meetings at the top)
     return filtered.sort((a, b) => {
       const dateA = new Date(a.startTime);
       const dateB = new Date(b.startTime);
       return dateB.getTime() - dateA.getTime(); // Descending order (latest first)
     });
-  }, [runningMeets, completedMeets, activeTab, searchTerm, statusFilter]);
+  }, [runningMeets, completedMeets, activeTab, searchTerm, statusFilter, creatorFilter, dateFilter]);
+
+  // Get unique creators for filter
+  const uniqueCreators = useMemo(() => {
+    const allMeetings = [...runningMeets, ...completedMeets];
+    const creators = allMeetings
+      .map(meeting => meeting.creator)
+      .filter(Boolean)
+      .filter((creator, index, arr) => arr.indexOf(creator) === index);
+    return creators.sort();
+  }, [runningMeets, completedMeets]);
 
   // Get tab counts with better reliability
   const getTabCount = (tabType: string) => {
@@ -740,6 +897,13 @@ export default function MeetLobby() {
     };
   }, [fetchRunningMeets]);
 
+  // Keep tab in sync with URL changes (back/forward navigation)
+  useEffect(() => {
+    const urlTab = searchParams.get("tab") || "my-meets";
+    if (urlTab !== activeTab) setActiveTab(urlTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
@@ -771,17 +935,17 @@ export default function MeetLobby() {
                   className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                 >
                   <Plus className="h-5 w-5 mr-2" />
-                  Meet
+                  New Meet
                 </Button>
                 
-                <Button
+                {/* <Button
                   onClick={openJoinModal}
                   variant="outline"
                   className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 dark:hover:border-green-700 text-gray-700 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                 >
                   <Users className="h-5 w-5 mr-2" />
                   Join
-                </Button>
+                </Button> */}
               
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
@@ -876,7 +1040,18 @@ export default function MeetLobby() {
         )}
 
         {/* Meetings Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(val) => {
+            setActiveTab(val);
+            setSearchParams((prev) => {
+              const p = new URLSearchParams(prev);
+              p.set("tab", val);
+              return p as any;
+            });
+          }} 
+          className="w-full"
+        >
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
             <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
@@ -923,22 +1098,22 @@ export default function MeetLobby() {
                 <div className="flex items-center gap-2 mb-4">
                   <div className="p-1.5 bg-blue-500 rounded-lg">
                     <Search className="h-4 w-4 text-white" />
-                          </div>
+                  </div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-                          </div>
+                </div>
                 <div className="flex flex-col lg:flex-row gap-4">
                   {/* Search Bar */}
                   <div className="flex-1 relative group">
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                     <input
                       type="text"
-                      placeholder="Search meetings by title or code..."
+                      placeholder="Search meetings by title, code, or creator..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                     />
-                        </div>
-                        
+                  </div>
+                  
                   {/* Filter Controls */}
                   <div className="flex flex-col sm:flex-row gap-3">
                     {/* Status Filter */}
@@ -946,35 +1121,57 @@ export default function MeetLobby() {
                       <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
                         <Filter className="h-4 w-4 text-white" />
                       </div>
-                      <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 px-3 text-sm font-medium"
-                      >
-                        <option value="all">All Status</option>
-                        <option value="live">Live</option>
-                        <option value="completed">Completed</option>
-                      </select>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-full sm:w-[140px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="live">Live</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Date Filter */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                        <Calendar className="h-4 w-4 text-white" />
                       </div>
-                      
+                      <Select value={dateFilter} onValueChange={setDateFilter}>
+                        <SelectTrigger className="w-full sm:w-[140px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectValue placeholder="Date" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All Dates</SelectItem>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="yesterday">Yesterday</SelectItem>
+                          <SelectItem value="this-week">This Week</SelectItem>
+                          <SelectItem value="this-month">This Month</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
                     {/* Clear Filters Button */}
-                    {(searchTerm || statusFilter !== "all") && (
-                        <Button
+                    {(searchTerm || statusFilter !== "all" || creatorFilter !== "all" || dateFilter !== "all") && (
+                      <Button
                         variant="outline"
-                          size="sm"
+                        size="sm"
                         onClick={() => {
                           setSearchTerm("");
                           setStatusFilter("all");
+                          setCreatorFilter("all");
+                          setDateFilter("all");
                         }}
                         className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                       >
                         Clear
-                        </Button>
+                      </Button>
                     )}
-                      </div>
-                    </div>
                   </div>
+                </div>
               </div>
+            </div>
 
             {/* Meetings Content */}
             <div className="space-y-4">
@@ -1085,6 +1282,21 @@ export default function MeetLobby() {
                             <ExternalLink className="h-4 w-4 mr-1" />
                               {meeting.isActive ? "Join" : "View"}
                           </Button>
+                          {currentUser?.role === 'admin' && (
+                            <Button
+                              onClick={() => deleteMeeting(meeting.id)}
+                              size="sm"
+                              variant="outline"
+                              disabled={deletingMeetingId === meeting.id}
+                              className="bg-white dark:bg-gray-800 border-red-200 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100"
+                            >
+                              {deletingMeetingId === meeting.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                           </div>
                         </div>
                       </div>
@@ -1095,6 +1307,94 @@ export default function MeetLobby() {
                 </div>
           </TabsContent>
         </Tabs>
+
+        {/* Undo Delete Countdown */}
+        {undoDelete.isCountingDown && deletedMeeting && (
+          <div className="fixed bottom-4 right-4 z-50">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-4 max-w-sm">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                    <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                  {/* Circular Progress Indicator */}
+                  <div className="absolute inset-0 w-12 h-12">
+                    <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 48 48">
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r="20"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        fill="none"
+                        className="text-gray-200 dark:text-gray-700"
+                      />
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r="20"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        fill="none"
+                        strokeDasharray={`${2 * Math.PI * 20}`}
+                        strokeDashoffset={`${2 * Math.PI * 20 * (1 - (10 - undoDelete.timeLeft) / 10)}`}
+                        className="text-red-500 transition-all duration-1000 ease-linear"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    Meeting Deleted
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    "{deletedMeeting.title}"
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-red-500 animate-pulse" />
+                        <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                          Permanently deleted in
+                        </span>
+                      </div>
+                      <div className="bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-md border border-red-200 dark:border-red-800">
+                        <span className="text-sm font-bold text-red-700 dark:text-red-300 tabular-nums">
+                          {undoDelete.timeLeft}s
+                        </span>
+                      </div>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                      <div 
+                        className="bg-red-500 h-1.5 rounded-full transition-all duration-1000 ease-linear"
+                        style={{ width: `${((10 - undoDelete.timeLeft) / 10) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Button
+                    onClick={undoDelete.cancelCountdown}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 h-7"
+                  >
+                    Undo
+                  </Button>
+                  <Button
+                    onClick={undoDelete.confirmDelete}
+                    size="sm"
+                    variant="outline"
+                    className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20 text-xs px-3 py-1 h-7"
+                  >
+                    Now
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Professional Modal for Create/Join Meeting */}
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

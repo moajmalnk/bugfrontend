@@ -34,7 +34,7 @@ export function ImpersonateBanner() {
   };
 
   return (
-    <div className="bg-gradient-to-r from-orange-600 via-red-600 to-orange-600 text-white border-b border-orange-500/30 shadow-lg relative z-50 animate-in slide-in-from-top duration-300">
+    <div className="bg-gradient-to-r from-orange-600 via-red-600 to-orange-600 text-white border-b border-orange-500/30 shadow-lg relative z-30 animate-in slide-in-from-top duration-300">
       <div className="max-w-7xl mx-auto px-4 py-4">
         {/* Mobile Layout - Center aligned, single row */}
         <div className="flex flex-col sm:hidden items-center justify-center gap-4">

@@ -63,8 +63,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
   return (
     <NotificationProvider>
-      <ImpersonateBanner />
-      <div className="flex h-screen min-w-0 bg-background">
+      <div className="flex flex-col h-screen min-w-0 bg-background">
+        <ImpersonateBanner />
+        <div className="flex flex-1 min-w-0">
         {/* Sidebar for desktop */}
         <div className="hidden lg:block w-72 min-w-0">
           <Sidebar />
@@ -149,6 +150,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               </footer>
             </div>
           </main>
+        </div>
         </div>
       </div>
       <AnnouncementPopup />
