@@ -202,6 +202,25 @@ export default function MeetLobby() {
     }
   };
 
+  // Check for OAuth success/error parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const googleConnected = urlParams.get('google_connected');
+    const googleError = urlParams.get('google_error');
+    
+    if (googleConnected === 'true') {
+      toast.success("Google account connected successfully! You can now create and manage meetings.");
+      // Clear the URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refresh meetings
+      fetchRunningMeets();
+    } else if (googleError) {
+      setError(`Google connection failed: ${decodeURIComponent(googleError)}`);
+      // Clear the URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   // Fetch running meets on component mount
   useEffect(() => {
     fetchRunningMeets();
