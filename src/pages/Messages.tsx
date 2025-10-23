@@ -22,6 +22,7 @@ const Messages = () => {
   const [triggerCreateGroup, setTriggerCreateGroup] = useState(false);
   const [groupsCount, setGroupsCount] = useState(0);
   const [deletedGroup, setDeletedGroup] = useState<ChatGroup | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Handle responsive behavior
   useEffect(() => {
@@ -72,8 +73,18 @@ const Messages = () => {
 
   const performActualDelete = async (groupId: string) => {
     try {
-      // Here you would call the actual delete API
+      // Import MessagingService to actually delete the group
+      const { MessagingService } = await import("@/services/messagingService");
+      
       console.log("Actually deleting group:", groupId);
+      await MessagingService.deleteGroup(groupId);
+      
+      // Successfully deleted - clear the deleted group state
+      setDeletedGroup(null);
+      
+      // Trigger a refresh of the groups list
+      setRefreshTrigger(prev => prev + 1);
+      
       toast.success("Group permanently deleted");
     } catch (err: any) {
       console.error("❌ Error deleting group:", err?.message);
@@ -173,6 +184,7 @@ const Messages = () => {
                     setDeletedGroup(group);
                     undoDelete.startCountdown();
                   }}
+                  refreshTrigger={refreshTrigger}
                 />
               </aside>
 
@@ -208,7 +220,7 @@ const Messages = () => {
                         </div>
                       </div>
                       <h3 className="text-[32px] font-light mb-6 text-[#e9edef] dark:text-[#e9edef]">
-                        BugRicer Messages
+                        BugRicer Chat
                       </h3>
                       <p className="text-sm text-[#8696a0] dark:text-[#8696a0] leading-relaxed mb-8">
                         Send and receive messages with your team members. Stay connected and collaborate in real-time.

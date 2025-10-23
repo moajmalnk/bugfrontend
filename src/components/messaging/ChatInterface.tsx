@@ -677,7 +677,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 {!isOwnMessage && (
                   <Avatar className="h-7 w-7 sm:h-8 sm:w-8 mr-2 flex-shrink-0">
                     <AvatarFallback className="text-xs">
-                      {message.sender_name.charAt(0).toUpperCase()}
+                      {(message.sender_name && message.sender_name !== '0' ? message.sender_name : 'User').charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -688,7 +688,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 >
                   {!isOwnMessage && (
                     <div className="text-xs text-muted-foreground font-medium px-1">
-                      {message.sender_name}
+                      {message.sender_name && message.sender_name !== '0' ? message.sender_name : 'User'}
                     </div>
                   )}
                   <div
@@ -720,7 +720,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         {message.reply_to_message_id && (
                           <div className="mb-2 p-2 bg-background/60 rounded text-xs border-l-4 border-primary/30">
                             <div className="font-medium">
-                              Replying to {message.reply_sender_name}
+                              Replying to {message.reply_sender_name && message.reply_sender_name !== '0' ? message.reply_sender_name : 'User'}
                             </div>
                             <div className="text-muted-foreground">
                               {message.reply_type === "voice"

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -43,6 +44,7 @@ interface ChatGroupSelectorProps {
   onTriggerCreateGroupReset?: () => void;
   onGroupsCountUpdate?: (count: number) => void;
   onGroupDelete?: (group: ChatGroup) => void;
+  refreshTrigger?: number;
 }
 
 export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
@@ -54,6 +56,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   onTriggerCreateGroupReset,
   onGroupsCountUpdate,
   onGroupDelete,
+  refreshTrigger,
 }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -163,36 +166,44 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     };
   }, [deletedGroups]);
 
-  useEffect(() => {
-    // Always load all projects and all groups
-    (async () => {
-      setIsLoading(true);
-      try {
-        const allProjects = await projectService.getProjects();
-        setProjects(allProjects as unknown as Project[]);
-        let allGroups: ChatGroup[] = [];
-        for (const project of allProjects) {
-          const groups = await MessagingService.getGroupsByProject(project.id);
-          allGroups = allGroups.concat(
-            groups.map((g) => ({
-              ...g,
-              projectName: project.name,
-              projectId: project.id,
-            }))
-          );
-        }
-        setGroups(allGroups);
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to load chat groups",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+  const loadGroups = async () => {
+    setIsLoading(true);
+    try {
+      const allProjects = await projectService.getProjects();
+      setProjects(allProjects as unknown as Project[]);
+      let allGroups: ChatGroup[] = [];
+      for (const project of allProjects) {
+        const groups = await MessagingService.getGroupsByProject(project.id);
+        allGroups = allGroups.concat(
+          groups.map((g) => ({
+            ...g,
+            projectName: project.name,
+            projectId: project.id,
+          }))
+        );
       }
-    })();
+      setGroups(allGroups);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load chat groups",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadGroups();
   }, []);
+
+  // Listen for refresh trigger from parent
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      loadGroups();
+    }
+  }, [refreshTrigger]);
 
   const handleCreateGroup = async () => {
     if (!createForm.projectId || !createForm.name.trim()) {
@@ -966,6 +977,9 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Chat Group</DialogTitle>
+              <DialogDescription>
+                Create a new chat group to organize team discussions and collaboration.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -1051,6 +1065,9 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                 </div>
                 Delete Chat Group
               </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this chat group? This action cannot be undone.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="text-center space-y-2">
@@ -1111,6 +1128,9 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                 </div>
                 Manage Group Members
               </DialogTitle>
+              <DialogDescription>
+                Add or remove members from this chat group. Changes will be applied immediately.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="text-center space-y-2">
@@ -1309,6 +1329,9 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Edit Chat Group</DialogTitle>
+              <DialogDescription>
+                Update the name and description of this chat group.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
