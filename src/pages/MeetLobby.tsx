@@ -155,6 +155,8 @@ export default function MeetLobby() {
         if (data?.error?.includes?.('insufficient authentication scopes') || 
             data?.error?.includes?.('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
           setError("Please re-authorize your Google account to access calendar features. Your current token doesn't have the required permissions.");
+        } else {
+          setError(data?.error || "Failed to fetch meetings");
         }
       }
     } catch (err: any) {
@@ -212,8 +214,12 @@ export default function MeetLobby() {
       toast.success("Google account connected successfully! You can now create and manage meetings.");
       // Clear the URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
-      // Refresh meetings
-      fetchRunningMeets();
+      // Clear any existing error state
+      setError(null);
+      // Refresh meetings after a short delay to ensure token is saved
+      setTimeout(() => {
+        fetchRunningMeets();
+      }, 1000);
     } else if (googleError) {
       setError(`Google connection failed: ${decodeURIComponent(googleError)}`);
       // Clear the URL parameters
