@@ -288,16 +288,6 @@ const BugDocsPage = () => {
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 {isConnected && (
                   <>
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={loadData}
-                      disabled={isLoading}
-                      className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
-                    >
-                      <RefreshCw className={`h-5 w-5 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-                      Refresh
-                    </Button>
                     <Button 
                       onClick={() => setIsCreateModalOpen(true)} 
                       size="lg"
