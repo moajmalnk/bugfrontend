@@ -304,7 +304,7 @@ const BugDocsPage = () => {
                       className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                     >
                       <Plus className="h-5 w-5 mr-2" />
-                      New Document
+                      New Doc
                     </Button>
                   </>
                 )}
@@ -330,52 +330,43 @@ const BugDocsPage = () => {
 
         {/* Statistics */}
         {isConnected && (
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-2xl"></div>
-              <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Documents</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{documents.length}</p>
-                  </div>
-                  <div className="p-3 bg-blue-500 rounded-xl">
-                    <FolderOpen className="h-6 w-6 text-white" />
-                  </div>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="bg-gray-800 dark:bg-gray-900 rounded-2xl p-4 sm:p-6 border border-gray-700 dark:border-gray-600">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-400 dark:text-gray-500 truncate">Total Documents</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white dark:text-white">{documents.length}</p>
+                </div>
+                <div className="p-2 sm:p-3 bg-blue-500 rounded-xl flex-shrink-0">
+                  <FolderOpen className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
                 </div>
               </div>
             </div>
-            <div className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-2xl"></div>
-              <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Templates Available</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{templates.length}</p>
-                  </div>
-                  <div className="p-3 bg-green-500 rounded-xl">
-                    <FileText className="h-6 w-6 text-white" />
-                  </div>
+            <div className="bg-gray-800 dark:bg-gray-900 rounded-2xl p-4 sm:p-6 border border-gray-700 dark:border-gray-600">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-400 dark:text-gray-500 truncate">Templates Available</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white dark:text-white">{templates.length}</p>
+                </div>
+                <div className="p-2 sm:p-3 bg-green-500 rounded-xl flex-shrink-0">
+                  <FileText className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
                 </div>
               </div>
             </div>
-            <div className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 to-red-50/50 dark:from-orange-950/20 dark:to-red-950/20 rounded-2xl"></div>
-              <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Recent Activity</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">
-                      {documents.length > 0
-                        ? formatDistanceToNow(new Date(documents[0].created_at), {
-                            addSuffix: true,
-                          })
-                        : "No activity"}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-orange-500 rounded-xl">
-                    <Clock className="h-6 w-6 text-white" />
-                  </div>
+            <div className="bg-gray-800 dark:bg-gray-900 rounded-2xl p-4 sm:p-6 border border-gray-700 dark:border-gray-600 sm:col-span-2 lg:col-span-1">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-400 dark:text-gray-500 truncate">Recent Activity</p>
+                  <p className="text-lg sm:text-2xl lg:text-3xl font-bold text-white dark:text-white truncate">
+                    {documents.length > 0
+                      ? formatDistanceToNow(new Date(documents[0].created_at), {
+                          addSuffix: true,
+                        })
+                      : "No activity"}
+                  </p>
+                </div>
+                <div className="p-2 sm:p-3 bg-orange-500 rounded-xl flex-shrink-0">
+                  <Clock className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
                 </div>
               </div>
             </div>
@@ -451,50 +442,52 @@ const BugDocsPage = () => {
                       className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300"
                     >
                       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-red-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-red-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <div className="relative p-6">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start space-x-4 flex-1">
-                            <div className="text-3xl">{getDocTypeIcon(doc.doc_type)}</div>
+                      <div className="relative p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                          <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
+                            <div className="text-2xl sm:text-3xl flex-shrink-0">{getDocTypeIcon(doc.doc_type)}</div>
                             <div className="flex-1 min-w-0">
-                              <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-700 dark:group-hover:text-orange-300 transition-colors">
+                              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-700 dark:group-hover:text-orange-300 transition-colors truncate">
                                 {doc.doc_title}
                               </h3>
-                              <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
                                 {doc.template_name && (
                                   <span className="flex items-center">
-                                    <FileText className="h-4 w-4 mr-1" />
-                                    {doc.template_name}
+                                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                                    <span className="truncate">{doc.template_name}</span>
                                   </span>
                                 )}
                                 <span className="flex items-center">
-                                  <Clock className="h-4 w-4 mr-1" />
-                                  Created {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                                  <span className="truncate">Created {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}</span>
                                 </span>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 sm:gap-2 flex-shrink-0">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleViewDocument(doc)}
-                              className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                              className="h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
                             >
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              View
+                              <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                              <span className="hidden sm:inline">View</span>
+                              <span className="sm:hidden">View</span>
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => handleDeleteClick(doc)}
                               disabled={isDeleting === doc.id}
-                              className="h-10 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                              className="h-9 sm:h-10 w-9 sm:w-auto px-2 sm:px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                             >
                               {isDeleting === doc.id ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                               ) : (
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                               )}
+                              <span className="hidden sm:inline ml-1">Delete</span>
                             </Button>
                           </div>
                         </div>
