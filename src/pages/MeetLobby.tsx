@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createMeeting, getMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail } from "lucide-react";
+import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { ENV } from "@/lib/env";
 import axios from "axios";
@@ -57,6 +57,46 @@ interface TeamMember {
 interface TeamMembersResponse {
   success: boolean;
   emails: string[];
+  error?: string;
+}
+
+// Meeting details interfaces
+interface ParticipantSession {
+  participant: {
+    email: string;
+    displayName: string;
+    role: string;
+  };
+  sessionId: string;
+  joinTime: string;
+  leaveTime: string;
+  duration: number;
+  durationFormatted: string;
+  status: 'active' | 'completed';
+}
+
+interface MeetingDetails {
+  id: string;
+  title: string;
+  description: string;
+  startTime: string;
+  endTime: string;
+  creator: string;
+  meetingUri: string | null;
+  meetingCode: string | null;
+  participants: Array<{
+    email: string;
+    displayName: string;
+    responseStatus: string;
+    role: string;
+  }>;
+  sessionAnalytics: ParticipantSession[];
+}
+
+interface MeetingDetailsResponse {
+  success: boolean;
+  meetingDetails: MeetingDetails;
+  timestamp: string;
   error?: string;
 }
 
@@ -113,6 +153,10 @@ export default function MeetLobby() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [activeRoleTab, setActiveRoleTab] = useState<"all" | "admin" | "developer" | "tester">("all");
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [meetingDetails, setMeetingDetails] = useState<MeetingDetails | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleCreate = async () => {
@@ -335,6 +379,54 @@ export default function MeetLobby() {
 
   const copyMeetCode = (meetingCode: string) => {
     copyToClipboard(meetingCode);
+  };
+
+  const fetchMeetingDetails = async (meetingId: string) => {
+    setLoadingDetails(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Please log in to view meeting details");
+      }
+
+      console.log("🔄 Fetching meeting details for ID:", meetingId);
+      const response = await axios.get(
+        `${ENV.API_URL}/meet/get-meeting-details.php?meeting_id=${meetingId}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      const data = response.data as MeetingDetailsResponse;
+      console.log("📊 Meeting details response:", data);
+      
+      if (data?.success && data?.meetingDetails) {
+        setMeetingDetails(data.meetingDetails);
+        setIsDetailsModalOpen(true);
+      } else {
+        throw new Error(data?.error || "Failed to fetch meeting details");
+      }
+    } catch (err: any) {
+      console.error("❌ Error fetching meeting details:", err?.message);
+      const errorMessage = err?.response?.data?.error || err?.message || "Failed to fetch meeting details";
+      toast.error(errorMessage);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const openMeetingDetails = (meetingId: string) => {
+    setSelectedMeetingId(meetingId);
+    fetchMeetingDetails(meetingId);
+  };
+
+  const closeDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    setMeetingDetails(null);
+    setSelectedMeetingId(null);
   };
 
   const formatMeetingTime = (startTime: string, endTime: string) => {
@@ -977,6 +1069,15 @@ export default function MeetLobby() {
                           </div>
                           <div className="flex items-center gap-2">
                           <Button
+                            onClick={() => openMeetingDetails(meeting.id)}
+                            size="sm"
+                            variant="outline"
+                            className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Details
+                          </Button>
+                          <Button
                             onClick={() => joinRunningMeet(meeting.meetingUri)}
                             size="sm"
                               className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -998,8 +1099,8 @@ export default function MeetLobby() {
         {/* Professional Modal for Create/Join Meeting */}
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto mx-4 sm:mx-0">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3">
+            <DialogHeader className="relative">
+              <DialogTitle className="flex items-center gap-3 pr-12">
                 <div className={`p-2 rounded-xl ${modalType === "create" ? "bg-gradient-to-br from-blue-500 to-blue-600" : "bg-gradient-to-br from-green-500 to-emerald-600"}`}>
                   {modalType === "create" ? (
                     <Video className="h-5 w-5 text-white" />
@@ -1011,6 +1112,14 @@ export default function MeetLobby() {
                   {modalType === "create" ? "Start a meet" : "Join with code"}
                 </span>
               </DialogTitle>
+              <Button
+                onClick={closeModal}
+                variant="ghost"
+                size="sm"
+                className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </DialogHeader>
             
             <div className="space-y-6">
@@ -1233,17 +1342,201 @@ export default function MeetLobby() {
                     </>
                   )}
                 </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    onClick={closeModal}
-                    className="h-10 sm:h-12 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
-                  >
-                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </Button>
             </div>
                   </div>
                 </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Meeting Details Modal */}
+        <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0">
+            <DialogHeader className="relative">
+              <DialogTitle className="flex items-center gap-3 pr-12">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600">
+                  <BarChart3 className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-xl font-semibold">
+                  Meeting Details & Analytics
+                </span>
+              </DialogTitle>
+              <Button
+                onClick={closeDetailsModal}
+                variant="ghost"
+                size="sm"
+                className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogHeader>
+            
+            {loadingDetails ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  <span className="text-lg text-gray-600 dark:text-gray-400">Loading meeting details...</span>
+                </div>
+              </div>
+            ) : meetingDetails ? (
+              <div className="space-y-6">
+                {/* Meeting Overview */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        {meetingDetails.title}
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        {meetingDetails.description || "No description provided"}
+                      </p>
+                    </div>
+                    {meetingDetails.meetingCode && (
+                      <div className="flex items-center gap-2">
+                        <code className="px-3 py-1 bg-white dark:bg-gray-800 rounded-lg text-sm font-mono border">
+                          {meetingDetails.meetingCode}
+                        </code>
+                        <Button
+                          onClick={() => copyToClipboard(meetingDetails.meetingCode!)}
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <strong>Start:</strong> {new Date(meetingDetails.startTime).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <strong>End:</strong> {new Date(meetingDetails.endTime).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <strong>Creator:</strong> {meetingDetails.creator}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Participants Overview */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Users className="h-5 w-5 text-green-600" />
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Participants ({meetingDetails.participants.length})
+                    </h4>
+                  </div>
+                  
+                  <div className="grid gap-3">
+                    {meetingDetails.participants.map((participant, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                            <User className="h-4 w-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {participant.displayName || participant.email}
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {participant.email}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            participant.responseStatus === 'accepted' 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                              : participant.responseStatus === 'declined'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                          }`}>
+                            {participant.responseStatus}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Session Analytics */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <BarChart3 className="h-5 w-5 text-purple-600" />
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Session Analytics
+                    </h4>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {meetingDetails.sessionAnalytics.map((session, index) => (
+                      <div key={session.sessionId} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
+                              <UserCheck className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white">
+                                {session.participant.displayName}
+                              </p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {session.participant.email}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              session.status === 'active'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                            }`}>
+                              {session.status}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Timer className="h-4 w-4 text-green-600" />
+                            <span className="text-gray-600 dark:text-gray-400">
+                              <strong>Joined:</strong> {new Date(session.joinTime).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Timer className="h-4 w-4 text-red-600" />
+                            <span className="text-gray-600 dark:text-gray-400">
+                              <strong>Left:</strong> {new Date(session.leaveTime).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-blue-600" />
+                            <span className="text-gray-600 dark:text-gray-400">
+                              <strong>Duration:</strong> {session.durationFormatted}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500 dark:text-gray-400">No meeting details available</p>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
