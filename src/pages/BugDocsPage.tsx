@@ -261,201 +261,251 @@ const BugDocsPage = () => {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">BugDocs</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your Google Docs documents
-          </p>
-        </div>
-        {isConnected && (
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={loadData}
-              disabled={isLoading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-            <Button onClick={() => setIsCreateModalOpen(true)} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              New Document
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Statistics */}
-      {isConnected && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
-              <FolderOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{documents.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Templates Available</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{templates.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {documents.length > 0
-                  ? formatDistanceToNow(new Date(documents[0].created_at), {
-                      addSuffix: true,
-                    })
-                  : "No activity"}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-       {/* Connection Status */}
-       {!isConnected && !isCheckingConnection && (
-         <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
-           <CardHeader>
-             <CardTitle className="text-orange-800 dark:text-orange-200">Google Docs Not Connected</CardTitle>
-             <CardDescription className="text-orange-700 dark:text-orange-300">
-               Connect your Google account to create and manage documents
-             </CardDescription>
-           </CardHeader>
-           <CardContent>
-             <div className="flex flex-col items-center justify-center py-8 text-center">
-               <div className="relative mb-6">
-                 <LinkIcon className="h-16 w-16 text-orange-500" />
-                 <div className="absolute -top-2 -right-2 h-6 w-6 bg-orange-400 rounded-full border-2 border-white animate-pulse"></div>
-               </div>
-               <h3 className="text-xl font-semibold mb-2 text-orange-800 dark:text-orange-200">
-                 Connect Google Docs
-               </h3>
-               <p className="text-orange-700 dark:text-orange-300 mb-6 max-w-md">
-                 Link your Google account to create, manage, and collaborate on documents directly from BugRicer.
-               </p>
-               <div className="flex flex-col gap-3">
-                 <Button
-                   onClick={handleConnectGoogleDocs}
-                   className="
-                     h-12 px-8 py-3 rounded-xl font-semibold text-sm
-                     bg-gradient-to-r from-orange-500 via-orange-600 to-orange-700 
-                     hover:from-orange-600 hover:via-orange-700 hover:to-orange-800 
-                     text-white border-0 shadow-lg hover:shadow-xl
-                     transition-all duration-300 ease-in-out
-                     transform hover:scale-[1.02] active:scale-[0.98]
-                     relative overflow-hidden
-                   "
-                 >
-                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                   <div className="relative flex items-center space-x-3">
-                     <LinkIcon className="h-5 w-5" />
-                     <span>Connect Google Account</span>
-                     <ExternalLink className="h-4 w-4" />
-                   </div>
-                 </Button>
-               </div>
-             </div>
-           </CardContent>
-         </Card>
-       )}
-
-      {/* Documents List */}
-      {isConnected && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Documents</CardTitle>
-            <CardDescription>
-              Click on a document to view and edit it in Google Docs
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading documents...</span>
-              </div>
-            ) : documents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No documents yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Create your first document to get started
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        {/* Professional Header */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
+                    <FileText className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                      BugDocs
+                    </h1>
+                    <div className="h-1 w-20 bg-gradient-to-r from-orange-500 to-red-600 rounded-full mt-2"></div>
+                  </div>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                  Manage your Google Docs documents and templates
                 </p>
-                <Button onClick={() => setIsCreateModalOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Document
-                </Button>
               </div>
-            ) : (
-            <div className="space-y-3">
-              {documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-start space-x-4 flex-1">
-                    <div className="text-2xl">{getDocTypeIcon(doc.doc_type)}</div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate">{doc.doc_title}</h3>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                        {doc.template_name && (
-                          <span className="flex items-center">
-                            <FileText className="h-3 w-3 mr-1" />
-                            {doc.template_name}
-                          </span>
-                        )}
-                        <span className="flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Created {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
-                        </span>
+              
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                {isConnected && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={loadData}
+                      disabled={isLoading}
+                      className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                    >
+                      <RefreshCw className={`h-5 w-5 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+                      Refresh
+                    </Button>
+                    <Button 
+                      onClick={() => setIsCreateModalOpen(true)} 
+                      size="lg"
+                      className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      New Document
+                    </Button>
+                  </>
+                )}
+                
+                {isConnected && (
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
+                      <div className="p-1.5 bg-orange-500 rounded-lg">
+                        <FileText className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                          {documents.length}
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewDocument(doc)}
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Statistics */}
+        {isConnected && (
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-2xl"></div>
+              <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Documents</p>
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{documents.length}</p>
+                  </div>
+                  <div className="p-3 bg-blue-500 rounded-xl">
+                    <FolderOpen className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-2xl"></div>
+              <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Templates Available</p>
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{templates.length}</p>
+                  </div>
+                  <div className="p-3 bg-green-500 rounded-xl">
+                    <FileText className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 to-red-50/50 dark:from-orange-950/20 dark:to-red-950/20 rounded-2xl"></div>
+              <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Recent Activity</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {documents.length > 0
+                        ? formatDistanceToNow(new Date(documents[0].created_at), {
+                            addSuffix: true,
+                          })
+                        : "No activity"}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-orange-500 rounded-xl">
+                    <Clock className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Connection Status */}
+        {!isConnected && !isCheckingConnection && (
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-yellow-50/30 to-red-50/50 dark:from-orange-950/20 dark:via-yellow-950/10 dark:to-red-950/20 rounded-2xl"></div>
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                <LinkIcon className="h-10 w-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Google Docs Not Connected</h3>
+              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                Connect your Google account to create, manage, and collaborate on documents directly from BugRicer.
+              </p>
+              <Button
+                onClick={handleConnectGoogleDocs}
+                className="h-12 px-8 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <LinkIcon className="h-5 w-5 mr-2" />
+                Connect Google Account
+                <ExternalLink className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Documents List */}
+        {isConnected && (
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
+            <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="p-1.5 bg-orange-500 rounded-lg">
+                  <FileText className="h-4 w-4 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Your Documents</h3>
+              </div>
+              
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Loading documents...</span>
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                  <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                    <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                      <FileText className="h-10 w-10 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Documents Yet</h3>
+                    <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                      Create your first document to get started with BugDocs
+                    </p>
+                    <Button 
+                      onClick={() => setIsCreateModalOpen(true)}
+                      className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                     >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      View
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteClick(doc)}
-                      disabled={isDeleting === doc.id}
-                    >
-                      {isDeleting === doc.id ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
+                      <Plus className="h-5 w-5 mr-2" />
+                      Create Document
                     </Button>
                   </div>
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-4">
+                  {documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300"
+                    >
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-red-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-red-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="relative p-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start space-x-4 flex-1">
+                            <div className="text-3xl">{getDocTypeIcon(doc.doc_type)}</div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-700 dark:group-hover:text-orange-300 transition-colors">
+                                {doc.doc_title}
+                              </h3>
+                              <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                {doc.template_name && (
+                                  <span className="flex items-center">
+                                    <FileText className="h-4 w-4 mr-1" />
+                                    {doc.template_name}
+                                  </span>
+                                )}
+                                <span className="flex items-center">
+                                  <Clock className="h-4 w-4 mr-1" />
+                                  Created {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewDocument(doc)}
+                              className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteClick(doc)}
+                              disabled={isDeleting === doc.id}
+                              className="h-10 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                            >
+                              {isDeleting === doc.id ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
-      )}
+          </div>
+        )}
 
       {/* Create Document Modal */}
       {isConnected && (
@@ -546,60 +596,61 @@ const BugDocsPage = () => {
       </Dialog>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Document</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{documentToDelete?.doc_title}"? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-              <div className="flex items-start space-x-3">
-                <div className="rounded-full bg-destructive/20 p-2">
-                  <Trash2 className="h-5 w-5 text-destructive" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-sm mb-1">Warning</h4>
-                  <p className="text-sm text-muted-foreground">
-                    This will permanently delete the document from both BugRicer and Google Drive. 
-                    This action cannot be undone.
-                  </p>
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Delete Document</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{documentToDelete?.doc_title}"? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="rounded-full bg-destructive/20 p-2">
+                    <Trash2 className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-sm mb-1">Warning</h4>
+                    <p className="text-sm text-muted-foreground">
+                      This will permanently delete the document from both BugRicer and Google Drive. 
+                      This action cannot be undone.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={handleDeleteCancel}
-              disabled={isDeleting !== null}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteConfirm}
-              disabled={isDeleting !== null}
-            >
-              {isDeleting !== null ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Document
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={handleDeleteCancel}
+                disabled={isDeleting !== null}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting !== null}
+              >
+                {isDeleting !== null ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Document
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </section>
+    </main>
   );
 };
 
