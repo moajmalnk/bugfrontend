@@ -1053,7 +1053,7 @@ export default function MeetLobby() {
                     }}
                     className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3"
                   >
-                    {error.includes("re-authorize") ? "Re-authorize Google Account" : "Connect Google Account"}
+                    {error.includes("re-authorize") ? "Re-authorize Google" : "Connect Google"}
                   </Button>
                 </div>
               </div>

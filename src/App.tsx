@@ -36,6 +36,8 @@ import { ModernErrorBoundary } from "@/components/error/ModernErrorBoundary";
 import { SEOHead } from "@/components/seo/SEOHead";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
+import { ProfessionalRefreshButton } from '@/components/ui/ProfessionalRefreshButton';
+import { RefreshKeyboardShortcuts } from '@/components/ui/RefreshKeyboardShortcuts';
 
 // Initialize the query client outside of the component with optimized defaults
 const queryClient = new QueryClient({
@@ -117,7 +119,7 @@ function UpdateNotificationModal({ show, onAccept, onDismiss }: {
           A new version of BugRicer is ready with improvements and bug fixes.
           Would you like to update now?
         </p>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "center" }}>
           <button
             style={{
               background: "#f3f4f6",
@@ -139,27 +141,13 @@ function UpdateNotificationModal({ show, onAccept, onDismiss }: {
           >
             Later
           </button>
-          <button
-            style={{
-              background: "#2563eb",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              padding: "0.75rem 1.5rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.2s"
-            }}
-            onClick={onAccept}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = "#1d4ed8";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = "#2563eb";
-            }}
-          >
-            Update Now
-          </button>
+          <ProfessionalRefreshButton
+            onHardRefresh={onAccept}
+            showDropdown={false}
+            label="Update Now"
+            variant="default"
+            className="bg-blue-600 hover:bg-blue-700 text-white border-0"
+          />
         </div>
       </div>
     </div>
@@ -311,6 +299,7 @@ function AppContent() {
     <>
       <SEOHead />
       <SkipToContent />
+      <RefreshKeyboardShortcuts />
       <OfflineBanner show={isOffline} />
       <div style={{ paddingTop: isOffline ? '3rem' : '0' }}>
         <RouteConfig />

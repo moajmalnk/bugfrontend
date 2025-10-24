@@ -113,7 +113,7 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
                   <LinkIcon className="h-5 w-5 transition-all duration-200 group-hover/icon:scale-110 group-hover/icon:rotate-12" />
                   <div className="absolute -top-1 -right-1 h-3 w-3 bg-orange-400 rounded-full border-2 border-white animate-pulse shadow-sm"></div>
                 </div>
-                <span className="font-semibold tracking-wide">Connect Google Docs</span>
+                <span className="font-semibold tracking-wide">Connect Google</span>
                 <ExternalLink className="h-4 w-4 transition-all duration-200 hover:translate-x-0.5 hover:-translate-y-0.5 hover:scale-110" />
               </>
             )}

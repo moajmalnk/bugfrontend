@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AlertTriangle, Wifi, WifiOff, RefreshCw, LogOut, Clock, AlertCircle, Zap } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ENV } from '@/lib/env';
+import { ProfessionalRefreshButton } from '@/components/ui/ProfessionalRefreshButton';
 
 interface ErrorState {
   type: 'inactivity' | 'network' | 'version' | 'cache' | 'auth' | 'server' | 'unknown';
@@ -207,17 +208,17 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
           requiresLogin: false,
           severity: 'error'
         });
-      } else {
-        showError({
-          type: 'unknown',
-          message: 'An unexpected error occurred. Please refresh the page.',
-          canRetry: true,
-          requiresLogin: false,
-          severity: 'error'
-        });
-      }
+      } 
     };
-
+    // else {
+    //   showError({
+    //     type: 'unknown',
+    //     message: 'An unexpected error occurred. Please refresh the page.',
+    //     canRetry: true,
+    //     requiresLogin: false,
+    //     severity: 'error'
+    //   });
+    // }
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       if (event.reason?.message?.includes('401') || 
           event.reason?.message?.includes('Unauthorized')) {
@@ -338,10 +339,13 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
                 ) : (
                   <>
                     {errorState.canRetry && (
-                      <Button onClick={handleRetry} className="flex-1">
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Refresh Page
-                      </Button>
+                      <ProfessionalRefreshButton
+                        onHardRefresh={handleRetry}
+                        showDropdown={false}
+                        label="Refresh Page"
+                        className="flex-1"
+                        variant="default"
+                      />
                     )}
                   </>
                 )}
@@ -364,10 +368,14 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
               {errorState.message}
               <div className="flex gap-2 mt-2">
                 {errorState.canRetry && (
-                  <Button onClick={handleRetry} size="sm" variant="outline">
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Refresh
-                  </Button>
+                  <ProfessionalRefreshButton
+                    onHardRefresh={handleRetry}
+                    showDropdown={false}
+                    label="Refresh"
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                  />
                 )}
                 <Button onClick={clearError} size="sm" variant="ghost">
                   Dismiss

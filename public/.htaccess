@@ -1,0 +1,30 @@
+# Content Security Policy Configuration
+# This file sets proper CSP headers for production
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Set Content Security Policy headers
+# Note: These headers should be adjusted based on your production environment
+<IfModule mod_headers.c>
+    # Content Security Policy
+    # Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost https://bugbackend.bugricer.com https://accounts.google.com https://oauth2.googleapis.com; frame-src 'self' https://accounts.google.com https://csp.withgoogle.com; object-src 'none'; base-uri 'self'; form-action 'self';"
+    
+    # X-Content-Type-Options
+    Header set X-Content-Type-Options "nosniff"
+    
+    # X-Frame-Options
+    Header set X-Frame-Options "SAMEORIGIN"
+    
+    # X-XSS-Protection
+    Header set X-XSS-Protection "1; mode=block"
+    
+    # Referrer-Policy
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Redirect all requests to index.html for SPA routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^.*$ /index.html [QSA,L]
+
