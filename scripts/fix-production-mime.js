@@ -61,7 +61,7 @@ const vercelConfig = {
       "has": [
         {
           "type": "host",
-          "value": "bugs.moajmalnk.in"
+          "value": "bugs.bugricer.com"
         }
       ]
     }
