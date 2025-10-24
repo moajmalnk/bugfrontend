@@ -292,8 +292,16 @@ async function cacheFirst(request) {
 async function staleWhileRevalidate(request) {
   const cachedResponse = await caches.match(request);
 
+  // Skip Google CSP requests to avoid conflicts
+  if (request.url.includes('csp.withgoogle.com') || request.url.includes('accounts.google.com')) {
+    return cachedResponse || new Response('Skipped CSP request', { status: 200 });
+  }
+
   // Always fetch from network to update cache
-  const networkPromise = fetch(request)
+  const networkPromise = fetch(request, {
+    mode: 'cors',
+    credentials: 'omit'
+  })
     .then(response => {
       if (response && response.ok && shouldCache(request)) {
         const cache = caches.open(DYNAMIC_CACHE);
