@@ -81,8 +81,8 @@
     <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups" />
     <meta http-equiv="Cross-Origin-Embedder-Policy" content="unsafe-none" />
     
-    <!-- Content Security Policy temporarily disabled to fix Google OAuth compatibility -->
-    <!-- <meta http-equiv="Content-Security-Policy" content="frame-src 'self' https://accounts.google.com https://csp.withgoogle.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://www.google.com; connect-src 'self' http://localhost https://bugbackend.bugricer.com https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com;" /> -->
+    <!-- Content Security Policy for Google Sign-In - Temporarily disabled to fix syntax error -->
+    <!-- <meta http-equiv="Content-Security-Policy" content="frame-src 'self' https://accounts.google.com https://csp.withgoogle.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://www.gstatic.com; connect-src 'self' http://localhost https://bugbackend.bugricer.com https://accounts.google.com https://oauth2.googleapis.com;" /> -->
     
     <!-- Structured Data -->
     <script type="application/ld+json">
@@ -141,31 +141,6 @@
         if (e.reason && e.reason.message && e.reason.message.includes('Loading chunk')) {
           console.error('Chunk loading rejection:', e.reason);
           // The React LoadingErrorModal will handle showing the UI
-        }
-      });
-      
-      // Handle JavaScript syntax errors that might prevent Google Sign-In from working
-      window.addEventListener('error', function(e) {
-        if (e.message && e.message.includes('CSP')) {
-          console.error('CSP-related JavaScript error detected:', e);
-          console.log('This error is likely caused by Content Security Policy conflicts with Google OAuth.');
-          console.log('The CSP has been temporarily disabled to resolve this issue.');
-          
-          // Try to clear any problematic cached content
-          if ('caches' in window) {
-            caches.keys().then(function(names) {
-              names.forEach(function(name) {
-                caches.delete(name);
-              });
-            });
-          }
-          
-          // Show user-friendly message
-          setTimeout(function() {
-            if (window.confirm('Google Sign-In encountered a security policy conflict. Would you like to refresh the page to try again?')) {
-              window.location.reload();
-            }
-          }, 2000);
         }
       });
     </script>

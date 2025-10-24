@@ -3,15 +3,6 @@ import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { GOOGLE_OAUTH_SETUP } from '@/utils/googleOAuthSetup';
 import { oauthDiagnostic } from '@/utils/oauthDiagnostic';
 
-// Extend Window interface to include Google OAuth API
-declare global {
-  interface Window {
-    google?: {
-      accounts?: any;
-    };
-  }
-}
-
 interface GoogleSignInButtonProps {
   onSuccess: (credentialResponse: CredentialResponse) => void;
   onError: (error: any) => void;
@@ -19,35 +10,6 @@ interface GoogleSignInButtonProps {
 }
 
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSuccess, onError, variant = 'full' }) => {
-  const [isGoogleScriptLoaded, setIsGoogleScriptLoaded] = React.useState(false);
-  const [scriptLoadError, setScriptLoadError] = React.useState(false);
-
-  // Check if Google OAuth script is loaded
-  React.useEffect(() => {
-    const checkGoogleScript = () => {
-      if (window.google && window.google.accounts) {
-        setIsGoogleScriptLoaded(true);
-        setScriptLoadError(false);
-      } else {
-        // Retry after a short delay
-        setTimeout(checkGoogleScript, 100);
-      }
-    };
-
-    // Check immediately
-    checkGoogleScript();
-
-    // Set a timeout to detect if script fails to load
-    const timeout = setTimeout(() => {
-      if (!isGoogleScriptLoaded) {
-        setScriptLoadError(true);
-        console.warn('Google OAuth script failed to load within expected time');
-      }
-    }, 5000);
-
-    return () => clearTimeout(timeout);
-  }, [isGoogleScriptLoaded]);
-
   // Suppress Google OAuth console errors
   React.useEffect(() => {
     const originalError = console.error;
@@ -58,8 +20,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
       const errorMessage = args[0]?.toString() || '';
       if (errorMessage.includes('GSI_LOGGER') || 
           errorMessage.includes('accounts.google.com') ||
-          errorMessage.includes('Cross-Origin-Opener-Policy') ||
-          errorMessage.includes('CSP')) {
+          errorMessage.includes('Cross-Origin-Opener-Policy')) {
         return; // Suppress these errors
       }
       originalError.apply(console, args);
@@ -70,8 +31,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
       const warningMessage = args[0]?.toString() || '';
       if (warningMessage.includes('GSI_LOGGER') || 
           warningMessage.includes('accounts.google.com') ||
-          warningMessage.includes('Cross-Origin-Opener-Policy') ||
-          warningMessage.includes('CSP')) {
+          warningMessage.includes('Cross-Origin-Opener-Policy')) {
         return; // Suppress these warnings
       }
       originalWarn.apply(console, args);
@@ -83,36 +43,6 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
     };
   }, []);
 
-  // Show fallback if Google script failed to load
-  if (scriptLoadError) {
-    if (variant === 'icon') {
-      return (
-        <div className="relative w-10 h-10 sm:w-12 sm:h-12">
-          <button
-            type="button"
-            className="group relative flex items-center justify-center w-full h-full rounded-lg sm:rounded-xl border-2 border-red-200 dark:border-red-600 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 cursor-not-allowed"
-            title="Google Sign-In temporarily unavailable"
-            disabled
-          >
-            <svg className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="15" y1="9" x2="9" y2="15"/>
-              <line x1="9" y1="9" x2="15" y2="15"/>
-            </svg>
-          </button>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="flex justify-center mt-3">
-        <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
-          Google Sign-In temporarily unavailable
-        </div>
-      </div>
-    );
-  }
-
   if (variant === 'icon') {
     return (
       <div className="relative w-10 h-10 sm:w-12 sm:h-12">
@@ -121,15 +51,6 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
           type="button"
           className="group relative flex items-center justify-center w-full h-full rounded-lg sm:rounded-xl border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md transition-all duration-300 hover:scale-105"
           title="Sign in with Google"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // Trigger the Google Login programmatically
-            const googleButton = document.querySelector('[data-testid="google-login-button"]') as HTMLElement;
-            if (googleButton) {
-              googleButton.click();
-            }
-          }}
         >
           {/* Google G icon */}
           <svg className="h-4 w-4 sm:h-5 sm:w-5 transition-colors text-slate-500 group-hover:text-blue-600" viewBox="0 0 24 24">
@@ -174,7 +95,6 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
             ux_mode="popup"
             auto_select={false}
             key={`google-login-${Date.now()}`}
-            data-testid="google-login-button"
           />
         </div>
       </div>
@@ -185,26 +105,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
     <div className="flex justify-center mt-3">
       <GoogleLogin
         onSuccess={onSuccess}
-        onError={() => {
-          console.error('Google OAuth Error');
-          
-          // Run diagnostic to get current origin info
-          const diagnostic = oauthDiagnostic.logDiagnostic();
-          
-          if (diagnostic.needsSetup) {
-            onError({
-              type: 'setup_required',
-              message: `Google OAuth not configured for ${diagnostic.origin}. Please check the console for setup instructions.`,
-              setup: diagnostic.instructions,
-              currentOrigin: diagnostic.origin
-            });
-          } else {
-            onError({
-              type: 'oauth_error',
-              message: 'Google Sign-In failed. Please try again or use another login method.'
-            });
-          }
-        }}
+        onError={() => onError({})}
         useOneTap={false}
         theme="outline"
         size="large"
@@ -217,7 +118,6 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
         auto_select={false}
         // Force refresh of the button to avoid caching issues
         key={`google-login-${Math.random()}`}
-        data-testid="google-login-button"
       />
     </div>
   );
