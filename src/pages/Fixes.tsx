@@ -387,25 +387,114 @@ const Fixes = () => {
 
     if (bugs.filter((bug) => bug.status === "fixed").length === 0) {
       return (
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-blue-50/30 to-emerald-50/50 dark:from-green-950/20 dark:via-blue-950/10 dark:to-emerald-950/20 rounded-2xl"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-            <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-              <CheckCircle className="h-10 w-10 text-white" />
+        <div className="space-y-6 sm:space-y-8">
+          {/* Always show search and filters when tabs are visible */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+            <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 bg-blue-500 rounded-lg">
+                    <Search className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                </div>
+                
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Search Bar */}
+                  <div className="flex-1 relative group">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input
+                      type="text"
+                      placeholder="Search fixes by title, description, or bug ID..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                    />
+                  </div>
+
+                  {/* Filter Controls */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Priority Filter */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                        <Filter className="h-4 w-4 text-white" />
+                      </div>
+                      <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectValue placeholder="Priority" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All Priorities</SelectItem>
+                          <SelectItem value="high">High Priority</SelectItem>
+                          <SelectItem value="medium">Medium Priority</SelectItem>
+                          <SelectItem value="low">Low Priority</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Project Filter */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                        <FolderOpen className="h-4 w-4 text-white" />
+                      </div>
+                      <Select value={projectFilter} onValueChange={setProjectFilter}>
+                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectValue placeholder="Project" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All Projects</SelectItem>
+                          {visibleProjects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Clear Filters Button */}
+                    {(searchTerm || priorityFilter !== "all" || projectFilter !== "all") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearchTerm("");
+                          setPriorityFilter("all");
+                          setProjectFilter("all");
+                        }}
+                        className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">All Clear!</h3>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-              There are no fixed bugs to display. Great job on keeping your projects bug-free!
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button asChild size="lg" className="h-12 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
-                <Link
-                  to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}
-                >
-                  <Bug className="mr-2 h-5 w-5" />
-                  View All Bugs
-                </Link>
-              </Button>
+          </div>
+
+          {/* Empty state */}
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-blue-50/30 to-emerald-50/50 dark:from-green-950/20 dark:via-blue-950/10 dark:to-emerald-950/20 rounded-2xl"></div>
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                <CheckCircle className="h-10 w-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">All Clear!</h3>
+              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                There are no fixed bugs to display. Great job on keeping your projects bug-free!
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button asChild size="lg" className="h-12 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
+                  <Link
+                    to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}
+                  >
+                    <Bug className="mr-2 h-5 w-5" />
+                    View All Bugs
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -414,31 +503,120 @@ const Fixes = () => {
 
     if (filteredBugs.length === 0) {
       return (
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-yellow-50/30 to-red-50/50 dark:from-orange-950/20 dark:via-yellow-950/10 dark:to-red-950/20 rounded-2xl"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-            <div className="mx-auto w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-              <Search className="h-10 w-10 text-white" />
+        <div className="space-y-6 sm:space-y-8">
+          {/* Always show search and filters when tabs are visible */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+            <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 bg-blue-500 rounded-lg">
+                    <Search className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                </div>
+                
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Search Bar */}
+                  <div className="flex-1 relative group">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input
+                      type="text"
+                      placeholder="Search fixes by title, description, or bug ID..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                    />
+                  </div>
+
+                  {/* Filter Controls */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Priority Filter */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                        <Filter className="h-4 w-4 text-white" />
+                      </div>
+                      <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectValue placeholder="Priority" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All Priorities</SelectItem>
+                          <SelectItem value="high">High Priority</SelectItem>
+                          <SelectItem value="medium">Medium Priority</SelectItem>
+                          <SelectItem value="low">Low Priority</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Project Filter */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                        <FolderOpen className="h-4 w-4 text-white" />
+                      </div>
+                      <Select value={projectFilter} onValueChange={setProjectFilter}>
+                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectValue placeholder="Project" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All Projects</SelectItem>
+                          {visibleProjects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Clear Filters Button */}
+                    {(searchTerm || priorityFilter !== "all" || projectFilter !== "all") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearchTerm("");
+                          setPriorityFilter("all");
+                          setProjectFilter("all");
+                        }}
+                        className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Results Found</h3>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-              No fixes match your current filters. Try adjusting your search criteria or clearing the filters.
-            </p>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
-              onClick={() => {
-                setSearchTerm("");
-                setPriorityFilter("all");
-                setProjectFilter("all");
-              }}
-            >
-              <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new` : "/bugs/new"}>
-                Fix a Bug
-              </Link>
-            </Button>
+          </div>
+
+          {/* No results state */}
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-yellow-50/30 to-red-50/50 dark:from-orange-950/20 dark:via-yellow-950/10 dark:to-red-950/20 rounded-2xl"></div>
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                <Search className="h-10 w-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Results Found</h3>
+              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                No fixes match your current filters. Try adjusting your search criteria or clearing the filters.
+              </p>
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                onClick={() => {
+                  setSearchTerm("");
+                  setPriorityFilter("all");
+                  setProjectFilter("all");
+                }}
+              >
+                <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new` : "/bugs/new"}>
+                  Fix a Bug
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       );
@@ -1005,8 +1183,8 @@ const Fixes = () => {
           </div>
         </div>
 
-        {/* Professional Tabs - show only when there are fixed bugs */}
-        {showTabs && hasAnyFixed ? (
+        {/* Professional Tabs - always show for users who can view them */}
+        {showTabs ? (
           <Tabs
             value={activeTab}
             onValueChange={(val) => {

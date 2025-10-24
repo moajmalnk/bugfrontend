@@ -165,7 +165,7 @@ const Projects = () => {
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get("tab") || (currentUser?.role === "admin" ? "all-projects" : "overview");
+  const tabFromUrl = searchParams.get("tab") || (currentUser?.role === "admin" ? "all-projects" : currentUser?.role === "developer" ? "my-projects" : "overview");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(12);
   const [showUndoNotification, setShowUndoNotification] = useState(false);
@@ -329,13 +329,13 @@ const Projects = () => {
       );
     }
 
-    // Filter by tab for admin tabs
-    if (currentUser?.role === "admin") {
+    // Filter by tab for admin and developer tabs
+    if (currentUser?.role === "admin" || currentUser?.role === "developer") {
       if (tabFromUrl === "my-projects") {
-        // For "My Projects" tab, only show projects where the admin is a member
+        // For "My Projects" or "Assigned Projects" tab, only show projects where the user is a member
         filtered = filtered.filter(project => userProjectMemberships[project.id]);
       }
-      // For "all-projects" tab or any other value, show all projects for admins
+      // For "all-projects" tab, show all projects for admins, but for developers show all projects (read-only)
     }
 
     // Apply custom status filter
@@ -377,8 +377,8 @@ const Projects = () => {
       });
     }
 
-    // Admins see all, others see only assigned projects
-    if (currentUser?.role !== "admin") {
+    // For non-admin, non-developer users, only show assigned projects
+    if (currentUser?.role !== "admin" && currentUser?.role !== "developer") {
       filtered = filtered.filter(
         (project) => userProjectMemberships[project.id]
       );
@@ -787,11 +787,11 @@ const Projects = () => {
   // NOTE: The component's actual return is defined after helper functions below.
   // This placeholder was removed to avoid duplicate returns preventing dialogs from rendering.
 
-  function renderProjectsContent() {
+  function renderProjectsContent(activeTab?: string) {
     return (
       <>
-        {/* Professional Search and Filter Controls (only when there are projects) */}
-        {totalFiltered > 0 && (
+        {/* Professional Search and Filter Controls - show when there are projects OR when there are active filters */}
+        {(projects.length > 0 || hasActiveFilters) && (
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
           <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
@@ -801,6 +801,14 @@ const Projects = () => {
                   <FolderKanban className="h-4 w-4 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                {/* Show active filters indicator */}
+                {hasActiveFilters && (
+                  <div className="ml-auto flex items-center gap-2">
+                    <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+                      {[searchQuery && "Search", statusFilter !== "all" && "Status", dateFilter !== "all" && "Date"].filter(Boolean).length} filter{([searchQuery && "Search", statusFilter !== "all" && "Status", dateFilter !== "all" && "Date"].filter(Boolean).length) !== 1 ? "s" : ""} active
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="flex flex-col md:flex-row gap-4">
@@ -875,7 +883,7 @@ const Projects = () => {
         </div>
         )}
 
-        {/* Professional Responsive Pagination Controls - Only show if there are multiple pages */}
+        {/* Professional Responsive Pagination Controls - Show when there are multiple pages */}
         {!skeletonLoading &&
           !isLoading &&
           totalFiltered > 0 &&
@@ -1115,7 +1123,7 @@ const Projects = () => {
           </div>
         )}
 
-        {/* Simple results info when no pagination needed */}
+        {/* Simple results info when no pagination needed - show when there are projects */}
         {!skeletonLoading &&
           !isLoading &&
           totalFiltered > 0 &&
@@ -1197,13 +1205,27 @@ const Projects = () => {
               <FolderKanban className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">
-              No projects found
+              {hasActiveFilters ? "No matching projects found" : "No projects found"}
             </h3>
             <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-              {searchQuery
+              {hasActiveFilters
+                ? "Try adjusting your search criteria or filters to find more projects."
+                : searchQuery
                 ? "We couldn't find any projects matching your search criteria."
                 : "You are not a member of any projects yet."}
             </p>
+            {hasActiveFilters && (
+              <div className="mb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="h-9 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                >
+                  Clear All Filters
+                </Button>
+              </div>
+            )}
             {currentUser?.role === "admin" && (
               <Button
                 className="mt-2 h-10 sm:h-11 px-6 sm:px-8"
@@ -1344,21 +1366,26 @@ const Projects = () => {
                   </div>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-2 sm:gap-3 sm:flex-row pt-2 mt-auto p-4 sm:p-5">
-                  <Button
-                    asChild
-                    variant="default"
-                    className="w-full sm:flex-1 min-w-0 h-11 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                  >
-                    <Link
-                      to={
-                        currentUser?.role
-                          ? `/${currentUser.role}/projects/${project.id}`
-                          : `/projects/${project.id}`
-                      }
+                  {/* Show View button only for assigned projects (my-projects tab) or for admins */}
+                  {((currentUser?.role === "developer" && activeTab === "my-projects") || 
+                    (currentUser?.role === "admin") || 
+                    (currentUser?.role === "tester")) && (
+                    <Button
+                      asChild
+                      variant="default"
+                      className="w-full sm:flex-1 min-w-0 h-11 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                     >
-                      View
-                    </Link>
-                  </Button>
+                      <Link
+                        to={
+                          currentUser?.role
+                            ? `/${currentUser.role}/projects/${project.id}`
+                            : `/projects/${project.id}`
+                        }
+                      >
+                        View
+                      </Link>
+                    </Button>
+                  )}
                   {currentUser?.role === "admin" && (
                     <TooltipProvider>
                       <Tooltip>
@@ -1451,8 +1478,8 @@ const Projects = () => {
           </div>
         </div>
 
-        {/* Admin Tabs */}
-        {currentUser?.role === "admin" ? (
+        {/* Admin and Developer Tabs */}
+        {(currentUser?.role === "admin" || currentUser?.role === "developer") ? (
           <Tabs
             value={tabFromUrl}
             onValueChange={handleTabChange}
@@ -1467,7 +1494,9 @@ const Projects = () => {
                     className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
                   >
                     <FolderKanban className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">All Projects</span>
+                    <span className="hidden sm:inline">
+                      {currentUser?.role === "admin" ? "All Projects" : "All Projects"}
+                    </span>
                     <span className="sm:hidden">All</span>
                     <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
                       {projects.length}
@@ -1478,8 +1507,12 @@ const Projects = () => {
                     className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
                   >
                     <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">My Projects</span>
-                    <span className="sm:hidden">My</span>
+                    <span className="hidden sm:inline">
+                      {currentUser?.role === "admin" ? "My Projects" : "Assigned Projects"}
+                    </span>
+                    <span className="sm:hidden">
+                      {currentUser?.role === "admin" ? "My" : "Assigned"}
+                    </span>
                     <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
                       {projects.filter(p => userProjectMemberships[p.id]).length}
                     </span>
@@ -1489,10 +1522,10 @@ const Projects = () => {
             </div>
 
             <TabsContent value="all-projects" className="space-y-6 sm:space-y-8">
-              {renderProjectsContent()}
+              {renderProjectsContent("all-projects")}
             </TabsContent>
             <TabsContent value="my-projects" className="space-y-6 sm:space-y-8">
-              {renderProjectsContent()}
+              {renderProjectsContent("my-projects")}
             </TabsContent>
           </Tabs>
         ) : (

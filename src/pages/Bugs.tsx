@@ -321,8 +321,8 @@ const Bugs = () => {
           </div>
         </div>
 
-        {/* Admin Tabs or Regular Content - only show tabs if there are bugs */}
-        {canViewTabs && !skeletonLoading && !loading && filteredBugs.length > 0 ? (
+        {/* Admin Tabs or Regular Content - always show tabs for users who can view them */}
+        {canViewTabs && !skeletonLoading && !loading ? (
           <Tabs
             value={activeTab}
             onValueChange={(val) => {
@@ -366,8 +366,8 @@ const Bugs = () => {
             </div>
 
             <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
-              {/* Only show search and filters if there are bugs */}
-              {!skeletonLoading && !loading && filteredBugs.length > 0 && (
+              {/* Always show search and filters when tabs are visible */}
+              {!skeletonLoading && !loading && (
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
                   <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
@@ -458,7 +458,7 @@ const Bugs = () => {
                 </div>
               )}
 
-              {/* Professional Responsive Pagination Controls - Only show if there are multiple pages and bugs */}
+              {/* Professional Responsive Pagination Controls - Show when there are bugs */}
               {!skeletonLoading && !loading && filteredBugs.length > 0 && totalPages > 1 && (
                 <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   {/* Top Row - Results Info and Items Per Page */}
@@ -703,7 +703,7 @@ const Bugs = () => {
                 </div>
               )}
 
-              {/* Simple results info when no pagination needed - only show if there are bugs */}
+              {/* Simple results info when no pagination needed - show when there are bugs */}
               {!skeletonLoading && !loading && filteredBugs.length > 0 && totalPages <= 1 && (
                 <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   <div className="flex items-center gap-2">
@@ -792,8 +792,8 @@ const Bugs = () => {
           </Tabs>
         ) : (
           <div className="space-y-6 sm:space-y-8">
-            {/* Unified Search & Filter design for Developers (same as Admins/Testers) - only show if there are bugs */}
-            {!skeletonLoading && !loading && filteredBugs.length > 0 && (
+            {/* Unified Search & Filter design for Developers (same as Admins/Testers) - always show */}
+            {!skeletonLoading && !loading && (
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
                 <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
@@ -896,7 +896,7 @@ const Bugs = () => {
                 </div>
               </div>
             )}
-            {/* Professional Responsive Pagination for Developers - Only show if there are multiple pages and bugs */}
+            {/* Professional Responsive Pagination for Developers - Show when there are bugs and multiple pages */}
             {!skeletonLoading &&
               !loading &&
               filteredBugs.length > 0 &&
@@ -1144,7 +1144,7 @@ const Bugs = () => {
                 </div>
               )}
 
-            {/* Simple results info when no pagination needed for developers - only show if there are bugs */}
+            {/* Simple results info when no pagination needed for developers - show when there are bugs */}
             {!skeletonLoading &&
               !loading &&
               filteredBugs.length > 0 &&

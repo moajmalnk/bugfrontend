@@ -307,7 +307,7 @@ const Updates = () => {
       </div>
 
       <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
-        {/* Enhanced Search and Filter Controls */}
+        {/* Enhanced Search and Filter Controls - Always show when tabs are visible */}
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
           <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
@@ -407,7 +407,7 @@ const Updates = () => {
           </div>
         </div>
 
-        {/* Professional Responsive Pagination Controls - Only show if there are multiple pages */}
+        {/* Professional Responsive Pagination Controls - Show when there are updates and multiple pages */}
         {filteredUpdates.length > 0 && totalPages > 1 && (
           <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             {/* Top Row - Results Info and Items Per Page */}
@@ -644,7 +644,7 @@ const Updates = () => {
           </div>
         )}
 
-        {/* Simple results info when no pagination needed */}
+        {/* Simple results info when no pagination needed - show when there are updates */}
         {filteredUpdates.length > 0 && totalPages <= 1 && (
           <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             <div className="flex items-center gap-2">
@@ -945,7 +945,7 @@ const Updates = () => {
           </div>
         )}
 
-        {hasAnyUpdates ? (
+        {!isLoading ? (
           <UpdatesTabs />
         ) : (
           <div className="relative overflow-hidden">

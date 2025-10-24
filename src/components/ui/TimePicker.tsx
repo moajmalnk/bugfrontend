@@ -59,6 +59,7 @@ export function TimePicker({ value, onChange, placeholder = 'Select time', class
           <div className="space-y-1 col-span-1">
             <div className="text-xs text-muted-foreground">Hour</div>
             <input
+              id="time-picker-hour"
               aria-label="Hour"
               inputMode="numeric"
               type="number"
@@ -72,6 +73,7 @@ export function TimePicker({ value, onChange, placeholder = 'Select time', class
           <div className="space-y-1 col-span-1">
             <div className="text-xs text-muted-foreground">Minute</div>
             <input
+              id="time-picker-minute"
               aria-label="Minute"
               inputMode="numeric"
               type="number"

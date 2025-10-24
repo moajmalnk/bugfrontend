@@ -104,7 +104,22 @@ export function useFeedback(): UseFeedbackReturn {
       // Don't set shouldShowFeedback to false here, as user might want to submit later
     } catch (error) {
       console.error('Error dismissing feedback:', error);
-      // Still close modal even if dismiss fails
+      
+      // If the error is that feedback has already been submitted, 
+      // that's actually fine - just close the modal
+      if (error instanceof Error && error.message.includes('already been submitted')) {
+        console.log('Feedback already submitted, closing modal');
+        setIsModalOpen(false);
+        setShouldShowFeedback(false);
+        return;
+      }
+      
+      // For other errors, still close modal but show a message
+      toast({
+        title: "Notice",
+        description: "Feedback prompt closed. You can still provide feedback later if needed.",
+        variant: "default",
+      });
       setIsModalOpen(false);
     }
   }, []);

@@ -2,6 +2,7 @@ import { ActivityList } from "@/components/activities/ActivityList";
 import { BugCard } from "@/components/bugs/BugCard";
 import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
 import ProjectUpdates from "@/components/updates/ProjectUpdates";
+import { sharedTaskService, SharedTask } from "@/services/sharedTaskService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,12 +41,16 @@ import {
   Bug,
   CheckCircle2,
   ChevronLeft,
+  Clock,
   Code,
+  ListChecks,
   Loader2,
   Plus,
   Search,
   Shield,
   TestTube,
+  User,
+  Users,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -221,7 +226,9 @@ const ProjectDetails = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [projectOwner, setProjectOwner] = useState<ProjectUser | null>(null);
   const [bugs, setBugs] = useState<BugType[]>([]);
+  const [sharedTasks, setSharedTasks] = useState<SharedTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [tasksLoading, setTasksLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "overview";
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -251,6 +258,7 @@ const ProjectDetails = () => {
       fetchProjectDetails();
       fetchProjectBugs();
       fetchMembers();
+      fetchProjectSharedTasks();
     }
   }, [projectId]);
 
@@ -341,6 +349,26 @@ const ProjectDetails = () => {
         description: "Failed to load project bugs. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const fetchProjectSharedTasks = async () => {
+    try {
+      setTasksLoading(true);
+      const allTasks = await sharedTaskService.getSharedTasks();
+      // Filter tasks that belong to this project
+      const projectTasks = allTasks.filter(task => 
+        task.project_ids?.includes(projectId!) || task.project_id === projectId
+      );
+      setSharedTasks(projectTasks);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load project shared tasks. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTasksLoading(false);
     }
   };
 
@@ -751,6 +779,14 @@ const ProjectDetails = () => {
                 <span className="hidden sm:inline">Updates</span>
                 <span className="sm:hidden">Updates</span>
               </TabsTrigger>
+              <TabsTrigger value="tasks" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap min-w-fit">
+                <ListChecks className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Tasks</span>
+                <span className="sm:hidden">Tasks</span>
+                <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
+                  {sharedTasks.length}
+                </span>
+              </TabsTrigger>
               <TabsTrigger value="members" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap min-w-fit">
                 Members
               </TabsTrigger>
@@ -1003,6 +1039,181 @@ const ProjectDetails = () => {
             projectName={project.name}
             showCreateButton={true}
           />
+        </TabsContent>
+
+        <TabsContent value="tasks">
+          <Card className="border shadow-sm">
+            <CardHeader className="pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <CardTitle className="text-lg">Project Shared Tasks</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchProjectSharedTasks}
+                    disabled={tasksLoading}
+                  >
+                    {tasksLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-4 w-4 mr-2" />
+                        Refresh
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {tasksLoading ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="border border-border rounded-lg p-4">
+                      <div className="space-y-3">
+                        <div className="h-4 bg-muted rounded animate-pulse"></div>
+                        <div className="h-3 bg-muted rounded animate-pulse w-3/4"></div>
+                        <div className="h-3 bg-muted rounded animate-pulse w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : sharedTasks.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg mb-4">
+                    <ListChecks className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Shared Tasks</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    This project doesn't have any shared tasks yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {sharedTasks.map((task) => (
+                    <motion.div
+                      key={task.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex flex-col p-5 shadow-sm hover:shadow-lg transition-all duration-200"
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="text-left flex-1 min-w-0">
+                          <h3 className="text-base font-semibold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors line-clamp-2">
+                            {task.title}
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            task.status === 'approved' ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/20 dark:text-purple-400' :
+                            task.status === 'completed' ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' :
+                            task.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/20 dark:text-blue-400' :
+                            'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-400'
+                          }`}>
+                            {task.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      {task.description && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-4">
+                          {task.description}
+                        </p>
+                      )}
+
+                      {/* Task Details */}
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2 text-xs">
+                          <User className="h-3 w-3 text-blue-500" />
+                          <span className="text-gray-500 dark:text-gray-400">Created by:</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">
+                            {task.created_by_name || 'Unknown'}
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2 text-xs">
+                          <Users className="h-3 w-3 text-purple-500 mt-0.5" />
+                          <span className="text-gray-500 dark:text-gray-400">Assigned to:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {((task as any).assigned_to_names?.map((name: string, index: number) => {
+                              const isCompleted = (task as any).completed_assignee_names?.includes(name);
+                              return (
+                                <span
+                                  key={index}
+                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    isCompleted
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                  }`}
+                                >
+                                  {name} {isCompleted && '✓'}
+                                </span>
+                              );
+                            }) || [(task as any).assigned_to_name || 'Unknown'].map((name: string) => (
+                              <span key={name} className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                {name}
+                              </span>
+                            )))}
+                          </div>
+                        </div>
+                        {task.due_date && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <Clock className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-500 dark:text-gray-400">Due:</span>
+                            <span className="font-medium text-gray-700 dark:text-gray-300">{task.due_date}</span>
+                          </div>
+                        )}
+                        {task.completed_at && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                            <span className="text-gray-500 dark:text-gray-400">Completed:</span>
+                            <span className="font-medium text-gray-700 dark:text-gray-300">
+                              {new Date(task.completed_at).toLocaleDateString()} {task.completed_by_name && `by ${task.completed_by_name}`}
+                            </span>
+                          </div>
+                        )}
+                        {task.approved_by_name && task.status === 'approved' && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <CheckCircle2 className="h-3 w-3 text-purple-500" />
+                            <span className="text-gray-500 dark:text-gray-400">Approved by:</span>
+                            <span className="font-medium text-gray-700 dark:text-gray-300">
+                              {task.approved_by_name}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="mt-auto flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 flex-1"
+                          >
+                            View Details
+                          </Button>
+                          {task.status !== 'completed' && task.status !== 'approved' && ((task as any).assigned_to_ids ? (task as any).assigned_to_ids.includes(currentUser?.id || '') : task.assigned_to === currentUser?.id) && (
+                            <Button 
+                              size="sm" 
+                              className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white flex-1"
+                            >
+                              Mark Complete
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="members">

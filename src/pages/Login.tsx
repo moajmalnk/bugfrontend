@@ -34,8 +34,12 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
+import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
+import { GoogleSignInButton } from '@/components/GoogleSignInButton';
+import { clearGoogleOAuthCache, handleGoogleOAuthError } from '@/utils/googleOAuthUtils';
 
-type LoginMethod = "username" | "email" | "otp" | "forgot";
+type LoginMethod = "username" | "email" | "otp" | "forgot" | "magic";
 
 type ApiResponse = { success: boolean; message?: string; user?: any };
 
@@ -61,6 +65,8 @@ const Login = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [forgotEmailExists, setForgotEmailExists] = useState(false);
   const [checkingForgotEmail, setCheckingForgotEmail] = useState(false);
+  const [magicEmailExists, setMagicEmailExists] = useState(false);
+  const [checkingMagicEmail, setCheckingMagicEmail] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showTermsOfUse, setShowTermsOfUse] = useState(false);
   const {
@@ -96,6 +102,14 @@ const Login = () => {
       localStorage.getItem("token") || sessionStorage.getItem("token");
     if (isAuthenticated && currentUser && token) {
       // navigate to projects
+    }
+
+    // Check for magic link token in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const magicToken = urlParams.get('magic_token');
+    
+    if (magicToken) {
+      handleMagicLinkVerification(magicToken);
     }
   }, [isAuthenticated, currentUser, navigate]);
 
@@ -310,6 +324,52 @@ const Login = () => {
     }
   };
 
+  const handleMagicLinkVerification = async (token: string) => {
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/verify_magic_link_simple.php`, {
+        token: token
+      });
+
+      if ((response.data as any).success) {
+        const { token: jwtToken, user } = response.data as { token: string; user: any };
+        localStorage.setItem("token", jwtToken);
+        sessionStorage.setItem("token", jwtToken);
+        
+        // Update auth context
+        loginWithToken(user, jwtToken);
+        
+        // Show success animation
+        setShowSuccess(true);
+        setIsAnimating(true);
+        
+        toast({
+          title: "Welcome back! ✨",
+          description: `Signed in with magic link as ${user.username}`,
+          variant: "default",
+        });
+        
+        setTimeout(() => {
+          setShowSuccess(false);
+          setIsAnimating(false);
+          // Navigate to the appropriate dashboard based on user role
+          navigate(`/${user.role}/projects`, { replace: true });
+        }, 1500);
+      } else {
+        throw new Error((response.data as any).message || "Magic link verification failed");
+      }
+    } catch (error: any) {
+      console.error("Magic link verification error:", error);
+      toast({
+        title: "Magic Link Error",
+        description: (error.response?.data as any)?.message || "Invalid or expired magic link",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     toast({
@@ -371,6 +431,105 @@ const Login = () => {
     }
   };
 
+  const handleMagicLink = async () => {
+    if (!email || !validateEmail(email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!magicEmailExists) {
+      toast({
+        title: "Email Not Found",
+        description: "Please verify the email address exists before sending magic link",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/send_magic_link_simple.php`, { 
+        email: email.trim().toLowerCase() 
+      });
+      
+      const data = response.data as any;
+      if (data.success) {
+        toast({
+          title: "Magic Link Sent! ✨",
+          description: "A secure magic link has been sent to your email address.",
+          variant: "default",
+        });
+        
+        // Reset form
+        setEmail("");
+        setMagicEmailExists(false);
+        setLoginMethod("username");
+      } else {
+        throw new Error(data.message || "Failed to send magic link");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || error.message || "Failed to send magic link. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      toast({
+        title: "Google Sign-In Failed",
+        description: "No credential received from Google",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/google-login.php`, {
+        id_token: credentialResponse.credential
+      });
+      
+      const data = response.data as any;
+      if (data.success && data.token && data.user) {
+        // Store the token
+        localStorage.setItem("token", data.token);
+        
+        // Update auth context
+        loginWithToken(data.user, data.token);
+        
+        // Show success animation
+        setShowSuccess(true);
+        setIsAnimating(true);
+        
+        setTimeout(() => {
+          setShowSuccess(false);
+          setIsAnimating(false);
+          // Navigate to the appropriate dashboard based on user role
+          navigate(`/${data.user.role}/projects`, { replace: true });
+        }, 1500);
+      } else {
+        throw new Error(data.message || "Google Sign-In failed");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Google Sign-In Failed",
+        description: error?.response?.data?.message || error.message || "Failed to sign in with Google. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleMethodChange = (method: LoginMethod) => {
     setLoginMethod(method);
     setUsername("");
@@ -381,6 +540,8 @@ const Login = () => {
     setOtpCountdown(0);
     setForgotEmailExists(false);
     setCheckingForgotEmail(false);
+    setMagicEmailExists(false);
+    setCheckingMagicEmail(false);
   };
 
   const isFormValid = () => {
@@ -413,6 +574,8 @@ const Login = () => {
         }
       case "forgot":
         return email.trim() && validateEmail(email) && forgotEmailExists;
+      case "magic":
+        return email.trim() && validateEmail(email) && magicEmailExists;
       default:
         return false;
     }
@@ -465,6 +628,25 @@ const Login = () => {
       return false;
     } finally {
       setCheckingForgotEmail(false);
+    }
+  };
+
+  const checkMagicEmailExists = async (email: string) => {
+    setCheckingMagicEmail(true);
+    setMagicEmailExists(false);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/check_user.php`, {
+        type: "email",
+        value: email,
+      });
+      const exists = (response.data as { exists: boolean }).exists;
+      setMagicEmailExists(exists);
+      return exists;
+    } catch (error) {
+      setMagicEmailExists(false);
+      return false;
+    } finally {
+      setCheckingMagicEmail(false);
     }
   };
 
@@ -746,68 +928,93 @@ const Login = () => {
   `;
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-2 sm:p-4 relative overflow-hidden">
-      {/* Enhanced Background with animated elements */}
-      <div className="absolute inset-0 bg-grid-slate-100 dark:bg-grid-slate-800/25 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-32 bg-gradient-to-b from-blue-500/10 to-transparent dark:from-blue-400/10" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-3 sm:p-4 md:p-6 lg:p-8 relative overflow-hidden">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.05)_1px,transparent_0)] dark:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)] [background-size:20px_20px]" />
       
-      {/* Floating geometric shapes - hidden on mobile for performance */}
-      <div className="hidden sm:block absolute top-20 left-10 w-20 h-20 bg-blue-500/10 rounded-full blur-xl animate-pulse"></div>
-      <div className="hidden sm:block absolute top-40 right-16 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl animate-pulse delay-1000"></div>
-      <div className="hidden sm:block absolute bottom-20 left-20 w-24 h-24 bg-purple-500/10 rounded-full blur-xl animate-pulse delay-2000"></div>
+      {/* Floating elements for depth - hidden on mobile for performance */}
+      <div className="hidden sm:block absolute top-20 left-10 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl animate-pulse"></div>
+      <div className="hidden sm:block absolute bottom-20 right-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      <div className="w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl relative z-10">
-        <Card className={`border-0 shadow-2xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl transition-all duration-500 ${
-          isAnimating ? 'scale-105 shadow-3xl' : ''
+      <div className="w-full max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl relative z-10">
+        <div className={`bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/50 transition-all duration-700 ${
+          isAnimating ? 'scale-105 shadow-2xl' : 'hover:shadow-2xl'
         }`}>
-          {/* Enhanced Logo and branding inside card */}
-          <div className="text-center pt-4 sm:pt-6 pb-3 sm:pb-4 px-4 sm:px-6 lg:px-8">
-            <div className="relative inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl sm:rounded-2xl lg:rounded-3xl shadow-xl mb-3 sm:mb-4 lg:mb-6 transform hover:scale-105 transition-all duration-300 group">
-              <BugIcon className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10 text-white group-hover:rotate-12 transition-transform duration-300" />
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-xl sm:rounded-2xl lg:rounded-3xl blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+          {/* Header Section */}
+          <div className="text-center px-4 sm:px-6 md:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6">
+            <div className="relative inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl sm:rounded-2xl shadow-lg mb-4 sm:mb-6 transform hover:scale-105 transition-all duration-300 group">
+              <BugIcon className="h-7 w-7 sm:h-8 sm:w-8 text-white group-hover:rotate-12 transition-transform duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-xl sm:rounded-2xl blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
             </div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 dark:from-white dark:via-blue-100 dark:to-indigo-100 bg-clip-text text-transparent mb-1 sm:mb-2 lg:mb-3 tracking-tight">
-              BugRicer
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2 sm:mb-3 tracking-tight">
+              Welcome back
             </h1>
-            <div className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span>Secure • Fast • Reliable</span>
-            </div>
+            <p className="text-slate-600 dark:text-slate-400 text-sm sm:text-base leading-relaxed px-2">
+              Sign in to your account to continue
+            </p>
           </div>
-          <form onSubmit={isSignUp ? handleSignUp : handleLogin}>
-            <CardContent className="space-y-1 sm:space-y-2 p-2 sm:p-3 lg:p-4">
+          <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="px-4 sm:px-6 md:px-8 pb-6 sm:pb-8">
+            <div className="space-y-4 sm:space-y-5 md:space-y-6">
               {/* Login Method Selection */}
               {!isSignUp && (
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex justify-center gap-1 sm:gap-2">
+                <div className="space-y-4 sm:space-y-5">
+                  <div className="flex justify-center gap-2 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => handleMethodChange("username")}
-                      className={`group relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
+                      className={`group relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
                         loginMethod === "username"
-                          ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white border-blue-600 shadow-lg shadow-blue-500/30 scale-105"
+                          ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30 scale-105"
                           : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md"
                       }`}
                       title="Username Login"
                     >
-                      <User className={`h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 transition-colors ${
+                      <User className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors ${
                         loginMethod === "username" ? "text-white" : "text-slate-500 group-hover:text-blue-600"
                       }`} />
                       {loginMethod === "username" && (
                         <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                       )}
                     </button>
+                    {/* Google Sign-In Button */}
+                    <GoogleSignInButton
+                      variant="icon"
+                      onSuccess={handleGoogleLogin}
+                      onError={(error) => {
+                        console.error('Google OAuth Error:', error);
+                        
+                        if (error?.type === 'setup_required') {
+                          toast({
+                            title: "Google OAuth Setup Required",
+                            description: `Google Sign-In is not configured for your current domain (${error.currentOrigin}). Please check the console for setup instructions or contact support.`,
+                            variant: "destructive",
+                          });
+                          
+                          // Clear cache and suggest refresh
+                          setTimeout(() => {
+                            clearGoogleOAuthCache();
+                          }, 1000);
+                        } else {
+                          const errorMessage = handleGoogleOAuthError(error);
+                          toast({
+                            title: "Google Sign-In Error",
+                            description: errorMessage,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    />
                     <button
                       type="button"
                       onClick={() => handleMethodChange("email")}
-                      className={`group relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
+                      className={`group relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
                         loginMethod === "email"
-                          ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white border-blue-600 shadow-lg shadow-blue-500/30 scale-105"
+                          ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30 scale-105"
                           : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md"
                       }`}
                       title="Email Login"
                     >
-                      <Mail className={`h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 transition-colors ${
+                      <Mail className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors ${
                         loginMethod === "email" ? "text-white" : "text-slate-500 group-hover:text-blue-600"
                       }`} />
                       {loginMethod === "email" && (
@@ -817,14 +1024,14 @@ const Login = () => {
                     <button
                       type="button"
                       onClick={() => handleMethodChange("otp")}
-                      className={`group relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
+                      className={`group relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
                         loginMethod === "otp"
-                          ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white border-blue-600 shadow-lg shadow-blue-500/30 scale-105"
+                          ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30 scale-105"
                           : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md"
                       }`}
                       title="OTP Login"
                     >
-                      <Key className={`h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 transition-colors ${
+                      <Key className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors ${
                         loginMethod === "otp" ? "text-white" : "text-slate-500 group-hover:text-blue-600"
                       }`} />
                       {loginMethod === "otp" && (
@@ -834,18 +1041,35 @@ const Login = () => {
                     <button
                       type="button"
                       onClick={() => handleMethodChange("forgot")}
-                      className={`group relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
+                      className={`group relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
                         loginMethod === "forgot"
-                          ? "bg-gradient-to-br from-orange-600 to-red-600 text-white border-orange-600 shadow-lg shadow-orange-500/30 scale-105"
+                          ? "bg-orange-600 text-white border-orange-600 shadow-lg shadow-orange-500/30 scale-105"
                           : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-orange-300 dark:hover:border-orange-500 hover:shadow-md"
                       }`}
                       title="Forgot Password"
                     >
-                      <Lock className={`h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 transition-colors ${
+                      <Lock className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors ${
                         loginMethod === "forgot" ? "text-white" : "text-slate-500 group-hover:text-orange-600"
                       }`} />
                       {loginMethod === "forgot" && (
                         <div className="absolute -top-1 -right-1 w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMethodChange("magic")}
+                      className={`group relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
+                        loginMethod === "magic"
+                          ? "bg-purple-600 text-white border-purple-600 shadow-lg shadow-purple-500/30 scale-105"
+                          : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-purple-300 dark:hover:border-purple-500 hover:shadow-md"
+                      }`}
+                      title="Magic Link Sign-In"
+                    >
+                      <Sparkles className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors ${
+                        loginMethod === "magic" ? "text-white" : "text-slate-500 group-hover:text-purple-600"
+                      }`} />
+                      {loginMethod === "magic" && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
                       )}
                     </button>
                   </div>
@@ -854,12 +1078,11 @@ const Login = () => {
 
               {/* Username Field */}
               {loginMethod === "username" && !isSignUp && (
-                <div className="space-y-1 sm:space-y-2">
-                  <Label htmlFor="username" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                    <User className="h-4 w-4" />
+                <div className="space-y-2 sm:space-y-3">
+                  <Label htmlFor="username" className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
                     Username
                   </Label>
-                  <div className="relative group">
+                  <div className="relative">
                     <Input
                       id="username"
                       type="text"
@@ -869,27 +1092,23 @@ const Login = () => {
                       onFocus={() => setFocusedField("username")}
                       onBlur={() => setFocusedField(null)}
                       required
-                      className={`h-10 sm:h-12 text-sm pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 ${
+                      className={`h-11 sm:h-12 text-sm pl-3 sm:pl-4 pr-3 sm:pr-4 rounded-lg sm:rounded-xl border-2 transition-all duration-300 w-full focus:outline-none ${
                         focusedField === "username" 
                           ? "border-blue-500 ring-4 ring-blue-500/20 shadow-lg shadow-blue-500/10" 
-                          : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500 group-hover:shadow-md"
+                          : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500"
                       }`}
                     />
-                    <div className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2">
-                      <User className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 group-hover:text-blue-500 transition-colors duration-200" />
-                    </div>
                   </div>
                 </div>
               )}
 
               {/* Email Field for Email login or SignUp only */}
               {(loginMethod === "email" || isSignUp) && (
-                <div className="space-y-1 sm:space-y-2">
-                  <Label htmlFor="email" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
+                <div className="space-y-2 sm:space-y-3">
+                  <Label htmlFor="email" className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
                     Email Address
                   </Label>
-                  <div className="relative group">
+                  <div className="relative">
                     <Input
                       id="email"
                       type="email"
@@ -905,10 +1124,10 @@ const Login = () => {
                       }}
                       required
                       disabled={isSignUp}
-                      className={`h-10 sm:h-12 text-sm pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 ${
+                      className={`h-11 sm:h-12 text-sm pl-3 sm:pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 w-full focus:outline-none ${
                         focusedField === "email" 
                           ? "border-blue-500 ring-4 ring-blue-500/20 shadow-lg shadow-blue-500/10" 
-                          : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500 group-hover:shadow-md"
+                          : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500"
                       } ${isSignUp ? "opacity-50 cursor-not-allowed" : ""}`}
                     />
                     <div className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-1 sm:gap-2">
@@ -916,10 +1135,10 @@ const Login = () => {
                         <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 animate-spin" />
                       )}
                       {!checkingUser && !userExists && (
-                        <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 group-hover:text-blue-500 transition-colors duration-200" />
+                        <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400" />
                       )}
                       {userExists && !checkingUser && (
-                        <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                        <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
                       )}
                     </div>
                   </div>
@@ -930,12 +1149,11 @@ const Login = () => {
               {(loginMethod === "username" ||
                 loginMethod === "email" ||
                 isSignUp) && (
-                <div className="space-y-1 sm:space-y-2">
-                  <Label htmlFor="password" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                    <Key className="h-4 w-4" />
+                <div className="space-y-2 sm:space-y-3">
+                  <Label htmlFor="password" className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
                     Password
                   </Label>
-                  <div className="relative group">
+                  <div className="relative">
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
@@ -945,21 +1163,21 @@ const Login = () => {
                       onFocus={() => setFocusedField("password")}
                       onBlur={() => setFocusedField(null)}
                       required
-                      className={`h-10 sm:h-12 text-sm pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 ${
+                      className={`h-11 sm:h-12 text-sm pl-3 sm:pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 w-full focus:outline-none ${
                         focusedField === "password" 
                           ? "border-blue-500 ring-4 ring-blue-500/20 shadow-lg shadow-blue-500/10" 
-                          : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500 group-hover:shadow-md"
+                          : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500"
                       }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                      className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 touch-manipulation"
                     >
                       {showPassword ? (
-                        <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <EyeOff className="h-3 w-3 sm:h-4 sm:w-4" />
                       ) : (
-                        <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                       )}
                     </button>
                   </div>
@@ -989,7 +1207,7 @@ const Login = () => {
                           }
                         }}
                         required
-                        className={`h-10 sm:h-12 text-sm pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 ${
+                        className={`h-11 sm:h-12 text-sm pl-3 sm:pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 ${
                           focusedField === "forgot-email" 
                             ? "border-orange-500 ring-4 ring-orange-500/20 shadow-lg shadow-orange-500/10" 
                             : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500 group-hover:shadow-md"
@@ -1000,10 +1218,10 @@ const Login = () => {
                           <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 animate-spin" />
                         )}
                         {!checkingForgotEmail && !forgotEmailExists && (
-                          <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 group-hover:text-orange-500 transition-colors duration-200" />
+                          <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 group-hover:text-orange-500 transition-colors duration-200" />
                         )}
                         {forgotEmailExists && !checkingForgotEmail && (
-                          <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                          <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
                         )}
                       </div>
                     </div>
@@ -1013,6 +1231,61 @@ const Login = () => {
                         No account found with this email address
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Magic Link Section */}
+              {loginMethod === "magic" && !isSignUp && (
+                <div className="space-y-2 sm:space-y-3">                    
+                  <div className="space-y-1 sm:space-y-2">
+                    <Label htmlFor="magic-email" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Email Address
+                    </Label>
+                    <div className="relative group">
+                      <Input
+                        id="magic-email"
+                        type="email"
+                        placeholder="Enter your email address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onFocus={() => setFocusedField("magic-email")}
+                        onBlur={async () => {
+                          setFocusedField(null);
+                          if (validateEmail(email)) {
+                            await checkMagicEmailExists(email);
+                          }
+                        }}
+                        required
+                        className={`h-11 sm:h-12 text-sm pl-3 sm:pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 ${
+                          focusedField === "magic-email" 
+                            ? "border-purple-500 ring-4 ring-purple-500/20 shadow-lg shadow-purple-500/10" 
+                            : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500 group-hover:shadow-md"
+                        }`}
+                      />
+                      <div className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-1 sm:gap-2">
+                        {checkingMagicEmail && (
+                          <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500 animate-spin" />
+                        )}
+                        {!checkingMagicEmail && !magicEmailExists && (
+                          <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 group-hover:text-purple-500 transition-colors duration-200" />
+                        )}
+                        {magicEmailExists && !checkingMagicEmail && (
+                          <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                        )}
+                      </div>
+                    </div>
+                    {!magicEmailExists && email && validateEmail(email) && !checkingMagicEmail && (
+                      <div className="text-xs text-red-500 dark:text-red-400 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        No account found with this email address
+                      </div>
+                    )}
+                    <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      We'll send you a secure link to sign in without a password
+                    </div>
                   </div>
                 </div>
               )}
@@ -1027,12 +1300,12 @@ const Login = () => {
                         <Zap className="h-4 w-4" />
                         Send OTP via
                       </Label>
-                      <div className="flex w-full gap-1 sm:gap-2 p-1 sm:p-1.5 bg-slate-100 dark:bg-slate-700 rounded-xl sm:rounded-2xl">
+                      <div className="flex w-full gap-1 sm:gap-2 p-1 sm:p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg sm:rounded-xl">
                         <Button
                           type="button"
                           variant="ghost"
                           onClick={() => setOtpMethod("mail")}
-                          className={`flex-1 h-8 sm:h-10 rounded-lg sm:rounded-xl transition-all duration-300 font-medium text-xs sm:text-sm ${
+                          className={`flex-1 h-9 sm:h-10 rounded-md sm:rounded-lg transition-all duration-300 font-medium text-xs sm:text-sm ${
                             otpMethod === "mail" 
                               ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-lg scale-105" 
                               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:scale-105"
@@ -1045,7 +1318,7 @@ const Login = () => {
                           type="button"
                           variant="ghost"
                           onClick={() => setOtpMethod("whatsapp")}
-                          className={`flex-1 h-8 sm:h-10 rounded-lg sm:rounded-xl transition-all duration-300 font-medium text-xs sm:text-sm ${
+                          className={`flex-1 h-9 sm:h-10 rounded-md sm:rounded-lg transition-all duration-300 font-medium text-xs sm:text-sm ${
                             otpMethod === "whatsapp" 
                               ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-lg scale-105" 
                               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:scale-105"
@@ -1081,7 +1354,7 @@ const Login = () => {
                                 }
                               }}
                               required
-                              className={`h-10 sm:h-12 text-sm pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 ${
+                              className={`h-11 sm:h-12 text-sm pl-3 sm:pl-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border-2 transition-all duration-300 ${
                                 focusedField === "otp-email" 
                                   ? "border-blue-500 ring-4 ring-blue-500/20 shadow-lg shadow-blue-500/10" 
                                   : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500 group-hover:shadow-md"
@@ -1092,10 +1365,10 @@ const Login = () => {
                                 <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 animate-spin" />
                               )}
                               {!checkingUser && !userExists && (
-                                <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 group-hover:text-blue-500 transition-colors duration-200" />
+                                <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 group-hover:text-blue-500 transition-colors duration-200" />
                               )}
                               {userExists && !checkingUser && (
-                                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
                               )}
                             </div>
                           </div>
@@ -1129,7 +1402,7 @@ const Login = () => {
                                   }
                                 }}
                                 required
-                                className={`h-10 sm:h-12 text-sm w-full border-2 border-slate-200 dark:border-slate-600 rounded-r-lg sm:rounded-r-xl px-2 sm:px-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 transition-all duration-300 ${
+                                className={`h-11 sm:h-12 text-sm w-full border-2 border-slate-200 dark:border-slate-600 rounded-r-lg sm:rounded-r-xl px-2 sm:px-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 transition-all duration-300 ${
                                   focusedField === "otp-phone" 
                                     ? "border-blue-500 ring-4 ring-blue-500/20 shadow-lg shadow-blue-500/10" 
                                     : "hover:border-slate-300 dark:hover:border-slate-500 group-hover:shadow-md"
@@ -1144,7 +1417,7 @@ const Login = () => {
                                   <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 animate-spin" />
                                 )}
                                 {userExists && !checkingUser && (
-                                  <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                                  <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
                                 )}
                               </div>
                             </div>
@@ -1155,9 +1428,9 @@ const Login = () => {
                   )}
                   {/* OTP Input - shown after OTP is sent */}
                   {otpSent && (
-                    <div className="space-y-2 sm:space-y-3 p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl sm:rounded-2xl border-2 border-blue-200 dark:border-blue-800 shadow-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                    <div className="space-y-3 sm:space-y-4 p-4 sm:p-5 md:p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg sm:rounded-xl md:rounded-2xl border-2 border-blue-200 dark:border-blue-800 shadow-lg">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                           <Label htmlFor="otp" className="text-sm font-semibold text-blue-900 dark:text-blue-100 flex items-center gap-2">
                             <Sparkles className="h-4 w-4" />
                             OTP
@@ -1166,7 +1439,7 @@ const Login = () => {
                             {otpMethod === "mail" ? (
                               <>
                                 <Mail className="h-3 w-3" />
-                                {email}
+                                <span className="truncate max-w-[120px] sm:max-w-none">{email}</span>
                               </>
                             ) : (
                               <>
@@ -1177,7 +1450,7 @@ const Login = () => {
                           </div>
                         </div>
                         {otpCountdown > 0 && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-full">
+                          <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-full self-start sm:self-auto">
                             Expires in {otpCountdown}s
                           </span>
                         )}
@@ -1195,40 +1468,42 @@ const Login = () => {
                           onBlur={() => setFocusedField(null)}
                           required
                           maxLength={6}
-                          className={`h-12 sm:h-14 text-base sm:text-lg text-center font-mono tracking-widest transition-all duration-300 rounded-lg sm:rounded-xl border-2 ${
+                          className={`h-11 sm:h-12 md:h-14 text-base sm:text-lg text-center font-mono tracking-widest transition-all duration-300 rounded-lg sm:rounded-xl border-2 ${
                             focusedField === "otp" 
                               ? "border-blue-500 ring-4 ring-blue-500/20 shadow-lg shadow-blue-500/10" 
                               : "border-blue-200 dark:border-blue-700 hover:border-blue-300 dark:hover:border-blue-600 group-hover:shadow-md"
                           }`}
                         />
                         <div className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2">
-                          <Key className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400 group-hover:text-blue-600 transition-colors duration-200" />
+                          <Key className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-blue-400 group-hover:text-blue-600 transition-colors duration-200" />
                         </div>
                       </div>
                       {otpCountdown === 0 && otpSent && (
-                        <Button
-                          type="button"
-                          onClick={handleSendOtp}
-                          disabled={
-                            otpMethod === "mail"
-                              ? !email || !validateEmail(email) || isSendingOtp
-                              : !phone || phone.length < 10 || isSendingOtp
-                          }
-                          className="w-full h-10 sm:h-11 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                          variant="default"
-                        >
-                          {isSendingOtp ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Sending...
-                            </>
-                          ) : (
-                            <>
-                              <Zap className="h-4 w-4 mr-2" />
-                              Resend OTP
-                            </>
-                          )}
-                        </Button>
+                        <div className="mt-4 sm:mt-5">
+                          <Button
+                            type="button"
+                            onClick={handleSendOtp}
+                            disabled={
+                              otpMethod === "mail"
+                                ? !email || !validateEmail(email) || isSendingOtp
+                                : !phone || phone.length < 10 || isSendingOtp
+                            }
+                            className="w-full h-10 sm:h-11 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 touch-manipulation"
+                            variant="default"
+                          >
+                            {isSendingOtp ? (
+                              <>
+                                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              <>
+                                <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                                Resend OTP
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1245,7 +1520,7 @@ const Login = () => {
                     </Label>
                     <select
                       id="role"
-                      className="w-full h-10 sm:h-12 text-sm border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 rounded-lg sm:rounded-xl px-3 sm:px-4 transition-all duration-300"
+                      className="w-full h-11 sm:h-12 text-sm border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 rounded-lg sm:rounded-xl px-3 sm:px-4 transition-all duration-300"
                       value={role}
                       onChange={(e) => setRole(e.target.value)}
                       required
@@ -1269,41 +1544,42 @@ const Login = () => {
                   </Alert>
                 </>
               )}
-            </CardContent>
+            </div>
 
-            <CardFooter className="flex flex-col space-y-1 sm:space-y-2 pt-1 sm:pt-2 px-2 sm:px-3 lg:px-4 pb-2 sm:pb-3 lg:pb-4">
-              {/* Success Animation Overlay */}
-              {showSuccess && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                  <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl p-6 sm:p-8 text-center shadow-2xl animate-in zoom-in-50 duration-500 max-w-sm w-full">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                      <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 dark:text-green-400" />
-                    </div>
-                    <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                      Login Successful!
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                      Redirecting to your dashboard...
-                    </p>
+            {/* Success Animation Overlay */}
+            {showSuccess && (
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl p-6 sm:p-8 text-center shadow-2xl animate-in zoom-in-50 duration-500 max-w-xs sm:max-w-sm w-full">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                    <CheckCircle2 className="h-7 w-7 sm:h-8 sm:w-8 text-green-600 dark:text-green-400" />
                   </div>
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                    Login Successful!
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                    Redirecting to your dashboard...
+                  </p>
                 </div>
-              )}
+              </div>
+            )}
 
+            {/* Action Buttons */}
+            <div className="space-y-4 sm:space-y-5 mt-6 sm:mt-8">
               {/* Create Account Button - only for signup */}
               {isSignUp && (
                 <Button
-                  className="w-full h-10 sm:h-12 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl shadow-blue-500/25 transition-all duration-300 rounded-lg sm:rounded-xl hover:scale-105 disabled:scale-100 disabled:opacity-50"
+                  className="w-full h-11 sm:h-12 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:scale-100 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-blue-500/20 touch-manipulation"
                   type="submit"
                   disabled={isLoading || !isFormValid()}
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
                       Creating account...
                     </>
                   ) : (
                     <>
-                      <User className="h-4 w-4 mr-2" />
+                      <User className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                       Create Account
                     </>
                   )}
@@ -1311,20 +1587,20 @@ const Login = () => {
               )}
 
               {/* Sign in Button - for username/email login */}
-              {!isSignUp && loginMethod !== "otp" && loginMethod !== "forgot" && (
+              {!isSignUp && loginMethod !== "otp" && loginMethod !== "forgot" && loginMethod !== "magic" && (
                 <Button
-                  className="w-full h-10 sm:h-12 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl shadow-blue-500/25 transition-all duration-300 rounded-lg sm:rounded-xl hover:scale-105 disabled:scale-100 disabled:opacity-50"
+                  className="w-full h-11 sm:h-12 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:scale-100 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-blue-500/20 touch-manipulation"
                   type="submit"
                   disabled={isLoading || !isFormValid()}
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
                       Signing in...
                     </>
                   ) : (
                     <>
-                      <ArrowRight className="h-4 w-4 mr-2" />
+                      <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                       Sign in
                     </>
                   )}
@@ -1334,7 +1610,7 @@ const Login = () => {
               {/* Send OTP Button - for OTP login when OTP not sent */}
               {!isSignUp && loginMethod === "otp" && !otpSent && (
                 <Button
-                  className="w-full h-10 sm:h-12 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl shadow-blue-500/25 transition-all duration-300 rounded-lg sm:rounded-xl hover:scale-105 disabled:scale-100 disabled:opacity-50"
+                  className="w-full h-11 sm:h-12 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:scale-100 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-blue-500/20 touch-manipulation"
                   type="button"
                   onClick={handleSendOtp}
                   disabled={
@@ -1346,12 +1622,12 @@ const Login = () => {
                 >
                   {isSendingOtp ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
                       Sending...
                     </>
                   ) : (
                     <>
-                      <Zap className="h-4 w-4 mr-2" />
+                      <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                       Send OTP
                     </>
                   )}
@@ -1361,18 +1637,18 @@ const Login = () => {
               {/* Sign in Button - for OTP login after OTP is sent */}
               {!isSignUp && loginMethod === "otp" && otpSent && (
                 <Button
-                  className="w-full h-10 sm:h-12 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl shadow-blue-500/25 transition-all duration-300 rounded-lg sm:rounded-xl hover:scale-105 disabled:scale-100 disabled:opacity-50"
+                  className="w-full h-11 sm:h-12 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:scale-100 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-blue-500/20 touch-manipulation"
                   type="submit"
                   disabled={isLoading || !isFormValid()}
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
                       Signing in...
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                       Verify & Sign in
                     </>
                   )}
@@ -1382,88 +1658,97 @@ const Login = () => {
               {/* Send Reset Link Button - for forgot password */}
               {!isSignUp && loginMethod === "forgot" && (
                 <Button
-                  className="w-full h-10 sm:h-12 text-sm font-semibold bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white shadow-xl shadow-orange-500/25 transition-all duration-300 rounded-lg sm:rounded-xl hover:scale-105 disabled:scale-100 disabled:opacity-50"
+                  className="w-full h-11 sm:h-12 text-sm font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:scale-100 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-orange-500/20 touch-manipulation"
                   type="button"
                   onClick={handleForgotPassword}
                   disabled={isLoading || !email || !validateEmail(email) || !forgotEmailExists || checkingForgotEmail}
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
                       Sending...
                     </>
                   ) : checkingForgotEmail ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
                       Verifying...
                     </>
                   ) : (
                     <>
-                      <Lock className="h-4 w-4 mr-2" />
+                      <Lock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                       Send Reset Link
                     </>
                   )}
                 </Button>
               )}
 
-              {/* <Button 
-                variant="link" 
-                type="button"
-                className="w-full h-8 text-xs sm:text-sm"
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setUsername('');
-                  setEmail('');
-                  setPassword('');
-                  setRole('tester');
-                }}
-              >
-                {isSignUp 
-                  ? "Already have an account? Sign in" 
-                  : "Don't have an account? Sign up"
-                }
-              </Button> */}
-            </CardFooter>
+              {/* Send Magic Link Button - for magic link */}
+              {!isSignUp && loginMethod === "magic" && (
+                <Button
+                  className="w-full h-11 sm:h-12 text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:scale-100 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-purple-500/20 touch-manipulation"
+                  type="button"
+                  onClick={handleMagicLink}
+                  disabled={isLoading || !email || !validateEmail(email) || !magicEmailExists || checkingMagicEmail}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : checkingMagicEmail ? (
+                    <>
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-2 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                      Send Magic Link
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </form>
-        </Card>
 
-        {/* Enhanced Footer */}
-        <div className="mt-1 sm:mt-2 text-center space-y-2">
-          <div className="flex justify-center gap-4 text-xs">
-            <button
-              onClick={() => setShowPrivacyPolicy(true)}
-              className="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 flex items-center gap-1"
-            >
-              <FileText className="h-3 w-3" />
-              Privacy Policy
-            </button>
-            <span className="text-slate-300 dark:text-slate-600">•</span>
-            <button
-              onClick={() => setShowTermsOfUse(true)}
-              className="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 flex items-center gap-1"
-            >
-              <FileText className="h-3 w-3" />
-              Terms of Use
-            </button>
+          {/* Footer */}
+          <div className="px-4 sm:px-6 md:px-8 pb-6 sm:pb-8 text-center space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-6 text-xs">
+              <button
+                onClick={() => setShowPrivacyPolicy(true)}
+                className="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 flex items-center gap-1 touch-manipulation"
+              >
+                <FileText className="h-3 w-3" />
+                Privacy Policy
+              </button>
+              <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
+              <button
+                onClick={() => setShowTermsOfUse(true)}
+                className="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 flex items-center gap-1 touch-manipulation"
+              >
+                <FileText className="h-3 w-3" />
+                Terms of Use
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 px-2">
+              © 2025 BugRicer | CODO AI Innovations
+            </p>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            © 2025 BugRicer | CODO AI Innovations
-          </p>
         </div>
       </div>
 
       {/* Privacy Policy Dialog */}
       {showPrivacyPolicy && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl shadow-2xl max-w-xs sm:max-w-lg md:max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <FileText className="h-5 w-5" />
+              <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
                 Privacy Policy
               </h2>
               <button
                 onClick={() => setShowPrivacyPolicy(false)}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200 flex-shrink-0"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200 flex-shrink-0 touch-manipulation"
               >
                 <X className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               </button>
@@ -1477,7 +1762,7 @@ const Login = () => {
             <div className="flex justify-end p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
               <Button
                 onClick={() => setShowPrivacyPolicy(false)}
-                className="px-6"
+                className="px-4 sm:px-6 h-9 sm:h-10 text-sm touch-manipulation"
               >
                 Close
               </Button>
@@ -1488,16 +1773,16 @@ const Login = () => {
 
       {/* Terms of Use Dialog */}
       {showTermsOfUse && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl shadow-2xl max-w-xs sm:max-w-lg md:max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <FileText className="h-5 w-5" />
+              <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
                 Terms of Use
               </h2>
               <button
                 onClick={() => setShowTermsOfUse(false)}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200 flex-shrink-0"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200 flex-shrink-0 touch-manipulation"
               >
                 <X className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               </button>
@@ -1511,7 +1796,7 @@ const Login = () => {
             <div className="flex justify-end p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
               <Button
                 onClick={() => setShowTermsOfUse(false)}
-                className="px-6"
+                className="px-4 sm:px-6 h-9 sm:h-10 text-sm touch-manipulation"
               >
                 Close
               </Button>

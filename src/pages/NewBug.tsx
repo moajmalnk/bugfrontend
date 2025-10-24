@@ -1052,9 +1052,9 @@ const NewBug = () => {
                             <ImagePlus className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                           </div>
                           <span className="font-semibold text-gray-700 dark:text-gray-300">Add Screenshots</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {/* <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             (Paste or Upload)
-                          </span>
+                          </span> */}
                         </Button>
 
                         {/* Preview of screenshots */}
@@ -1122,9 +1122,9 @@ const NewBug = () => {
                             <Paperclip className="h-6 w-6 text-green-600 dark:text-green-400" />
                           </div>
                           <span className="font-semibold text-gray-700 dark:text-gray-300">Attach Files</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {/* <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             (Documents, logs, etc.)
-                          </span>
+                          </span> */}
                         </Button>
 
                         {/* Preview of files */}
@@ -1221,9 +1221,9 @@ const NewBug = () => {
                                 <Mic className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                               </div>
                               <span className="font-semibold text-gray-700 dark:text-gray-300">Record Voice Note</span>
-                              <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              {/* <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                 (Click to start)
-                              </span>
+                              </span> */}
                             </>
                           )}
                         </Button>

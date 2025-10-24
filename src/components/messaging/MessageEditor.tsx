@@ -82,7 +82,10 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-lg max-w-[95vw] max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <DialogContent 
+          className="sm:max-w-lg max-w-[95vw] max-h-[90vh] overflow-y-auto custom-scrollbar"
+          aria-describedby="message-editor-description"
+        >
           <DialogHeader>
             <div className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20 rounded-t-lg"></div>
@@ -93,6 +96,9 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
                   </div>
                   <span className="text-lg font-semibold text-gray-900 dark:text-white">Edit Message</span>
                 </DialogTitle>
+                <p id="message-editor-description" className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  Edit your message content and formatting.
+                </p>
               </div>
             </div>
           </DialogHeader>

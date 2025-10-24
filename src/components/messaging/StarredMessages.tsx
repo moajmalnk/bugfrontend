@@ -84,12 +84,18 @@ export const StarredMessages: React.FC<StarredMessagesProps> = ({
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh]">
+        <DialogContent 
+          className="sm:max-w-2xl max-h-[80vh]"
+          aria-describedby="starred-messages-description"
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
               Starred Messages
             </DialogTitle>
+            <p id="starred-messages-description" className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              View and manage your starred messages for quick access.
+            </p>
           </DialogHeader>
 
           <div className="space-y-2 overflow-y-auto max-h-[60vh] pr-2">

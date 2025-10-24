@@ -59,25 +59,9 @@ const createLazyComponent = (importFn: () => Promise<any>, exportName?: string) 
 };
 
 // Lazy-loaded page components with preloading
+// Note: Page components are now handled in RouteConfig.tsx to avoid duplicate imports
 export const LazyPages = {
-  Dashboard: lazy(() => import('@/pages/Dashboard')),
-  Bugs: lazy(() => import('@/pages/Bugs')),
-  Projects: lazy(() => import('@/pages/Projects')),
-  Users: lazy(() => import('@/pages/Users')),
-  Settings: lazy(() => import('@/pages/Settings')),
-  Profile: lazy(() => import('@/pages/Profile')),
-  Activity: lazy(() => import('@/pages/Activity')),
-  Fixes: lazy(() => import('@/pages/Fixes')),
-  BugDetails: lazy(() => import('@/pages/BugDetails')),
-  ProjectDetails: lazy(() => import('@/pages/ProjectDetails')),
-  NewBug: lazy(() => import('@/pages/NewBug')),
-  NewUpdate: lazy(() => import('@/pages/NewUpdate')),
-  Updates: lazy(() => import('@/pages/Updates')),
-  UpdateDetails: lazy(() => import('@/pages/UpdateDetails')),
-  EditUpdate: lazy(() => import('@/pages/EditUpdate')),
-  FixBug: lazy(() => import('@/pages/FixBug')),
-  Reports: lazy(() => import('@/pages/Reports')),
-  Messages: lazy(() => import('@/pages/Messages')),
+  // Page components moved to RouteConfig.tsx to prevent chunk loading conflicts
 } as const;
 
 // Lazy-loaded component components

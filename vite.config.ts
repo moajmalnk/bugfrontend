@@ -13,6 +13,20 @@ export default defineConfig(({ mode }) => ({
     fs: {
       strict: false,
     },
+    // Add headers to help with chunk loading
+    headers: {
+      'Cache-Control': 'no-cache',
+    },
+    // Force reload on chunk errors
+    force: true,
+    // Improve chunk loading reliability
+    middlewareMode: false,
+    cors: true,
+    // Better handling of dynamic imports
+    watch: {
+      usePolling: false,
+      interval: 100,
+    },
   },
   plugins: [
     react({
@@ -47,6 +61,12 @@ export default defineConfig(({ mode }) => ({
       'lucide-react',
       'axios',
     ],
+    // Exclude problematic modules from pre-bundling
+    exclude: ['@radix-ui/react-slider'],
+    // Improve chunk loading stability
+    esbuildOptions: {
+      target: 'esnext',
+    },
   },
   build: {
     outDir: "dist",
@@ -57,6 +77,9 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: mode === 'development' ? {
       output: {
         manualChunks: undefined,
+        // Better chunk naming for development
+        chunkFileNames: 'assets/[name].js',
+        entryFileNames: 'assets/[name].js',
       },
     } : {
       output: {

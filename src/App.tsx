@@ -34,6 +34,8 @@ import { BundleAnalyzer } from "@/components/performance/BundleAnalyzer";
 import { AccessibilityProvider, SkipToContent } from "@/components/accessibility/AccessibilityProvider";
 import { ModernErrorBoundary } from "@/components/error/ModernErrorBoundary";
 import { SEOHead } from "@/components/seo/SEOHead";
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
 
 // Initialize the query client outside of the component with optimized defaults
 const queryClient = new QueryClient({
@@ -349,60 +351,62 @@ function App() {
   return (
     <ChunkErrorHandler>
       <HelmetProvider>
-        <Router
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
-          <ThemeProvider>
-            <AccessibilityProvider>
-              <AppProviders queryClient={queryClient}>
-                <AuthProvider>
-                  <BugProvider>
-                  <NotificationProvider>
-                    <NotificationSettingsProvider>
-                      <ModernErrorBoundary
-                        fallbackRender={({ error, resetError, retry }) => (
-                          <div className="min-h-screen flex items-center justify-center bg-background p-4">
-                            <div className="max-w-md w-full bg-card rounded-lg shadow-lg p-6 text-center">
-                              <h1 className="text-xl font-semibold text-foreground mb-2">
-                                Application Error
-                              </h1>
-                              <p className="text-muted-foreground mb-4">
-                                Something went wrong. Please try again.
-                              </p>
-                              <div className="space-y-2">
-                                <button
-                                  onClick={retry}
-                                  className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-                                >
-                                  Try Again
-                                </button>
-                                <button
-                                  onClick={resetError}
-                                  className="w-full bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors"
-                                >
-                                  Reset
-                                </button>
+        <GoogleOAuthProvider clientId={GOOGLE_OAUTH_CONFIG.clientId}>
+          <Router
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
+            <ThemeProvider>
+              <AccessibilityProvider>
+                <AppProviders queryClient={queryClient}>
+                  <AuthProvider>
+                    <BugProvider>
+                    <NotificationProvider>
+                      <NotificationSettingsProvider>
+                        <ModernErrorBoundary
+                          fallbackRender={({ error, resetError, retry }) => (
+                            <div className="min-h-screen flex items-center justify-center bg-background p-4">
+                              <div className="max-w-md w-full bg-card rounded-lg shadow-lg p-6 text-center">
+                                <h1 className="text-xl font-semibold text-foreground mb-2">
+                                  Application Error
+                                </h1>
+                                <p className="text-muted-foreground mb-4">
+                                  Something went wrong. Please try again.
+                                </p>
+                                <div className="space-y-2">
+                                  <button
+                                    onClick={retry}
+                                    className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                                  >
+                                    Try Again
+                                  </button>
+                                  <button
+                                    onClick={resetError}
+                                    className="w-full bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      >
-                        <ErrorBoundaryProvider>
-                          <AppContent />
-                        </ErrorBoundaryProvider>
-                      </ModernErrorBoundary>
-                    </NotificationSettingsProvider>
-                  </NotificationProvider>
-                </BugProvider>
-              </AuthProvider>
-            </AppProviders>
-          </AccessibilityProvider>
-        </ThemeProvider>
-      </Router>
-    </HelmetProvider>
+                          )}
+                        >
+                          <ErrorBoundaryProvider>
+                            <AppContent />
+                          </ErrorBoundaryProvider>
+                        </ModernErrorBoundary>
+                      </NotificationSettingsProvider>
+                    </NotificationProvider>
+                  </BugProvider>
+                </AuthProvider>
+              </AppProviders>
+            </AccessibilityProvider>
+          </ThemeProvider>
+        </Router>
+        </GoogleOAuthProvider>
+      </HelmetProvider>
     </ChunkErrorHandler>
   );
 }

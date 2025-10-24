@@ -30,7 +30,7 @@ export interface SharedTask {
 const API_BASE = `${ENV.API_URL}/tasks`;
 
 const getAuthToken = () => {
-  return localStorage.getItem('token') || sessionStorage.getItem('token');
+  return sessionStorage.getItem('token') || localStorage.getItem('token');
 };
 
 const getHeaders = () => {
@@ -76,6 +76,29 @@ export const sharedTaskService = {
       return data?.data || [];
     } catch (error: any) {
       console.error('Error fetching shared tasks:', error);
+      throw error;
+    }
+  },
+
+  // Get shared tasks for a specific project
+  async getSharedTasksByProject(projectId: string): Promise<SharedTask[]> {
+    try {
+      const response = await fetch(`${API_BASE}/shared_tasks_get.php?project_id=${projectId}`, {
+        method: 'GET',
+        headers: getHeaders(),
+      });
+
+      const data = await parseJsonSafe(response);
+      if (!response.ok) {
+        const msg = data?.message || 'Failed to fetch project shared tasks';
+        throw new Error(msg);
+      }
+      if (!data?.success) {
+        throw new Error(data?.message || 'Failed to fetch project shared tasks');
+      }
+      return data?.data || [];
+    } catch (error: any) {
+      console.error('Error fetching project shared tasks:', error);
       throw error;
     }
   },

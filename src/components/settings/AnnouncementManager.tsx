@@ -143,7 +143,7 @@ export const AnnouncementManager = () => {
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
-                    Manage Announcements
+                    Announcements
                   </h1>
                   <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mt-2"></div>
                 </div>
@@ -158,7 +158,7 @@ export const AnnouncementManager = () => {
                 className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
                 <PlusCircle className="mr-2 h-5 w-5" />
-                Add New Announcement
+                Add Announcement
               </Button>
             </div>
           </div>

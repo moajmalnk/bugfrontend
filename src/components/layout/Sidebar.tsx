@@ -147,27 +147,27 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               icon={<Bell className="h-5 w-5" />}
               label="Updates"
             />
+            <NavLink
+              to="/bugdocs"
+              icon={<FileText className="h-5 w-5" />}
+              label="BugDocs"
+            />
+            {/* BugMeet */}
+            <NavLink
+              to="/meet?tab=shared-meets"
+              icon={<Video className="h-5 w-5" />}
+              label="BugMeet"
+            />
             
             {/* Daily Update, My Tasks & BugDocs - Only for Admins and Developers */}
             {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
               <>
                <NavLink
-                  to="/my-tasks"
+                  to="/my-tasks?tab=shared-tasks"
                   icon={<ListTodo className="h-5 w-5" />}
                   label="BugToDo"
                 />
                 <NavLink
-                  to="/bugdocs"
-                  icon={<FileText className="h-5 w-5" />}
-                  label="BugDocs"
-                />
-                {/* BugMeet */}
-                <NavLink
-                  to="/meet"
-                  icon={<Video className="h-5 w-5" />}
-                  label="BugMeet"
-                />
-                                <NavLink
                   to="/daily-update"
                   icon={<Calendar className="h-5 w-5" />}
                   label="BugUpdate"

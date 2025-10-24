@@ -112,6 +112,7 @@ export function HourPicker({
           <div className="space-y-2">
             <label className="text-xs text-muted-foreground">Custom Input</label>
             <input
+              id="hour-picker-custom"
               type="number"
               min={min}
               max={max}
