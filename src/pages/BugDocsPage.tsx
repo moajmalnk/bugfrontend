@@ -502,81 +502,84 @@ const BugDocsPage = () => {
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
                 <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="p-1.5 bg-orange-500 rounded-lg">
-                      <Search className="h-4 w-4 text-white" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-                  </div>
-                  <div className="flex flex-col lg:flex-row gap-4">
-                    {/* Search Bar */}
-                    <div className="flex-1 relative group">
-                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
-                      <input
-                        type="text"
-                        placeholder="Search documents by title, template, or type..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                      />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-1.5 bg-orange-500 rounded-lg">
+                        <Search className="h-4 w-4 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
                     </div>
                     
-                    {/* Filter Controls */}
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      {/* Type Filter */}
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                          <Filter className="h-4 w-4 text-white" />
-                        </div>
-                        <Select value={typeFilter} onValueChange={setTypeFilter}>
-                          <SelectTrigger className="w-full sm:w-[140px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                            <SelectValue placeholder="Type" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" className="z-[60]">
-                            <SelectItem value="all">All Types</SelectItem>
-                            {uniqueTypes.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type.charAt(0).toUpperCase() + type.slice(1)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    <div className="flex flex-col md:flex-row gap-4">
+                      {/* Search Bar */}
+                      <div className="flex-1 relative group">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                        <input
+                          type="text"
+                          placeholder="Search documents by title, template, or type..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                        />
                       </div>
 
-                      {/* Date Filter */}
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
-                          <Calendar className="h-4 w-4 text-white" />
+                      {/* Filter Controls */}
+                      <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                        {/* Type Filter */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                            <Filter className="h-4 w-4 text-white" />
+                          </div>
+                          <Select value={typeFilter} onValueChange={setTypeFilter}>
+                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent position="popper" className="z-[60]">
+                              <SelectItem value="all">All Types</SelectItem>
+                              {uniqueTypes.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                        <Select value={dateFilter} onValueChange={setDateFilter}>
-                          <SelectTrigger className="w-full sm:w-[140px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                            <SelectValue placeholder="Date" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" className="z-[60]">
-                            <SelectItem value="all">All Dates</SelectItem>
-                            <SelectItem value="today">Today</SelectItem>
-                            <SelectItem value="yesterday">Yesterday</SelectItem>
-                            <SelectItem value="this-week">This Week</SelectItem>
-                            <SelectItem value="this-month">This Month</SelectItem>
-                          </SelectContent>
-                        </Select>
+
+                        {/* Date Filter */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                            <Calendar className="h-4 w-4 text-white" />
+                          </div>
+                          <Select value={dateFilter} onValueChange={setDateFilter}>
+                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                              <SelectValue placeholder="Date" />
+                            </SelectTrigger>
+                            <SelectContent position="popper" className="z-[60]">
+                              <SelectItem value="all">All Dates</SelectItem>
+                              <SelectItem value="today">Today</SelectItem>
+                              <SelectItem value="yesterday">Yesterday</SelectItem>
+                              <SelectItem value="this-week">This Week</SelectItem>
+                              <SelectItem value="this-month">This Month</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Clear Filters Button */}
+                        {(searchTerm || typeFilter !== "all" || dateFilter !== "all") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearchTerm("");
+                              setTypeFilter("all");
+                              setDateFilter("all");
+                            }}
+                            className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                          >
+                            Clear
+                          </Button>
+                        )}
                       </div>
-                      
-                      {/* Clear Filters Button */}
-                      {(searchTerm || typeFilter !== "all" || dateFilter !== "all") && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSearchTerm("");
-                            setTypeFilter("all");
-                            setDateFilter("all");
-                          }}
-                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                        >
-                          Clear
-                        </Button>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -614,13 +617,18 @@ const BugDocsPage = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="grid gap-4 mt-4 grid-cols-1" style={{ minHeight: 200 }} aria-label="Document list">
                     {filteredDocuments.map((doc) => (
                       <div
                         key={doc.id}
-                        className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300"
+                        className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-1"
                       >
+                        {/* Gradient overlay */}
                         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-red-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-red-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        
+                        {/* Status indicator */}
+                        <div className="absolute top-4 right-4 w-3 h-3 bg-orange-500 rounded-full shadow-lg"></div>
+                        
                         <div className="relative p-4 sm:p-6">
                           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                             <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
@@ -683,49 +691,52 @@ const BugDocsPage = () => {
       {/* Create Document Modal */}
       {isConnected && (
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create New Document</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Create New Document</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
               Create a new Google Doc from a template or start from scratch
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="doc-title">Document Title *</Label>
+              <Label htmlFor="doc-title" className="text-sm font-medium">Document Title *</Label>
               <Input
                 id="doc-title"
                 placeholder="Enter document title..."
                 value={docTitle}
                 onChange={(e) => setDocTitle(e.target.value)}
                 disabled={isCreating}
+                className="w-full"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="template">Template (Optional)</Label>
+              <Label htmlFor="template" className="text-sm font-medium">Template (Optional)</Label>
               <Select
                 value={selectedTemplateId}
                 onValueChange={setSelectedTemplateId}
                 disabled={isCreating}
               >
-                <SelectTrigger id="template">
+                <SelectTrigger id="template" className="w-full">
                   <SelectValue placeholder="Blank document (no template)" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[200px] overflow-y-auto">
                   <SelectItem value="0">Blank document (no template)</SelectItem>
                   {templates.map((template) => (
                     <SelectItem key={template.id} value={template.id.toString()}>
-                      {template.template_name}
-                      {!template.is_configured && (
-                        <span className="text-orange-500 text-xs ml-2">
-                          (not configured)
-                        </span>
-                      )}
-                      {template.is_configured && template.description && (
-                        <span className="text-muted-foreground text-xs ml-2">
-                          ({template.category})
-                        </span>
-                      )}
+                      <div className="flex flex-col items-start">
+                        <span>{template.template_name}</span>
+                        {!template.is_configured && (
+                          <span className="text-orange-500 text-xs">
+                            (not configured)
+                          </span>
+                        )}
+                        {template.is_configured && template.description && (
+                          <span className="text-muted-foreground text-xs">
+                            ({template.category})
+                          </span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -743,15 +754,20 @@ const BugDocsPage = () => {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => setIsCreateModalOpen(false)}
               disabled={isCreating}
+              className="w-full sm:w-auto order-2 sm:order-1"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateDocument} disabled={isCreating}>
+            <Button 
+              onClick={handleCreateDocument} 
+              disabled={isCreating}
+              className="w-full sm:w-auto order-1 sm:order-2"
+            >
               {isCreating ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -771,20 +787,20 @@ const BugDocsPage = () => {
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Delete Document</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-lg sm:text-xl">Delete Document</DialogTitle>
+              <DialogDescription className="text-sm sm:text-base">
                 Are you sure you want to delete "{documentToDelete?.doc_title}"? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
               <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
                 <div className="flex items-start space-x-3">
-                  <div className="rounded-full bg-destructive/20 p-2">
+                  <div className="rounded-full bg-destructive/20 p-2 flex-shrink-0">
                     <Trash2 className="h-5 w-5 text-destructive" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-sm mb-1">Warning</h4>
                     <p className="text-sm text-muted-foreground">
                       This will permanently delete the document from both BugRicer and Google Drive. 
@@ -794,11 +810,12 @@ const BugDocsPage = () => {
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
               <Button
                 variant="outline"
                 onClick={handleDeleteCancel}
                 disabled={isDeleting !== null}
+                className="w-full sm:w-auto order-2 sm:order-1"
               >
                 Cancel
               </Button>
@@ -806,6 +823,7 @@ const BugDocsPage = () => {
                 variant="destructive"
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting !== null}
+                className="w-full sm:w-auto order-1 sm:order-2"
               >
                 {isDeleting !== null ? (
                   <>

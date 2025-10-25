@@ -740,7 +740,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   return (
     <div className="flex flex-col h-full min-h-0 bg-background overflow-hidden">
       {/* Professional Header */}
-      {/* <div className="relative overflow-hidden">
+      <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"></div>
         <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-3 sticky top-0 z-10">
           <div className="flex items-center justify-between">
@@ -775,10 +775,10 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
             )}
           </div>
         </div>
-      </div> */}
+      </div>
       
-      {/* Professional Search Bar - Mobile */}
-      <div className="md:hidden sticky top-16 z-10">
+      {/* Professional Search Bar - Always visible */}
+      <div className="sticky top-16 z-10">
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30"></div>
           <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-2">
@@ -794,6 +794,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
           </div>
         </div>
       </div>
+      
       {/* Scrollable Groups List */}
       <div className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden space-y-0 bg-background hide-scrollbar">
         {isLoading ? (
@@ -807,81 +808,103 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
           <div className="flex items-center justify-center h-full text-center px-4">
             {searchQuery ? (
               // Search results empty state
-              <div className="space-y-3">
-                <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    No groups found
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-yellow-50/30 to-red-50/50 dark:from-orange-950/20 dark:via-yellow-950/10 dark:to-red-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-8">
+                  <div className="mx-auto w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl mb-4">
+                    <Search className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Groups Found</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Try adjusting your search terms or create a new group
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Try adjusting your search terms
-                  </p>
+                  {isAdmin && (
+                    <Button
+                      onClick={() => setIsCreateDialogOpen(true)}
+                      className="h-10 px-4 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create New Group
+                    </Button>
+                  )}
                 </div>
               </div>
             ) : (
               // No groups promotional state
-              <div className="space-y-6 max-w-sm animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
-                <div className="space-y-3">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
-                    <MessageCircle className="h-8 w-8 text-primary" />
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-8 max-w-md animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <MessageCircle className="h-10 w-10 text-white" />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">
-                      No Chat Groups Yet
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      Create your first chat group to start collaborating with
-                      your team members. Chat groups help organize conversations
-                      by project or topic.
-                    </p>
-                  </div>
-                </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Chat Groups Yet</h3>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                    Create your first chat group to start collaborating with your team members. Chat groups help organize conversations by project or topic.
+                  </p>
 
-                {isAdmin ? (
-                  // Admin can create groups
-                  <div className="space-y-3">
-                    <Button
-                      onClick={() => setIsCreateDialogOpen(true)}
-                      className="w-full"
-                      size="lg"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Your First Group
-                    </Button>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <p>✨ Create project-specific chat rooms</p>
-                      <p>👥 Invite team members to collaborate</p>
-                      <p>💬 Share updates and discuss issues</p>
+                  {isAdmin ? (
+                    // Admin can create groups
+                    <div className="space-y-4">
+                      <Button
+                        onClick={() => setIsCreateDialogOpen(true)}
+                        className="w-full h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                        size="lg"
+                      >
+                        <Plus className="h-5 w-5 mr-2" />
+                        Create Your First Group
+                      </Button>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                          <span>Create project-specific chat rooms</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
+                          <span>Invite team members to collaborate</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-indigo-500 rounded-full"></div>
+                          <span>Share updates and discuss issues</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  // Non-admin users
-                  <div className="space-y-3">
-                    <div className="bg-muted/50 rounded-lg p-4">
-                      <p className="text-sm text-muted-foreground">
-                        Contact your administrator to create chat groups for
-                        your team.
-                      </p>
+                  ) : (
+                    // Non-admin users
+                    <div className="space-y-4">
+                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                        <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                          Contact your administrator to create chat groups for your team.
+                        </p>
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                          <span>Chat groups help organize conversations</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
+                          <span>Get notified about important updates</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1 h-1 bg-indigo-500 rounded-full"></div>
+                          <span>Share ideas and collaborate effectively</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <p>📋 Chat groups help organize conversations</p>
-                      <p>🔔 Get notified about important updates</p>
-                      <p>💡 Share ideas and collaborate effectively</p>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="space-y-1 p-2">
             {filteredGroups.map((group) => (
               <div
                 key={group.id}
-                className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 cursor-pointer transition-colors hover:bg-muted/50 ${
+                className={`group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.01] cursor-pointer ${
                   selectedGroup?.id === group.id
-                    ? "bg-primary/10 border-r-2 border-primary"
-                    : ""
+                    ? "ring-2 ring-primary/50 border-primary/50 bg-primary/5"
+                    : "hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 dark:hover:from-blue-950/20 dark:hover:to-purple-950/20"
                 }`}
                 onClick={() => onGroupSelect(group)}
                 tabIndex={0}
@@ -890,82 +913,108 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                 }}
                 aria-selected={selectedGroup?.id === group.id}
               >
-                {/* Group Avatar */}
-                <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
-                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm sm:text-base">
-                    {group.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                {/* Group Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <h4 className="font-medium truncate text-sm">
-                      {group.name}
-                    </h4>
-                    <span className="text-xs text-primary font-semibold flex-shrink-0 ml-2">
-                      {group.projectName}
-                    </span>
-                  </div>
-                  {group.description && (
-                    <p className="text-xs text-muted-foreground mb-1 line-clamp-1">
-                      {group.description}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      <span>{group.member_count}</span>
+                {/* Status indicator */}
+                {selectedGroup?.id === group.id && (
+                  <div className="absolute top-3 right-3 w-2 h-2 bg-primary rounded-full shadow-lg"></div>
+                )}
+                
+                <div className="p-4">
+                  <div className="flex items-start gap-3">
+                    {/* Group Avatar */}
+                    <Avatar className="h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0">
+                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-lg">
+                        {group.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    {/* Group Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white truncate group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                            {group.name}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs px-2 py-1 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                              {group.projectName}
+                            </Badge>
+                            {!group.is_member && (
+                              <Badge variant="secondary" className="text-xs px-2 py-1">
+                                Not Member
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Admin Actions - Mobile responsive */}
+                        {isAdmin && (
+                          <div className="flex items-center space-x-1 ml-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleManageMembers(group.id);
+                              }}
+                              tabIndex={-1}
+                              className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
+                              title="Manage members"
+                            >
+                              <UserPlus className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditGroup(group);
+                              }}
+                              tabIndex={-1}
+                              className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
+                              title="Edit group"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteGroup(group.id);
+                              }}
+                              tabIndex={-1}
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all duration-200"
+                              title="Delete group"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {group.description && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2 leading-relaxed">
+                          {group.description}
+                        </p>
+                      )}
+                      
+                      <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1 bg-blue-500 rounded-lg">
+                            <Users className="h-3 w-3 text-white" />
+                          </div>
+                          <span className="font-medium">{group.member_count} members</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="p-1 bg-green-500 rounded-lg">
+                            <MessageCircle className="h-3 w-3 text-white" />
+                          </div>
+                          <span className="font-medium">Active chat</span>
+                        </div>
+                      </div>
                     </div>
-                    {!group.is_member && (
-                      <Badge variant="secondary" className="text-xs px-1 py-0">
-                        Not Member
-                      </Badge>
-                    )}
                   </div>
                 </div>
-                {/* Admin Actions - Desktop only */}
-                {isAdmin && (
-                  <div className="hidden md:flex items-center space-x-1 ml-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleManageMembers(group.id);
-                      }}
-                      tabIndex={-1}
-                      className="h-6 w-6 p-0 hover:bg-primary/10"
-                      title="Manage members"
-                    >
-                      <UserPlus className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditGroup(group);
-                      }}
-                      tabIndex={-1}
-                      className="h-6 w-6 p-0 hover:bg-primary/10"
-                      title="Edit group"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteGroup(group.id);
-                      }}
-                      tabIndex={-1}
-                      className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
               </div>
             ))}
           </div>

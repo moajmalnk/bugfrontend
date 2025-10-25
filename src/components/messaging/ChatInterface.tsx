@@ -574,34 +574,34 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Professional Header - Fixed/Sticky */}
       <div className="relative overflow-hidden flex-shrink-0 z-20">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"></div>
-        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
               {/* Back button for mobile */}
               {onBackToChatList && (
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={onBackToChatList}
-                  className="md:hidden h-9 w-9 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
+                  className="md:hidden h-8 w-8 sm:h-9 sm:w-9 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200 flex-shrink-0"
                 >
-                  <ArrowLeft className="h-5 w-5" />
+                  <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               )}
               
               {/* Group Avatar */}
-              <div className="relative">
-                <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-blue-500/20 shadow-lg">
-                  <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-semibold">
+              <div className="relative flex-shrink-0">
+                <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-blue-500/20 shadow-lg">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-semibold text-sm sm:text-base">
                     {selectedGroup.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900"></div>
+                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900"></div>
               </div>
               
               {/* Group Info */}
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                <CardTitle className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate">
                   {selectedGroup.name}
                 </CardTitle>
                 <div className="text-xs text-gray-600 dark:text-gray-400">
@@ -620,7 +620,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
             
             {/* Header Actions */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <MessageSearch
                 groupId={selectedGroup.id}
                 onMessageClick={handleMessageClick}
@@ -644,15 +644,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Messages Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-1 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-2 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar">
         {hasMoreMessages && (
-          <div className="flex justify-center mb-2">
+          <div className="flex justify-center mb-3">
             <Button
               variant="outline"
               size="sm"
               onClick={() => loadMessages(currentPage + 1, true)}
               disabled={isLoading}
-              className="text-xs"
+              className="text-xs px-3 py-1.5 h-8 bg-white/80 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
             >
               Load More Messages
             </Button>
@@ -670,13 +670,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               } w-full px-1 group transition-all`}
             >
               <div
-                className={`flex items-end max-w-[90%] xs:max-w-[85%] sm:max-w-[75%] md:max-w-[70%] lg:max-w-[65%] ${
+                className={`flex items-end max-w-[85%] sm:max-w-[75%] md:max-w-[70%] lg:max-w-[65%] ${
                   isOwnMessage ? "flex-row-reverse" : "flex-row"
                 }`}
               >
                 {!isOwnMessage && (
-                  <Avatar className="h-7 w-7 sm:h-8 sm:w-8 mr-2 flex-shrink-0">
-                    <AvatarFallback className="text-xs">
+                  <Avatar className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 mr-2 flex-shrink-0">
+                    <AvatarFallback className="text-xs font-semibold">
                       {(message.sender_name && message.sender_name !== '0' ? message.sender_name : 'User').charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -687,7 +687,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   } flex flex-col w-full`}
                 >
                   {!isOwnMessage && (
-                    <div className="text-xs text-muted-foreground font-medium px-1">
+                    <div className="text-xs text-muted-foreground font-medium px-1 mb-1">
                       {message.sender_name && message.sender_name !== '0' ? message.sender_name : 'User'}
                     </div>
                   )}
@@ -743,11 +743,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             <img
                               src={message.media_file_path}
                               alt={message.media_file_name || "Image"}
-                              className="max-w-full rounded-lg max-h-96 object-contain"
+                              className="max-w-full rounded-lg max-h-80 sm:max-h-96 object-contain shadow-sm"
                               loading="lazy"
                             />
                             {message.content && (
-                              <div className="mt-2 text-sm">{message.content}</div>
+                              <div className="mt-2 text-sm leading-relaxed">{message.content}</div>
                             )}
                           </div>
                         ) : message.message_type === "video" ? (
@@ -755,15 +755,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             <video
                               src={message.media_file_path}
                               controls
-                              className="max-w-full rounded-lg max-h-96"
+                              className="max-w-full rounded-lg max-h-80 sm:max-h-96 shadow-sm"
                             />
                             {message.content && (
-                              <div className="mt-2 text-sm">{message.content}</div>
+                              <div className="mt-2 text-sm leading-relaxed">{message.content}</div>
                             )}
                           </div>
                         ) : message.message_type === "document" ? (
-                          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
-                            <FileText className="h-8 w-8 text-primary flex-shrink-0" />
+                          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg shadow-sm">
+                            <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-primary flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">
                                 {message.media_file_name}
@@ -776,7 +776,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                               variant="ghost"
                               size="sm"
                               onClick={() => window.open(message.media_file_path, '_blank')}
-                              className="flex-shrink-0"
+                              className="flex-shrink-0 h-8 w-8 p-0 rounded-lg"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             </Button>
@@ -833,7 +833,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     )}
 
                   <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 px-1">
-                    <span>
+                    <span className="text-xs">
                       {MessagingService.formatMessageTime(message.created_at)}
                     </span>
                     {isOwnMessage && !isDeleted && (
@@ -848,7 +848,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => setReplyToMessage(message)}
-                          className="h-6 w-6 p-0 hover:bg-primary/10"
+                          className="h-6 w-6 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
                           title="Reply"
                         >
                           <Reply className="h-3 w-3" />
@@ -858,25 +858,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0 hover:bg-primary/10"
+                              className="h-6 w-6 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
                             >
                               <MoreVertical className="h-3 w-3" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent>
+                          <DropdownMenuContent className="w-48 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 shadow-xl">
                             {/* Star */}
                             <DropdownMenuItem
                               onClick={() => handleStarMessage(message.id, message.is_starred || false)}
+                              className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                             >
-                              <Star className={`h-3 w-3 mr-2 ${message.is_starred ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                              <Star className={`h-4 w-4 mr-3 ${message.is_starred ? 'fill-yellow-500 text-yellow-500' : ''}`} />
                               {message.is_starred ? "Unstar" : "Star"}
                             </DropdownMenuItem>
                             
                             {/* Forward */}
                             <DropdownMenuItem
                               onClick={() => setForwardMessage(message)}
+                              className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                             >
-                              <Forward className="h-3 w-3 mr-2" />
+                              <Forward className="h-4 w-4 mr-3" />
                               Forward
                             </DropdownMenuItem>
                             
@@ -884,8 +886,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             {isOwnMessage && message.message_type === "text" && !message.is_edited && (
                               <DropdownMenuItem
                                 onClick={() => setEditMessage(message)}
+                                className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                               >
-                                <Edit className="h-3 w-3 mr-2" />
+                                <Edit className="h-4 w-4 mr-3" />
                                 Edit
                               </DropdownMenuItem>
                             )}
@@ -894,32 +897,35 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             {isOwnMessage && (
                               <DropdownMenuItem
                                 onClick={() => setMessageInfo(message)}
+                                className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                               >
-                                <Info className="h-3 w-3 mr-2" />
+                                <Info className="h-4 w-4 mr-3" />
                                 Message Info
                               </DropdownMenuItem>
                             )}
                             
                             <DropdownMenuItem
                               onClick={() => copyMessage(message.content || "")}
+                              className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                             >
-                              <Copy className="h-3 w-3 mr-2" />
+                              <Copy className="h-4 w-4 mr-3" />
                               Copy
                             </DropdownMenuItem>
                             {isAdmin && !message.is_pinned && (
                               <DropdownMenuItem
                                 onClick={() => handlePinMessage(message)}
+                                className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                               >
-                                <Pin className="h-3 w-3 mr-2" />
+                                <Pin className="h-4 w-4 mr-3" />
                                 Pin Message
                               </DropdownMenuItem>
                             )}
                             {canDeleteMessage(message) && (
                               <DropdownMenuItem
                                 onClick={() => handleDeleteMessage(message)}
-                                className="text-destructive"
+                                className="text-sm px-3 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
                               >
-                                <Trash2 className="h-3 w-3 mr-2" />
+                                <Trash2 className="h-4 w-4 mr-3" />
                                 Delete
                               </DropdownMenuItem>
                             )}
@@ -940,7 +946,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className="flex-shrink-0 z-20 bg-[#202c33] dark:bg-[#202c33] border-t border-[#2a3942] dark:border-[#2a3942]">
         {/* Reply Preview */}
         {replyToMessage && (
-          <div className="px-4 py-2 bg-[#2a3942] dark:bg-[#2a3942] border-b border-[#3b4a54] flex items-center justify-between">
+          <div className="px-3 sm:px-4 py-2 bg-[#2a3942] dark:bg-[#2a3942] border-b border-[#3b4a54] flex items-center justify-between">
             <div className="text-sm flex-1 min-w-0">
               <span className="font-medium text-[#00a884]">
                 Replying to {replyToMessage.sender_name}
@@ -955,7 +961,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => setReplyToMessage(null)}
-              className="h-8 w-8 text-[#8696a0] hover:bg-[#3b4a54]"
+              className="h-8 w-8 text-[#8696a0] hover:bg-[#3b4a54] rounded-lg transition-all duration-200"
             >
               ×
             </Button>
@@ -972,7 +978,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 onChange={(e) => handleTyping(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type a message..."
-                className="min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-[#3b4a54] bg-[#2a3942] dark:bg-[#2a3942] text-[#e9edef] placeholder:text-[#8696a0] focus:bg-[#2a3942] focus:border-[#00a884] transition-colors text-sm"
+                className="min-h-[40px] sm:min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-[#3b4a54] bg-[#2a3942] dark:bg-[#2a3942] text-[#e9edef] placeholder:text-[#8696a0] focus:bg-[#2a3942] focus:border-[#00a884] transition-colors text-sm"
                 rows={1}
               />
             </div>
@@ -1001,7 +1007,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 onMouseUp={handleMicMouseUp}
                 onTouchStart={handleMicMouseDown}
                 onTouchEnd={handleMicMouseUp}
-                className={`h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 transition-all duration-200 ${
+                className={`h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 flex-shrink-0 transition-all duration-200 rounded-xl ${
                   isRecording
                     ? "bg-red-500 text-white hover:bg-red-600 animate-pulse shadow-lg"
                     : "text-[#8696a0] hover:bg-[#3b4a54] hover:text-[#aebac1]"
@@ -1024,7 +1030,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 onClick={handleSendMessage}
                 disabled={!newMessage.trim() || isLoading}
                 size="icon"
-                className="h-9 w-9 sm:h-10 sm:w-10 bg-[#00a884] text-white hover:bg-[#06cf9c] flex-shrink-0 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 bg-[#00a884] text-white hover:bg-[#06cf9c] flex-shrink-0 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 rounded-xl"
                 title="Send message"
               >
                 <Send className="h-4 w-4 sm:h-5 sm:w-5" />
