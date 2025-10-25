@@ -122,6 +122,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuthStatus();
   }, []);
 
+  // Heartbeat system - send heartbeat every 30 seconds when user is authenticated
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+        if (!token) return;
+
+        await fetch(`${ENV.API_URL}/user/heartbeat.php`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (error) {
+        // Silently handle errors - don't disrupt user experience
+        console.error('Heartbeat failed:', error);
+      }
+    };
+
+    // Send heartbeat immediately on mount
+    sendHeartbeat();
+
+    // Set up interval for subsequent heartbeats
+    const intervalId = setInterval(sendHeartbeat, 30000); // 30 seconds
+
+    // Cleanup interval on unmount or when user changes
+    return () => clearInterval(intervalId);
+  }, [currentUser]);
+
   const login = async (
     identifier: string,
     password: string

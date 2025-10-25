@@ -51,19 +51,21 @@ export default function MyTasks() {
   const [showAllAssignees, setShowAllAssignees] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<'details' | 'members'>('details');
 
-  // Filter users by role
+  // Filter users by role (exclude testers)
   const filteredUsers = useMemo(() => {
-    if (selectedUserTab === 'all') return users;
-    return users.filter(user => user.role === selectedUserTab);
+    const nonTesters = users.filter(user => user.role !== 'tester');
+    if (selectedUserTab === 'all') return nonTesters;
+    return nonTesters.filter(user => user.role === selectedUserTab);
   }, [users, selectedUserTab]);
 
-  // Get user counts by role
+  // Get user counts by role (exclude testers)
   const userCounts = useMemo(() => {
+    const nonTesters = users.filter(u => u.role !== 'tester');
     return {
-      all: users.length,
-      admin: users.filter(u => u.role === 'admin').length,
-      developer: users.filter(u => u.role === 'developer').length,
-      tester: users.filter(u => u.role === 'tester').length,
+      all: nonTesters.length,
+      admin: nonTesters.filter(u => u.role === 'admin').length,
+      developer: nonTesters.filter(u => u.role === 'developer').length,
+      tester: 0, // No testers
     };
   }, [users]);
 
@@ -406,6 +408,10 @@ export default function MyTasks() {
     } else {
       setSelectedUsers([]);
     }
+    // Ensure project_ids is an array
+    if (!t.project_ids) {
+      setEditingShared(prev => ({ ...prev, project_ids: [] }));
+    }
     setSharedModalOpen(true);
   }
 
@@ -417,8 +423,8 @@ export default function MyTasks() {
   }
 
   async function onSaveShared() {
-    if (!editingShared?.title || selectedUsers.length === 0) {
-      toast({ title: 'Error', description: 'Title and at least one assigned user are required', variant: 'destructive' });
+    if (!editingShared?.title || selectedUsers.length === 0 || !editingShared?.project_ids?.length) {
+      toast({ title: 'Error', description: 'Title, project, and at least one assigned user are required', variant: 'destructive' });
       return;
     }
     try {
@@ -1264,67 +1270,194 @@ export default function MyTasks() {
                   {/* Card Actions */}
                   <div className="pt-2 mt-auto p-4 sm:p-5">
                     {(() => {
-                      const buttons = [
-                        // View button (always present)
-                        {
-                          component: (
-                        <Button 
-                              variant="default"
-                              className="w-full h-11 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                          onClick={() => openDetailsShared(t)} 
-                        >
-                              View
-                        </Button>
-                          )
-                        },
-                        // Edit button (only for creator)
-                        ...(t.created_by === currentUser?.id ? [{
-                          component: (
+                      const isCreator = t.created_by === currentUser?.id;
+                      const isAssignee = t.assigned_to === currentUser?.id || 
+                                        (t.assigned_to_ids && t.assigned_to_ids.includes(currentUser?.id || ''));
+                      const isApproved = t.status === 'approved';
+                      const isCompleted = t.status === 'completed';
+
+                      const buttons = [];
+
+                      // Always show View button
+                      buttons.push({
+                        component: (
                           <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => openEditShared(t)} 
-                              className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                            variant="default"
+                            className="w-full h-11 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                            onClick={() => openDetailsShared(t)} 
                           >
-                              Edit
+                            View
                           </Button>
-                          )
-                        }] : []),
-                        // Complete button (only for assignee when not completed)
-                        ...(t.status !== 'completed' && 
-                            (t.assigned_to === currentUser?.id || 
-                             (t.assigned_to_ids && t.assigned_to_ids.includes(currentUser?.id || ''))) ? [{
-                          component: (
-                          <Button 
-                            size="sm" 
-                            onClick={() => markSharedCompleted(t)} 
-                              className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-                          >
-                            Complete
-                          </Button>
-                          )
-                        }] : []),
-                        // Delete button (only for creator)
-                        ...(t.created_by === currentUser?.id ? [{
-                          component: sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
-                            <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
-                              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                              <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                                {undoDeleteSharedTask.timeLeft}s
-                              </span>
-                            </div>
-                          ) : (
-                            <Button 
-                              variant="destructive"
-                              size="sm" 
-                              onClick={() => onDeleteShared(t.id)} 
-                              className="w-full h-11 font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
-                            >
-                              Delete
-                            </Button>
-                          )
-                        }] : [])
-                      ];
+                        )
+                      });
+
+                      // If task is approved: Show View, Edit, Delete (for creator) OR View only (for assignees)
+                      if (isApproved) {
+                        if (isCreator) {
+                          buttons.push({
+                            component: (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => openEditShared(t)} 
+                                className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                              >
+                                Edit
+                              </Button>
+                            )
+                          });
+                          buttons.push({
+                            component: sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
+                              <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
+                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                                  {undoDeleteSharedTask.timeLeft}s
+                                </span>
+                              </div>
+                            ) : (
+                              <Button 
+                                variant="destructive"
+                                size="sm" 
+                                onClick={() => onDeleteShared(t.id)} 
+                                className="w-full h-11 font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                              >
+                                Delete
+                              </Button>
+                            )
+                          });
+                        }
+                      }
+                      // If task is completed but not approved
+                      else if (isCompleted && !isApproved) {
+                        // For assignees (but not creator): Show Incomplete button
+                        if (isAssignee && !isCreator) {
+                          buttons.push({
+                            component: (
+                              <Button 
+                                size="sm" 
+                                onClick={() => uncompleteSharedTask(t)} 
+                                className="w-full h-11 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                              >
+                                Incomplete
+                              </Button>
+                            )
+                          });
+                        }
+                        // For creator: Show Incomplete (if also assignee), Approve, Edit, and Delete buttons
+                        if (isCreator) {
+                          // Only add Incomplete if creator is also an assignee
+                          if (isAssignee) {
+                            buttons.push({
+                              component: (
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => uncompleteSharedTask(t)} 
+                                  className="w-full h-11 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                                >
+                                  Incomplete
+                                </Button>
+                              )
+                            });
+                          }
+                          // Only show Approve button when all assigned members have completed
+                          const allMembersCompleted = t.assigned_to_ids?.every(id => t.completed_assignee_ids?.includes(id)) || false;
+                          if (allMembersCompleted) {
+                            buttons.push({
+                              component: (
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => approveSharedTask(t)} 
+                                  className="w-full h-11 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                                >
+                                  Approve
+                                </Button>
+                              )
+                            });
+                          }
+                          buttons.push({
+                            component: (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => openEditShared(t)} 
+                                className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                              >
+                                Edit
+                              </Button>
+                            )
+                          });
+                          buttons.push({
+                            component: sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
+                              <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
+                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                                  {undoDeleteSharedTask.timeLeft}s
+                                </span>
+                              </div>
+                            ) : (
+                              <Button 
+                                variant="destructive"
+                                size="sm" 
+                                onClick={() => onDeleteShared(t.id)} 
+                                className="w-full h-11 font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                              >
+                                Delete
+                              </Button>
+                            )
+                          });
+                        }
+                      }
+                      // If task is not completed and not approved
+                      else {
+                        // For assignees: Show Complete and View buttons
+                        if (isAssignee) {
+                          buttons.push({
+                            component: (
+                              <Button 
+                                size="sm" 
+                                onClick={() => markSharedCompleted(t)} 
+                                className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                              >
+                                Complete
+                              </Button>
+                            )
+                          });
+                        }
+                        // For creator: Show Edit and Delete buttons
+                        if (isCreator) {
+                          buttons.push({
+                            component: (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => openEditShared(t)} 
+                                className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                              >
+                                Edit
+                              </Button>
+                            )
+                          });
+                          buttons.push({
+                            component: sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
+                              <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
+                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                                  {undoDeleteSharedTask.timeLeft}s
+                                </span>
+                              </div>
+                            ) : (
+                              <Button 
+                                variant="destructive"
+                                size="sm" 
+                                onClick={() => onDeleteShared(t.id)} 
+                                className="w-full h-11 font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                              >
+                                Delete
+                              </Button>
+                            )
+                          });
+                        }
+                      }
 
                       const buttonCount = buttons.length;
                       
@@ -1334,8 +1467,39 @@ export default function MyTasks() {
                         if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
                         if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
                         if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                        if (buttonCount === 5) return "grid grid-cols-1 sm:grid-cols-3 gap-3";
                         return "grid grid-cols-1 sm:grid-cols-2 gap-3";
                       };
+
+                      // Custom layout for 5 buttons: View + Incomplete in first row, Approve spans full width in second row, Edit + Delete in third row
+                      if (buttonCount === 5) {
+                        return (
+                          <div className="space-y-3">
+                            {/* First row: View, Incomplete */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {buttons.slice(0, 2).map((button, index) => (
+                                <div key={index}>
+                                  {button.component}
+                                </div>
+                              ))}
+                            </div>
+                            {/* Second row: Approve (spans full width) */}
+                            <div className="grid grid-cols-1 gap-3">
+                              <div key={2}>
+                                {buttons[2].component}
+                              </div>
+                            </div>
+                            {/* Third row: Edit, Delete */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {buttons.slice(3, 5).map((button, index) => (
+                                <div key={index + 3}>
+                                  {button.component}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
 
                       return (
                         <div className={getGridClasses()}>
@@ -1871,47 +2035,30 @@ export default function MyTasks() {
                             {userCounts.developer}
                           </span>
                         </button>
-                        
-                        <button
-                          onClick={() => setSelectedUserTab('tester')}
-                          className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                            selectedUserTab === 'tester'
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                          }`}
-                        >
-                          <User className="h-3 w-3 sm:h-4 sm:w-4" />
-                          <span className="hidden sm:inline">Testers</span>
-                          <span className="sm:hidden">Test</span>
-                          <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full ${
-                            selectedUserTab === 'tester'
-                              ? 'bg-green-200 text-green-800 dark:bg-green-800/30 dark:text-green-300'
-                              : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                          }`}>
-                            {userCounts.tester}
-                          </span>
-                        </button>
                       </div>
                     </div>
 
                     {/* Multi-select Controls */}
                     {filteredUsers.length > 0 && (
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center justify-between mb-3 p-3 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {selectedUsers.length} selected
+                          <CheckCircle2 className={`h-4 w-4 ${selectedUsers.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`} />
+                          <span className={`text-sm font-medium ${selectedUsers.length > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>
+                            {selectedUsers.length} {selectedUsers.length === 1 ? 'user' : 'users'} selected
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={selectAllUsers}
-                            className="text-xs px-2 py-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                            disabled={selectedUsers.length === filteredUsers.length}
+                            className="text-xs px-3 py-1.5 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                           >
                             Select All
                           </button>
                           <button
                             onClick={clearAllSelections}
-                            className="text-xs px-2 py-1 text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+                            disabled={selectedUsers.length === 0}
+                            className="text-xs px-3 py-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                           >
                             Clear
                           </button>
@@ -1922,19 +2069,27 @@ export default function MyTasks() {
                     {/* User Selection List */}
                     <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg hide-scrollbar">
                       {filteredUsers.length === 0 ? (
-                        <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                          No users found for this role.
+                        <div className="p-8 text-center">
+                          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                            <Users className="h-6 w-6 text-gray-400" />
+                          </div>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                            No users found
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Try selecting a different role filter
+                          </p>
                         </div>
                       ) : (
-                        <div className="space-y-1 p-1 sm:p-2 flex flex-col items-center">
+                        <div className="space-y-2 p-3">
                           {filteredUsers.map((user) => (
                             <button
                               key={user.id}
                               onClick={() => toggleUserSelection(user.id)}
-                              className={`w-full max-w-sm sm:max-w-md flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg text-left transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                              className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all duration-200 group ${
                                 selectedUsers.includes(user.id)
-                                  ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                                  : 'hover:shadow-sm'
+                                  ? 'bg-gradient-to-r from-blue-50 to-blue-50/50 dark:from-blue-900/20 dark:to-blue-900/10 border-2 border-blue-300 dark:border-blue-700 shadow-sm'
+                                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700'
                               }`}
                             >
                               <div className={`p-1.5 sm:p-2 rounded-lg ${
@@ -1971,11 +2126,14 @@ export default function MyTasks() {
                                   </span>
                                 </div>
                               </div>
-                              <div className="flex items-center">
+                              <div className="flex items-center flex-shrink-0">
                                 {selectedUsers.includes(user.id) ? (
-                                  <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+                                  <div className="relative">
+                                    <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20"></div>
+                                    <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-blue-400 relative" />
+                                  </div>
                                 ) : (
-                                  <div className="h-4 w-4 sm:h-5 sm:w-5 border-2 border-gray-300 dark:border-gray-600 rounded-full"></div>
+                                  <div className="h-5 w-5 border-2 border-gray-300 dark:border-gray-600 rounded-full group-hover:border-blue-400 dark:group-hover:border-blue-500 transition-colors"></div>
                                 )}
                               </div>
                             </button>
@@ -1983,6 +2141,31 @@ export default function MyTasks() {
                         </div>
                       )}
                     </div>
+                  </div>
+
+                {/* Project Selection */}
+                  <div>
+                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Project <span className="text-red-500">*</span>
+                    </Label>
+                  <Select
+                      value={editingShared?.project_ids?.[0] || ''}
+                      onValueChange={(value) => setEditingShared({ ...editingShared, project_ids: value ? [value] : [] } as SharedTask)}
+                  >
+                      <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
+                        <SelectValue placeholder="Select a project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600"></div>
+                              {project.name}
+                            </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   </div>
 
                 {/* Due Date */}
@@ -2007,31 +2190,89 @@ export default function MyTasks() {
                     onValueChange={(value) => setEditingShared({ ...editingShared, priority: value } as SharedTask)}
                   >
                     <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
-                      <SelectValue />
+                      <SelectValue>
+                        {editingShared?.priority && (
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              editingShared.priority === 'low' ? 'bg-green-500' :
+                              editingShared.priority === 'medium' ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}></div>
+                            <span className="capitalize">{editingShared.priority} Priority</span>
+                          </div>
+                        )}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low" className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        Low Priority
+                        <span>Low Priority</span>
                       </SelectItem>
                       <SelectItem value="medium" className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        Medium Priority
+                        <span>Medium Priority</span>
                       </SelectItem>
                       <SelectItem value="high" className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        High Priority
+                        <span>High Priority</span>
                       </SelectItem>
                     </SelectContent>
                   </Select>
                   </div>
+
+                {/* Status - Only visible when editing */}
+                {editingShared?.id && (
+                  <div>
+                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Status
+                    </Label>
+                    <Select
+                      value={editingShared?.status || "pending"}
+                      onValueChange={(value) => setEditingShared({ ...editingShared, status: value } as SharedTask)}
+                    >
+                      <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
+                        <SelectValue>
+                          {editingShared?.status && (
+                            <div className="flex items-center gap-2">
+                              <div className={`w-3 h-3 rounded-full ${
+                                editingShared.status === 'pending' ? 'bg-gray-500' :
+                                editingShared.status === 'in_progress' ? 'bg-blue-500' :
+                                editingShared.status === 'completed' ? 'bg-green-500' :
+                                'bg-purple-500'
+                              }`}></div>
+                              <span className="capitalize">{editingShared.status.replace('_', ' ')}</span>
+                            </div>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending" className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                          <span>Pending</span>
+                        </SelectItem>
+                        <SelectItem value="in_progress" className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                          <span>In Progress</span>
+                        </SelectItem>
+                        <SelectItem value="completed" className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          <span>Completed</span>
+                        </SelectItem>
+                        <SelectItem value="approved" className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                          <span>Approved</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 </div>
 
                 {/* Actions */}
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   <Button 
                     onClick={onSaveShared} 
-                  disabled={submitting || !editingShared?.title?.trim() || selectedUsers.length === 0}
+                  disabled={submitting || !editingShared?.title?.trim() || selectedUsers.length === 0 || !editingShared?.project_ids?.length}
                   className={`flex-1 h-11 sm:h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
                     "bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white"
                   }`}
@@ -2152,54 +2393,54 @@ export default function MyTasks() {
                 {/* Tab Content */}
                 {activeDetailTab === 'details' && (
                   <div className="space-y-6">
-                    {/* Description Section */}
-                    {selectedShared.description && (
-                      <div className="space-y-3">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                          <div className="p-1.5 bg-blue-600 rounded-lg">
-                            <FileText className="h-4 w-4 text-white" />
-                          </div>
-                          Description
-                        </h3>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                          <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                            {selectedShared.description}
-                          </p>
-                        </div>
+                {/* Description Section */}
+                {selectedShared.description && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="p-1.5 bg-blue-600 rounded-lg">
+                        <FileText className="h-4 w-4 text-white" />
                       </div>
-                    )}
+                      Description
+                    </h3>
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                      <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {selectedShared.description}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-                    {/* Task Information Grid */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <div className="p-1.5 bg-emerald-600 rounded-lg">
-                          <ListChecks className="h-4 w-4 text-white" />
-                        </div>
-                        Task Information
-                      </h3>
-                      
+                {/* Task Information Grid */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="p-1.5 bg-emerald-600 rounded-lg">
+                      <ListChecks className="h-4 w-4 text-white" />
+                    </div>
+                    Task Information
+                  </h3>
+                  
                       <div className="grid grid-cols-6 gap-4">
                         {/* Left Column - Basic Info (3 columns) */}
                         <div className="col-span-3 space-y-4">
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                              <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <span className="text-gray-600 dark:text-gray-400">Created:</span>
-                            <span className="font-medium text-gray-900 dark:text-white">
-                              {new Date(selectedShared.created_at || '').toLocaleDateString()}
-                            </span>
-                          </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                          <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <span className="text-gray-600 dark:text-gray-400">Created:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {new Date(selectedShared.created_at || '').toLocaleDateString()}
+                        </span>
+                    </div>
 
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                              <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />
-                            </div>
-                            <span className="text-gray-600 dark:text-gray-400">Due Date:</span>
-                            <span className="font-medium text-gray-900 dark:text-white">
-                              {selectedShared.due_date ? new Date(selectedShared.due_date).toLocaleDateString() : 'No due date'}
-                            </span>
-                          </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                          <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        </div>
+                        <span className="text-gray-600 dark:text-gray-400">Due Date:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {selectedShared.due_date ? new Date(selectedShared.due_date).toLocaleDateString() : 'No due date'}
+                        </span>
+                      </div>
 
                           <div className="flex items-center gap-2 text-sm">
                             <div className="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
@@ -2209,15 +2450,31 @@ export default function MyTasks() {
                             <span className="font-medium text-gray-900 dark:text-white capitalize">
                               {selectedShared.priority || 'medium'}
                             </span>
+                    </div>
+
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                              <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                          </div>
+                            <span className="text-gray-600 dark:text-gray-400">Project:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                              {(() => {
+                                if (selectedShared.project_ids && selectedShared.project_ids.length > 0) {
+                                  const project = projects.find(p => p.id === selectedShared.project_ids[0]);
+                                  return project ? project.name : 'Unknown Project';
+                                }
+                                return 'No Project';
+                              })()}
+                        </span>
                           </div>
                         </div>
-
+                      
                         {/* Right Column - Quick Assignee Summary (3 columns) */}
                         <div className="col-span-3 space-y-3">
                           <div className="flex items-center gap-2">
                             <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
                               <User className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                            </div>
+                          </div>
                             <span className="text-gray-600 dark:text-gray-400 text-sm">Quick Summary:</span>
                           </div>
                           
@@ -2242,19 +2499,19 @@ export default function MyTasks() {
                                   </div>
                                   <span className="text-sm font-medium text-gray-900 dark:text-white">
                                     {assignedUsers.length} assignee{assignedUsers.length > 1 ? 's' : ''}
-                                  </span>
+                        </span>
                                   <button
                                     onClick={() => setActiveDetailTab('members')}
                                     className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                                   >
                                     View all →
                                   </button>
-                                </div>
+                        </div>
                               );
                             })()}
-                          </div>
-                        </div>
                       </div>
+                          </div>
+                </div>
                     </div>
                   </div>
                 )}
@@ -2304,21 +2561,48 @@ export default function MyTasks() {
                         return (
                           <>
                             <div className="space-y-2">
-                              {displayUsers.map((user) => (
-                                <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
-                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm">
-                                    {user.name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-gray-900 dark:text-white text-base truncate">
-                                      {user.name}
+                              {displayUsers.map((user) => {
+                                const isCompleted = selectedShared.completed_assignee_ids?.includes(user.id) || false;
+                                const completedAt = selectedShared.completion_details?.[user.id];
+                                
+                                return (
+                                  <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm">
+                                      {user.name.charAt(0).toUpperCase()}
                                     </div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                      {user.email}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-gray-900 dark:text-white text-base truncate">
+                                        {user.name}
+                                      </div>
+                                      <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                        {user.email}
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-1">
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-xs ${
+                                          isCompleted 
+                                            ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' 
+                                            : 'bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-800 dark:text-gray-400'
+                                        }`}
+                                      >
+                                        {isCompleted ? (
+                                          <div className="flex items-center gap-1">
+                                            <CheckCircle2 className="h-3 w-3" />
+                                            Completed
+                                          </div>
+                                        ) : 'Pending'}
+                                      </Badge>
+                                      {completedAt && (
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {new Date(completedAt).toLocaleDateString()}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                             {!showAllAssignees && remainingCount > 0 && (
                               <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -2332,21 +2616,48 @@ export default function MyTasks() {
                             )}
                             {showAllAssignees && remainingCount > 0 && (
                               <div className="max-h-40 overflow-y-auto hide-scrollbar space-y-2">
-                                {assignedUsers.slice(2).map((user) => (
-                                  <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
-                                    <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-semibold shadow-sm">
-                                      {user.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                                        {user.name}
+                                {assignedUsers.slice(2).map((user) => {
+                                  const isCompleted = selectedShared.completed_assignee_ids?.includes(user.id) || false;
+                                  const completedAt = selectedShared.completion_details?.[user.id];
+                                  
+                                  return (
+                                    <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
+                                      <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-semibold shadow-sm">
+                                        {user.name.charAt(0).toUpperCase()}
                                       </div>
-                                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                        {user.email}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                                          {user.name}
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                          {user.email}
+                                        </div>
+                                      </div>
+                                      <div className="flex flex-col items-end gap-1">
+                                        <Badge 
+                                          variant="outline" 
+                                          className={`text-xs ${
+                                            isCompleted 
+                                              ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' 
+                                              : 'bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-800 dark:text-gray-400'
+                                          }`}
+                                        >
+                                          {isCompleted ? (
+                                            <div className="flex items-center gap-1">
+                                              <CheckCircle2 className="h-3 w-3" />
+                                              Completed
+                                            </div>
+                                          ) : 'Pending'}
+                                        </Badge>
+                                        {completedAt && (
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {new Date(completedAt).toLocaleDateString()}
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </>
@@ -2386,38 +2697,6 @@ export default function MyTasks() {
                       <Plus className="h-4 w-4 mr-2" />
                       Edit Task
                     </Button>
-                        )
-                      }] : []),
-                      // Complete button (only for assignee when not completed/approved)
-                      ...(selectedShared.status !== 'completed' && selectedShared.status !== 'approved' && 
-                          (selectedShared.assigned_to === currentUser?.id || 
-                           (selectedShared.assigned_to_ids && selectedShared.assigned_to_ids.includes(currentUser?.id || ''))) ? [{
-                        component: (
-                      <Button 
-                        onClick={async () => { 
-                          await markSharedCompleted(selectedShared); 
-                          setSharedDetailOpen(false); 
-                        }} 
-                            className="w-full h-12 px-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                      >
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Mark as Completed
-                      </Button>
-                        )
-                      }] : []),
-                      // Approve button (only for creator when completed)
-                      ...(selectedShared.status === 'completed' && selectedShared.created_by === currentUser?.id ? [{
-                        component: (
-                      <Button 
-                        onClick={async () => { 
-                          await approveSharedTask(selectedShared); 
-                          setSharedDetailOpen(false); 
-                        }} 
-                            className="w-full h-12 px-6 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                      >
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Approve Task
-                      </Button>
                         )
                       }] : []),
                       // Delete button (only for creator)

@@ -22,6 +22,23 @@ import { Bug, Code2, Shield, UserRound, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+// Status Badge Component for user presence
+const StatusBadge = ({ status }: { status: string }) => {
+  const config = {
+    active: { color: 'bg-green-500', text: 'Active', icon: '●' },
+    idle: { color: 'bg-yellow-500', text: 'Idle', icon: '●' },
+    offline: { color: 'bg-gray-400', text: 'Offline', icon: '●' }
+  };
+  const { color, text, icon } = config[status as keyof typeof config] || config.offline;
+  
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${color} text-white`}>
+      <span>{icon}</span>
+      {text}
+    </span>
+  );
+};
+
 // Enhanced User Card Skeleton component for loading state
 const UserCardSkeleton = () => (
   <div className="relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow-sm p-4 sm:p-5 flex flex-col gap-4 w-full">
@@ -782,13 +799,16 @@ const Users = () => {
               <Table className="w-full">
                 <TableHeader className="bg-gradient-to-r from-gray-50/80 to-blue-50/80 dark:from-gray-800/80 dark:to-blue-900/80 backdrop-blur-sm">
                   <TableRow className="border-b border-gray-200/60 dark:border-gray-700/60 hover:bg-transparent">
-                    <TableHead className="w-[25%] px-6 font-semibold text-sm text-gray-700 dark:text-gray-300 py-5">
+                    <TableHead className="w-[20%] px-6 font-semibold text-sm text-gray-700 dark:text-gray-300 py-5">
                       User
                     </TableHead>
-                    <TableHead className="w-[30%] px-6 font-semibold text-sm text-gray-700 dark:text-gray-300 py-5">
+                    <TableHead className="w-[25%] px-6 font-semibold text-sm text-gray-700 dark:text-gray-300 py-5">
                       Contact
                     </TableHead>
-                    <TableHead className="w-[25%] px-6 font-semibold text-sm text-gray-700 dark:text-gray-300 py-5">
+                    <TableHead className="w-[15%] px-6 font-semibold text-sm text-gray-700 dark:text-gray-300 py-5">
+                      Status
+                    </TableHead>
+                    <TableHead className="w-[20%] px-6 font-semibold text-sm text-gray-700 dark:text-gray-300 py-5">
                       Work Stats
                     </TableHead>
                     <TableHead className="w-[20%] px-6 text-right font-semibold text-sm text-gray-700 dark:text-gray-300 py-5">
@@ -802,7 +822,7 @@ const Users = () => {
                         .fill(0)
                         .map((_, index) => (
                           <TableRow key={index} className="animate-pulse border-b border-gray-100/50 dark:border-gray-800/50">
-                            <TableCell className="w-[25%] px-6 py-5">
+                            <TableCell className="w-[20%] px-6 py-5">
                               <div className="flex items-center gap-3">
                                 <Skeleton className="h-10 w-10 rounded-full" />
                                 <div className="space-y-2">
@@ -811,13 +831,16 @@ const Users = () => {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="w-[30%] px-6 py-5">
+                            <TableCell className="w-[25%] px-6 py-5">
                               <div className="space-y-2">
                                 <Skeleton className="h-4 w-40" />
                                 <Skeleton className="h-3 w-32" />
                               </div>
                             </TableCell>
-                            <TableCell className="w-[25%] px-6 py-5">
+                            <TableCell className="w-[15%] px-6 py-5">
+                              <Skeleton className="h-6 w-16 rounded-full" />
+                            </TableCell>
+                            <TableCell className="w-[20%] px-6 py-5">
                               <div className="flex gap-2">
                                 <Skeleton className="h-6 w-12 rounded-md" />
                                 <Skeleton className="h-6 w-12 rounded-md" />
@@ -835,7 +858,7 @@ const Users = () => {
                             index % 2 === 0 ? 'bg-white/30 dark:bg-gray-900/30' : 'bg-gray-50/20 dark:bg-gray-800/20'
                           }`}
                         >
-                          <TableCell className="w-[25%] px-6 py-5">
+                          <TableCell className="w-[20%] px-6 py-5">
                             <div className="flex items-center gap-3">
                               <img
                                 src={user.avatar}
@@ -852,7 +875,7 @@ const Users = () => {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="w-[30%] px-6 py-5">
+                          <TableCell className="w-[25%] px-6 py-5">
                             <div className="space-y-1">
                               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {user.email}
@@ -862,7 +885,10 @@ const Users = () => {
                               </p>
                             </div>
                           </TableCell>
-                          <TableCell className="w-[25%] px-6 py-5">
+                          <TableCell className="w-[15%] px-6 py-5">
+                            <StatusBadge status={user.status || 'offline'} />
+                          </TableCell>
+                          <TableCell className="w-[20%] px-6 py-5">
                             <UserWorkStats userId={user.id} compact={true} />
                           </TableCell>
                           <TableCell className="w-[20%] px-6 py-5 text-right">
@@ -913,11 +939,14 @@ const Users = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {user.email}
                         </p>
-                        <div className="flex items-center gap-1 mt-1">
-                          {getRoleIcon(user.role)}
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 capitalize">
-                            {user.role}
-                          </span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-1">
+                            {getRoleIcon(user.role)}
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400 capitalize">
+                              {user.role}
+                            </span>
+                          </div>
+                          <StatusBadge status={user.status || 'offline'} />
                         </div>
                       </div>
                     </div>

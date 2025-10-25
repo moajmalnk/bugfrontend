@@ -61,6 +61,7 @@ export interface User {
   avatar?: string;
   created_at?: string;
   admin_id?: string; // For impersonation tracking
+  status?: 'active' | 'idle' | 'offline'; // For presence tracking
 }
 
 // Messaging System Types

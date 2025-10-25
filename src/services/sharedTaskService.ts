@@ -12,6 +12,7 @@ export interface SharedTask {
   assigned_to_names?: string[];
   completed_assignee_ids?: string[];
   completed_assignee_names?: string[];
+  completion_details?: Record<string, string>; // userId => completed_at timestamp
   approved_by?: string;
   approved_by_name?: string;
   completed_by?: string;

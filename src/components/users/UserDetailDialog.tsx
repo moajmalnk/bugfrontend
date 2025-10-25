@@ -34,6 +34,7 @@ import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
 import { UserWorkStats } from "./UserWorkStats";
+import { ActiveHours } from "./ActiveHours";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -350,6 +351,11 @@ export function UserDetailDialog({
               Work Statistics
             </h4>
             <UserWorkStats userId={user.id} showTrend={true} />
+          </div>
+
+          {/* Active Hours Tracking */}
+          <div>
+            <ActiveHours userId={user.id} userName={user.username} />
           </div>
 
           {/* Project & Bug Stats */}
