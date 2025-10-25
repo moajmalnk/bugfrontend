@@ -907,7 +907,7 @@ const Updates = () => {
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                    A log of all features, fixes, and maintenance updates.
+                    A log of all features and updations.
                   </p>
                 </div>
 

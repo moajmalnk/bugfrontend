@@ -1,7 +1,10 @@
 import { ActivityList } from "@/components/activities/ActivityList";
 import { BugCard } from "@/components/bugs/BugCard";
 import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
-import ProjectUpdates from "@/components/updates/ProjectUpdates";
+import Bugs from "@/pages/Bugs";
+import Fixes from "@/pages/Fixes";
+import MyTasks from "@/pages/MyTasks";
+import Updates from "@/pages/Updates";
 import { sharedTaskService, SharedTask } from "@/services/sharedTaskService";
 import {
   AlertDialog,
@@ -13,8 +16,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -24,6 +28,14 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
@@ -34,16 +46,20 @@ import {
   projectService,
   UpdateProjectData,
 } from "@/services/projectService";
+import { updateService } from "@/services/updateService";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
   Bell,
   Bug,
+  BugIcon,
   CheckCircle2,
   ChevronLeft,
   Clock,
   Code,
+  Filter,
   ListChecks,
+  Lock,
   Loader2,
   Plus,
   Search,
@@ -53,7 +69,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 // Skeleton components for loading state
@@ -221,6 +237,3284 @@ const MemberCard = ({
   );
 };
 
+// Wrapper component to handle Bugs component with URL parameters
+const BugsWrapper = () => {
+  const { projectId } = useParams();
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  const status = searchParams.get("status");
+  
+  // Map main tab to internal tab if needed
+  let internalTab = urlTab;
+  if (urlTab === "bugs") {
+    internalTab = "all-bugs"; // Default to all-bugs when main bugs tab is selected
+  }
+  
+  // Create a custom Bugs component that accepts initial parameters
+  return <BugsWithInitialParams projectId={projectId} initialTab={internalTab} initialStatus={status} />;
+};
+
+// Wrapper component to handle Fixes component with URL parameters
+const FixesWrapper = () => {
+  const { projectId } = useParams();
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  const status = searchParams.get("status");
+  
+  // Map main tab to internal tab if needed
+  let internalTab = urlTab;
+  if (urlTab === "fixes") {
+    internalTab = "all-fixes"; // Default to all-fixes when main fixes tab is selected
+  }
+  
+  // Create a custom Fixes component that accepts initial parameters
+  return <FixesWithInitialParams projectId={projectId} initialTab={internalTab} initialStatus={status} />;
+};
+
+// Wrapper component to handle Updates component with URL parameters
+const UpdatesWrapper = () => {
+  const { projectId } = useParams();
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  const status = searchParams.get("status");
+  
+  // Map main tab to internal tab if needed
+  let internalTab = urlTab;
+  if (urlTab === "updates") {
+    internalTab = "all-updates"; // Default to all-updates when main updates tab is selected
+  }
+  
+  // Create a custom Updates component that accepts initial parameters
+  return <UpdatesWithInitialParams projectId={projectId} initialTab={internalTab} initialStatus={status} />;
+};
+
+// Custom Bugs component that accepts initial parameters
+const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { projectId: string | undefined; initialTab: string | null; initialStatus: string | null }) => {
+  const { currentUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [bugs, setBugs] = useState<BugType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [skeletonLoading, setSkeletonLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus || "all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState(initialTab || "all-bugs");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalBugs, setTotalBugs] = useState(0);
+  const [pendingBugsCount, setPendingBugsCount] = useState(0);
+  
+  // Update activeTab when initialTab changes
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Sync activeTab with URL (back/forward navigation)
+  useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    let targetTab = "all-bugs";
+    
+    if (urlTab === "my-bugs" || urlTab === "all-bugs") {
+      targetTab = urlTab;
+    } else if (urlTab === "bugs") {
+      targetTab = "all-bugs";
+    }
+    
+    if (targetTab !== activeTab) setActiveTab(targetTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+  
+  // Fetch bugs data
+  useEffect(() => {
+    fetchBugs();
+  }, []);
+  
+  const fetchBugs = async () => {
+    try {
+      setLoading(true);
+      setSkeletonLoading(true);
+      
+      const data = await bugService.getBugs({
+        projectId: projectId,
+        page: 1,
+        limit: 1000,
+        status: "pending",
+        userId: currentUser?.id,
+      });
+      setBugs(data.bugs);
+      setCurrentPage(data.pagination.currentPage);
+      setTotalBugs(data.pagination.totalBugs);
+      
+      // Calculate pending bugs from all fetched bugs
+      const pendingCount = data.bugs.filter(
+        (bug) => bug.status === "pending"
+      ).length;
+      setPendingBugsCount(pendingCount);
+      
+      setSkeletonLoading(false);
+    } catch (error) {
+      console.error("Error fetching bugs:", error);
+      setBugs([]);
+      setSkeletonLoading(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Filter bugs based on active tab
+  const getFilteredBugs = () => {
+    let filteredByTab = bugs;
+    
+    if (currentUser?.role === "admin" || currentUser?.role === "tester") {
+      switch (activeTab) {
+        case "all-bugs":
+          filteredByTab = bugs;
+          break;
+        case "my-bugs":
+          filteredByTab = bugs.filter((bug) => {
+            return String(bug.reported_by) === String(currentUser.id);
+          });
+          break;
+        default:
+          filteredByTab = bugs;
+      }
+    }
+    
+    // Apply additional filters
+    return filteredByTab.filter((bug) => {
+      const matchesSearch =
+        bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        bug.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPriority =
+        priorityFilter === "all" || bug.priority === priorityFilter;
+      const matchesStatus =
+        statusFilter === "all" || bug.status === statusFilter;
+      const matchesProject =
+        projectFilter === "all" || bug.project_id === projectFilter;
+      // Exclude fixed bugs from Bugs page
+      const isNotFixed = bug.status !== "fixed";
+      return (
+        matchesSearch &&
+        matchesPriority &&
+        matchesStatus &&
+        matchesProject &&
+        isNotFixed
+      );
+    });
+  };
+  
+  const filteredBugs = getFilteredBugs();
+  const totalFiltered = filteredBugs.length;
+  const paginatedBugs = filteredBugs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+  
+  // Get tab-specific count
+  const getTabCount = (tabType: string) => {
+    const validStatuses = ["pending", "in_progress", "declined", "rejected"];
+    switch (tabType) {
+      case "all-bugs":
+        return bugs.filter((bug) => validStatuses.includes(bug.status)).length;
+      case "my-bugs":
+        return bugs.filter(
+          (bug) =>
+            bug.reported_by === currentUser?.id &&
+            validStatuses.includes(bug.status)
+        ).length;
+      default:
+        return 0;
+    }
+  };
+  
+  const canViewTabs = currentUser?.role === "admin" || currentUser?.role === "tester";
+  const isDeveloper = currentUser?.role === "developer";
+  const noBugs = !loading && filteredBugs.length === 0;
+  
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 bg-muted rounded animate-pulse"></div>
+        <div className="h-32 bg-muted rounded animate-pulse"></div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-6 sm:space-y-8">
+      {/* Professional Header */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
+        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+          <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
+                  <BugIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                    Bugs
+                  </h1>
+                  <div className="h-1 w-20 bg-gradient-to-r from-orange-500 to-red-600 rounded-full mt-2"></div>
+                </div>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                Track and manage pending bugs across your projects
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
+                  <div className="p-1.5 bg-orange-500 rounded-lg">
+                    <BugIcon className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                      {pendingBugsCount}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Admin Tabs or Regular Content */}
+      {canViewTabs && !skeletonLoading && !loading ? (
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(val) => {
+            setActiveTab(val);
+            setSearchParams((prev) => {
+              const p = new URLSearchParams(prev);
+              // Update the main tab parameter to reflect the internal tab
+              p.set("tab", val);
+              return p as any;
+            });
+          }} 
+          className="w-full"
+        >
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-orange-50/50 dark:from-gray-800/50 dark:to-orange-900/50 rounded-2xl"></div>
+            <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
+              <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
+                <TabsTrigger
+                  value="all-bugs"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <BugIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">All Bugs</span>
+                  <span className="sm:hidden">All</span>
+                  <span className="ml-2 px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-bold">
+                    {getTabCount("all-bugs")}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="my-bugs"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">My Bugs</span>
+                  <span className="sm:hidden">My</span>
+                  <span className="ml-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-xs font-bold">
+                    {getTabCount("my-bugs")}
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
+
+          <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
+            {/* Search and Filter */}
+            {!skeletonLoading && !loading && (
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
+                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-1.5 bg-orange-500 rounded-lg">
+                        <Search className="h-4 w-4 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row gap-4">
+                      {/* Search Bar */}
+                      <div className="flex-1 relative group">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                        <input
+                          type="text"
+                          placeholder="Search bugs by title, description, or bug ID..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                        />
+                      </div>
+
+                      {/* Filter Controls */}
+                      <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                        {/* Status Filter */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                            <BugIcon className="h-4 w-4 text-white" />
+                          </div>
+                          <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent position="popper" className="z-[60]">
+                              <SelectItem value="all">All Status</SelectItem>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="declined">Declined</SelectItem>
+                              <SelectItem value="rejected">Rejected</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Clear Filters Button */}
+                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearchTerm("");
+                              setPriorityFilter("all");
+                              setStatusFilter("all");
+                              setProjectFilter("all");
+                            }}
+                            className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Professional Responsive Pagination Controls - Show when there are bugs */}
+            {!skeletonLoading && !loading && filteredBugs.length > 0 && totalPages > 1 && (
+              <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                {/* Top Row - Results Info and Items Per Page */}
+                <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                    <span className="text-sm sm:text-base text-foreground font-semibold">
+                      Showing{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {(currentPage - 1) * itemsPerPage + 1}
+                      </span>
+                      -
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalFiltered}
+                      </span>{" "}
+                      bugs
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center sm:justify-end gap-3">
+                    <label
+                      htmlFor="items-per-page"
+                      className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                    >
+                      Items per page:
+                    </label>
+                    <div className="relative group">
+                      <select
+                        id="items-per-page"
+                        value={itemsPerPage}
+                        onChange={(e) =>
+                          setItemsPerPage(Number(e.target.value))
+                        }
+                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                        aria-label="Items per page"
+                      >
+                        {[10, 25, 50].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                        <svg
+                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row - Pagination Navigation */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+                  {/* Page Info for Mobile */}
+                  <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                    {/* Previous Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.max(1, p - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden text-lg">‹</span>
+                    </Button>
+
+                    {/* Page Numbers - Responsive Display */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Always show first page on larger screens */}
+                      <Button
+                        variant={currentPage === 1 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        1
+                      </Button>
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage > 4 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Dynamic page numbers based on current page - show more on larger screens */}
+                      {(() => {
+                        const pages = [];
+                        const start = Math.max(2, currentPage - 1);
+                        const end = Math.min(totalPages - 1, currentPage + 1);
+
+                        for (let i = start; i <= end; i++) {
+                          if (i > 1 && i < totalPages) {
+                            pages.push(i);
+                          }
+                        }
+
+                        return pages.map((page) => (
+                          <Button
+                            key={page}
+                            variant={
+                              currentPage === page ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                          >
+                            {page}
+                          </Button>
+                        ));
+                      })()}
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage < totalPages - 3 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Always show last page if more than 1 page on larger screens */}
+                      {totalPages > 1 && (
+                        <Button
+                          variant={
+                            currentPage === totalPages ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        >
+                          {totalPages}
+                        </Button>
+                      )}
+
+                      {/* Mobile-friendly page selector */}
+                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
+                        <select
+                          value={currentPage}
+                          onChange={(e) =>
+                            setCurrentPage(Number(e.target.value))
+                          }
+                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
+                          aria-label="Go to page"
+                        >
+                          {Array.from({ length: totalPages }, (_, i) => (
+                            <option key={i + 1} value={i + 1}>
+                              {i + 1}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm text-muted-foreground font-medium">
+                          {" "}
+                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                            {totalPages}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Next Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <span className="sm:hidden text-lg">›</span>
+                      <svg
+                        className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </Button>
+                  </div>
+
+                  {/* Page Info for Desktop */}
+                  <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Simple results info when no pagination needed - show when there are bugs */}
+            {!skeletonLoading && !loading && filteredBugs.length > 0 && totalPages <= 1 && (
+              <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                  <span className="text-sm sm:text-base text-foreground font-semibold">
+                    Showing{" "}
+                    <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalFiltered}
+                    </span>{" "}
+                    bugs
+                  </span>
+                </div>
+                <div className="flex items-center justify-center sm:justify-end gap-3">
+                  <label
+                    htmlFor="items-per-page-simple"
+                    className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                  >
+                    Items per page:
+                  </label>
+                  <div className="relative group">
+                    <select
+                      id="items-per-page-simple"
+                      value={itemsPerPage}
+                      onChange={(e) =>
+                        setItemsPerPage(Number(e.target.value))
+                      }
+                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                      aria-label="Items per page"
+                    >
+                      {[10, 25, 50].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                      <svg
+                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Content */}
+            {skeletonLoading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : loading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : filteredBugs.length === 0 ? (
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <BugIcon className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Found</h3>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                    No bugs match your current filters. Try adjusting your search criteria.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 grid-cols-1">
+                {paginatedBugs.map((bug) => (
+                  <BugCard key={bug.id} bug={bug} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <div className="space-y-6 sm:space-y-8">
+          {/* Search & Filter for Developers */}
+          {!skeletonLoading && !loading && (
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-orange-500 rounded-lg">
+                      <Search className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-4">
+                    {/* Search Bar */}
+                    <div className="flex-1 relative group">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                      <input
+                        type="text"
+                        placeholder="Search bugs by title, description, or bug ID..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      />
+                    </div>
+
+                    {/* Filter Controls */}
+                    <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                      {/* Status Filter */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                          <BugIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                          <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="in_progress">In Progress</SelectItem>
+                            <SelectItem value="declined">Declined</SelectItem>
+                            <SelectItem value="rejected">Rejected</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Clear Filters Button */}
+                      {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearchTerm("");
+                            setPriorityFilter("all");
+                            setStatusFilter("all");
+                            setProjectFilter("all");
+                          }}
+                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Professional Responsive Pagination for Developers - Show when there are bugs and multiple pages */}
+          {!skeletonLoading &&
+            !loading &&
+            filteredBugs.length > 0 &&
+            totalPages > 1 && (
+              <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                {/* Top Row - Results Info and Items Per Page */}
+                <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                    <span className="text-sm sm:text-base text-foreground font-semibold">
+                      Showing{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {(currentPage - 1) * itemsPerPage + 1}
+                      </span>
+                      -
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalFiltered}
+                      </span>{" "}
+                      bugs
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center sm:justify-end gap-3">
+                    <label
+                      htmlFor="items-per-page-dev"
+                      className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                    >
+                      Items per page:
+                    </label>
+                    <div className="relative group">
+                      <select
+                        id="items-per-page-dev"
+                        value={itemsPerPage}
+                        onChange={(e) =>
+                          setItemsPerPage(Number(e.target.value))
+                        }
+                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                        aria-label="Items per page"
+                      >
+                        {[10, 25, 50].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                        <svg
+                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row - Pagination Navigation */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+                  {/* Page Info for Mobile */}
+                  <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                    {/* Previous Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.max(1, p - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden text-lg">‹</span>
+                    </Button>
+
+                    {/* Page Numbers - Responsive Display */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Always show first page on larger screens */}
+                      <Button
+                        variant={currentPage === 1 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        1
+                      </Button>
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage > 4 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Dynamic page numbers based on current page - show more on larger screens */}
+                      {(() => {
+                        const pages = [];
+                        const start = Math.max(2, currentPage - 1);
+                        const end = Math.min(totalPages - 1, currentPage + 1);
+
+                        for (let i = start; i <= end; i++) {
+                          if (i > 1 && i < totalPages) {
+                            pages.push(i);
+                          }
+                        }
+
+                        return pages.map((page) => (
+                          <Button
+                            key={page}
+                            variant={
+                              currentPage === page ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                          >
+                            {page}
+                          </Button>
+                        ));
+                      })()}
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage < totalPages - 3 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Always show last page if more than 1 page on larger screens */}
+                      {totalPages > 1 && (
+                        <Button
+                          variant={
+                            currentPage === totalPages ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        >
+                          {totalPages}
+                        </Button>
+                      )}
+
+                      {/* Mobile-friendly page selector */}
+                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
+                        <select
+                          value={currentPage}
+                          onChange={(e) =>
+                            setCurrentPage(Number(e.target.value))
+                          }
+                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
+                          aria-label="Go to page"
+                        >
+                          {Array.from({ length: totalPages }, (_, i) => (
+                            <option key={i + 1} value={i + 1}>
+                              {i + 1}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm text-muted-foreground font-medium">
+                          {" "}
+                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                            {totalPages}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Next Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <span className="sm:hidden text-lg">›</span>
+                      <svg
+                        className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </Button>
+                  </div>
+
+                  {/* Page Info for Desktop */}
+                  <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {/* Simple results info when no pagination needed for developers - show when there are bugs */}
+          {!skeletonLoading &&
+            !loading &&
+            filteredBugs.length > 0 &&
+            totalPages <= 1 && (
+              <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                  <span className="text-sm sm:text-base text-foreground font-semibold">
+                    Showing{" "}
+                    <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalFiltered}
+                    </span>{" "}
+                    bugs
+                  </span>
+                </div>
+                <div className="flex items-center justify-center sm:justify-end gap-3">
+                  <label
+                    htmlFor="items-per-page-dev-simple"
+                    className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                  >
+                    Items per page:
+                  </label>
+                  <div className="relative group">
+                    <select
+                      id="items-per-page-dev-simple"
+                      value={itemsPerPage}
+                      onChange={(e) =>
+                        setItemsPerPage(Number(e.target.value))
+                      }
+                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                      aria-label="Items per page"
+                    >
+                      {[10, 25, 50].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                      <svg
+                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {/* Content for Developers */}
+          <div className="space-y-6 sm:space-y-8">
+            {skeletonLoading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : loading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : filteredBugs.length === 0 ? (
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <BugIcon className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Assigned</h3>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                    Great job! You currently have no bugs assigned to you. Check back later or ask your project admin for new assignments.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 grid-cols-1">
+                {paginatedBugs.map((bug) => (
+                  <BugCard key={bug.id} bug={bug} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Custom Fixes component that accepts initial parameters
+const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { projectId: string | undefined; initialTab: string | null; initialStatus: string | null }) => {
+  const { currentUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [bugs, setBugs] = useState<BugType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [skeletonLoading, setSkeletonLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus || "all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState(initialTab || "all-fixes");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalBugs, setTotalBugs] = useState(0);
+  const [fixedBugsCount, setFixedBugsCount] = useState(0);
+  
+  // Update activeTab when initialTab changes
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Sync activeTab with URL (back/forward navigation)
+  useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    let targetTab = "all-fixes";
+    
+    if (urlTab === "my-fixes" || urlTab === "all-fixes") {
+      targetTab = urlTab;
+    } else if (urlTab === "fixes") {
+      targetTab = "all-fixes";
+    }
+    
+    if (targetTab !== activeTab) setActiveTab(targetTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+  
+  // Fetch bugs data
+  useEffect(() => {
+    fetchBugs();
+  }, []);
+  
+  const fetchBugs = async () => {
+    try {
+      setLoading(true);
+      setSkeletonLoading(true);
+      
+      const data = await bugService.getBugs({
+        projectId: projectId,
+        page: 1,
+        limit: 1000,
+        status: "fixed",
+        userId: currentUser?.id,
+      });
+      setBugs(data.bugs);
+      setCurrentPage(data.pagination.currentPage);
+      setTotalBugs(data.pagination.totalBugs);
+      
+      // Calculate fixed bugs from all fetched bugs
+      const fixedCount = data.bugs.filter(
+        (bug) => bug.status === "fixed"
+      ).length;
+      setFixedBugsCount(fixedCount);
+      
+      setSkeletonLoading(false);
+    } catch (error) {
+      console.error("Error fetching fixed bugs:", error);
+      setBugs([]);
+      setSkeletonLoading(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Filter bugs based on active tab
+  const getFilteredBugs = () => {
+    let filteredByTab = bugs;
+    
+    if (currentUser?.role === "admin" || currentUser?.role === "tester") {
+      switch (activeTab) {
+        case "all-fixes":
+          filteredByTab = bugs;
+          break;
+        case "my-fixes":
+          filteredByTab = bugs.filter((bug) => {
+            return String(bug.reported_by) === String(currentUser.id);
+          });
+          break;
+        default:
+          filteredByTab = bugs;
+      }
+    }
+    
+    // Apply additional filters
+    return filteredByTab.filter((bug) => {
+      const matchesSearch =
+        bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        bug.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPriority =
+        priorityFilter === "all" || bug.priority === priorityFilter;
+      const matchesStatus =
+        statusFilter === "all" || bug.status === statusFilter;
+      const matchesProject =
+        projectFilter === "all" || bug.project_id === projectFilter;
+      // Only show fixed bugs in Fixes page
+      const isFixed = bug.status === "fixed";
+      return (
+        matchesSearch &&
+        matchesPriority &&
+        matchesStatus &&
+        matchesProject &&
+        isFixed
+      );
+    });
+  };
+  
+  const filteredBugs = getFilteredBugs();
+  const totalFiltered = filteredBugs.length;
+  const paginatedBugs = filteredBugs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+  
+  // Get tab-specific count
+  const getTabCount = (tabType: string) => {
+    const validStatuses = ["fixed"];
+    switch (tabType) {
+      case "all-fixes":
+        return bugs.filter((bug) => validStatuses.includes(bug.status)).length;
+      case "my-fixes":
+        return bugs.filter(
+          (bug) =>
+            bug.reported_by === currentUser?.id &&
+            validStatuses.includes(bug.status)
+        ).length;
+      default:
+        return 0;
+    }
+  };
+  
+  const canViewTabs = currentUser?.role === "admin" || currentUser?.role === "tester";
+  const isDeveloper = currentUser?.role === "developer";
+  const noBugs = !loading && filteredBugs.length === 0;
+  
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 bg-muted rounded animate-pulse"></div>
+        <div className="h-32 bg-muted rounded animate-pulse"></div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-6 sm:space-y-8">
+      {/* Professional Header */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-green-50/50 via-transparent to-emerald-50/50 dark:from-green-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
+        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+          <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
+                  <CheckCircle2 className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                    Fixes
+                  </h1>
+                  <div className="h-1 w-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full mt-2"></div>
+                </div>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                Track and manage fixed bugs across your projects
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800 rounded-xl shadow-sm">
+                  <div className="p-1.5 bg-green-500 rounded-lg">
+                    <CheckCircle2 className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                      {fixedBugsCount}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Admin Tabs or Regular Content */}
+      {canViewTabs && !skeletonLoading && !loading ? (
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(val) => {
+            setActiveTab(val);
+            setSearchParams((prev) => {
+              const p = new URLSearchParams(prev);
+              // Update the main tab parameter to reflect the internal tab
+              p.set("tab", val);
+              return p as any;
+            });
+          }} 
+          className="w-full"
+        >
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-green-50/50 dark:from-gray-800/50 dark:to-green-900/50 rounded-2xl"></div>
+            <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
+              <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
+                <TabsTrigger
+                  value="all-fixes"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">All Fixes</span>
+                  <span className="sm:hidden">All</span>
+                  <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
+                    {getTabCount("all-fixes")}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="my-fixes"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">My Fixes</span>
+                  <span className="sm:hidden">My</span>
+                  <span className="ml-2 px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full text-xs font-bold">
+                    {getTabCount("my-fixes")}
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
+
+          <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
+            {/* Search and Filter */}
+            {!skeletonLoading && !loading && (
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-green-50/30 dark:from-gray-800/30 dark:to-green-900/30 rounded-2xl"></div>
+                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-1.5 bg-green-500 rounded-lg">
+                        <Search className="h-4 w-4 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row gap-4">
+                      {/* Search Bar */}
+                      <div className="flex-1 relative group">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                        <input
+                          type="text"
+                          placeholder="Search fixes by title, description, or bug ID..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                        />
+                      </div>
+
+                      {/* Filter Controls */}
+                      <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                        {/* Status Filter */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                            <CheckCircle2 className="h-4 w-4 text-white" />
+                          </div>
+                          <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent position="popper" className="z-[60]">
+                              <SelectItem value="all">All Status</SelectItem>
+                              <SelectItem value="fixed">Fixed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Clear Filters Button */}
+                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearchTerm("");
+                              setPriorityFilter("all");
+                              setStatusFilter("all");
+                              setProjectFilter("all");
+                            }}
+                            className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Professional Responsive Pagination Controls - Show when there are fixes */}
+            {!skeletonLoading && !loading && filteredBugs.length > 0 && totalPages > 1 && (
+              <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                {/* Top Row - Results Info and Items Per Page */}
+                <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                    <span className="text-sm sm:text-base text-foreground font-semibold">
+                      Showing{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {(currentPage - 1) * itemsPerPage + 1}
+                      </span>
+                      -
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalFiltered}
+                      </span>{" "}
+                      fixes
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center sm:justify-end gap-3">
+                    <label
+                      htmlFor="items-per-page-fixes"
+                      className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                    >
+                      Items per page:
+                    </label>
+                    <div className="relative group">
+                      <select
+                        id="items-per-page-fixes"
+                        value={itemsPerPage}
+                        onChange={(e) =>
+                          setItemsPerPage(Number(e.target.value))
+                        }
+                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                        aria-label="Items per page"
+                      >
+                        {[10, 25, 50].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                        <svg
+                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row - Pagination Navigation */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+                  {/* Page Info for Mobile */}
+                  <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                    {/* Previous Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.max(1, p - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden text-lg">‹</span>
+                    </Button>
+
+                    {/* Page Numbers - Responsive Display */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Always show first page on larger screens */}
+                      <Button
+                        variant={currentPage === 1 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        1
+                      </Button>
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage > 4 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Dynamic page numbers based on current page - show more on larger screens */}
+                      {(() => {
+                        const pages = [];
+                        const start = Math.max(2, currentPage - 1);
+                        const end = Math.min(totalPages - 1, currentPage + 1);
+
+                        for (let i = start; i <= end; i++) {
+                          if (i > 1 && i < totalPages) {
+                            pages.push(i);
+                          }
+                        }
+
+                        return pages.map((page) => (
+                          <Button
+                            key={page}
+                            variant={
+                              currentPage === page ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                          >
+                            {page}
+                          </Button>
+                        ));
+                      })()}
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage < totalPages - 3 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Always show last page if more than 1 page on larger screens */}
+                      {totalPages > 1 && (
+                        <Button
+                          variant={
+                            currentPage === totalPages ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        >
+                          {totalPages}
+                        </Button>
+                      )}
+
+                      {/* Mobile-friendly page selector */}
+                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
+                        <select
+                          value={currentPage}
+                          onChange={(e) =>
+                            setCurrentPage(Number(e.target.value))
+                          }
+                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
+                          aria-label="Go to page"
+                        >
+                          {Array.from({ length: totalPages }, (_, i) => (
+                            <option key={i + 1} value={i + 1}>
+                              {i + 1}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm text-muted-foreground font-medium">
+                          {" "}
+                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                            {totalPages}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Next Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <span className="sm:hidden text-lg">›</span>
+                      <svg
+                        className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </Button>
+                  </div>
+
+                  {/* Page Info for Desktop */}
+                  <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Simple results info when no pagination needed - show when there are fixes */}
+            {!skeletonLoading && !loading && filteredBugs.length > 0 && totalPages <= 1 && (
+              <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                  <span className="text-sm sm:text-base text-foreground font-semibold">
+                    Showing{" "}
+                    <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalFiltered}
+                    </span>{" "}
+                    fixes
+                  </span>
+                </div>
+                <div className="flex items-center justify-center sm:justify-end gap-3">
+                  <label
+                    htmlFor="items-per-page-fixes-simple"
+                    className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                  >
+                    Items per page:
+                  </label>
+                  <div className="relative group">
+                    <select
+                      id="items-per-page-fixes-simple"
+                      value={itemsPerPage}
+                      onChange={(e) =>
+                        setItemsPerPage(Number(e.target.value))
+                      }
+                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                      aria-label="Items per page"
+                    >
+                      {[10, 25, 50].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                      <svg
+                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Content */}
+            {skeletonLoading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : loading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : filteredBugs.length === 0 ? (
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-emerald-50/30 to-teal-50/50 dark:from-green-950/20 dark:via-emerald-950/10 dark:to-teal-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <CheckCircle2 className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Fixes Found</h3>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                    No fixes match your current filters. Try adjusting your search criteria.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 grid-cols-1">
+                {paginatedBugs.map((bug) => (
+                  <BugCard key={bug.id} bug={bug} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <div className="space-y-6 sm:space-y-8">
+          {/* Search & Filter for Developers */}
+          {!skeletonLoading && !loading && (
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-green-50/30 dark:from-gray-800/30 dark:to-green-900/30 rounded-2xl"></div>
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-green-500 rounded-lg">
+                      <Search className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-4">
+                    {/* Search Bar */}
+                    <div className="flex-1 relative group">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                      <input
+                        type="text"
+                        placeholder="Search fixes by title, description, or bug ID..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      />
+                    </div>
+
+                    {/* Filter Controls */}
+                    <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                      {/* Status Filter */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                          <CheckCircle2 className="h-4 w-4 text-white" />
+                        </div>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                          <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="fixed">Fixed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Clear Filters Button */}
+                      {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearchTerm("");
+                            setPriorityFilter("all");
+                            setStatusFilter("all");
+                            setProjectFilter("all");
+                          }}
+                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Professional Responsive Pagination for Developers - Show when there are fixes and multiple pages */}
+          {!skeletonLoading &&
+            !loading &&
+            filteredBugs.length > 0 &&
+            totalPages > 1 && (
+              <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                {/* Top Row - Results Info and Items Per Page */}
+                <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                    <span className="text-sm sm:text-base text-foreground font-semibold">
+                      Showing{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {(currentPage - 1) * itemsPerPage + 1}
+                      </span>
+                      -
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalFiltered}
+                      </span>{" "}
+                      fixes
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center sm:justify-end gap-3">
+                    <label
+                      htmlFor="items-per-page-dev-fixes"
+                      className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                    >
+                      Items per page:
+                    </label>
+                    <div className="relative group">
+                      <select
+                        id="items-per-page-dev-fixes"
+                        value={itemsPerPage}
+                        onChange={(e) =>
+                          setItemsPerPage(Number(e.target.value))
+                        }
+                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                        aria-label="Items per page"
+                      >
+                        {[10, 25, 50].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                        <svg
+                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row - Pagination Navigation */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+                  {/* Page Info for Mobile */}
+                  <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                    {/* Previous Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.max(1, p - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden text-lg">‹</span>
+                    </Button>
+
+                    {/* Page Numbers - Responsive Display */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Always show first page on larger screens */}
+                      <Button
+                        variant={currentPage === 1 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        1
+                      </Button>
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage > 4 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Dynamic page numbers based on current page - show more on larger screens */}
+                      {(() => {
+                        const pages = [];
+                        const start = Math.max(2, currentPage - 1);
+                        const end = Math.min(totalPages - 1, currentPage + 1);
+
+                        for (let i = start; i <= end; i++) {
+                          if (i > 1 && i < totalPages) {
+                            pages.push(i);
+                          }
+                        }
+
+                        return pages.map((page) => (
+                          <Button
+                            key={page}
+                            variant={
+                              currentPage === page ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                          >
+                            {page}
+                          </Button>
+                        ));
+                      })()}
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage < totalPages - 3 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Always show last page if more than 1 page on larger screens */}
+                      {totalPages > 1 && (
+                        <Button
+                          variant={
+                            currentPage === totalPages ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        >
+                          {totalPages}
+                        </Button>
+                      )}
+
+                      {/* Mobile-friendly page selector */}
+                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
+                        <select
+                          value={currentPage}
+                          onChange={(e) =>
+                            setCurrentPage(Number(e.target.value))
+                          }
+                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
+                          aria-label="Go to page"
+                        >
+                          {Array.from({ length: totalPages }, (_, i) => (
+                            <option key={i + 1} value={i + 1}>
+                              {i + 1}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm text-muted-foreground font-medium">
+                          {" "}
+                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                            {totalPages}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Next Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <span className="sm:hidden text-lg">›</span>
+                      <svg
+                        className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </Button>
+                  </div>
+
+                  {/* Page Info for Desktop */}
+                  <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {/* Simple results info when no pagination needed for developers - show when there are fixes */}
+          {!skeletonLoading &&
+            !loading &&
+            filteredBugs.length > 0 &&
+            totalPages <= 1 && (
+              <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                  <span className="text-sm sm:text-base text-foreground font-semibold">
+                    Showing{" "}
+                    <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalFiltered}
+                    </span>{" "}
+                    fixes
+                  </span>
+                </div>
+                <div className="flex items-center justify-center sm:justify-end gap-3">
+                  <label
+                    htmlFor="items-per-page-dev-fixes-simple"
+                    className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                  >
+                    Items per page:
+                  </label>
+                  <div className="relative group">
+                    <select
+                      id="items-per-page-dev-fixes-simple"
+                      value={itemsPerPage}
+                      onChange={(e) =>
+                        setItemsPerPage(Number(e.target.value))
+                      }
+                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                      aria-label="Items per page"
+                    >
+                      {[10, 25, 50].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                      <svg
+                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {/* Content for Developers */}
+          <div className="space-y-6 sm:space-y-8">
+            {skeletonLoading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : loading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : filteredBugs.length === 0 ? (
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-emerald-50/30 to-teal-50/50 dark:from-green-950/20 dark:via-emerald-950/10 dark:to-teal-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <CheckCircle2 className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Fixes Assigned</h3>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                    Great job! You currently have no fixes assigned to you. Check back later or ask your project admin for new assignments.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 grid-cols-1">
+                {paginatedBugs.map((bug) => (
+                  <BugCard key={bug.id} bug={bug} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Custom Updates component that accepts initial parameters
+const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { projectId: string | undefined; initialTab: string | null; initialStatus: string | null }) => {
+  const { currentUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [updates, setUpdates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [skeletonLoading, setSkeletonLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [createdByFilter, setCreatedByFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState(initialTab || "all-updates");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalUpdates, setTotalUpdates] = useState(0);
+  const [allUpdatesCount, setAllUpdatesCount] = useState(0);
+  const [typeOpen, setTypeOpen] = useState(false);
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  
+  // Update activeTab when initialTab changes
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Sync activeTab with URL (back/forward navigation)
+  useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    let targetTab = "all-updates";
+    
+    if (urlTab === "my-updates" || urlTab === "all-updates") {
+      targetTab = urlTab;
+    } else if (urlTab === "updates") {
+      targetTab = "all-updates";
+    }
+    
+    if (targetTab !== activeTab) setActiveTab(targetTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+  
+  // Fetch updates data
+  useEffect(() => {
+    fetchUpdates();
+  }, []);
+  
+  const fetchUpdates = async () => {
+    try {
+      setLoading(true);
+      setSkeletonLoading(true);
+      
+      // Use actual API call to get project-specific updates
+      console.log("Fetching updates for project:", projectId);
+      const updatesData = await updateService.getUpdatesByProject(projectId || "");
+      console.log("Updates data received:", updatesData);
+      
+      setUpdates(updatesData);
+      setCurrentPage(1);
+      setTotalUpdates(updatesData.length);
+      setAllUpdatesCount(updatesData.length);
+      
+      setSkeletonLoading(false);
+    } catch (error) {
+      console.error("Error fetching updates:", error);
+      setUpdates([]);
+      setSkeletonLoading(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Filter updates based on active tab
+  const getFilteredUpdates = () => {
+    let filteredByTab = updates;
+    
+    if (currentUser?.role === "admin" || currentUser?.role === "tester") {
+      switch (activeTab) {
+        case "all-updates":
+          filteredByTab = updates;
+          break;
+        case "my-updates":
+          filteredByTab = updates.filter((update) => {
+            return String(update.created_by_id) === String(currentUser.id);
+          });
+          break;
+        default:
+          filteredByTab = updates;
+      }
+    }
+    
+    // Apply additional filters
+    return filteredByTab.filter((update) => {
+      const matchesSearch =
+        update.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        update.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = typeFilter === "all" || update.type === typeFilter;
+      const matchesCreatedBy = createdByFilter === "all" || update.created_by === createdByFilter;
+      const matchesProject = projectId === undefined || update.project_id === projectId; // Filter by project_id
+      return (
+        matchesSearch &&
+        matchesType &&
+        matchesCreatedBy &&
+        matchesProject
+      );
+    });
+  };
+  
+  const filteredUpdates = getFilteredUpdates();
+  const totalFiltered = filteredUpdates.length;
+  const paginatedUpdates = filteredUpdates.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+  
+  // Get tab-specific count
+  const getTabCount = (tabType: string) => {
+    switch (tabType) {
+      case "all-updates":
+        return updates.length;
+      case "my-updates":
+        return updates.filter(
+          (update) => update.created_by_id === currentUser?.id
+        ).length;
+      default:
+        return 0;
+    }
+  };
+  
+  const uniqueCreators = useMemo(() => {
+    const creators = updates
+      .map((update) => update.created_by)
+      .filter(Boolean)
+      .filter((creator, index, arr) => arr.indexOf(creator) === index);
+    return creators.sort();
+  }, [updates]);
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case "feature":
+        return "text-blue-500 border-blue-200 bg-blue-50 dark:text-blue-300 dark:border-blue-800 dark:bg-blue-950/30";
+      case "updation":
+        return "text-green-500 border-green-200 bg-green-50 dark:text-green-300 dark:border-green-800 dark:bg-green-950/30";
+      case "maintenance":
+        return "text-yellow-500 border-yellow-200 bg-yellow-50 dark:text-yellow-300 dark:border-yellow-800 dark:bg-yellow-950/30";
+      default:
+        return "";
+    }
+  };
+
+  const canViewTabs = currentUser?.role === "admin" || currentUser?.role === "tester";
+  const isDeveloper = currentUser?.role === "developer";
+  const noUpdates = !loading && filteredUpdates.length === 0;
+  
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 bg-muted rounded animate-pulse"></div>
+        <div className="h-32 bg-muted rounded animate-pulse"></div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-6 sm:space-y-8">
+      {/* Professional Header */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-indigo-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-indigo-950/20"></div>
+        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+          <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                  <Bell className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                    Updates
+                  </h1>
+                  <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full mt-2"></div>
+                </div>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                Track and manage project updates and announcements
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
+                  <div className="p-1.5 bg-blue-500 rounded-lg">
+                    <Bell className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                      {allUpdatesCount}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Admin Tabs or Regular Content */}
+      {canViewTabs && !skeletonLoading && !loading ? (
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(val) => {
+            setActiveTab(val);
+            setSearchParams((prev) => {
+              const p = new URLSearchParams(prev);
+              // Update the main tab parameter to reflect the internal tab
+              p.set("tab", val);
+              return p as any;
+            });
+          }} 
+          className="w-full"
+        >
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
+            <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
+              <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
+                <TabsTrigger
+                  value="all-updates"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <Bell className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">All Updates</span>
+                  <span className="sm:hidden">All</span>
+                  <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
+                    {getTabCount("all-updates")}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="my-updates"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">My Updates</span>
+                  <span className="sm:hidden">My</span>
+                  <span className="ml-2 px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-bold">
+                    {getTabCount("my-updates")}
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
+
+          <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
+            {/* Search and Filter */}
+            {!skeletonLoading && !loading && (
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-1.5 bg-blue-500 rounded-lg">
+                        <Search className="h-4 w-4 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row gap-4">
+                      {/* Search Bar */}
+                      <div className="flex-1 relative group">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                        <input
+                          type="text"
+                          placeholder="Search updates by title, description, or update ID..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                        />
+                      </div>
+
+                      {/* Filter Controls */}
+                      <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                        {/* Type Filter */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                            <Filter className="h-4 w-4 text-white" />
+                          </div>
+                          <Select
+                            open={typeOpen}
+                            onOpenChange={setTypeOpen}
+                            value={typeFilter}
+                            onValueChange={(v) => {
+                              setTypeFilter(v);
+                              setTypeOpen(false);
+                            }}
+                          >
+                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent position="popper" className="z-[60]">
+                              <SelectItem value="all">All Types</SelectItem>
+                              <SelectItem value="feature">Feature</SelectItem>
+                              <SelectItem value="updation">Updation</SelectItem>
+                              <SelectItem value="maintenance">Maintenance</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Created By Filter */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                            <User className="h-4 w-4 text-white" />
+                          </div>
+                          <Select
+                            open={creatorOpen}
+                            onOpenChange={setCreatorOpen}
+                            value={createdByFilter}
+                            onValueChange={(v) => {
+                              setCreatedByFilter(v);
+                              setCreatorOpen(false);
+                            }}
+                          >
+                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                              <SelectValue placeholder="Created By" />
+                            </SelectTrigger>
+                            <SelectContent position="popper" className="z-[60]">
+                              <SelectItem value="all">All Creators</SelectItem>
+                              {uniqueCreators.map((creator) => (
+                                <SelectItem key={creator} value={creator}>
+                                  {creator}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Clear Filters Button */}
+                        {(searchTerm || typeFilter !== "all" || createdByFilter !== "all") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearchTerm("");
+                              setTypeFilter("all");
+                              setCreatedByFilter("all");
+                            }}
+                            className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Professional Responsive Pagination Controls - Show when there are updates */}
+            {!skeletonLoading && !loading && filteredUpdates.length > 0 && totalPages > 1 && (
+              <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                {/* Top Row - Results Info and Items Per Page */}
+                <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                    <span className="text-sm sm:text-base text-foreground font-semibold">
+                      Showing{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {(currentPage - 1) * itemsPerPage + 1}
+                      </span>
+                      -
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                        {totalFiltered}
+                      </span>{" "}
+                      updates
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center sm:justify-end gap-3">
+                    <label
+                      htmlFor="items-per-page-updates"
+                      className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                    >
+                      Items per page:
+                    </label>
+                    <div className="relative group">
+                      <select
+                        id="items-per-page-updates"
+                        value={itemsPerPage}
+                        onChange={(e) =>
+                          setItemsPerPage(Number(e.target.value))
+                        }
+                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                        aria-label="Items per page"
+                      >
+                        {[10, 25, 50].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                        <svg
+                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row - Pagination Navigation */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 border-t border-border/30">
+                  {/* Page Info for Mobile */}
+                  <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                    {/* Previous Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.max(1, p - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden text-lg">‹</span>
+                    </Button>
+
+                    {/* Page Numbers - Responsive Display */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Always show first page on larger screens */}
+                      <Button
+                        variant={currentPage === 1 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        1
+                      </Button>
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage > 4 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Dynamic page numbers based on current page - show more on larger screens */}
+                      {(() => {
+                        const pages = [];
+                        const start = Math.max(2, currentPage - 1);
+                        const end = Math.min(totalPages - 1, currentPage + 1);
+
+                        for (let i = start; i <= end; i++) {
+                          if (i > 1 && i < totalPages) {
+                            pages.push(i);
+                          }
+                        }
+
+                        return pages.map((page) => (
+                          <Button
+                            key={page}
+                            variant={
+                              currentPage === page ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                          >
+                            {page}
+                          </Button>
+                        ));
+                      })()}
+
+                      {/* Show ellipsis if needed on larger screens */}
+                      {currentPage < totalPages - 3 && (
+                        <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                          •••
+                        </span>
+                      )}
+
+                      {/* Always show last page if more than 1 page on larger screens */}
+                      {totalPages > 1 && (
+                        <Button
+                          variant={
+                            currentPage === totalPages ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        >
+                          {totalPages}
+                        </Button>
+                      )}
+
+                      {/* Mobile-friendly page selector */}
+                      <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
+                        <select
+                          value={currentPage}
+                          onChange={(e) =>
+                            setCurrentPage(Number(e.target.value))
+                          }
+                          className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
+                          aria-label="Go to page"
+                        >
+                          {Array.from({ length: totalPages }, (_, i) => (
+                            <option key={i + 1} value={i + 1}>
+                              {i + 1}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm text-muted-foreground font-medium">
+                          {" "}
+                          <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                            {totalPages}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Next Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <span className="sm:hidden text-lg">›</span>
+                      <svg
+                        className="w-4 h-4 ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </Button>
+                  </div>
+
+                  {/* Page Info for Desktop */}
+                  <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                    <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
+                    Page{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {currentPage}
+                    </span>{" "}
+                    of{" "}
+                    <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalPages}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Simple results info when no pagination needed - show when there are updates */}
+            {!skeletonLoading && !loading && filteredUpdates.length > 0 && totalPages <= 1 && (
+              <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                  <span className="text-sm sm:text-base text-foreground font-semibold">
+                    Showing{" "}
+                    <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                      {totalFiltered}
+                    </span>{" "}
+                    updates
+                  </span>
+                </div>
+                <div className="flex items-center justify-center sm:justify-end gap-3">
+                  <label
+                    htmlFor="items-per-page-updates-simple"
+                    className="text-sm text-muted-foreground font-medium whitespace-nowrap"
+                  >
+                    Items per page:
+                  </label>
+                  <div className="relative group">
+                    <select
+                      id="items-per-page-updates-simple"
+                      value={itemsPerPage}
+                      onChange={(e) =>
+                        setItemsPerPage(Number(e.target.value))
+                      }
+                      className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
+                      aria-label="Items per page"
+                    >
+                      {[10, 25, 50].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
+                      <svg
+                        className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Content */}
+            {skeletonLoading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : loading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : filteredUpdates.length === 0 ? (
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <Bell className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Updates Found</h3>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                    No updates match your current filters. Try adjusting your search criteria.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Table for larger screens */}
+                <div className="hidden lg:block relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
+                  <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+                    <Table className="w-full table-fixed">
+                      <TableHeader className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900">
+                        <TableRow className="border-b border-gray-200/50 dark:border-gray-700/50">
+                          <TableHead className="w-[40%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Title
+                          </TableHead>
+                          <TableHead className="w-[20%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Type
+                          </TableHead>
+                          <TableHead className="w-[30%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Project
+                          </TableHead>
+                          <TableHead className="w-[10%] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedUpdates.map((update, index) => (
+                          <TableRow
+                            key={update.id}
+                            className={`group hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 transition-all duration-300 border-b border-gray-100/50 dark:border-gray-800/50 ${
+                              index % 2 === 0 ? 'bg-white/50 dark:bg-gray-900/50' : 'bg-gray-50/30 dark:bg-gray-800/30'
+                            }`}
+                          >
+                            <TableCell className="w-[40%] px-4 font-semibold text-sm sm:text-base text-gray-900 dark:text-white py-4 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                {update.title}
+                              </div>
+                            </TableCell>
+                            <TableCell className="w-[20%] px-4 py-4">
+                              <Badge
+                                variant="outline"
+                                className={`font-medium text-xs sm:text-sm px-2 py-1 rounded-full shadow-sm ${getTypeColor(
+                                  update.type
+                                )}`}
+                              >
+                                {update.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="w-[30%] px-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
+                              {update.project_name}
+                            </TableCell>
+                            <TableCell className="w-[10%] pr-4 text-right py-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="h-9 sm:h-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                              >
+                                <Link
+                                  to={
+                                    currentUser?.role
+                                      ? `/${currentUser.role}/updates/${update.id}?from=project`
+                                      : `/updates/${update.id}?from=project`
+                                  }
+                                >
+                                  View
+                                </Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {/* Card layout for mobile and tablets */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4 lg:hidden">
+                {paginatedUpdates.map((update) => (
+                  <Card
+                    key={update.id}
+                    className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex flex-col justify-between hover:shadow-2xl transition-all duration-300"
+                  >
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-emerald-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-emerald-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <CardHeader className="relative p-4 sm:p-5">
+                      <div className="flex justify-between items-start gap-3">
+                        <CardTitle className="text-base sm:text-lg font-bold leading-tight break-all flex-1">
+                          <Link
+                            to={
+                              currentUser?.role
+                                ? `/${currentUser.role}/updates/${update.id}`
+                                : `/updates/${update.id}`
+                            }
+                            className="hover:underline"
+                          >
+                            {update.title}
+                          </Link>
+                        </CardTitle>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs sm:text-sm h-fit shrink-0 px-2 py-1 rounded-full shadow-sm ${getTypeColor(
+                            update.type
+                          )}`}
+                        >
+                          {update.type}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="relative space-y-3 text-sm sm:text-base p-4 sm:p-5 pt-0">
+                      <div className="flex items-center text-muted-foreground">
+                        <Lock className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-primary/70" />{" "}
+                        Project:{" "}
+                        <span className="font-medium text-foreground ml-1">
+                          {update.project_name}
+                        </span>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex-col items-start gap-3 p-4 sm:p-5 pt-0">
+                      <div className="flex justify-end w-full gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          className="w-full h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                        >
+                          <Link
+                            to={
+                              currentUser?.role
+                                ? `/${currentUser.role}/updates/${update.id}`
+                                : `/updates/${update.id}`
+                            }
+                          >
+                            View
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardFooter>
+                  </Card>
+                ))}
+                </div>
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <div className="space-y-6 sm:space-y-8">
+          {/* Search & Filter for Developers */}
+          {!skeletonLoading && !loading && (
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-blue-500 rounded-lg">
+                      <Search className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-4">
+                    {/* Search Bar */}
+                    <div className="flex-1 relative group">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                      <input
+                        type="text"
+                        placeholder="Search updates by title, description, or update ID..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      />
+                    </div>
+
+                    {/* Filter Controls */}
+                    <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                      {/* Type Filter */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                          <Filter className="h-4 w-4 text-white" />
+                        </div>
+                        <Select
+                          open={typeOpen}
+                          onOpenChange={setTypeOpen}
+                          value={typeFilter}
+                          onValueChange={(v) => {
+                            setTypeFilter(v);
+                            setTypeOpen(false);
+                          }}
+                        >
+                          <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All Types</SelectItem>
+                            <SelectItem value="feature">Feature</SelectItem>
+                            <SelectItem value="updation">Updation</SelectItem>
+                            <SelectItem value="maintenance">Maintenance</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Created By Filter */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                          <User className="h-4 w-4 text-white" />
+                        </div>
+                        <Select
+                          open={creatorOpen}
+                          onOpenChange={setCreatorOpen}
+                          value={createdByFilter}
+                          onValueChange={(v) => {
+                            setCreatedByFilter(v);
+                            setCreatorOpen(false);
+                          }}
+                        >
+                          <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Created By" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All Creators</SelectItem>
+                            {uniqueCreators.map((creator) => (
+                              <SelectItem key={creator} value={creator}>
+                                {creator}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Clear Filters Button */}
+                      {(searchTerm || typeFilter !== "all" || createdByFilter !== "all") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearchTerm("");
+                            setTypeFilter("all");
+                            setCreatedByFilter("all");
+                          }}
+                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Content for Developers */}
+          <div className="space-y-6 sm:space-y-8">
+            {skeletonLoading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : loading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted rounded animate-pulse"></div>
+                <div className="h-32 bg-muted rounded animate-pulse"></div>
+              </div>
+            ) : filteredUpdates.length === 0 ? (
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <Bell className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Updates Available</h3>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                    There are currently no updates available. Check back later for new announcements.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Table for larger screens */}
+                <div className="hidden lg:block relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
+                  <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+                    <Table className="w-full table-fixed">
+                      <TableHeader className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900">
+                        <TableRow className="border-b border-gray-200/50 dark:border-gray-700/50">
+                          <TableHead className="w-[40%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Title
+                          </TableHead>
+                          <TableHead className="w-[20%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Type
+                          </TableHead>
+                          <TableHead className="w-[30%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Project
+                          </TableHead>
+                          <TableHead className="w-[10%] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedUpdates.map((update, index) => (
+                          <TableRow
+                            key={update.id}
+                            className={`group hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 transition-all duration-300 border-b border-gray-100/50 dark:border-gray-800/50 ${
+                              index % 2 === 0 ? 'bg-white/50 dark:bg-gray-900/50' : 'bg-gray-50/30 dark:bg-gray-800/30'
+                            }`}
+                          >
+                            <TableCell className="w-[40%] px-4 font-semibold text-sm sm:text-base text-gray-900 dark:text-white py-4 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                {update.title}
+                              </div>
+                            </TableCell>
+                            <TableCell className="w-[20%] px-4 py-4">
+                              <Badge
+                                variant="outline"
+                                className={`font-medium text-xs sm:text-sm px-2 py-1 rounded-full shadow-sm ${getTypeColor(
+                                  update.type
+                                )}`}
+                              >
+                                {update.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="w-[30%] px-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
+                              {update.project_name}
+                            </TableCell>
+                            <TableCell className="w-[10%] pr-4 text-right py-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="h-9 sm:h-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                              >
+                                <Link
+                                  to={
+                                    currentUser?.role
+                                      ? `/${currentUser.role}/updates/${update.id}?from=project`
+                                      : `/updates/${update.id}?from=project`
+                                  }
+                                >
+                                  View
+                                </Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {/* Card layout for mobile and tablets */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4 lg:hidden">
+                {paginatedUpdates.map((update) => (
+                  <Card
+                    key={update.id}
+                    className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex flex-col justify-between hover:shadow-2xl transition-all duration-300"
+                  >
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-emerald-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-emerald-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <CardHeader className="relative p-4 sm:p-5">
+                      <div className="flex justify-between items-start gap-3">
+                        <CardTitle className="text-base sm:text-lg font-bold leading-tight break-all flex-1">
+                          <Link
+                            to={
+                              currentUser?.role
+                                ? `/${currentUser.role}/updates/${update.id}`
+                                : `/updates/${update.id}`
+                            }
+                            className="hover:underline"
+                          >
+                            {update.title}
+                          </Link>
+                        </CardTitle>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs sm:text-sm h-fit shrink-0 px-2 py-1 rounded-full shadow-sm ${getTypeColor(
+                            update.type
+                          )}`}
+                        >
+                          {update.type}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="relative space-y-3 text-sm sm:text-base p-4 sm:p-5 pt-0">
+                      <div className="flex items-center text-muted-foreground">
+                        <Lock className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-primary/70" />{" "}
+                        Project:{" "}
+                        <span className="font-medium text-foreground ml-1">
+                          {update.project_name}
+                        </span>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex-col items-start gap-3 p-4 sm:p-5 pt-0">
+                      <div className="flex justify-end w-full gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          className="w-full h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                        >
+                          <Link
+                            to={
+                              currentUser?.role
+                                ? `/${currentUser.role}/updates/${update.id}`
+                                : `/updates/${update.id}`
+                            }
+                          >
+                            View
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardFooter>
+                  </Card>
+                ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ProjectDetails = () => {
   const { projectId } = useParams();
   const [project, setProject] = useState<Project | null>(null);
@@ -230,10 +3524,33 @@ const ProjectDetails = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") || "overview";
-  const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
   const { currentUser } = useAuth();
+  
+  const getDefaultTab = () => {
+    const urlTab = searchParams.get("tab");
+    if (urlTab) {
+      // Handle Bugs component internal tabs - keep them as is
+      if (urlTab === "my-bugs" || urlTab === "all-bugs") {
+        return "bugs";
+      }
+      // Handle Fixes component internal tabs - keep them as is
+      if (urlTab === "my-fixes" || urlTab === "all-fixes") {
+        return "fixes";
+      }
+      // Handle Updates component internal tabs - keep them as is
+      if (urlTab === "my-updates" || urlTab === "all-updates") {
+        return "updates";
+      }
+      return urlTab;
+    }
+    
+    // Set default tab based on user role
+    if (currentUser?.role === "tester") return "fixes";
+    if (currentUser?.role === "developer") return "bugs";
+    return "overview"; // default for admins
+  };
+  const [activeTab, setActiveTab] = useState(getDefaultTab());
   const { logMemberActivity, logProjectActivity } = useActivityLogger();
   const [availableMembers, setAvailableMembers] = useState<ProjectUser[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -264,8 +3581,35 @@ const ProjectDetails = () => {
 
   // Keep tab in sync with URL changes (back/forward navigation)
   useEffect(() => {
-    const urlTab = searchParams.get("tab") || "overview";
+    const urlTab = searchParams.get("tab");
+    
+    // Handle Bugs component internal tabs
+    if (urlTab === "my-bugs" || urlTab === "all-bugs") {
+      // These are internal tabs for the Bugs component, set main tab to "bugs"
+      if (activeTab !== "bugs") setActiveTab("bugs");
+    } else if (urlTab === "my-fixes" || urlTab === "all-fixes") {
+      // These are internal tabs for the Fixes component, set main tab to "fixes"
+      if (activeTab !== "fixes") setActiveTab("fixes");
+    } else if (urlTab === "my-updates" || urlTab === "all-updates") {
+      // These are internal tabs for the Updates component, set main tab to "updates"
+      if (activeTab !== "updates") setActiveTab("updates");
+    } else if (urlTab) {
+      // Regular main tabs
     if (urlTab !== activeTab) setActiveTab(urlTab);
+    } else {
+      // No tab in URL, use default
+      const defaultTab = getDefaultTab();
+      if (defaultTab !== activeTab) setActiveTab(defaultTab);
+    }
+    
+    // Remove status parameter from URL if it exists
+    if (searchParams.get("status")) {
+      setSearchParams((prev) => {
+        const newParams = new URLSearchParams(prev);
+        newParams.delete("status");
+        return newParams;
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -752,12 +4096,13 @@ const ProjectDetails = () => {
       </div>
 
       <Tabs
-        defaultValue="overview"
+        defaultValue={getDefaultTab()}
         value={activeTab}
         onValueChange={(val) => {
           setActiveTab(val);
           setSearchParams((prev) => {
             const p = new URLSearchParams(prev);
+            // Update main tab parameter for all tabs
             p.set("tab", val);
             return p as any;
           });
@@ -767,25 +4112,37 @@ const ProjectDetails = () => {
         <div className="relative mb-4">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-1 sm:p-2">
-            <TabsList className="flex w-full gap-1 sm:gap-2 md:gap-3 p-1 bg-transparent overflow-hidden">
-              <TabsTrigger value="overview" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm">
+            <TabsList className="flex w-full gap-1 sm:gap-2 md:gap-3 p-1 bg-transparent">
+              <TabsTrigger value="overview" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm cursor-pointer pointer-events-auto">
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="bugs" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm">
+              {/* Show Bugs tab for Admins and Developers */}
+              {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                <TabsTrigger value="bugs" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm cursor-pointer pointer-events-auto">
                 Bugs
               </TabsTrigger>
-              <TabsTrigger value="updates" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center">
+              )}
+              
+              {/* Show Fixes tab for Testers and Admins */}
+              {(currentUser?.role === "tester" || currentUser?.role === "admin") && (
+                <TabsTrigger value="fixes" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm cursor-pointer pointer-events-auto">
+                  Fixes
+              </TabsTrigger>
+              )}
+              <TabsTrigger value="updates" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto">
                 <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
                 <span className="truncate">Updates</span>
               </TabsTrigger>
-              <TabsTrigger value="tasks" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center">
-                <ListChecks className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
-                <span className="truncate">Tasks</span>
-                <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold flex-shrink-0">
+              {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                <TabsTrigger value="tasks" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto">
+                  <ListChecks className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                  <span className="truncate">Tasks</span>
+                  <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold flex-shrink-0">
                   {sharedTasks.length}
                 </span>
               </TabsTrigger>
-              <TabsTrigger value="members" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm">
+              )}
+              <TabsTrigger value="members" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm cursor-pointer pointer-events-auto">
                 Members
               </TabsTrigger>
             </TabsList>
@@ -839,6 +4196,7 @@ const ProjectDetails = () => {
             </Card>
           </div>
 
+          {currentUser?.role === "admin" && (
           <div className="mt-6">
             <ActivityList
               projectId={projectId}
@@ -848,371 +4206,38 @@ const ProjectDetails = () => {
               refreshInterval={30000}
             />
           </div>
+          )}
         </TabsContent>
 
         {/* Bugs Tab */}
         <TabsContent value="bugs">
-          <Card className="border shadow-sm">
-            <CardHeader className="pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <CardTitle className="text-lg">Project Bugs</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Select value={bugSort} onValueChange={setBugSort}>
-                    <SelectTrigger className="w-[170px] h-9 text-sm">
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="newest">Newest first</SelectItem>
-                      <SelectItem value="oldest">Oldest first</SelectItem>
-                      <SelectItem value="priority_high">Priority: High→Low</SelectItem>
-                      <SelectItem value="priority_low">Priority: Low→High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setBugSearch("");
-                      setBugStatus("pending");
-                      setBugPriority("all");
-                      setBugSort("newest");
-                      setBugPage(1);
-                      setBugPageSize(10);
-                    }}
-                  >
-                    Reset
-                  </Button>
+          <div className="w-full [&>main]:min-h-0 [&>main]:bg-transparent [&>main]:p-0 [&>main]:px-0 [&>main]:py-0 [&>main>section]:max-w-none [&>main>section]:mx-0 [&>main>section]:space-y-4 [&_.TabsList]:pointer-events-auto [&_.TabsTrigger]:pointer-events-auto [&_.TabsTrigger]:cursor-pointer">
+            <BugsWrapper />
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Filters */}
-              <div className="flex flex-col gap-3 w-full">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search by title or description..."
-                    value={bugSearch}
-                    onChange={(e) => setBugSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-sm"
-                  />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Select value={bugStatus} onValueChange={setBugStatus}>
-                    <SelectTrigger className="w-full sm:w-[160px] h-10 text-sm">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="fixed">Fixed</SelectItem>
-                      <SelectItem value="declined">Declined</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={bugPriority} onValueChange={setBugPriority}>
-                    <SelectTrigger className="w-full sm:w-[160px] h-10 text-sm">
-                      <SelectValue placeholder="Priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Priorities</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* List */}
-              {(() => {
-                // Filtering
-                let filtered = bugs.filter((b) => {
-                  const matchesSearch =
-                    b.title.toLowerCase().includes(bugSearch.toLowerCase()) ||
-                    b.description
-                      .toLowerCase()
-                      .includes(bugSearch.toLowerCase());
-                  const matchesStatus =
-                    bugStatus === "all" || b.status === bugStatus;
-                  const matchesPriority =
-                    bugPriority === "all" || b.priority === bugPriority;
-                  return matchesSearch && matchesStatus && matchesPriority;
-                });
-
-                // Sorting
-                const priorityRank: Record<string, number> = { high: 3, medium: 2, low: 1 };
-                filtered = filtered.slice().sort((a, b) => {
-                  switch (bugSort) {
-                    case "oldest":
-                      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-                    case "priority_high":
-                      return (priorityRank[b.priority] || 0) - (priorityRank[a.priority] || 0);
-                    case "priority_low":
-                      return (priorityRank[a.priority] || 0) - (priorityRank[b.priority] || 0);
-                    case "newest":
-                    default:
-                      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-                  }
-                });
-                const total = filtered.length;
-                const pageStart = (bugPage - 1) * bugPageSize;
-                const pageEnd = bugPage * bugPageSize;
-                const pageItems = filtered.slice(pageStart, pageEnd);
-
-                return (
-                  <>
-                    {total === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No bugs match your filters.
-                      </div>
-                    ) : (
-                      <div className="grid gap-4 grid-cols-1">
-                        {pageItems.map((bug) => (
-                          <BugCard key={bug.id} bug={bug} />
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Pagination */}
-                    {total > bugPageSize && (
-                      <div className="flex flex-col gap-3 pt-2">
-                        <div className="text-sm text-muted-foreground text-center sm:text-left">
-                          Showing {Math.min(pageStart + 1, total)}-
-                          {Math.min(pageEnd, total)} of {total}
-                        </div>
-                        <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                setBugPage((p) => Math.max(1, p - 1))
-                              }
-                              disabled={bugPage === 1}
-                            >
-                              Previous
-                            </Button>
-                            <Select
-                              value={String(bugPageSize)}
-                              onValueChange={(v) => setBugPageSize(Number(v))}
-                            >
-                              <SelectTrigger className="w-[110px] h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="10">10 / page</SelectItem>
-                                <SelectItem value="25">25 / page</SelectItem>
-                                <SelectItem value="50">50 / page</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                setBugPage((p) =>
-                                  Math.min(Math.ceil(total / bugPageSize), p + 1)
-                                )
-                              }
-                              disabled={bugPage >= Math.ceil(total / bugPageSize)}
-                            >
-                              Next
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </CardContent>
-          </Card>
         </TabsContent>
+
+        {/* Fixes Tab - for Testers and Admins */}
+        {(currentUser?.role === "tester" || currentUser?.role === "admin") && (
+          <TabsContent value="fixes">
+            <div className="w-full [&>main]:min-h-0 [&>main]:bg-transparent [&>main]:p-0 [&>main]:px-0 [&>main]:py-0 [&>main>section]:max-w-none [&>main>section]:mx-0 [&>main>section]:space-y-4 [&_.TabsList]:pointer-events-auto [&_.TabsTrigger]:pointer-events-auto [&_.TabsTrigger]:cursor-pointer">
+              <FixesWrapper />
+                      </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="updates">
-          <ProjectUpdates 
-            projectId={projectId!} 
-            projectName={project.name}
-            showCreateButton={true}
-          />
+          <div className="w-full [&>main]:min-h-0 [&>main]:bg-transparent [&>main]:p-0 [&>main]:px-0 [&>main]:py-0 [&>main>section]:max-w-none [&>main>section]:mx-0 [&>main>section]:space-y-4 [&_.TabsList]:pointer-events-auto [&_.TabsTrigger]:pointer-events-auto [&_.TabsTrigger]:cursor-pointer">
+            <UpdatesWrapper />
+                        </div>
         </TabsContent>
 
+        {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
         <TabsContent value="tasks">
-          <Card className="border shadow-sm">
-            <CardHeader className="pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <CardTitle className="text-lg">Project Shared Tasks</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={fetchProjectSharedTasks}
-                    disabled={tasksLoading}
-                  >
-                    {tasksLoading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Loading...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="h-4 w-4 mr-2" />
-                        Refresh
-                      </>
-                    )}
-                  </Button>
+            <div className="w-full [&>main]:min-h-0 [&>main]:bg-transparent [&>main]:p-0 [&>main]:px-0 [&>main]:py-0 [&>main>section]:max-w-none [&>main>section]:mx-0 [&>main>section]:space-y-4 [&_.TabsList]:pointer-events-auto [&_.TabsTrigger]:pointer-events-auto [&_.TabsTrigger]:cursor-pointer">
+              <MyTasks />
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {tasksLoading ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="border border-border rounded-lg p-4">
-                      <div className="space-y-3">
-                        <div className="h-4 bg-muted rounded animate-pulse"></div>
-                        <div className="h-3 bg-muted rounded animate-pulse w-3/4"></div>
-                        <div className="h-3 bg-muted rounded animate-pulse w-1/2"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : sharedTasks.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg mb-4">
-                    <ListChecks className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Shared Tasks</h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    This project doesn't have any shared tasks yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {sharedTasks.map((task) => (
-                    <motion.div
-                      key={task.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex flex-col p-5 shadow-sm hover:shadow-lg transition-all duration-200"
-                    >
-                      {/* Header */}
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div className="text-left flex-1 min-w-0">
-                          <h3 className="text-base font-semibold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors line-clamp-2">
-                            {task.title}
-                          </h3>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            task.status === 'approved' ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/20 dark:text-purple-400' :
-                            task.status === 'completed' ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' :
-                            task.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/20 dark:text-blue-400' :
-                            'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-400'
-                          }`}>
-                            {task.status.replace('_', ' ')}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      {task.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-4">
-                          {task.description}
-                        </p>
-                      )}
-
-                      {/* Task Details */}
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2 text-xs">
-                          <User className="h-3 w-3 text-blue-500" />
-                          <span className="text-gray-500 dark:text-gray-400">Created by:</span>
-                          <span className="font-medium text-gray-700 dark:text-gray-300">
-                            {task.created_by_name || 'Unknown'}
-                          </span>
-                        </div>
-                        <div className="flex items-start gap-2 text-xs">
-                          <Users className="h-3 w-3 text-purple-500 mt-0.5" />
-                          <span className="text-gray-500 dark:text-gray-400">Assigned to:</span>
-                          <div className="flex flex-wrap gap-1">
-                            {((task as any).assigned_to_names?.map((name: string, index: number) => {
-                              const isCompleted = (task as any).completed_assignee_names?.includes(name);
-                              return (
-                                <span
-                                  key={index}
-                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    isCompleted
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                                  }`}
-                                >
-                                  {name} {isCompleted && '✓'}
-                                </span>
-                              );
-                            }) || [(task as any).assigned_to_name || 'Unknown'].map((name: string) => (
-                              <span key={name} className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                {name}
-                              </span>
-                            )))}
-                          </div>
-                        </div>
-                        {task.due_date && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <Clock className="h-3 w-3 text-gray-400" />
-                            <span className="text-gray-500 dark:text-gray-400">Due:</span>
-                            <span className="font-medium text-gray-700 dark:text-gray-300">{task.due_date}</span>
-                          </div>
-                        )}
-                        {task.completed_at && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <CheckCircle2 className="h-3 w-3 text-green-500" />
-                            <span className="text-gray-500 dark:text-gray-400">Completed:</span>
-                            <span className="font-medium text-gray-700 dark:text-gray-300">
-                              {new Date(task.completed_at).toLocaleDateString()} {task.completed_by_name && `by ${task.completed_by_name}`}
-                            </span>
-                          </div>
-                        )}
-                        {task.approved_by_name && task.status === 'approved' && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <CheckCircle2 className="h-3 w-3 text-purple-500" />
-                            <span className="text-gray-500 dark:text-gray-400">Approved by:</span>
-                            <span className="font-medium text-gray-700 dark:text-gray-300">
-                              {task.approved_by_name}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="mt-auto flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 flex-1"
-                          >
-                            View Details
-                          </Button>
-                          {task.status !== 'completed' && task.status !== 'approved' && ((task as any).assigned_to_ids ? (task as any).assigned_to_ids.includes(currentUser?.id || '') : task.assigned_to === currentUser?.id) && (
-                            <Button 
-                              size="sm" 
-                              className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white flex-1"
-                            >
-                              Mark Complete
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+          </TabsContent>
+        )}
 
         <TabsContent value="members">
           <Card className="border shadow-sm">

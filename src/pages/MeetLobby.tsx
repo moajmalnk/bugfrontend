@@ -943,7 +943,7 @@ export default function MeetLobby() {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Professional video meetings for your development team
+                  Professional video meetings for your projects
                 </p>
               </div>
               

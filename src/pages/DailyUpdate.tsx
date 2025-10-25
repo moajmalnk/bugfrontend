@@ -326,7 +326,7 @@ export default function DailyUpdate() {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Track your daily progress, manage tasks efficiently
+                  Track your daily progress and efficiently
                 </p>
               </div>
               

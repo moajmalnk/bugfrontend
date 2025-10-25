@@ -120,7 +120,7 @@ const Messages = () => {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Stay connected with your team through real-time messaging and collaboration
+                  Stay connected with team through messaging
                 </p>
               </div>
               

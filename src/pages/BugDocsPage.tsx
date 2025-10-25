@@ -391,7 +391,7 @@ const BugDocsPage = () => {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Manage your Google Docs documents and templates
+                  Manage your Documents and templates
                 </p>
               </div>
               
@@ -439,14 +439,14 @@ const BugDocsPage = () => {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Google Docs Not Connected</h3>
               <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                Connect your Google account to create, manage, and collaborate on documents directly from BugRicer.
+                Connect your account to create, manage, and collaborate on documents directly from BugRicer.
               </p>
               <Button
                 onClick={handleConnectGoogleDocs}
                 className="h-12 px-8 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
                 <LinkIcon className="h-5 w-5 mr-2" />
-                Connect Google
+                Connect Account
                 <ExternalLink className="h-4 w-4 ml-2" />
               </Button>
             </div>

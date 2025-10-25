@@ -10,6 +10,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
+import { updateService } from "@/services/updateService";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, Undo2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -20,7 +21,6 @@ import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import { formatDetailedDate } from "@/lib/dateUtils";
 
-const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
 // Enhanced skeleton components for better loading experience
 const UpdateHeaderSkeleton = () => (
@@ -168,20 +168,7 @@ const UpdateDetails = () => {
 
   const { data: update, isLoading, isError, error, refetch, isFetching, isStale } = useQuery({
     queryKey: ["update", updateId],
-    queryFn: async () => {
-      const response = await fetch(`${API_BASE}/get.php?id=${updateId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      if (!response.ok) {
-        if (response.status === 403 || response.status === 404) {
-          throw new Error("Update not found or you do not have permission to view it.");
-        }
-        throw new Error("Failed to fetch update details.");
-      }
-      const data = await response.json();
-      if (data.success) return data.data;
-      throw new Error(data.message || "An unknown error occurred.");
-    },
+    queryFn: () => updateService.getUpdate(updateId),
     enabled: !!updateId,
     retry: 1,
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
@@ -200,13 +187,10 @@ const UpdateDetails = () => {
     let isMounted = true;
     setUpdateListLoading(true);
     
-    fetch(`${API_BASE}/getAll.php`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    })
-      .then((res) => res.json())
+    updateService.getUpdates()
       .then((data) => {
-        if (isMounted && data.success) {
-          setUpdateList(data.data || []);
+        if (isMounted) {
+          setUpdateList(data || []);
           setUpdateListLoading(false);
         }
       })
@@ -231,17 +215,17 @@ const UpdateDetails = () => {
   };
 
   const approveMutation = useMutation({
-    mutationFn: () => fetch(`${API_BASE}/approve.php?id=${updateId}`, { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then(res => res.json().then(data => { if (!data.success) throw new Error(data.message); return "Update approved successfully."; })),
+    mutationFn: () => updateService.approveUpdate(updateId),
     ...mutationOptions,
   });
 
   const declineMutation = useMutation({
-    mutationFn: () => fetch(`${API_BASE}/decline.php?id=${updateId}`, { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then(res => res.json().then(data => { if (!data.success) throw new Error(data.message); return "Update declined successfully."; })),
+    mutationFn: () => updateService.declineUpdate(updateId),
     ...mutationOptions,
   });
 
   const performActualDelete = useMutation({
-    mutationFn: () => fetch(`${API_BASE}/delete.php?id=${updateId}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then(res => res.json().then(data => { if (!data.success) throw new Error(data.message); return "Update deleted successfully."; })),
+    mutationFn: () => updateService.deleteUpdate(updateId),
     onSuccess: (successMessage) => {
       setIsDeletingUpdate(false);
       toast({ title: "Success", description: successMessage });
@@ -357,9 +341,23 @@ const UpdateDetails = () => {
           <div className="relative p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
               <div className="min-w-0">
-                <Button variant="ghost" onClick={() => navigate(-1)} className="mb-2 -ml-2 sm:-ml-4">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    if (fromProject) {
+                      // If coming from project, go back to the project updates tab
+                      const role = currentUser?.role || "admin";
+                      navigate(`/${role}/projects/${update?.project_id}?tab=updates`);
+                    } else {
+                      // Otherwise, go back to the updates page
+                      const role = currentUser?.role || "admin";
+                      navigate(`/${role}/updates`);
+                    }
+                  }} 
+                  className="mb-2 -ml-2 sm:-ml-4"
+                >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Updates
+                  {fromProject ? "Back to Project Updates" : "Back to Updates"}
                 </Button>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent truncate">
                   {update.title}

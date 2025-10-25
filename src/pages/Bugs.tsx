@@ -273,7 +273,7 @@ const Bugs = () => {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Track and manage pending bugs across your projects
+                  Track pending bugs across your projects
                 </p>
               </div>
               

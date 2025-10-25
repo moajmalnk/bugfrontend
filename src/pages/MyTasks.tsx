@@ -904,50 +904,85 @@ export default function MyTasks() {
 
                 {/* Card Actions */}
                 <div className="p-4 sm:p-5 border-t border-gray-200/50 dark:border-gray-700/50">
-                  <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => openDetails(t)} 
-                      className="h-8 px-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 min-w-0"
-                    >
-                      <span className="truncate">View</span>
-                    </Button>
-                    {t.status !== 'done' && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => markCompleted(t)} 
-                        className="h-8 px-2 text-xs bg-green-600 hover:bg-green-700 text-white min-w-0"
-                      >
-                        <span className="truncate">Complete</span>
-                      </Button>
-                    )}
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => openEdit(t)} 
-                      className="h-8 px-2 text-xs min-w-0"
-                    >
-                      <span className="truncate">Edit</span>
-                    </Button>
-                    {taskToDelete?.id === t.id && undoDeleteTask.isCountingDown ? (
-                      <div className="flex items-center justify-center gap-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-8">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                        <span className="text-xs font-medium text-red-700 dark:text-red-300">
-                          {undoDeleteTask.timeLeft}s
-                        </span>
+                  {(() => {
+                    const buttons = [
+                      {
+                        component: (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => openDetails(t)} 
+                            className="h-8 px-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 min-w-0"
+                          >
+                            <span className="truncate">View</span>
+                          </Button>
+                        )
+                      },
+                      ...(t.status !== 'done' ? [{
+                        component: (
+                          <Button 
+                            size="sm" 
+                            onClick={() => markCompleted(t)} 
+                            className="h-8 px-2 text-xs bg-green-600 hover:bg-green-700 text-white min-w-0"
+                          >
+                            <span className="truncate">Complete</span>
+                          </Button>
+                        )
+                      }] : []),
+                      {
+                        component: (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => openEdit(t)} 
+                            className="h-8 px-2 text-xs min-w-0"
+                          >
+                            <span className="truncate">Edit</span>
+                          </Button>
+                        )
+                      },
+                      {
+                        component: taskToDelete?.id === t.id && undoDeleteTask.isCountingDown ? (
+                          <div className="flex items-center justify-center gap-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-8">
+                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                            <span className="text-xs font-medium text-red-700 dark:text-red-300">
+                              {undoDeleteTask.timeLeft}s
+                            </span>
+                          </div>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => onDelete(t.id)} 
+                            className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 min-w-0"
+                          >
+                            <span className="truncate">Delete</span>
+                          </Button>
+                        )
+                      }
+                    ];
+
+                    const buttonCount = buttons.length;
+                    
+                    // Responsive grid layout based on button count
+                    const getGridClasses = () => {
+                      if (buttonCount === 1) return "grid grid-cols-1 gap-2";
+                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-2";
+                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2";
+                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-2";
+                      return "grid grid-cols-1 sm:grid-cols-2 gap-2";
+                    };
+
+                    return (
+                      <div className={getGridClasses()}>
+                        {buttons.map((button, index) => (
+                          <div key={index}>
+                            {button.component}
+                          </div>
+                        ))}
                       </div>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => onDelete(t.id)} 
-                        className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 min-w-0"
-                      >
-                        <span className="truncate">Delete</span>
-                      </Button>
-                    )}
-                  </div>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -1084,81 +1119,93 @@ export default function MyTasks() {
 
                   {/* Card Actions */}
                   <div className="p-4 sm:p-5 border-t border-gray-200/50 dark:border-gray-700/50">
-                    <div className="space-y-3">
-                      {/* Primary Actions */}
-                      <div className={`${t.created_by === currentUser?.id ? 'grid grid-cols-2' : 'grid grid-cols-1'} gap-2`}>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => openDetailsShared(t)} 
-                          className="h-8 px-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 min-w-0"
-                        >
-                          <span className="truncate">View</span>
-                        </Button>
-                        {t.created_by === currentUser?.id && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => openEditShared(t)} 
-                            className="h-8 px-2 text-xs border-green-200 text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20 min-w-0"
-                          >
-                            <span className="truncate">Edit</span>
-                          </Button>
-                        )}
-                      </div>
-                      
-                      {/* Secondary Actions */}
-                      <div className="flex flex-wrap gap-2">
-                        {t.status === 'completed' && t.created_by === currentUser?.id && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => uncompleteSharedTask(t)} 
-                            className="h-8 px-2 text-xs border-yellow-200 text-yellow-600 hover:bg-yellow-50 dark:border-yellow-800 dark:text-yellow-400 dark:hover:bg-yellow-900/20"
-                          >
-                            <Undo2 className="h-3 w-3 mr-1" />
-                            Uncomplete
-                          </Button>
-                        )}
-                        
-                        {t.status !== 'completed' && t.assigned_to === currentUser?.id && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => markSharedCompleted(t)} 
-                            className="h-8 px-2 text-xs border-green-200 text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20"
-                          >
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Complete
-                          </Button>
-                        )}
-                        
-                        {t.status === 'completed' && t.assigned_to === currentUser?.id && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => declineSharedTask(t)} 
-                            className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-                          >
-                            <X className="h-3 w-3 mr-1" />
-                            Decline
-                          </Button>
-                        )}
-                        
-                        {t.status === 'completed' && t.created_by === currentUser?.id && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => approveSharedTask(t)} 
-                            className="h-8 px-2 text-xs border-purple-200 text-purple-600 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400 dark:hover:bg-purple-900/20"
-                          >
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Approve
-                          </Button>
-                        )}
-                        
-                        {t.created_by === currentUser?.id && (
-                          sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
+                    {(() => {
+                      const buttons = [
+                        // View button (always present)
+                        {
+                          component: (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => openDetailsShared(t)} 
+                              className="h-8 px-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 min-w-0"
+                            >
+                              <span className="truncate">View</span>
+                            </Button>
+                          )
+                        },
+                        // Edit button (only for creator)
+                        ...(t.created_by === currentUser?.id ? [{
+                          component: (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => openEditShared(t)} 
+                              className="h-8 px-2 text-xs border-green-200 text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20 min-w-0"
+                            >
+                              <span className="truncate">Edit</span>
+                            </Button>
+                          )
+                        }] : []),
+                        // Uncomplete button (only for creator when completed)
+                        ...(t.status === 'completed' && t.created_by === currentUser?.id ? [{
+                          component: (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => uncompleteSharedTask(t)} 
+                              className="h-8 px-2 text-xs border-yellow-200 text-yellow-600 hover:bg-yellow-50 dark:border-yellow-800 dark:text-yellow-400 dark:hover:bg-yellow-900/20"
+                            >
+                              <Undo2 className="h-3 w-3 mr-1" />
+                              Uncomplete
+                            </Button>
+                          )
+                        }] : []),
+                        // Complete button (only for assignee when not completed)
+                        ...(t.status !== 'completed' && t.assigned_to === currentUser?.id ? [{
+                          component: (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => markSharedCompleted(t)} 
+                              className="h-8 px-2 text-xs border-green-200 text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20"
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Complete
+                            </Button>
+                          )
+                        }] : []),
+                        // Decline button (only for assignee when completed)
+                        ...(t.status === 'completed' && t.assigned_to === currentUser?.id ? [{
+                          component: (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => declineSharedTask(t)} 
+                              className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              Decline
+                            </Button>
+                          )
+                        }] : []),
+                        // Approve button (only for creator when completed)
+                        ...(t.status === 'completed' && t.created_by === currentUser?.id ? [{
+                          component: (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => approveSharedTask(t)} 
+                              className="h-8 px-2 text-xs border-purple-200 text-purple-600 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Approve
+                            </Button>
+                          )
+                        }] : []),
+                        // Delete button (only for creator)
+                        ...(t.created_by === currentUser?.id ? [{
+                          component: sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
                             <div className="flex items-center justify-center gap-2 px-3 py-1 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-8">
                               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
                               <span className="text-xs font-medium text-red-700 dark:text-red-300">
@@ -1176,9 +1223,30 @@ export default function MyTasks() {
                               Delete
                             </Button>
                           )
-                        )}
-                      </div>
-                    </div>
+                        }] : [])
+                      ];
+
+                      const buttonCount = buttons.length;
+                      
+                      // Responsive grid layout based on button count
+                      const getGridClasses = () => {
+                        if (buttonCount === 1) return "grid grid-cols-1 gap-2";
+                        if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-2";
+                        if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2";
+                        if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-2";
+                        return "grid grid-cols-1 sm:grid-cols-2 gap-2";
+                      };
+
+                      return (
+                        <div className={getGridClasses()}>
+                          {buttons.map((button, index) => (
+                            <div key={index}>
+                              {button.component}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))
@@ -1190,7 +1258,8 @@ export default function MyTasks() {
         {/* Professional Modal for Create/Edit Task */}
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
           <DialogContent 
-            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0"
+            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-2xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !ml-0"
+            style={{ marginLeft: '0 !important' }}
             aria-describedby="task-edit-description"
           >
             <DialogHeader className="relative">
@@ -1198,7 +1267,7 @@ export default function MyTasks() {
                 <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600">
                   <ListChecks className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-xl font-semibold">
+                <span className="text-lg sm:text-xl font-semibold">
                   {editing?.id ? 'Edit Task' : 'Create New Task'}
                 </span>
               </DialogTitle>
@@ -1344,24 +1413,24 @@ export default function MyTasks() {
                 </div>
               </div>
 
-              {/* Actions */}
+                {/* Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <Button 
                   onClick={onSave} 
                     disabled={submitting || !editing?.title?.trim()}
-                    className={`flex-1 h-10 sm:h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
+                    className={`flex-1 h-11 sm:h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
                       "bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white"
                     }`}
                   >
                     {submitting ? (
                       <>
-                        <Clock className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                        <span className="text-sm sm:text-base">Saving…</span>
+                        <Clock className="mr-2 h-4 w-4 animate-spin" />
+                        <span className="text-sm">Saving…</span>
                       </>
                     ) : (
                       <>
-                        <Plus className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="text-sm sm:text-base">{editing?.id ? 'Update Task' : 'Create Task'}</span>
+                        <Plus className="mr-2 h-4 w-4" />
+                        <span className="text-sm">{editing?.id ? 'Update Task' : 'Create Task'}</span>
                       </>
                     )}
                 </Button>
@@ -1373,7 +1442,8 @@ export default function MyTasks() {
         {/* Professional Detail Modal */}
         <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
           <DialogContent 
-            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0"
+            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-2xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !ml-0"
+            style={{ marginLeft: '0 !important' }}
             aria-describedby="task-detail-description"
           >
             <DialogHeader className="relative">
@@ -1381,7 +1451,7 @@ export default function MyTasks() {
                 <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600">
                   <ListChecks className="h-5 w-5 text-white" />
           </div>
-                <span className="text-xl font-semibold line-clamp-2">
+                <span className="text-lg sm:text-xl font-semibold line-clamp-2">
                   {selected?.title}
                 </span>
               </DialogTitle>
@@ -1499,36 +1569,68 @@ export default function MyTasks() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setDetailOpen(false);
-                      openEdit(selected);
-                    }} 
-                    className="h-11 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 order-2 sm:order-1"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Edit Task
-                  </Button>
-                  
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 order-1 sm:order-2">
-                    <Button variant="outline" onClick={() => setDetailOpen(false)} className="h-11 px-6">
-                      Close
-                    </Button>
-                    {selected.status !== 'done' && (
-                      <Button 
-                        onClick={async () => { 
-                          await markCompleted(selected); 
-                          setDetailOpen(false); 
-                        }} 
-                        className="h-11 px-6 bg-green-600 hover:bg-green-700 text-white"
-                      >
-                      Mark as Completed
-                    </Button>
-                  )}
-              </div>
-            </div>
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  {(() => {
+                    const buttons = [
+                      {
+                        component: (
+                          <Button 
+                            variant="outline" 
+                            onClick={() => {
+                              setDetailOpen(false);
+                              openEdit(selected);
+                            }} 
+                            className="h-11 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Edit Task
+                          </Button>
+                        )
+                      },
+                      {
+                        component: (
+                          <Button variant="outline" onClick={() => setDetailOpen(false)} className="h-11 px-6">
+                            Close
+                          </Button>
+                        )
+                      },
+                      ...(selected.status !== 'done' ? [{
+                        component: (
+                          <Button 
+                            onClick={async () => { 
+                              await markCompleted(selected); 
+                              setDetailOpen(false); 
+                            }} 
+                            className="h-11 px-6 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Mark as Completed
+                          </Button>
+                        )
+                      }] : [])
+                    ];
+
+                    const buttonCount = buttons.length;
+                    
+                    // Responsive grid layout based on button count
+                    const getGridClasses = () => {
+                      if (buttonCount === 1) return "grid grid-cols-1 gap-3";
+                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
+                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                      return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                    };
+
+                    return (
+                      <div className={getGridClasses()}>
+                        {buttons.map((button, index) => (
+                          <div key={index}>
+                            {button.component}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
           </div>
         )}
           </DialogContent>
@@ -1537,7 +1639,8 @@ export default function MyTasks() {
         {/* Professional Shared Task Creation/Edit Modal */}
         <Dialog open={sharedModalOpen} onOpenChange={setSharedModalOpen}>
           <DialogContent 
-            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0"
+            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-2xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !ml-0"
+            style={{ marginLeft: '0 !important' }}
             aria-describedby="shared-task-edit-description"
           >
             <DialogHeader className="relative">
@@ -1545,7 +1648,7 @@ export default function MyTasks() {
                 <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600">
                   <ListChecks className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-xl font-semibold">
+                <span className="text-lg sm:text-xl font-semibold">
                   {editingShared?.id ? 'Edit Shared Task' : 'Create New Shared Task'}
                       </span>
               </DialogTitle>
@@ -1620,13 +1723,11 @@ export default function MyTasks() {
                     <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Due Date
                     </Label>
-                  <Input
-                    id="edit-shared-task-due-date"
-                    type="date"
-                    value={editingShared?.due_date?.split('T')[0] || ''}
-                    onChange={(e) => setEditingShared({ ...editingShared, due_date: e.target.value } as SharedTask)}
-                    className="h-11"
-                  />
+                    <DatePicker
+                      value={editingShared?.due_date || ''}
+                      onChange={(value) => setEditingShared({ ...editingShared, due_date: value } as SharedTask)}
+                      placeholder="Select due date"
+                    />
                   </div>
 
                 {/* Priority */}
@@ -1655,19 +1756,19 @@ export default function MyTasks() {
                   <Button 
                     onClick={onSaveShared} 
                   disabled={submitting || !editingShared?.title?.trim() || !editingShared?.assigned_to}
-                  className={`flex-1 h-10 sm:h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
+                  className={`flex-1 h-11 sm:h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
                     "bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white"
                   }`}
                 >
                   {submitting ? (
                     <>
-                      <Clock className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                      <span className="text-sm sm:text-base">Saving…</span>
+                      <Clock className="mr-2 h-4 w-4 animate-spin" />
+                      <span className="text-sm">Saving…</span>
                     </>
                   ) : (
                     <>
-                      <Plus className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="text-sm sm:text-base">{editingShared?.id ? 'Update Task' : 'Create Task'}</span>
+                      <Plus className="mr-2 h-4 w-4" />
+                      <span className="text-sm">{editingShared?.id ? 'Update Task' : 'Create Task'}</span>
                     </>
                   )}
                   </Button>
@@ -1679,7 +1780,8 @@ export default function MyTasks() {
         {/* Professional Shared Task Detail Modal */}
         <Dialog open={sharedDetailOpen} onOpenChange={setSharedDetailOpen}>
           <DialogContent 
-            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0"
+            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-2xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !ml-0"
+            style={{ marginLeft: '0 !important' }}
             aria-describedby="shared-task-detail-description"
           >
             <DialogHeader className="relative">
@@ -1687,7 +1789,7 @@ export default function MyTasks() {
                 <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600">
                   <ListChecks className="h-5 w-5 text-white" />
             </div>
-                <span className="text-xl font-semibold line-clamp-2">
+                <span className="text-lg sm:text-xl font-semibold line-clamp-2">
                   {selectedShared?.title}
                 </span>
               </DialogTitle>
@@ -1805,69 +1907,106 @@ export default function MyTasks() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  {selectedShared.created_by === currentUser?.id && (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        setSharedDetailOpen(false);
-                        openEditShared(selectedShared);
-                      }} 
-                      className="h-11 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 order-2 sm:order-1"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Edit Task
-                    </Button>
-                  )}
-                  
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 order-1 sm:order-2">
-                    <Button variant="outline" onClick={() => setSharedDetailOpen(false)} className="h-11 px-6">
-                      Close
-                    </Button>
-                    {selectedShared.status !== 'completed' && selectedShared.status !== 'approved' && selectedShared.assigned_to === currentUser?.id && (
-                      <Button 
-                        onClick={async () => { 
-                          await markSharedCompleted(selectedShared); 
-                          setSharedDetailOpen(false); 
-                        }} 
-                        className="h-11 px-6 bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        Mark as Completed
-                      </Button>
-                    )}
-                    {selectedShared.status === 'completed' && selectedShared.created_by === currentUser?.id && (
-                      <Button 
-                        onClick={async () => { 
-                          await approveSharedTask(selectedShared); 
-                          setSharedDetailOpen(false); 
-                        }} 
-                        className="h-11 px-6 bg-purple-600 hover:bg-purple-700 text-white"
-                      >
-                        Approve Task
-                      </Button>
-                    )}
-                    {selectedShared.created_by === currentUser?.id && (
-                      sharedTaskToDelete?.id === selectedShared.id && undoDeleteSharedTask.isCountingDown ? (
-                        <div className="flex items-center justify-center gap-2 px-6 py-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11">
-                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                          <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                            Deleting in {undoDeleteSharedTask.timeLeft}s
-                          </span>
-                        </div>
-                      ) : (
-                        <Button 
-                          variant="outline"
-                          onClick={async () => { 
-                            await onDeleteShared(selectedShared.id); 
-                            setSharedDetailOpen(false); 
-                          }} 
-                          className="h-11 px-6 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-                        >
-                          Delete
-                        </Button>
-                      )
-                    )}
-                  </div>
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  {(() => {
+                    const buttons = [
+                      // Close button (always present)
+                      {
+                        component: (
+                          <Button variant="outline" onClick={() => setSharedDetailOpen(false)} className="h-11 px-6">
+                            Close
+                          </Button>
+                        )
+                      },
+                      // Edit button (only for creator)
+                      ...(selectedShared.created_by === currentUser?.id ? [{
+                        component: (
+                          <Button 
+                            variant="outline" 
+                            onClick={() => {
+                              setSharedDetailOpen(false);
+                              openEditShared(selectedShared);
+                            }} 
+                            className="h-11 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Edit Task
+                          </Button>
+                        )
+                      }] : []),
+                      // Complete button (only for assignee when not completed/approved)
+                      ...(selectedShared.status !== 'completed' && selectedShared.status !== 'approved' && selectedShared.assigned_to === currentUser?.id ? [{
+                        component: (
+                          <Button 
+                            onClick={async () => { 
+                              await markSharedCompleted(selectedShared); 
+                              setSharedDetailOpen(false); 
+                            }} 
+                            className="h-11 px-6 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Mark as Completed
+                          </Button>
+                        )
+                      }] : []),
+                      // Approve button (only for creator when completed)
+                      ...(selectedShared.status === 'completed' && selectedShared.created_by === currentUser?.id ? [{
+                        component: (
+                          <Button 
+                            onClick={async () => { 
+                              await approveSharedTask(selectedShared); 
+                              setSharedDetailOpen(false); 
+                            }} 
+                            className="h-11 px-6 bg-purple-600 hover:bg-purple-700 text-white"
+                          >
+                            Approve Task
+                          </Button>
+                        )
+                      }] : []),
+                      // Delete button (only for creator)
+                      ...(selectedShared.created_by === currentUser?.id ? [{
+                        component: selectedShared.id && undoDeleteSharedTask.isCountingDown && sharedTaskToDelete?.id === selectedShared.id ? (
+                          <div className="flex items-center justify-center gap-2 px-6 py-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11">
+                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                            <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                              Deleting in {undoDeleteSharedTask.timeLeft}s
+                            </span>
+                          </div>
+                        ) : (
+                          <Button 
+                            variant="outline"
+                            onClick={async () => { 
+                              await onDeleteShared(selectedShared.id); 
+                              setSharedDetailOpen(false); 
+                            }} 
+                            className="h-11 px-6 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                          >
+                            Delete
+                          </Button>
+                        )
+                      }] : [])
+                    ];
+
+                    const buttonCount = buttons.length;
+                    
+                    // Responsive grid layout based on button count
+                    const getGridClasses = () => {
+                      if (buttonCount === 1) return "grid grid-cols-1 gap-3";
+                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
+                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                      return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                    };
+
+                    return (
+                      <div className={getGridClasses()}>
+                        {buttons.map((button, index) => (
+                          <div key={index}>
+                            {button.component}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}

@@ -367,7 +367,7 @@ const Users = () => {
                 </div>
               </div>
               <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                Manage your team members and their access levels
+                Manage team members and their roles
               </p>
             </div>
 
@@ -1003,10 +1003,10 @@ const Users = () => {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Manage your team members and their access levels
+                  Manage team members and their roles
                 </p>
               </div>
-
+    
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 <div className="shrink-0 group">
                   <AddUserDialog onUserAdd={handleAddUser} />
