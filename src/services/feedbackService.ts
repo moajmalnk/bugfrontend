@@ -18,6 +18,7 @@ export interface FeedbackStats {
     text_feedback_count: number | string;
   };
   recent_feedback: Array<{
+    id: string;
     rating: number;
     feedback_text: string | null;
     submitted_at: string;
@@ -196,6 +197,35 @@ class FeedbackService {
       console.error('Error checking feedback status:', error);
       // If there's an error, don't show feedback to avoid spamming
       return false;
+    }
+  }
+
+  /**
+   * Delete feedback (admin only)
+   */
+  async deleteFeedback(feedbackId: string): Promise<void> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/delete.php?id=${feedbackId}`,
+        {
+          method: 'DELETE',
+          headers: this.getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to delete feedback');
+      }
+    } catch (error) {
+      console.error('Error deleting feedback:', error);
+      throw error;
     }
   }
 

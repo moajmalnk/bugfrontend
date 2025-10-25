@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { feedbackService, type FeedbackStats } from '@/services/feedbackService';
 import { toast } from '@/hooks/use-toast';
+import { useUndoDelete } from '@/hooks/useUndoDelete';
 import { 
   Star, 
   Users, 
@@ -17,7 +18,8 @@ import {
   ThumbsUp,
   Heart,
   Lock,
-  BarChart3
+  BarChart3,
+  Trash2
 } from 'lucide-react';
 
 const RATING_EMOJIS = ['😠', '😢', '😐', '😊', '🤩'];
@@ -27,6 +29,48 @@ export default function FeedbackStats() {
   const { currentUser } = useAuth();
   const [stats, setStats] = useState<FeedbackStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [feedbackToDelete, setFeedbackToDelete] = useState<string | null>(null);
+
+  // Undo delete hook
+  const {
+    isCountingDown,
+    timeLeft,
+    startCountdown,
+    cancelCountdown,
+    confirmDelete: confirmDeleteFeedback,
+  } = useUndoDelete({
+    duration: 10,
+    onConfirm: async () => {
+      if (feedbackToDelete) {
+        try {
+          await feedbackService.deleteFeedback(feedbackToDelete);
+          toast({
+            title: 'Feedback Deleted',
+            description: 'The feedback has been permanently deleted.',
+            variant: 'default',
+          });
+          // Refresh stats
+          fetchStats();
+        } catch (error) {
+          console.error('Error deleting feedback:', error);
+          toast({
+            title: 'Delete Failed',
+            description: 'Failed to delete the feedback. Please try again.',
+            variant: 'destructive',
+          });
+        }
+        setFeedbackToDelete(null);
+      }
+    },
+    onUndo: () => {
+      toast({
+        title: 'Delete Cancelled',
+        description: 'The feedback deletion has been cancelled.',
+        variant: 'default',
+      });
+      setFeedbackToDelete(null);
+    },
+  });
 
   // Check if user is admin
   if (currentUser?.role !== 'admin') {
@@ -65,6 +109,26 @@ export default function FeedbackStats() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDeleteClick = (feedbackId: string) => {
+    setFeedbackToDelete(feedbackId);
+    startCountdown();
+    toast({
+      title: 'Feedback Deletion Started',
+      description: `Feedback will be deleted in ${timeLeft} seconds. Click "Undo" to cancel.`,
+      variant: 'default',
+      action: (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={cancelCountdown}
+          className="text-xs"
+        >
+          Undo ({timeLeft}s)
+        </Button>
+      ),
+    });
   };
 
   useEffect(() => {
@@ -367,7 +431,7 @@ export default function FeedbackStats() {
               ) : (
                 <div className="space-y-4">
                   {recent_feedback.map((feedback, index) => (
-                    <div key={index} className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm hover:shadow-lg transition-all duration-300 p-5">
+                    <div key={feedback.id} className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm hover:shadow-lg transition-all duration-300 p-5">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-2">
@@ -384,8 +448,19 @@ export default function FeedbackStats() {
                             </Badge>
                           </div>
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                          {new Date(feedback.submitted_at).toLocaleDateString()}
+                        <div className="flex items-center gap-3">
+                          <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                            {new Date(feedback.submitted_at).toLocaleDateString()}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteClick(feedback.id)}
+                            className="h-8 px-3 text-xs font-medium bg-white dark:bg-gray-800 border-red-200 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 hover:shadow-md"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
                         </div>
                       </div>
                       

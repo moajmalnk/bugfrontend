@@ -6,9 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { activityService, Activity, ActivityResponse } from '@/services/activityService';
 import { useToast } from '@/components/ui/use-toast';
-import { Clock, RefreshCw, ChevronLeft, ChevronRight, Activity as ActivityIcon, Eye } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { Clock, RefreshCw, ChevronLeft, ChevronRight, Activity as ActivityIcon, Eye, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ActivityDetailsModal from './ActivityDetailsModal';
+import { useUndoDelete } from '@/hooks/useUndoDelete';
 
 interface ActivityListProps {
   projectId?: string;
@@ -40,7 +42,9 @@ const ActivityItem: React.FC<{
   activity: Activity; 
   index: number; 
   onShowDetails: (activity: Activity) => void;
-}> = ({ activity, index, onShowDetails }) => {
+  onDeleteClick: (activity: Activity) => void;
+  isAdmin: boolean;
+}> = ({ activity, index, onShowDetails, onDeleteClick, isAdmin }) => {
   const typeInfo = activityService.getActivityTypeInfo(activity.type);
   const formattedDescription = activityService.formatActivityDescription(activity);
 
@@ -91,30 +95,44 @@ const ActivityItem: React.FC<{
               </Badge>
             </div>
             
-            {/* Mobile: Full-width View button at bottom */}
-            <div className="block sm:hidden">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onShowDetails(activity)}
-                className="w-full h-8 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                View Details
-              </Button>
-            </div>
-            
-            {/* Desktop: Compact button */}
-            <div className="hidden sm:block">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onShowDetails(activity)}
-                className="h-7 px-3 text-xs border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 text-blue-600 dark:text-blue-400 transition-all duration-200"
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                View
-              </Button>
+            <div className="flex items-center gap-2">
+              {/* Mobile: Full-width View button at bottom */}
+              <div className="block sm:hidden">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onShowDetails(activity)}
+                  className="w-full h-8 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  View Details
+                </Button>
+              </div>
+              
+              {/* Desktop: Compact buttons */}
+              <div className="hidden sm:flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onShowDetails(activity)}
+                  className="h-7 px-3 text-xs border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 text-blue-600 dark:text-blue-400 transition-all duration-200"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  View
+                </Button>
+                
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDeleteClick(activity)}
+                    className="h-7 px-3 text-xs border border-red-200 dark:border-red-700 bg-white/50 dark:bg-gray-800/50 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 text-red-600 dark:text-red-400 transition-all duration-200"
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Delete
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -131,6 +149,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({
   refreshInterval = 30000,
   className = ''
 }) => {
+  const { currentUser } = useAuth();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -139,7 +158,52 @@ export const ActivityList: React.FC<ActivityListProps> = ({
   const [hasMore, setHasMore] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activityToDelete, setActivityToDelete] = useState<Activity | null>(null);
   const { toast } = useToast();
+
+  // Check if current user is admin
+  const isAdmin = currentUser?.role === 'admin';
+
+  // Undo delete hook
+  const {
+    isCountingDown,
+    timeLeft,
+    startCountdown,
+    cancelCountdown,
+    confirmDelete: confirmDeleteActivity,
+  } = useUndoDelete({
+    duration: 10,
+    onConfirm: async () => {
+      if (activityToDelete) {
+        try {
+          await activityService.deleteActivity(activityToDelete.id);
+          toast({
+            title: 'Activity Deleted',
+            description: 'The activity has been permanently deleted.',
+            variant: 'default',
+          });
+          // Refresh activities list
+          fetchActivities(currentPage, true);
+        } catch (error) {
+          console.error('Error deleting activity:', error);
+          toast({
+            title: 'Delete Failed',
+            description: 'Failed to delete the activity. Please try again.',
+            variant: 'destructive',
+          });
+        }
+        setActivityToDelete(null);
+      }
+    },
+    onUndo: () => {
+      toast({
+        title: 'Delete Cancelled',
+        description: 'The activity deletion has been cancelled.',
+        variant: 'default',
+      });
+      setActivityToDelete(null);
+    },
+  });
 
   const fetchActivities = useCallback(async (page: number = 0, showRefresh: boolean = false) => {
     try {
@@ -206,6 +270,26 @@ export const ActivityList: React.FC<ActivityListProps> = ({
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedActivity(null);
+  };
+
+  const handleDeleteClick = (activity: Activity) => {
+    setActivityToDelete(activity);
+    startCountdown();
+    toast({
+      title: 'Activity Deletion Started',
+      description: `Activity will be deleted in ${timeLeft} seconds. Click "Undo" to cancel.`,
+      variant: 'default',
+      action: (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={cancelCountdown}
+          className="text-xs"
+        >
+          Undo ({timeLeft}s)
+        </Button>
+      ),
+    });
   };
 
   const totalPages = Math.ceil(totalActivities / limit);
@@ -300,6 +384,8 @@ export const ActivityList: React.FC<ActivityListProps> = ({
                     activity={activity} 
                     index={index} 
                     onShowDetails={handleShowDetails}
+                    onDeleteClick={handleDeleteClick}
+                    isAdmin={isAdmin}
                   />
                 ))}
               </motion.div>

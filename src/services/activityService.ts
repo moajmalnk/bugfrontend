@@ -542,6 +542,35 @@ class ActivityService {
   }
 
   /**
+   * Delete an activity (admin only)
+   */
+  async deleteActivity(activityId: number): Promise<void> {
+    try {
+      const response = await fetch(
+        `${ENV.API_URL}/activities/delete_activity.php?id=${activityId}`,
+        {
+          method: 'DELETE',
+          headers: this.getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to delete activity');
+      }
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Format activity description for display
    */
   formatActivityDescription(activity: Activity): string {

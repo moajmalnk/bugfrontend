@@ -22,9 +22,11 @@ import {
   Clock,
   User,
   FolderOpen,
+  Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ActivityDetailsModal from '@/components/activities/ActivityDetailsModal';
+import { useUndoDelete } from '@/hooks/useUndoDelete';
 
 // Enhanced Activity Item Skeleton
 const ActivityItemSkeleton = () => (
@@ -45,7 +47,13 @@ const ActivityItemSkeleton = () => (
 );
 
 // Enhanced Activity Item Component
-const ActivityItem: React.FC<{ activity: Activity; index: number; onDetailsClick: (activity: Activity) => void }> = ({ activity, index, onDetailsClick }) => {
+const ActivityItem: React.FC<{ 
+  activity: Activity; 
+  index: number; 
+  onDetailsClick: (activity: Activity) => void;
+  onDeleteClick: (activity: Activity) => void;
+  isAdmin: boolean;
+}> = ({ activity, index, onDetailsClick, onDeleteClick, isAdmin }) => {
   const typeInfo = activityService.getActivityTypeInfo(activity.type);
   const formattedDescription = activityService.formatActivityDescription(activity);
 
@@ -100,14 +108,28 @@ const ActivityItem: React.FC<{ activity: Activity; index: number; onDetailsClick
             </Badge>
           </div>
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onDetailsClick(activity)}
-            className="h-8 px-3 text-xs font-medium bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 hover:shadow-md"
-          >
-            View
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onDetailsClick(activity)}
+              className="h-8 px-3 text-xs font-medium bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 hover:shadow-md"
+            >
+              View
+            </Button>
+            
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDeleteClick(activity)}
+                className="h-8 px-3 text-xs font-medium bg-white dark:bg-gray-800 border-red-200 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 hover:shadow-md"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Delete
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>
@@ -149,6 +171,51 @@ const Activity = () => {
   const [userOwnActivityCount, setUserOwnActivityCount] = useState(0);
   const [hasNewActivities, setHasNewActivities] = useState(false);
   const [lastActivityCount, setLastActivityCount] = useState(0);
+  const [activityToDelete, setActivityToDelete] = useState<Activity | null>(null);
+
+  // Check if current user is admin
+  const isAdmin = currentUser?.role === 'admin';
+
+  // Undo delete hook
+  const {
+    isCountingDown,
+    timeLeft,
+    startCountdown,
+    cancelCountdown,
+    confirmDelete: confirmDeleteActivity,
+  } = useUndoDelete({
+    duration: 10,
+    onConfirm: async () => {
+      if (activityToDelete) {
+        try {
+          await activityService.deleteActivity(activityToDelete.id);
+          toast({
+            title: 'Activity Deleted',
+            description: 'The activity has been permanently deleted.',
+            variant: 'default',
+          });
+          // Refresh activities list
+          fetchActivities(currentPage, true);
+        } catch (error) {
+          console.error('Error deleting activity:', error);
+          toast({
+            title: 'Delete Failed',
+            description: 'Failed to delete the activity. Please try again.',
+            variant: 'destructive',
+          });
+        }
+        setActivityToDelete(null);
+      }
+    },
+    onUndo: () => {
+      toast({
+        title: 'Delete Cancelled',
+        description: 'The activity deletion has been cancelled.',
+        variant: 'default',
+      });
+      setActivityToDelete(null);
+    },
+  });
 
   const fetchActivities = useCallback(async (page: number = 1, showRefresh: boolean = false) => {
     try {
@@ -278,6 +345,26 @@ const Activity = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedActivity(null);
+  };
+
+  const handleDeleteClick = (activity: Activity) => {
+    setActivityToDelete(activity);
+    startCountdown();
+    toast({
+      title: 'Activity Deletion Started',
+      description: `Activity will be deleted in ${timeLeft} seconds. Click "Undo" to cancel.`,
+      variant: 'default',
+      action: (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={cancelCountdown}
+          className="text-xs"
+        >
+          Undo ({timeLeft}s)
+        </Button>
+      ),
+    });
   };
 
   // Reset current page when filters change
@@ -923,6 +1010,8 @@ const Activity = () => {
                             activity={activity} 
                             index={index} 
                             onDetailsClick={handleDetailsClick}
+                            onDeleteClick={handleDeleteClick}
+                            isAdmin={isAdmin}
                           />
                         ))}
                       </motion.div>
