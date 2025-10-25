@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -54,9 +55,12 @@ import {
   Bug,
   BugIcon,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
+  Calendar,
   Clock,
   Code,
+  FileText,
   Filter,
   ListChecks,
   Lock,
@@ -232,6 +236,110 @@ const MemberCard = ({
             )}
           </div>
         </CardContent>
+      </Card>
+    </motion.div>
+  );
+};
+
+const TaskCard = ({ task, onView }: { task: SharedTask; onView: (task: SharedTask) => void }) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300";
+      case "in_progress":
+        return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300";
+      case "pending":
+        return "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-300";
+      default:
+        return "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <CheckCircle2 className="h-4 w-4" />;
+      case "in_progress":
+        return <Clock className="h-4 w-4" />;
+      case "pending":
+        return <AlertCircle className="h-4 w-4" />;
+      default:
+        return <AlertCircle className="h-4 w-4" />;
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card className="group relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300 h-full">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-yellow-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-yellow-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <CardHeader className="relative p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h4 className="font-semibold text-gray-900 dark:text-white truncate mb-1">
+                {task.title}
+              </h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                {task.description}
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              <Badge
+                variant="outline"
+                className={`text-xs font-medium flex items-center gap-1 ${getStatusColor(task.status)}`}
+              >
+                {getStatusIcon(task.status)}
+                {task.status.replace("_", " ")}
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="relative p-4 pt-0">
+          <div className="space-y-3">
+            {task.assigned_to_name && (
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <User className="h-4 w-4" />
+                <span className="truncate">Assigned to: {task.assigned_to_name}</span>
+              </div>
+            )}
+            {task.due_date && (
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <Clock className="h-4 w-4" />
+                <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+              </div>
+            )}
+            {task.priority && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Priority:</span>
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${
+                    task.priority === "high"
+                      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+                      : task.priority === "medium"
+                      ? "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-300"
+                      : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300"
+                  }`}
+                >
+                  {task.priority}
+                </Badge>
+              </div>
+            )}
+          </div>
+        </CardContent>
+        <CardFooter className="relative p-4 pt-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onView(task)}
+            className="w-full h-8 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+          >
+            <span className="truncate">View</span>
+          </Button>
+        </CardFooter>
       </Card>
     </motion.div>
   );
@@ -3562,6 +3670,19 @@ const ProjectDetails = () => {
     "all"
   );
   const [isAdding, setIsAdding] = useState(false);
+  // Member tab state management
+  const [activeMemberTab, setActiveMemberTab] = useState<"developers" | "testers" | "admins">(() => {
+    if (currentUser?.role === "admin") return "developers";
+    if (currentUser?.role === "developer") return "admins";
+    if (currentUser?.role === "tester") return "admins";
+    return "developers";
+  });
+  // Task tab state management
+  const [activeTaskTab, setActiveTaskTab] = useState<"all-tasks" | "my-tasks">("all-tasks");
+  const [taskSearchQuery, setTaskSearchQuery] = useState("");
+  const [taskStatusFilter, setTaskStatusFilter] = useState<string>("all");
+  const [taskDetailOpen, setTaskDetailOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<SharedTask | null>(null);
   // Bugs tab filters and pagination (sync with URL)
   const [bugSearch, setBugSearch] = useState(searchParams.get("q") || "");
   const [bugStatus, setBugStatus] = useState<string>(searchParams.get("status") || "pending");
@@ -3999,6 +4120,24 @@ const ProjectDetails = () => {
       )
     : [];
 
+  // Task filtering helper function
+  const getFilteredTasks = () => {
+    return sharedTasks.filter((task) => {
+      const matchesSearch = !taskSearchQuery || 
+        task.title?.toLowerCase().includes(taskSearchQuery.toLowerCase()) ||
+        task.description?.toLowerCase().includes(taskSearchQuery.toLowerCase()) ||
+        task.assigned_to_name?.toLowerCase().includes(taskSearchQuery.toLowerCase());
+      const matchesStatus = taskStatusFilter === "all" || task.status === taskStatusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  };
+
+  // Task detail functions
+  const openTaskDetails = (task: SharedTask) => {
+    setSelectedTask(task);
+    setTaskDetailOpen(true);
+  };
+
   // Render skeleton loading UI
   if (isLoading) {
     return (
@@ -4233,20 +4372,473 @@ const ProjectDetails = () => {
 
         {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
         <TabsContent value="tasks">
-            <div className="w-full [&>main]:min-h-0 [&>main]:bg-transparent [&>main]:p-0 [&>main]:px-0 [&>main]:py-0 [&>main>section]:max-w-none [&>main>section]:mx-0 [&>main>section]:space-y-4 [&_.TabsList]:pointer-events-auto [&_.TabsTrigger]:pointer-events-auto [&_.TabsTrigger]:cursor-pointer">
-              <MyTasks />
+          <div className="space-y-6 sm:space-y-8">
+            {/* Tasks Header */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-yellow-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-yellow-950/20"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg">
+                        <ListChecks className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
+                          Tasks
+                        </h2>
+                        <div className="h-1 w-16 bg-gradient-to-r from-orange-600 to-yellow-600 rounded-full mt-1"></div>
+                      </div>
+                    </div>
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
+                      Manage and track project tasks and assignments
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-r from-orange-500 to-yellow-600 rounded-xl p-3 shadow-lg">
+                      <ListChecks className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                        {sharedTasks.length}
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                        Total Tasks
+                      </div>
+                    </div>
+                  </div>
                 </div>
-          </TabsContent>
+              </div>
+            </div>
+
+            {/* Internal Tabs */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30"></div>
+              <div className="relative p-2">
+                <div className="flex gap-1">
+                  <button 
+                    onClick={() => setActiveTaskTab("all-tasks")}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
+                      activeTaskTab === "all-tasks" 
+                        ? "bg-gradient-to-r from-orange-500 to-yellow-600 text-white shadow-lg" 
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <ListChecks className="h-4 w-4 sm:h-5 sm:w-5" />
+                    All Tasks
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                      activeTaskTab === "all-tasks"
+                        ? "bg-white/20 text-white"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    }`}>
+                      {sharedTasks.length}
+                    </span>
+                  </button>
+                  <button 
+                    onClick={() => setActiveTaskTab("my-tasks")}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
+                      activeTaskTab === "my-tasks" 
+                        ? "bg-gradient-to-r from-orange-500 to-yellow-600 text-white shadow-lg" 
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                    My Tasks
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                      activeTaskTab === "my-tasks"
+                        ? "bg-white/20 text-white"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    }`}>
+                      {sharedTasks.filter(task => task.assigned_to === currentUser?.id).length}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Search & Filter */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                    <Search className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                  <input
+                    type="text"
+                        placeholder="Search tasks by title, description, or assignee..."
+                        value={taskSearchQuery}
+                        onChange={(e) => setTaskSearchQuery(e.target.value)}
+                        className="w-full h-11 pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200"
+                      />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      {taskSearchQuery && (
+                        <button
+                          onClick={() => setTaskSearchQuery("")}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                </div>
+                  </div>
+                  <div className="sm:w-48">
+                    <div className="relative">
+                      <select
+                        value={taskStatusFilter}
+                        onChange={(e) => setTaskStatusFilter(e.target.value)}
+                        className="w-full h-11 pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200 appearance-none"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                      <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+                </div>
+              </div>
+
+            {/* Tasks Content */}
+            <div className="space-y-6">
+              {/* All Tasks Tab Content */}
+              {activeTaskTab === "all-tasks" && (
+                <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-orange-50/30 to-yellow-50/30 dark:from-orange-900/30 dark:to-yellow-900/30"></div>
+                  <div className="relative p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg">
+                          <ListChecks className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">All Tasks</h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">All project tasks and assignments</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                          {getFilteredTasks().length}
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">Total Tasks</div>
+                      </div>
+                    </div>
+
+                    {getFilteredTasks().length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <ListChecks className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Tasks Found</h4>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {taskSearchQuery ? "No tasks match your search criteria." : "No tasks have been created for this project yet."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {getFilteredTasks().map((task) => (
+                          <TaskCard key={task.id} task={task} onView={openTaskDetails} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                      </div>
+                    )}
+
+              {/* My Tasks Tab Content */}
+              {activeTaskTab === "my-tasks" && (
+                <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/30 to-indigo-50/30 dark:from-blue-900/30 dark:to-indigo-900/30"></div>
+                  <div className="relative p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                          <User className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">My Tasks</h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Tasks assigned to you</p>
+                          </div>
+                        </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                          {getFilteredTasks().filter(task => task.assigned_to === currentUser?.id).length}
+                      </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">My Tasks</div>
+                      </div>
+                    </div>
+
+                    {getFilteredTasks().filter(task => task.assigned_to === currentUser?.id).length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <User className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Tasks Assigned</h4>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {taskSearchQuery ? "No assigned tasks match your search criteria." : "You don't have any tasks assigned to you yet."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {getFilteredTasks().filter(task => task.assigned_to === currentUser?.id).map((task) => (
+                          <TaskCard key={task.id} task={task} onView={openTaskDetails} />
+                        ))}
+                      </div>
+                    )}
+                </div>
+              </div>
+              )}
+                      </div>
+                    </div>
+        </TabsContent>
         )}
 
         <TabsContent value="members">
-          <Card className="border shadow-sm">
-            <CardHeader className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 pb-4">
+          <div className="space-y-6 sm:space-y-8">
+            {/* Members Header */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-purple-50/50 via-transparent to-pink-50/50 dark:from-purple-950/20 dark:via-transparent dark:to-pink-950/20"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                        <Users className="h-6 w-6 text-white" />
+                </div>
+                      <div>
+                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
+                          Members
+                        </h2>
+                        <div className="h-1 w-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full mt-1"></div>
+                  </div>
+                    </div>
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
+                      Manage project team members and their roles
+                  </p>
+                </div>
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-3 shadow-lg">
+                      <Users className="h-6 w-6 text-white" />
+                        </div>
+                    <div className="text-right">
+                      <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                        {members.length + admins.length}
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                        Total Members
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                        </div>
+                      </div>
+
+            {/* Internal Tabs - Role-based visibility with state management */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-purple-50/30 dark:from-gray-800/30 dark:to-purple-900/30"></div>
+              <div className="relative p-2">
+                <div className="flex gap-1">
+                  {/* Admins see: Developers and Testers */}
+                  {currentUser?.role === "admin" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveMemberTab("developers")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
+                          activeMemberTab === "developers" 
+                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <Code className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Developers
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          activeMemberTab === "developers"
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        }`}>
+                          {members.filter(m => m.role === "developer").length}
+                        </span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveMemberTab("testers")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
+                          activeMemberTab === "testers" 
+                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <TestTube className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Testers
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          activeMemberTab === "testers"
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        }`}>
+                          {members.filter(m => m.role === "tester").length}
+                        </span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* Developers see: Admins and Testers */}
+                  {currentUser?.role === "developer" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveMemberTab("admins")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
+                          activeMemberTab === "admins" 
+                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Admins
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          activeMemberTab === "admins"
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        }`}>
+                          {admins.length}
+                          </span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveMemberTab("testers")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
+                          activeMemberTab === "testers" 
+                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <TestTube className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Testers
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          activeMemberTab === "testers"
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        }`}>
+                          {members.filter(m => m.role === "tester").length}
+                                </span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* Testers see: Admins and Developers */}
+                  {currentUser?.role === "tester" && (
+                    <>
+                      <button 
+                        onClick={() => setActiveMemberTab("admins")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
+                          activeMemberTab === "admins" 
+                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Admins
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          activeMemberTab === "admins"
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        }`}>
+                          {admins.length}
+                              </span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveMemberTab("developers")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
+                          activeMemberTab === "developers" 
+                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <Code className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Developers
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          activeMemberTab === "developers"
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        }`}>
+                          {members.filter(m => m.role === "developer").length}
+                        </span>
+                      </button>
+                    </>
+                  )}
+                          </div>
+                        </div>
+                          </div>
+
+            {/* Search & Filter */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-purple-50/30 dark:from-gray-800/30 dark:to-purple-900/30"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                    <Search className="h-4 w-4 text-white" />
+                          </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                          </div>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search members by name, email, or role..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full h-11 pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200"
+                      />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery("")}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                        )}
+                      </div>
+                  </div>
+                  <div className="sm:w-48">
+                    <div className="relative">
+                      <select
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value as any)}
+                        className="w-full h-11 pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200 appearance-none"
+                      >
+                        <option value="all">All Roles</option>
+                        <option value="developer">Developers</option>
+                        <option value="tester">Testers</option>
+                      </select>
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                        </div>
+                      </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Add Members Section (Admin Only) */}
               {currentUser?.role === "admin" && (
-                <div className="flex flex-col gap-3 w-full">
-                  <div className="w-full border border-border/60 rounded-lg p-3 bg-muted/10">
+              <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/30 to-cyan-50/30 dark:from-blue-900/30 dark:to-cyan-900/30"></div>
+                <div className="relative p-4 sm:p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                      <Plus className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Members</h3>
+                  </div>
+                  
                     {/* Selected users as chips */}
-                    <div className="flex flex-wrap gap-2 mb-2 max-h-24 overflow-auto">
+                  <div className="flex flex-wrap gap-2 mb-4 max-h-24 overflow-auto">
                       {selectedUsers.map((id) => {
                         const u = availableMembers.find((m) => m.id === id);
                         if (!u) return null;
@@ -4285,9 +4877,9 @@ const ProjectDetails = () => {
                     </div>
 
                     {/* Single-select to add more users */}
-                    <div className="relative">
+                  <div className="relative mb-4">
                       <select
-                        className="appearance-none w-full border rounded-lg px-3 py-2 pr-10 bg-background focus:ring-2 focus:ring-primary/30 focus:border-primary focus:outline-none transition-all duration-200 text-sm"
+                      className="appearance-none w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 pr-10 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none transition-all duration-200 text-sm"
                         value=""
                         onChange={(e) => {
                           const value = e.target.value;
@@ -4323,14 +4915,12 @@ const ProjectDetails = () => {
                           ))}
                       </select>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Pick a user to add; they appear above. Remove with the
-                        ×.
+                      Pick a user to add; they appear above. Remove with the ×.
                       </p>
-                    </div>
                   </div>
 
-                  {/* Actions row under the selector */}
-                  <div className="w-full flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 sm:justify-between">
+                  {/* Actions row */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 sm:justify-between">
                     {/* Badges on the left */}
                     <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm flex-1">
                       <span className="px-2 py-1 rounded-md border bg-muted/40">
@@ -4385,115 +4975,298 @@ const ProjectDetails = () => {
                         </Button>
                       )}
                     </div>
+                    </div>
                   </div>
                 </div>
               )}
-            </CardHeader>
 
-            <CardContent className="space-y-6">
-              <div className="flex flex-col gap-3 w-full">
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    placeholder="Search members..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-10 border border-border rounded-md pl-10 pr-10 py-2 
-                    focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none 
-                    shadow-sm hover:border-primary/50 transition-all duration-200 
-                    bg-background/50 backdrop-blur-sm text-sm"
-                  />
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">
-                    <Search className="h-4 w-4" />
+            {/* Members List - Professional tab-based content */}
+            <div className="space-y-6">
+              {/* Developers Tab Content */}
+              {activeMemberTab === "developers" && (
+                <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/30 to-indigo-50/30 dark:from-blue-900/30 dark:to-indigo-900/30"></div>
+                  <div className="relative p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                          <Code className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Developers</h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Team members responsible for development</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                          {members.filter(m => m.role === "developer").length}
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">Total Developers</div>
+                      </div>
+                    </div>
+
+                    {members.filter(m => m.role === "developer").length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Code className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Developers Found</h4>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {searchQuery ? "No developers match your search criteria." : "No developers have been assigned to this project yet."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {members.filter(m => m.role === "developer").map((developer) => (
+                          <MemberCard
+                            key={developer.id}
+                            member={developer}
+                            onRemove={handleRemoveMember}
+                          />
+                        ))}
                   </div>
-                  {searchQuery && (
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 w-6 p-0 rounded-full opacity-70 hover:opacity-100"
-                        onClick={() => setSearchQuery("")}
-                      >
-                        <X className="h-3 w-3" />
-                        <span className="sr-only">Clear search</span>
-                      </Button>
+                    )}
+                  </div>
                     </div>
                   )}
+
+              {/* Testers Tab Content */}
+              {activeMemberTab === "testers" && (
+                <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-green-900/30 dark:to-emerald-900/30"></div>
+                  <div className="relative p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                          <TestTube className="h-5 w-5 text-white" />
                 </div>
-                <div className="relative w-full sm:w-[220px]">
-                  <select
-                    aria-label="Filter by role"
-                    value={roleFilter}
-                    onChange={(e) => setRoleFilter(e.target.value as any)}
-                    className="appearance-none w-full h-10 border rounded-md px-3 pr-8 bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-                  >
-                    <option value="all">All roles</option>
-                    <option value="developer">Developers</option>
-                    <option value="tester">Testers</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-muted-foreground">
-                    <svg
-                      className="w-4 h-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Testers</h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Team members responsible for quality assurance</p>
                   </div>
+                </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                          {members.filter(m => m.role === "tester").length}
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">Total Testers</div>
                 </div>
               </div>
 
+                    {members.filter(m => m.role === "tester").length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <TestTube className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Testers Found</h4>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {searchQuery ? "No testers match your search criteria." : "No testers have been assigned to this project yet."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {members.filter(m => m.role === "tester").map((tester) => (
+                          <MemberCard
+                            key={tester.id}
+                            member={tester}
+                            onRemove={handleRemoveMember}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Admins Tab Content */}
+              {activeMemberTab === "admins" && (
+                <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-purple-50/30 to-indigo-50/30 dark:from-purple-900/30 dark:to-indigo-900/30"></div>
+                  <div className="relative p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                          <Shield className="h-5 w-5 text-white" />
+                        </div>
               <div>
-                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 flex items-center">
-                  <Shield className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 text-blue-600" />
-                  Administrators
-                  <span className="ml-2 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground">
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Administrators</h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Project administrators with full access</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
                     {filteredAdmins.length}
-                  </span>
-                </h3>
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">Total Admins</div>
+                      </div>
+                    </div>
 
-                {filteredAdmins.length === 0 && (
-                  <p className="text-muted-foreground text-xs sm:text-sm italic">
-                    {searchQuery
-                      ? "No administrators match your search."
-                      : "No administrators assigned."}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-3">
+                    {filteredAdmins.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Shield className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Administrators Found</h4>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {searchQuery ? "No administrators match your search criteria." : "No administrators have been assigned to this project yet."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredAdmins.map((admin) => (
                     <MemberCard key={admin.id} member={admin} isAdmin={true} />
                   ))}
                 </div>
+                    )}
               </div>
-
-              <div>
-                {filteredMembers.length === 0 && (
-                  <p className="text-muted-foreground text-xs sm:text-sm italic">
-                    {searchQuery
-                      ? "No members match your search."
-                      : "No members assigned to this project yet."}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-3">
-                  {filteredMembers.map((member) => (
-                    <MemberCard
-                      key={member.id}
-                      member={member}
-                      onRemove={handleRemoveMember}
-                    />
-                  ))}
+                </div>
+              )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Task Detail Modal */}
+      <Dialog open={taskDetailOpen} onOpenChange={setTaskDetailOpen}>
+        <DialogContent 
+          className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-2xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !ml-0"
+          style={{ marginLeft: '0 !important' }}
+          aria-describedby="task-detail-description"
+        >
+          <DialogHeader className="relative">
+            <DialogTitle className="flex items-center gap-3 pr-12">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500 to-yellow-600">
+                <ListChecks className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-lg sm:text-xl font-semibold line-clamp-2">
+                {selectedTask?.title}
+              </span>
+            </DialogTitle>
+            <p id="task-detail-description" className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              View detailed information about this task including status, priority, and progress.
+            </p>
+            <Button
+              onClick={() => setTaskDetailOpen(false)}
+              variant="ghost"
+              size="sm"
+              className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogHeader>
+
+          {selectedTask && (
+            <div className="space-y-6">
+              {/* Status and Priority Badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge 
+                  variant="outline" 
+                  className={`capitalize text-xs ${
+                    selectedTask.status === 'completed' ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' :
+                    selectedTask.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/20 dark:text-blue-400' :
+                    selectedTask.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                    'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-400'
+                  }`}
+                >
+                  {selectedTask.status.replace('_', ' ')}
+                </Badge>
+                <Badge 
+                  variant="outline" 
+                  className={`capitalize text-xs ${
+                    selectedTask.priority === 'high' ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/20 dark:text-red-400' :
+                    selectedTask.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                    'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400'
+                  }`}
+                >
+                  {selectedTask.priority || 'medium'} priority
+                </Badge>
+              </div>
+
+              {/* Description Section */}
+              {selectedTask.description && (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="p-1.5 bg-orange-600 rounded-lg">
+                      <FileText className="h-4 w-4 text-white" />
+                    </div>
+                    Description
+                  </h3>
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                    <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                      {selectedTask.description}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Task Information Grid */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <div className="p-1.5 bg-yellow-600 rounded-lg">
+                    <ListChecks className="h-4 w-4 text-white" />
+                  </div>
+                  Task Information
+                </h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                        <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <span className="text-gray-600 dark:text-gray-400">Created:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {new Date(selectedTask.created_at || '').toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                        <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </div>
+                      <span className="text-gray-600 dark:text-gray-400">Due Date:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleDateString() : 'No due date'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                        <User className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <span className="text-gray-600 dark:text-gray-400">Assigned to:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {selectedTask.assigned_to_name || 'Unassigned'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                        <ListChecks className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <span className="text-gray-600 dark:text-gray-400">Priority:</span>
+                      <span className="font-medium text-gray-900 dark:text-white capitalize">
+                        {selectedTask.priority || 'medium'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Button variant="outline" onClick={() => setTaskDetailOpen(false)} className="h-11 px-6">
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -804,117 +804,137 @@ export default function MyTasks() {
           </div>
         </div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+        {/* Tasks Grid with Enhanced Professional Design */}
+        <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
           {myLoading
             ? Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-48 rounded-xl" />
+                <Skeleton key={i} className="h-48 rounded-2xl" />
               ))
             : itemsFiltered(items, myFilter.q).length === 0
             ? (
               <div className="col-span-full relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
-                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-                    <Clock className="h-10 w-10 text-white" />
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-10 sm:p-12 text-center">
+                  <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <Clock className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Tasks</h3>
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">No Tasks</h3>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
                     Create your first task to get started.
                   </p>
-                  <Button onClick={openCreate} className="h-11 px-6 bg-gradient-to-r from-blue-600 to-emerald-600 text-white">New Task</Button>
+                  <Button onClick={openCreate} className="h-10 sm:h-11 px-6 sm:px-8 bg-gradient-to-r from-blue-600 to-emerald-600 text-white">New Task</Button>
                 </div>
               </div>
             )
-            : itemsFiltered(items, myFilter.q).map((t) => (
-              <div key={t.id ?? Math.random()} className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex flex-col shadow-sm hover:shadow-lg transition-all duration-300">
+            : itemsFiltered(items, myFilter.q).map((t, index) => (
+              <div key={t.id ?? Math.random()} className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex flex-col h-full shadow-sm transition-all duration-300 hover:shadow-2xl">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-emerald-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-emerald-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                
                 {/* Card Header */}
-                <div className="p-4 sm:p-5 border-b border-gray-200/50 dark:border-gray-700/50">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <button
-                      onClick={() => openDetails(t)}
-                      className="text-left flex-1 min-w-0"
+                <div className="pb-2 p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
+                    <Badge
+                      variant={
+                        t.status === "done" ? "default" : "outline"
+                      }
+                      className="text-xs sm:text-sm px-2 py-1 rounded-full backdrop-blur-sm self-start"
                     >
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors line-clamp-2 mb-2">
-                        {t.title}
-                      </h3>
-                    </button>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Badge 
-                        variant="outline" 
-                        className={`capitalize text-xs ${
-                          t.status === 'done' ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' :
-                          t.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/20 dark:text-blue-400' :
-                          t.status === 'blocked' ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/20 dark:text-red-400' :
-                          'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-400'
-                        }`}
-                      >
-                        {t.status.replace('_', ' ')}
-                      </Badge>
+                      {t.status.charAt(0).toUpperCase() + t.status.slice(1).replace('_', ' ')}
+                    </Badge>
+                    <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
+                      <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                      <span className="truncate">
+                        {t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No due date'}
+                      </span>
                     </div>
                   </div>
-                  
-                  {/* Description */}
+                  <div className="break-words text-base sm:text-lg lg:text-xl font-semibold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent hover:opacity-90 transition-opacity cursor-pointer" onClick={() => openDetails(t)}>
+                    {t.title}
+                  </div>
                   {t.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">
+                    <div className="break-words text-xs sm:text-sm lg:text-base mt-1 sm:mt-2 text-muted-foreground">
                       {t.description}
-                    </p>
+                    </div>
                   )}
                 </div>
 
-                {/* Card Body */}
-                <div className="p-4 sm:p-5 flex-1">
-                  <div className="space-y-3">
-                    {t.priority && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-gray-500 dark:text-gray-400">Priority:</span>
-                        <span className={`font-medium capitalize ${
+                {/* Card Content */}
+                <div className="relative flex-1 flex flex-col justify-end py-2 px-4 sm:px-5">
+                  <div className="flex flex-col gap-3">
+                    {/* Priority and Hours Stats */}
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
+                      <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 transition-colors duration-200">
+                        <span className="text-xs sm:text-sm text-muted-foreground">
+                          Priority
+                        </span>
+                        <span className={`font-semibold text-lg sm:text-xl ${
                           t.priority === 'high' ? 'text-red-600 dark:text-red-400' :
                           t.priority === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
                           'text-green-600 dark:text-green-400'
                         }`}>
-                          {t.priority}
+                          {t.priority || 'medium'}
+                        </span>
+                        <span className="text-[10px] sm:text-xs text-muted-foreground">
+                          Level
                         </span>
                       </div>
-                    )}
-                    {t.due_date && (
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <Clock className="h-3 w-3" />
-                        <span>Due: {t.due_date}</span>
+                      <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-green-50/70 dark:bg-green-900/20 hover:bg-green-100/80 dark:hover:bg-green-900/30 transition-colors duration-200">
+                        <span className="text-xs sm:text-sm text-muted-foreground">
+                          Hours
+                        </span>
+                        <span className="font-semibold text-lg sm:text-xl text-green-600 dark:text-green-400">
+                          {t.spent_hours || 0}
+                        </span>
+                        <span className="text-[10px] sm:text-xs text-muted-foreground">
+                          Spent
+                        </span>
                       </div>
-                    )}
-                    {(typeof t.expected_hours === 'number' || typeof t.spent_hours === 'number') && (
-                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                        {typeof t.expected_hours === 'number' && (
-                          <div className="flex items-center gap-1">
-                            <span>Expected:</span>
-                            <span className="font-medium text-gray-700 dark:text-gray-300">{t.expected_hours}h</span>
+                    </div>
+
+                    {/* Task Information */}
+                    <div className="mt-1 p-2 sm:p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/20 hover:bg-gray-100/80 dark:hover:bg-gray-800/30 transition-colors duration-200">
+                      <div className="space-y-2">
+                        {/* First Row - Task Info */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <ListChecks className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-primary" />
+                            <span className="text-sm sm:text-base font-medium">
+                              Task
+                            </span>
                           </div>
-                        )}
-                        {typeof t.spent_hours === 'number' && (
-                          <div className="flex items-center gap-1">
-                            <span>Spent:</span>
-                            <span className="font-medium text-gray-700 dark:text-gray-300">{t.spent_hours}h</span>
+                          <div className="flex items-center gap-1" title="Expected Hours">
+                            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
+                            <span className="text-xs sm:text-sm">
+                              {t.expected_hours || 0}h
+                            </span>
                           </div>
-                        )}
+                        </div>
+                        {/* Second Row - Spent Hours */}
+                        <div className="flex items-center justify-end">
+                          <div className="flex items-center gap-1" title="Spent Hours">
+                            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+                            <span className="text-xs sm:text-sm">
+                              {t.spent_hours || 0}h
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Card Actions */}
-                <div className="p-4 sm:p-5 border-t border-gray-200/50 dark:border-gray-700/50">
+                <div className="pt-2 mt-auto p-4 sm:p-5">
                   {(() => {
                     const buttons = [
                       {
                         component: (
                           <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => openDetails(t)} 
-                            className="h-8 px-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 min-w-0"
+                            variant="default"
+                            className="w-full h-11 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                            onClick={() => openDetails(t)}
                           >
-                            <span className="truncate">View</span>
+                            View
                           </Button>
                         )
                       },
@@ -923,9 +943,9 @@ export default function MyTasks() {
                           <Button 
                             size="sm" 
                             onClick={() => markCompleted(t)} 
-                            className="h-8 px-2 text-xs bg-green-600 hover:bg-green-700 text-white min-w-0"
+                            className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
                           >
-                            <span className="truncate">Complete</span>
+                            Complete
                           </Button>
                         )
                       }] : []),
@@ -935,28 +955,28 @@ export default function MyTasks() {
                             variant="outline" 
                             size="sm" 
                             onClick={() => openEdit(t)} 
-                            className="h-8 px-2 text-xs min-w-0"
+                            className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200"
                           >
-                            <span className="truncate">Edit</span>
+                            Edit
                           </Button>
                         )
                       },
                       {
                         component: taskToDelete?.id === t.id && undoDeleteTask.isCountingDown ? (
-                          <div className="flex items-center justify-center gap-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-8">
+                          <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
                             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                            <span className="text-xs font-medium text-red-700 dark:text-red-300">
+                            <span className="text-sm font-medium text-red-700 dark:text-red-300">
                               {undoDeleteTask.timeLeft}s
                             </span>
                           </div>
                         ) : (
                           <Button 
-                            variant="outline" 
+                            variant="destructive"
                             size="sm" 
                             onClick={() => onDelete(t.id)} 
-                            className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 min-w-0"
+                            className="w-full h-11 font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
                           >
-                            <span className="truncate">Delete</span>
+                            Delete
                           </Button>
                         )
                       }
@@ -964,13 +984,13 @@ export default function MyTasks() {
 
                     const buttonCount = buttons.length;
                     
-                    // Responsive grid layout based on button count
+                    // Professional responsive grid layout based on button count
                     const getGridClasses = () => {
-                      if (buttonCount === 1) return "grid grid-cols-1 gap-2";
-                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-2";
-                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2";
-                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-2";
-                      return "grid grid-cols-1 sm:grid-cols-2 gap-2";
+                      if (buttonCount === 1) return "grid grid-cols-1 gap-3";
+                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
+                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                      return "grid grid-cols-1 sm:grid-cols-2 gap-3";
                     };
 
                     return (
@@ -1031,106 +1051,149 @@ export default function MyTasks() {
             </div>
           </div>
 
-          {/* Shared Tasks Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          {/* Shared Tasks Grid with Enhanced Professional Design */}
+          <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
             {sharedLoading ? (
               <>
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-48 rounded-xl" />
+                  <Skeleton key={i} className="h-48 rounded-2xl" />
                 ))}
               </>
             ) : filteredSharedTasks.length === 0 ? (
-              <div className="col-span-full text-center py-12">
-                <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                  <Users className="h-8 w-8 text-gray-400" />
+              <div className="col-span-full relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-10 sm:p-12 text-center">
+                  <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <Users className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">No shared tasks found</h3>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                    {sharedSearchTerm ? "Try adjusting your search terms" : "No shared tasks have been created yet"}
+                  </p>
+                  {currentUser?.role === 'admin' && (
+                    <Button onClick={openCreateShared} className="h-10 sm:h-11 px-6 sm:px-8 bg-gradient-to-r from-blue-600 to-emerald-600 text-white">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Shared Task
+                    </Button>
+                  )}
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No shared tasks found</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  {sharedSearchTerm ? "Try adjusting your search terms" : "No shared tasks have been created yet"}
-                </p>
-                {currentUser?.role === 'admin' && (
-                  <Button onClick={openCreateShared} className="bg-blue-600 hover:bg-blue-700 text-white">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Shared Task
-                  </Button>
-                )}
               </div>
             ) : (
-              filteredSharedTasks.map((t) => (
-                <div key={t.id} className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex flex-col shadow-sm hover:shadow-lg transition-all duration-300">
+              filteredSharedTasks.map((t, index) => (
+                <div key={t.id} className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex flex-col h-full shadow-sm transition-all duration-300 hover:shadow-2xl">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-emerald-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-emerald-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  
                   {/* Card Header */}
-                  <div className="p-4 sm:p-5 border-b border-gray-200/50 dark:border-gray-700/50">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors line-clamp-2 mb-2">
-                          {t.title}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge 
-                            variant="outline" 
-                            className={`capitalize text-xs ${
-                              t.status === 'approved' ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/20 dark:text-purple-400' :
-                              t.status === 'completed' ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' :
-                              t.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/20 dark:text-blue-400' :
-                              'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-400'
-                            }`}
-                          >
-                            {t.status.replace('_', ' ')}
-                          </Badge>
-                          <Badge 
-                            variant="outline" 
-                            className={`capitalize text-xs ${
-                              t.priority === 'high' ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/20 dark:text-red-400' :
-                              t.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-400' :
-                              'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400'
-                            }`}
-                          >
-                            {t.priority || 'medium'} priority
-                          </Badge>
-                        </div>
+                  <div className="pb-2 p-4 sm:p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3">
+                      <Badge
+                        variant={
+                          t.status === "approved" ? "default" : "outline"
+                        }
+                        className="text-xs sm:text-sm px-2 py-1 rounded-full backdrop-blur-sm self-start"
+                      >
+                        {t.status.charAt(0).toUpperCase() + t.status.slice(1).replace('_', ' ')}
+                      </Badge>
+                      <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
+                        <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="truncate">
+                          {t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No due date'}
+                        </span>
                       </div>
                     </div>
-                    
-                    {/* Description */}
+                    <div className="break-words text-base sm:text-lg lg:text-xl font-semibold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent hover:opacity-90 transition-opacity cursor-pointer" onClick={() => openDetailsShared(t)}>
+                      {t.title}
+                    </div>
                     {t.description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">
+                      <div className="break-words text-xs sm:text-sm lg:text-base mt-1 sm:mt-2 text-muted-foreground">
                         {t.description}
-                      </p>
+                      </div>
                     )}
                   </div>
 
-                  {/* Card Body */}
-                  <div className="p-4 sm:p-5 flex-1">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <User className="h-3 w-3" />
-                        <span className="truncate">Assigned to: {getUserDisplayName(t.assigned_to)}</span>
+                  {/* Card Content */}
+                  <div className="relative flex-1 flex flex-col justify-end py-2 px-4 sm:px-5">
+                    <div className="flex flex-col gap-3">
+                      {/* Priority and Status Stats */}
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
+                        <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 transition-colors duration-200">
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Priority
+                          </span>
+                          <span className={`font-semibold text-lg sm:text-xl ${
+                            t.priority === 'high' ? 'text-red-600 dark:text-red-400' :
+                            t.priority === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
+                            'text-green-600 dark:text-green-400'
+                          }`}>
+                            {t.priority || 'medium'}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Level
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-green-50/70 dark:bg-green-900/20 hover:bg-green-100/80 dark:hover:bg-green-900/30 transition-colors duration-200">
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Status
+                          </span>
+                          <span className={`font-semibold text-lg sm:text-xl ${
+                            t.status === 'approved' ? 'text-purple-600 dark:text-purple-400' :
+                            t.status === 'completed' ? 'text-green-600 dark:text-green-400' :
+                            t.status === 'in_progress' ? 'text-blue-600 dark:text-blue-400' :
+                            'text-gray-600 dark:text-gray-400'
+                          }`}>
+                            {t.status.replace('_', ' ')}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Current
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <Calendar className="h-3 w-3" />
-                        <span>Due: {t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No due date'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <Clock className="h-3 w-3" />
-                        <span>Created: {new Date(t.created_at).toLocaleDateString()}</span>
+
+                      {/* Task Information */}
+                      <div className="mt-1 p-2 sm:p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/20 hover:bg-gray-100/80 dark:hover:bg-gray-800/30 transition-colors duration-200">
+                        <div className="space-y-2">
+                          {/* First Row - Assigned Info */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-primary" />
+                              <span className="text-sm sm:text-base font-medium">
+                                Assigned
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1" title="Assigned To">
+                              <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
+                              <span className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-[100px]">
+                                {getUserDisplayName(t.assigned_to).split(' ')[0]}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Second Row - Date Info */}
+                          <div className="flex items-center justify-end">
+                            <div className="flex items-center gap-1" title="Created Date">
+                              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+                              <span className="text-xs sm:text-sm">
+                                {new Date(t.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Card Actions */}
-                  <div className="p-4 sm:p-5 border-t border-gray-200/50 dark:border-gray-700/50">
+                  <div className="pt-2 mt-auto p-4 sm:p-5">
                     {(() => {
                       const buttons = [
                         // View button (always present)
                         {
                           component: (
                             <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => openDetailsShared(t)} 
-                              className="h-8 px-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 min-w-0"
+                              variant="default"
+                              className="w-full h-11 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                              onClick={() => openDetailsShared(t)}
                             >
-                              <span className="truncate">View</span>
+                              View
                             </Button>
                           )
                         },
@@ -1141,23 +1204,9 @@ export default function MyTasks() {
                               variant="outline" 
                               size="sm" 
                               onClick={() => openEditShared(t)} 
-                              className="h-8 px-2 text-xs border-green-200 text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20 min-w-0"
+                              className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200"
                             >
-                              <span className="truncate">Edit</span>
-                            </Button>
-                          )
-                        }] : []),
-                        // Uncomplete button (only for creator when completed)
-                        ...(t.status === 'completed' && t.created_by === currentUser?.id ? [{
-                          component: (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => uncompleteSharedTask(t)} 
-                              className="h-8 px-2 text-xs border-yellow-200 text-yellow-600 hover:bg-yellow-50 dark:border-yellow-800 dark:text-yellow-400 dark:hover:bg-yellow-900/20"
-                            >
-                              <Undo2 className="h-3 w-3 mr-1" />
-                              Uncomplete
+                              Edit
                             </Button>
                           )
                         }] : []),
@@ -1165,61 +1214,30 @@ export default function MyTasks() {
                         ...(t.status !== 'completed' && t.assigned_to === currentUser?.id ? [{
                           component: (
                             <Button 
-                              variant="outline" 
                               size="sm" 
                               onClick={() => markSharedCompleted(t)} 
-                              className="h-8 px-2 text-xs border-green-200 text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20"
+                              className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
                             >
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
                               Complete
-                            </Button>
-                          )
-                        }] : []),
-                        // Decline button (only for assignee when completed)
-                        ...(t.status === 'completed' && t.assigned_to === currentUser?.id ? [{
-                          component: (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => declineSharedTask(t)} 
-                              className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-                            >
-                              <X className="h-3 w-3 mr-1" />
-                              Decline
-                            </Button>
-                          )
-                        }] : []),
-                        // Approve button (only for creator when completed)
-                        ...(t.status === 'completed' && t.created_by === currentUser?.id ? [{
-                          component: (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => approveSharedTask(t)} 
-                              className="h-8 px-2 text-xs border-purple-200 text-purple-600 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400 dark:hover:bg-purple-900/20"
-                            >
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              Approve
                             </Button>
                           )
                         }] : []),
                         // Delete button (only for creator)
                         ...(t.created_by === currentUser?.id ? [{
                           component: sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
-                            <div className="flex items-center justify-center gap-2 px-3 py-1 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-8">
+                            <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
                               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                              <span className="text-xs font-medium text-red-700 dark:text-red-300">
-                                Deleting in {undoDeleteSharedTask.timeLeft}s
+                              <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                                {undoDeleteSharedTask.timeLeft}s
                               </span>
                             </div>
                           ) : (
                             <Button 
-                              variant="outline" 
+                              variant="destructive"
                               size="sm" 
                               onClick={() => onDeleteShared(t.id)} 
-                              className="h-8 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                              className="w-full h-11 font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
                             >
-                              <X className="h-3 w-3 mr-1" />
                               Delete
                             </Button>
                           )
@@ -1228,13 +1246,13 @@ export default function MyTasks() {
 
                       const buttonCount = buttons.length;
                       
-                      // Responsive grid layout based on button count
+                      // Professional responsive grid layout based on button count
                       const getGridClasses = () => {
-                        if (buttonCount === 1) return "grid grid-cols-1 gap-2";
-                        if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-2";
-                        if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2";
-                        if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-2";
-                        return "grid grid-cols-1 sm:grid-cols-2 gap-2";
+                        if (buttonCount === 1) return "grid grid-cols-1 gap-3";
+                        if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                        if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
+                        if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                        return "grid grid-cols-1 sm:grid-cols-2 gap-3";
                       };
 
                       return (
@@ -1568,8 +1586,8 @@ export default function MyTasks() {
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                {/* Professional Actions */}
+                <div className="pt-6 border-t border-gray-200/60 dark:border-gray-700/60">
                   {(() => {
                     const buttons = [
                       {
@@ -1580,7 +1598,7 @@ export default function MyTasks() {
                               setDetailOpen(false);
                               openEdit(selected);
                             }} 
-                            className="h-11 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                            className="w-full h-12 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
                           >
                             <Plus className="h-4 w-4 mr-2" />
                             Edit Task
@@ -1589,7 +1607,11 @@ export default function MyTasks() {
                       },
                       {
                         component: (
-                          <Button variant="outline" onClick={() => setDetailOpen(false)} className="h-11 px-6">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setDetailOpen(false)} 
+                            className="w-full h-12 px-6 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
+                          >
                             Close
                           </Button>
                         )
@@ -1601,8 +1623,9 @@ export default function MyTasks() {
                               await markCompleted(selected); 
                               setDetailOpen(false); 
                             }} 
-                            className="h-11 px-6 bg-green-600 hover:bg-green-700 text-white"
+                            className="w-full h-12 px-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                           >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
                             Mark as Completed
                           </Button>
                         )
@@ -1611,19 +1634,19 @@ export default function MyTasks() {
 
                     const buttonCount = buttons.length;
                     
-                    // Responsive grid layout based on button count
+                    // Professional responsive grid layout based on button count
                     const getGridClasses = () => {
-                      if (buttonCount === 1) return "grid grid-cols-1 gap-3";
-                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
-                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
-                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
-                      return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                      if (buttonCount === 1) return "grid grid-cols-1 gap-4";
+                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-4";
+                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4";
+                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-4";
+                      return "grid grid-cols-1 sm:grid-cols-2 gap-4";
                     };
 
                     return (
                       <div className={getGridClasses()}>
                         {buttons.map((button, index) => (
-                          <div key={index}>
+                          <div key={index} className="flex">
                             {button.component}
                           </div>
                         ))}
@@ -1906,14 +1929,18 @@ export default function MyTasks() {
                           </div>
                 </div>
 
-                {/* Actions */}
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                {/* Professional Actions */}
+                <div className="pt-6 border-t border-gray-200/60 dark:border-gray-700/60">
                   {(() => {
                     const buttons = [
                       // Close button (always present)
                       {
                         component: (
-                          <Button variant="outline" onClick={() => setSharedDetailOpen(false)} className="h-11 px-6">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setSharedDetailOpen(false)} 
+                            className="w-full h-12 px-6 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
+                          >
                             Close
                           </Button>
                         )
@@ -1927,7 +1954,7 @@ export default function MyTasks() {
                               setSharedDetailOpen(false);
                               openEditShared(selectedShared);
                             }} 
-                            className="h-11 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                            className="w-full h-12 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
                           >
                             <Plus className="h-4 w-4 mr-2" />
                             Edit Task
@@ -1942,8 +1969,9 @@ export default function MyTasks() {
                               await markSharedCompleted(selectedShared); 
                               setSharedDetailOpen(false); 
                             }} 
-                            className="h-11 px-6 bg-green-600 hover:bg-green-700 text-white"
+                            className="w-full h-12 px-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                           >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
                             Mark as Completed
                           </Button>
                         )
@@ -1956,8 +1984,9 @@ export default function MyTasks() {
                               await approveSharedTask(selectedShared); 
                               setSharedDetailOpen(false); 
                             }} 
-                            className="h-11 px-6 bg-purple-600 hover:bg-purple-700 text-white"
+                            className="w-full h-12 px-6 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                           >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
                             Approve Task
                           </Button>
                         )
@@ -1965,7 +1994,7 @@ export default function MyTasks() {
                       // Delete button (only for creator)
                       ...(selectedShared.created_by === currentUser?.id ? [{
                         component: selectedShared.id && undoDeleteSharedTask.isCountingDown && sharedTaskToDelete?.id === selectedShared.id ? (
-                          <div className="flex items-center justify-center gap-2 px-6 py-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11">
+                          <div className="flex items-center justify-center gap-2 px-6 py-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-12 w-full">
                             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
                             <span className="text-sm font-medium text-red-700 dark:text-red-300">
                               Deleting in {undoDeleteSharedTask.timeLeft}s
@@ -1978,8 +2007,9 @@ export default function MyTasks() {
                               await onDeleteShared(selectedShared.id); 
                               setSharedDetailOpen(false); 
                             }} 
-                            className="h-11 px-6 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                            className="w-full h-12 px-6 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
                           >
+                            <X className="h-4 w-4 mr-2" />
                             Delete
                           </Button>
                         )
@@ -1988,19 +2018,19 @@ export default function MyTasks() {
 
                     const buttonCount = buttons.length;
                     
-                    // Responsive grid layout based on button count
+                    // Professional responsive grid layout based on button count
                     const getGridClasses = () => {
-                      if (buttonCount === 1) return "grid grid-cols-1 gap-3";
-                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
-                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
-                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
-                      return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                      if (buttonCount === 1) return "grid grid-cols-1 gap-4";
+                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-4";
+                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4";
+                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-4";
+                      return "grid grid-cols-1 sm:grid-cols-2 gap-4";
                     };
 
                     return (
                       <div className={getGridClasses()}>
                         {buttons.map((button, index) => (
-                          <div key={index}>
+                          <div key={index} className="flex">
                             {button.component}
                           </div>
                         ))}
