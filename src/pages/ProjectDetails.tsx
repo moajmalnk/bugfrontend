@@ -3629,6 +3629,7 @@ const ProjectDetails = () => {
   const [projectOwner, setProjectOwner] = useState<ProjectUser | null>(null);
   const [bugs, setBugs] = useState<BugType[]>([]);
   const [sharedTasks, setSharedTasks] = useState<SharedTask[]>([]);
+  const [updates, setUpdates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -3697,6 +3698,7 @@ const ProjectDetails = () => {
       fetchProjectBugs();
       fetchMembers();
       fetchProjectSharedTasks();
+      fetchProjectUpdates();
     }
   }, [projectId]);
 
@@ -3834,6 +3836,15 @@ const ProjectDetails = () => {
       });
     } finally {
       setTasksLoading(false);
+    }
+  };
+
+  const fetchProjectUpdates = async () => {
+    try {
+      const updatesData = await updateService.getUpdatesByProject(projectId || "");
+      setUpdates(updatesData);
+    } catch (error) {
+      console.error("Error fetching updates:", error);
     }
   };
 
@@ -4289,63 +4300,253 @@ const ProjectDetails = () => {
         </div>
 
         <TabsContent value="overview">
-          {/* Stats Cards - Responsive grid that works on all screen sizes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <Card className="flex-1 min-w-0">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Bugs
-                </CardTitle>
-                <Bug className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{bugs.length}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="flex-1 min-w-0">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Open Bugs</CardTitle>
-                <AlertCircle className="h-4 w-4 text-yellow-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {
-                    bugs.filter(
-                      (bug) =>
-                        bug.status === "pending" || bug.status === "in_progress"
-                    ).length
-                  }
+          <div className="space-y-6 sm:space-y-8">
+            {/* Professional Overview Header */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                        <Code className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
+                          Project Overview
+                        </h2>
+                        <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-1"></div>
+                      </div>
+                    </div>
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
+                      Comprehensive project statistics and recent activity
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-r from-blue-500 to-emerald-600 rounded-xl p-3 shadow-lg">
+                      <Code className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                        {bugs.length + sharedTasks.length + updates.length}
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                        Total Items
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card className="flex-1 min-w-0">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Fixed Bugs
-                </CardTitle>
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {bugs.filter((bug) => bug.status === "fixed").length}
+            {/* Enhanced Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              {/* Bugs Stats */}
+              <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-50/40 via-transparent to-pink-50/40 dark:from-red-950/15 dark:via-transparent dark:to-pink-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-lg flex items-center justify-center shadow-lg">
+                      <Bug className="h-5 w-5 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+                    <Badge variant="outline" className="text-xs font-medium border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+                      Bugs
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                      {bugs.length}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Total Bugs
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-yellow-600 dark:text-yellow-400">
+                        {bugs.filter(bug => bug.status === "pending" || bug.status === "in_progress").length} Open
+                      </span>
+                      <span className="text-gray-400">•</span>
+                      <span className="text-green-600 dark:text-green-400">
+                        {bugs.filter(bug => bug.status === "fixed").length} Fixed
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tasks Stats */}
+              <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-yellow-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-yellow-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-lg flex items-center justify-center shadow-lg">
+                      <ListChecks className="h-5 w-5 text-white" />
+                </div>
+                    <Badge variant="outline" className="text-xs font-medium border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300">
+                      Tasks
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                      {sharedTasks.length}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Total Tasks
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-blue-600 dark:text-blue-400">
+                        {sharedTasks.filter(task => task.status === "in_progress").length} In Progress
+                      </span>
+                      <span className="text-gray-400">•</span>
+                      <span className="text-green-600 dark:text-green-400">
+                        {sharedTasks.filter(task => task.status === "completed").length} Completed
+                      </span>
+                    </div>
+                  </div>
+                </div>
           </div>
 
-          {currentUser?.role === "admin" && (
-          <div className="mt-6">
-            <ActivityList
-              projectId={projectId}
-              limit={8}
-              showPagination={false}
-              autoRefresh={true}
-              refreshInterval={30000}
-            />
+              {/* Updates Stats */}
+              <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-50/40 via-transparent to-purple-50/40 dark:from-indigo-950/15 dark:via-transparent dark:to-purple-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+                      <Bell className="h-5 w-5 text-white" />
           </div>
-          )}
+                    <Badge variant="outline" className="text-xs font-medium border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                      Updates
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                      {updates.length}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Total Updates
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-blue-600 dark:text-blue-400">
+                        {updates.filter(update => update.status === "pending").length} Pending
+                      </span>
+                      <span className="text-gray-400">•</span>
+                      <span className="text-green-600 dark:text-green-400">
+                        {updates.filter(update => update.status === "published").length} Published
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Members Stats */}
+              <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-50/40 via-transparent to-teal-50/40 dark:from-emerald-950/15 dark:via-transparent dark:to-teal-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-lg">
+                      <Users className="h-5 w-5 text-white" />
+                </div>
+                    <Badge variant="outline" className="text-xs font-medium border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      Members
+                    </Badge>
+              </div>
+                  <div className="space-y-2">
+                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                      {members.length}
+                </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Team Members
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-purple-600 dark:text-purple-400">
+                        {members.filter(member => member.role === "admin").length} Admins
+                      </span>
+                      <span className="text-gray-400">•</span>
+                      <span className="text-blue-600 dark:text-blue-400">
+                        {members.filter(member => member.role === "developer").length} Developers
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                </div>
+              </div>
+
+            {/* Quick Actions Section */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                    <Plus className="h-4 w-4 text-white" />
+                      </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Quick Actions</h3>
+                      </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Role-based quick actions */}
+                  {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                    <Button 
+                      variant="outline" 
+                      className="h-12 justify-start gap-3 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                      onClick={() => setActiveTab("bugs")}
+                    >
+                      <Bug className="h-4 w-4" />
+                      <span>View Bugs</span>
+                    </Button>
+                  )}
+                  
+                  {(currentUser?.role === "tester" || currentUser?.role === "admin") && (
+                            <Button
+                              variant="outline"
+                      className="h-12 justify-start gap-3 border-green-200 text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20"
+                      onClick={() => setActiveTab("fixes")}
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>View Fixes</span>
+                            </Button>
+                  )}
+                  
+                  <Button 
+                    variant="outline" 
+                    className="h-12 justify-start gap-3 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+                    onClick={() => setActiveTab("updates")}
+                  >
+                    <Bell className="h-4 w-4" />
+                    <span>View Updates</span>
+                  </Button>
+                  
+                  {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                            <Button
+                              variant="outline"
+                      className="h-12 justify-start gap-3 border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                      onClick={() => setActiveTab("tasks")}
+                    >
+                      <ListChecks className="h-4 w-4" />
+                      <span>View Tasks</span>
+                            </Button>
+                  )}
+                          </div>
+                        </div>
+                      </div>
+
+            {/* Recent Activity Section */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30"></div>
+              <div className="relative p-4 sm:p-6">
+                {/* <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h3>
+                </div> */}
+                <ActivityList
+                  projectId={projectId}
+                  limit={6}
+                  showPagination={false}
+                  autoRefresh={true}
+                  refreshInterval={30000}
+                />
+              </div>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Bugs Tab */}
@@ -4486,7 +4687,7 @@ const ProjectDetails = () => {
                         </button>
                       )}
                 </div>
-                  </div>
+              </div>
                   <div className="sm:w-48">
                     <div className="relative">
                       <select
@@ -4501,8 +4702,8 @@ const ProjectDetails = () => {
                       </select>
                       <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                      </div>
                     </div>
-                  </div>
                 </div>
                 </div>
               </div>
@@ -4533,23 +4734,23 @@ const ProjectDetails = () => {
                     </div>
 
                     {getFilteredTasks().length === 0 ? (
-                      <div className="text-center py-12">
+                <div className="text-center py-12">
                         <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                           <ListChecks className="h-8 w-8 text-gray-400" />
-                        </div>
+                  </div>
                         <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Tasks Found</h4>
                         <p className="text-gray-600 dark:text-gray-400">
                           {taskSearchQuery ? "No tasks match your search criteria." : "No tasks have been created for this project yet."}
-                        </p>
-                      </div>
-                    ) : (
+                  </p>
+                </div>
+              ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {getFilteredTasks().map((task) => (
                           <TaskCard key={task.id} task={task} onView={openTaskDetails} />
                         ))}
-                      </div>
+                        </div>
                     )}
-                  </div>
+                        </div>
                       </div>
                     )}
 
@@ -4612,7 +4813,7 @@ const ProjectDetails = () => {
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
                         <Users className="h-6 w-6 text-white" />
-                </div>
+                        </div>
                       <div>
                         <h2 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
                           Members
@@ -4665,7 +4866,7 @@ const ProjectDetails = () => {
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                         }`}>
                           {members.filter(m => m.role === "developer").length}
-                        </span>
+                                </span>
                       </button>
                       <button 
                         onClick={() => setActiveMemberTab("testers")}
@@ -4683,7 +4884,7 @@ const ProjectDetails = () => {
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                         }`}>
                           {members.filter(m => m.role === "tester").length}
-                        </span>
+                              </span>
                       </button>
                     </>
                   )}
@@ -4707,7 +4908,7 @@ const ProjectDetails = () => {
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                         }`}>
                           {admins.length}
-                          </span>
+                            </span>
                       </button>
                       <button 
                         onClick={() => setActiveMemberTab("testers")}
@@ -4725,7 +4926,7 @@ const ProjectDetails = () => {
                             : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                         }`}>
                           {members.filter(m => m.role === "tester").length}
-                                </span>
+                            </span>
                       </button>
                     </>
                   )}
@@ -4770,10 +4971,10 @@ const ProjectDetails = () => {
                         </span>
                       </button>
                     </>
-                  )}
-                          </div>
+                          )}
                         </div>
-                          </div>
+                      </div>
+                </div>
 
             {/* Search & Filter */}
             <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
@@ -5204,7 +5405,7 @@ const ProjectDetails = () => {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   <div className="p-1.5 bg-yellow-600 rounded-lg">
                     <ListChecks className="h-4 w-4 text-white" />
-                  </div>
+                </div>
                   Task Information
                 </h3>
                 
@@ -5213,7 +5414,7 @@ const ProjectDetails = () => {
                     <div className="flex items-center gap-2 text-sm">
                       <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                         <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      </div>
+              </div>
                       <span className="text-gray-600 dark:text-gray-400">Created:</span>
                       <span className="font-medium text-gray-900 dark:text-white">
                         {new Date(selectedTask.created_at || '').toLocaleDateString()}

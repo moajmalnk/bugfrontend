@@ -20,17 +20,17 @@ interface ActivityListProps {
 }
 
 const ActivityItemSkeleton = () => (
-  <div className="flex items-start space-x-3 p-4 border-b border-border last:border-b-0">
-    <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
-    <div className="flex-1 space-y-2">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-4 w-48" />
-        <Skeleton className="h-3 w-16" />
+  <div className="flex items-start space-x-3 p-3 sm:p-4 border-b border-gray-200/60 dark:border-gray-800/60 last:border-b-0">
+    <Skeleton className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl flex-shrink-0" />
+    <div className="flex-1 space-y-2 sm:space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+        <Skeleton className="h-3 sm:h-4 w-32 sm:w-48" />
+        <Skeleton className="h-3 w-12 sm:w-16" />
       </div>
       <Skeleton className="h-3 w-full max-w-md" />
       <div className="flex items-center space-x-2">
-        <Skeleton className="h-5 w-16" />
-        <Skeleton className="h-5 w-20" />
+        <Skeleton className="h-5 sm:h-6 w-12 sm:w-16 rounded-full" />
+        <Skeleton className="h-5 sm:h-6 w-16 sm:w-20 rounded-full" />
       </div>
     </div>
   </div>
@@ -49,54 +49,74 @@ const ActivityItem: React.FC<{
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="flex items-start space-x-3 p-4 border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors duration-200"
+      className="group relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300 m-1 sm:m-2"
     >
-      <div className="flex-shrink-0">
-        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-          <span className="text-lg" role="img" aria-label={typeInfo.label}>
-            {typeInfo.icon}
-          </span>
-        </div>
-      </div>
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-indigo-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-indigo-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
       
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-sm font-medium text-foreground line-clamp-2">
-            {formattedDescription}
-          </p>
-          <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-            {activity.time_ago}
-          </span>
+      <div className="relative flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4">
+        <div className="flex-shrink-0">
+          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+            <span className="text-sm sm:text-lg text-white" role="img" aria-label={typeInfo.label}>
+              {typeInfo.icon}
+            </span>
+          </div>
         </div>
         
-        {activity.project && (
-          <p className="text-xs text-muted-foreground mb-2">
-            in <span className="font-medium">{activity.project.name}</span>
-          </p>
-        )}
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Badge variant="secondary" className={`text-xs ${typeInfo.color}`}>
-              {typeInfo.label}
-            </Badge>
-            
-            {activity.metadata && Object.keys(activity.metadata).length > 0 && (
-              <Badge variant="outline" className="text-xs">
-                {Object.keys(activity.metadata).length} detail{Object.keys(activity.metadata).length !== 1 ? 's' : ''}
-              </Badge>
-            )}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-2 gap-1 sm:gap-0">
+            <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white line-clamp-2 leading-relaxed">
+              {formattedDescription}
+            </p>
+            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0">
+              {activity.time_ago}
+            </span>
           </div>
           
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onShowDetails(activity)}
-            className="h-6 px-2 text-xs hover:bg-primary/10"
-          >
-            <Eye className="h-3 w-3 mr-1" />
-            Details
-          </Button>
+          {activity.project && (
+            <div className="flex items-center gap-1 mb-2 sm:mb-3">
+              <span className="text-xs text-gray-500 dark:text-gray-400">in</span>
+              <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 rounded-full">
+                {activity.project.name}
+              </span>
+            </div>
+          )}
+          
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+            <div className="flex items-center space-x-2">
+              <Badge 
+                variant="outline" 
+                className={`text-xs font-medium ${typeInfo.color} border-current/20 bg-current/10`}
+              >
+                {typeInfo.label}
+              </Badge>
+            </div>
+            
+            {/* Mobile: Full-width View button at bottom */}
+            <div className="block sm:hidden">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onShowDetails(activity)}
+                className="w-full h-8 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+              >
+                <Eye className="h-3 w-3 mr-1" />
+                View Details
+              </Button>
+            </div>
+            
+            {/* Desktop: Compact button */}
+            <div className="hidden sm:block">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onShowDetails(activity)}
+                className="h-7 px-3 text-xs border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 text-blue-600 dark:text-blue-400 transition-all duration-200"
+              >
+                <Eye className="h-3 w-3 mr-1" />
+                View
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -192,119 +212,134 @@ export const ActivityList: React.FC<ActivityListProps> = ({
 
   if (isLoading) {
     return (
-      <Card className={className}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div>
-            <CardTitle className="text-lg">Recent Activity</CardTitle>
-            <p className="text-sm text-muted-foreground">Loading activities...</p>
+      <div className={`relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm ${className}`}>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30"></div>
+        <div className="relative p-3 sm:p-4 lg:p-6">
+          <div className="flex items-center gap-2 sm:gap-3 mb-4">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <ActivityIcon className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h3>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Loading activities...</p>
+            </div>
           </div>
-          <Skeleton className="h-8 w-8 rounded-full" />
-        </CardHeader>
-        <CardContent className="p-0">
-          {Array(5).fill(0).map((_, i) => (
-            <ActivityItemSkeleton key={i} />
-          ))}
-        </CardContent>
-      </Card>
+          <div className="space-y-1 sm:space-y-2">
+            {Array(5).fill(0).map((_, i) => (
+              <ActivityItemSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className={className}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <div>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <ActivityIcon className="h-5 w-5" />
-            Recent Activity
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {totalActivities > 0 
-              ? `Showing ${activities.length} of ${totalActivities} activities`
-              : 'No recent activity'
-            }
-          </p>
-        </div>
-        
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="h-8 w-8 p-0"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span className="sr-only">Refresh activities</span>
-        </Button>
-      </CardHeader>
+    <div className={`relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm ${className}`}>
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30"></div>
       
-      <CardContent className="p-0">
-        <AnimatePresence mode="wait">
-          {activities.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="p-6"
-            >
-              <EmptyState
-                title="No activities yet"
-                description={
-                  projectId 
-                    ? "This project doesn't have any recent activity."
-                    : "You don't have any recent activity to show."
+      <div className="relative p-3 sm:p-4 lg:p-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3 sm:gap-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <ActivityIcon className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h3>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                {totalActivities > 0 
+                  ? `Showing ${activities.length} of ${totalActivities} activities`
+                  : 'No recent activity'
                 }
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              {activities.map((activity, index) => (
-                <ActivityItem 
-                  key={activity.id} 
-                  activity={activity} 
-                  index={index} 
-                  onShowDetails={handleShowDetails}
-                />
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </CardContent>
-      
-      {showPagination && totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-          <div className="text-sm text-muted-foreground">
-            Page {currentPage + 1} of {totalPages}
+              </p>
+            </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 0}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span className="sr-only">Previous page</span>
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={!hasMore}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronRight className="h-4 w-4" />
-              <span className="sr-only">Next page</span>
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 self-end sm:self-auto"
+          >
+            <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="sr-only">Refresh activities</span>
+          </Button>
         </div>
-      )}
+        
+        {/* Content */}
+        <div className="space-y-2">
+          <AnimatePresence mode="wait">
+            {activities.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="p-6"
+              >
+                <EmptyState
+                  title="No activities yet"
+                  description={
+                    projectId 
+                      ? "This project doesn't have any recent activity."
+                      : "You don't have any recent activity to show."
+                  }
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-2"
+              >
+                {activities.map((activity, index) => (
+                  <ActivityItem 
+                    key={activity.id} 
+                    activity={activity} 
+                    index={index} 
+                    onShowDetails={handleShowDetails}
+                  />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        
+        {/* Pagination */}
+        {showPagination && totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 pt-4 border-t border-gray-200/60 dark:border-gray-800/60 gap-3 sm:gap-0">
+            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left">
+              Page {currentPage + 1} of {totalPages}
+            </div>
+            
+            <div className="flex items-center justify-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 0}
+                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-gray-200 dark:border-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
+              >
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="sr-only">Previous page</span>
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={!hasMore}
+                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-gray-200 dark:border-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
+              >
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="sr-only">Next page</span>
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Activity Details Modal */}
       <ActivityDetailsModal
@@ -312,7 +347,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({
         isOpen={isModalOpen}
         onClose={handleCloseModal}
       />
-    </Card>
+    </div>
   );
 };
 

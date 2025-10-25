@@ -16,7 +16,8 @@ import {
   Users,
   AlertCircle,
   Clock,
-  MapPin
+  MapPin,
+  X
 } from 'lucide-react';
 import { activityService } from '@/services/activityService';
 import { useNavigate } from 'react-router-dom';
@@ -201,9 +202,9 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
     return Object.entries(metadata).map(([key, value]) => {
       const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
       return (
-        <div key={key} className="flex justify-between py-2">
-          <span className="text-sm font-medium text-muted-foreground">{formattedKey}:</span>
-          <span className="text-sm text-foreground">{String(value)}</span>
+        <div key={key} className="flex justify-between items-center py-2 px-3 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200/60 dark:border-gray-700/60">
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{formattedKey}:</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white">{String(value)}</span>
         </div>
       );
     });
@@ -225,152 +226,172 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-3xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !ml-0">
+        <DialogHeader className="relative">
+          <DialogTitle className="flex items-center gap-3 pr-12">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
               {getActivityIcon()}
             </div>
             <div>
-              <div className="text-lg font-semibold">{typeInfo.label}</div>
-              <div className="text-sm text-muted-foreground">{activity.time_ago}</div>
+              <div className="text-xl font-bold text-gray-900 dark:text-white">{typeInfo.label}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">{activity.time_ago}</div>
             </div>
           </DialogTitle>
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="sm"
+            className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Activity Description */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Activity Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-foreground leading-relaxed">
+          <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-indigo-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-indigo-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative p-4 sm:p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Activity Details</h3>
+              </div>
+              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
                 {formattedDescription}
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Project Information */}
           {activity.project && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Project Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-50/40 via-transparent to-teal-50/40 dark:from-emerald-950/15 dark:via-transparent dark:to-teal-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+                    <MapPin className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Project Information</h3>
+                </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">{activity.project.name}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{activity.project.name}</p>
                     {activity.project.description && (
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                         {activity.project.description}
                       </p>
                     )}
                   </div>
-                  <Badge variant="outline">
+                  <Badge 
+                    variant="outline" 
+                    className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                  >
                     {activity.project.status || 'Active'}
                   </Badge>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
 
           {/* User Information */}
           {activity.user && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  User Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-50/40 via-transparent to-pink-50/40 dark:from-purple-950/15 dark:via-transparent dark:to-pink-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                    <User className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">User Information</h3>
+                </div>
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-4 w-4" />
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
+                    <User className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <p className="font-medium">{activity.user.name || activity.user.email}</p>
-                    <p className="text-sm text-muted-foreground">{activity.user.role || 'User'}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{activity.user.name || activity.user.email}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{activity.user.role || 'User'}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
 
           {/* Metadata Information */}
           {activity.metadata && Object.keys(activity.metadata).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  Additional Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-1">
+            <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-yellow-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-yellow-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                    <Settings className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Additional Details</h3>
+                </div>
+                <div className="space-y-3">
                   {formatMetadata(activity.metadata)}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
 
           {/* Timestamp Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Timestamp Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">Created:</span>
-                  <span className="text-sm text-foreground">
+          <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-50/40 via-transparent to-purple-50/40 dark:from-indigo-950/15 dark:via-transparent dark:to-purple-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative p-4 sm:p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Calendar className="h-4 w-4 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Timestamp Information</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Created:</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
                     {new Date(activity.created_at).toLocaleString()}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">Time Ago:</span>
-                  <span className="text-sm text-foreground">{activity.time_ago}</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Time Ago:</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{activity.time_ago}</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Navigation Actions */}
-          <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-4 pt-4 border-t border-gray-200/60 dark:border-gray-800/60">
             {navigationInfo ? (
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-blue-500 rounded-lg">
-                    <navigationInfo.icon className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="font-semibold text-blue-900 dark:text-blue-100">
-                        Navigate to Related Item
-                      </h4>
-                      {currentUser?.role && (
-                        <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                          {currentUser.role}
-                        </Badge>
-                      )}
+              <div className="relative overflow-hidden rounded-xl border border-blue-200/60 dark:border-blue-800/60 bg-blue-50/80 dark:bg-blue-950/80 backdrop-blur-sm">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-indigo-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-indigo-950/15"></div>
+                <div className="relative p-4 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <navigationInfo.icon className="h-5 w-5 text-white" />
                     </div>
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
-                      {navigationInfo.description}
-                    </p>
-                    <div className="flex gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                          Navigate to Related Item
+                        </h4>
+                        {currentUser?.role && (
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                          >
+                            {currentUser.role}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+                        {navigationInfo.description}
+                      </p>
                       <Button 
                         onClick={handleNavigate} 
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                        className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
                         size="sm"
                       >
                         <navigationInfo.icon className="h-4 w-4" />
@@ -382,18 +403,21 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-50 dark:bg-gray-950/20 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-gray-500 rounded-lg">
-                    <Clock className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                      Navigation Not Available
-                    </h4>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      This activity doesn't have a specific related item to navigate to.
-                    </p>
+              <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-gray-50/80 dark:bg-gray-950/80 backdrop-blur-sm">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-gray-50/40 via-transparent to-gray-50/40 dark:from-gray-950/15 dark:via-transparent dark:to-gray-950/15"></div>
+                <div className="relative p-4 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <Clock className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                        Navigation Not Available
+                      </h4>
+                      <p className="text-sm text-gray-700 dark:text-gray-300">
+                        This activity doesn't have a specific related item to navigate to.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -401,43 +425,40 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
             {/* Role-specific Quick Actions */}
             {getRoleSpecificActions().length > 0 && (
-              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-green-500 rounded-lg">
-                    <Settings className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">
-                      Quick Actions ({currentUser?.role})
-                    </h4>
-                    <div className="grid grid-cols-1 gap-2">
-                      {getRoleSpecificActions().map((action, index) => (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            navigate(action.path);
-                            onClose();
-                          }}
-                          className="flex items-center gap-2 justify-start text-left h-auto p-2 bg-white dark:bg-gray-800 border-green-200 dark:border-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
-                        >
-                          <action.icon className="h-4 w-4" />
-                          {action.label}
-                          <ExternalLink className="h-3 w-3 ml-auto" />
-                        </Button>
-                      ))}
+              <div className="relative overflow-hidden rounded-xl border border-green-200/60 dark:border-green-800/60 bg-green-50/80 dark:bg-green-950/80 backdrop-blur-sm">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-green-50/40 via-transparent to-emerald-50/40 dark:from-green-950/15 dark:via-transparent dark:to-emerald-950/15"></div>
+                <div className="relative p-4 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <Settings className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-semibold text-green-900 dark:text-green-100 mb-3">
+                        Quick Actions ({currentUser?.role})
+                      </h4>
+                      <div className="grid grid-cols-1 gap-2">
+                        {getRoleSpecificActions().map((action, index) => (
+                          <Button
+                            key={index}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigate(action.path);
+                              onClose();
+                            }}
+                            className="flex items-center gap-3 justify-start text-left h-auto p-3 bg-white/50 dark:bg-gray-800/50 border-green-200 dark:border-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all duration-200"
+                          >
+                            <action.icon className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <span className="text-green-700 dark:text-green-300">{action.label}</span>
+                            <ExternalLink className="h-3 w-3 ml-auto text-green-500 dark:text-green-400" />
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             )}
-            
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={onClose}>
-                Close
-              </Button>
-            </div>
           </div>
         </div>
       </DialogContent>
