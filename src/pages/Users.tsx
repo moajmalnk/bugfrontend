@@ -21,21 +21,52 @@ import { User, UserRole } from "@/types";
 import { Bug, Code2, Shield, UserRound, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDistanceToNow } from "date-fns";
 
-// Status Badge Component for user presence
-const StatusBadge = ({ status }: { status: string }) => {
+// Enhanced Status Badge Component with professional tooltips
+const StatusBadge = ({ status, lastSeen }: { status: string; lastSeen?: string }) => {
   const config = {
-    active: { color: 'bg-green-500', text: 'Active', icon: '●' },
-    idle: { color: 'bg-yellow-500', text: 'Idle', icon: '●' },
-    offline: { color: 'bg-gray-400', text: 'Offline', icon: '●' }
+    active: { 
+      color: 'bg-green-500', 
+      text: 'Active', 
+      icon: '●',
+      tooltip: 'User is currently online and active',
+      description: 'Actively using the system right now'
+    },
+    idle: { 
+      color: 'bg-yellow-500', 
+      text: 'Idle', 
+      icon: '●',
+      tooltip: 'User is online but inactive',
+      description: 'Away from keyboard or inactive for a while'
+    },
+    offline: { 
+      color: 'bg-gray-400', 
+      text: 'Offline', 
+      icon: '●',
+      tooltip: 'User is currently offline',
+      description: lastSeen ? `Last seen ${formatDistanceToNow(new Date(lastSeen), { addSuffix: true })}` : 'Last seen a while ago'
+    }
   };
-  const { color, text, icon } = config[status as keyof typeof config] || config.offline;
+  
+  const { color, text, icon, tooltip, description } = config[status as keyof typeof config] || config.offline;
   
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${color} text-white`}>
-      <span>{icon}</span>
-      {text}
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${color} text-white cursor-help transition-all duration-200 hover:scale-105 hover:shadow-md ${status === 'active' ? 'animate-pulse' : ''}`}>
+          <span className={status === 'active' ? 'animate-pulse' : ''}>{icon}</span>
+          {text}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs z-50">
+        <div className="space-y-1">
+          <div className="font-medium text-sm">{tooltip}</div>
+          <div className="text-xs text-muted-foreground">{description}</div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -886,7 +917,7 @@ const Users = () => {
                             </div>
                           </TableCell>
                           <TableCell className="w-[15%] px-6 py-5">
-                            <StatusBadge status={user.status || 'offline'} />
+                            <StatusBadge status={user.status || 'offline'} lastSeen={user.last_active_at} />
                           </TableCell>
                           <TableCell className="w-[20%] px-6 py-5">
                             <UserWorkStats userId={user.id} compact={true} />
@@ -946,7 +977,7 @@ const Users = () => {
                               {user.role}
                             </span>
                           </div>
-                          <StatusBadge status={user.status || 'offline'} />
+                          <StatusBadge status={user.status || 'offline'} lastSeen={user.last_active_at} />
                         </div>
                       </div>
                     </div>
@@ -1012,9 +1043,10 @@ const Users = () => {
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-        {/* Professional Header */}
+    <TooltipProvider>
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+          {/* Professional Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
@@ -1135,7 +1167,8 @@ const Users = () => {
           loggedInUserRole={currentUser.role}
         />
       )}
-    </main>
+      </main>
+    </TooltipProvider>
   );
 };
 

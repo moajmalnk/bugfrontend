@@ -62,6 +62,7 @@ export interface User {
   created_at?: string;
   admin_id?: string; // For impersonation tracking
   status?: 'active' | 'idle' | 'offline'; // For presence tracking
+  last_active_at?: string; // For last seen information - updated
 }
 
 // Messaging System Types

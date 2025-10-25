@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import React from "react";
 
@@ -36,12 +37,25 @@ export const OnlineStatus: React.FC<OnlineStatusProps> = ({
     };
 
     return (
-      <div
-        className={`${dotSize[size]} rounded-full ${
-          isOnline ? "bg-green-500" : "bg-gray-400"
-        } ${isOnline ? "animate-pulse" : ""}`}
-        title={isOnline ? "Online" : formatLastSeen()}
-      />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={`${dotSize[size]} rounded-full ${
+              isOnline ? "bg-green-500" : "bg-gray-400"
+            } ${isOnline ? "animate-pulse" : ""} cursor-help transition-all duration-200 hover:scale-110`}
+          />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs z-50">
+          <div className="space-y-1">
+            <div className="font-medium text-sm">
+              {isOnline ? "User is online and active" : "User is offline"}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {isOnline ? "Actively using the system" : formatLastSeen()}
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
@@ -63,14 +77,28 @@ export const OnlineStatus: React.FC<OnlineStatusProps> = ({
 
   if (variant === "badge") {
     return (
-      <Badge
-        variant={isOnline ? "default" : "secondary"}
-        className={`text-xs ${
-          isOnline ? "bg-green-500 hover:bg-green-600" : ""
-        }`}
-      >
-        {isOnline ? "Online" : "Offline"}
-      </Badge>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant={isOnline ? "default" : "secondary"}
+            className={`text-xs cursor-help transition-all duration-200 hover:scale-105 hover:shadow-md ${
+              isOnline ? "bg-green-500 hover:bg-green-600" : ""
+            }`}
+          >
+            {isOnline ? "Online" : "Offline"}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs z-50">
+          <div className="space-y-1">
+            <div className="font-medium text-sm">
+              {isOnline ? "User is online and active" : "User is offline"}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {isOnline ? "Actively using the system" : formatLastSeen()}
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
