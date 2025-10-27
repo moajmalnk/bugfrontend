@@ -31,3 +31,27 @@ export const extractResourceId = (path: string, resourceType: string): string | 
   }
   return null;
 };
+
+/**
+ * Get effective user role for routing and display
+ * Uses role_id to determine the effective role (admin/developer/tester)
+ * @param user - User object with role and role_id
+ * @returns The effective role to use for routing ('admin', 'developer', 'tester', or 'user' for custom roles)
+ */
+export const getEffectiveRole = (user: { role?: string; role_id?: number | null }): string => {
+  if (!user) return 'user';
+  
+  // If role_id is set (new system)
+  if (user.role_id) {
+    // Map role_id to role
+    // 1 = Admin, 2 = Developer, 3 = Tester
+    if (user.role_id === 1) return 'admin';
+    if (user.role_id === 2) return 'developer';
+    if (user.role_id === 3) return 'tester';
+    // Custom roles (role_id > 3) should default to 'user' for routing
+    return 'user';
+  }
+  
+  // Fallback to legacy role field
+  return user.role || 'user';
+};

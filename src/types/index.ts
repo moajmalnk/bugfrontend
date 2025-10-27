@@ -51,6 +51,24 @@ export type BugStatus = 'pending' | 'in_progress' | 'fixed' | 'rejected' | 'decl
 
 export type UserRole = 'admin' | 'developer' | 'tester';
 
+export interface Permission {
+  id: number;
+  permission_key: string;
+  permission_name: string;
+  category: string;
+  scope: 'global' | 'project';
+  selected?: boolean; // For UI state in role editor
+}
+
+export interface Role {
+  id: number;
+  role_name: string;
+  description: string;
+  is_system_role: boolean;
+  permission_count?: number;
+  permissions?: Permission[];
+}
+
 export interface User {
   id: string;
   name: string;
@@ -58,11 +76,13 @@ export interface User {
   email: string;
   phone?: string;
   role: UserRole;
+  role_id?: number | null;
   avatar?: string;
   created_at?: string;
   admin_id?: string; // For impersonation tracking
   status?: 'active' | 'idle' | 'offline'; // For presence tracking
   last_active_at?: string; // For last seen information - updated
+  permissions?: string[]; // Effective permissions for the user
 }
 
 // Messaging System Types

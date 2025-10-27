@@ -767,13 +767,17 @@ const Bugs = () => {
               ) : filteredBugs.length === 0 ? (
                 <div className="relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
-                  <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-                    <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-                      <BugIcon className="h-10 w-10 text-white" />
+                  <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-10 sm:p-12 text-center">
+                    <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                      <BugIcon className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Assigned</h3>
-                    <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                      Great job! You currently have no bugs assigned to you. Check back later or ask your project admin for new assignments.
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Found</h3>
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                      {searchTerm || projectFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all"
+                        ? "No bugs match your search criteria. Try adjusting your filters."
+                        : currentUser?.role === "tester"
+                        ? "You're not assigned to any bugs yet. When bugs are reported, they'll appear here."
+                        : "Great job! You currently have no bugs assigned to you. Check back later or ask your project admin for new assignments."}
                     </p>
                   </div>
                 </div>
@@ -885,13 +889,17 @@ const Bugs = () => {
             {(isDeveloper || currentUser?.role === "tester" || currentUser?.role === "admin") && noBugs && (
               <div className="relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
-                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-                    <BugIcon className="h-10 w-10 text-white" />
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-10 sm:p-12 text-center">
+                  <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                    <BugIcon className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Assigned</h3>
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                    Great job! You currently have no bugs assigned to you. Check back later or ask your project admin for new assignments.
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Found</h3>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                    {searchTerm || projectFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all"
+                      ? "No bugs match your search criteria. Try adjusting your filters."
+                      : currentUser?.role === "tester"
+                      ? "You're not assigned to any bugs yet. When bugs are reported, they'll appear here."
+                      : "Great job! You currently have no bugs assigned to you. Check back later or ask your project admin for new assignments."}
                   </p>
                 </div>
               </div>

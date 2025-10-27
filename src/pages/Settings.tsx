@@ -1,5 +1,6 @@
 import { AnnouncementManager } from "@/components/settings/AnnouncementManager";
 import { NotificationSettingsCard } from "@/components/settings/NotificationSettings";
+import { RolesTab } from "@/components/settings/RolesTab";
 // WhatsApp feature removed
 import { Button } from "@/components/ui/button";
 import {
@@ -16,12 +17,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
-import { Bell, Megaphone, Moon, Settings as SettingsIcon, Shield, Sun } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
+import { Bell, Megaphone, Moon, Settings as SettingsIcon, Shield, Sun, Users, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 const Settings = () => {
   const { currentUser } = useAuth();
+  const { hasPermission, isLoading, clearCache, refreshPermissions } = usePermissions(null);
   const { theme, toggleTheme } = useTheme();
   const [autoAssign, setAutoAssign] = useState(true);
   const [initialAutoAssign, setInitialAutoAssign] = useState(true);
@@ -37,8 +40,26 @@ const Settings = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Only admin should access this page
-  if (currentUser?.role !== "admin") {
+  // Check for SETTINGS_EDIT permission
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <div className="text-center space-y-4 sm:space-y-6">
+          <div className="mx-auto flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-muted">
+            <Shield className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground animate-pulse" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
+            Loading...
+          </h1>
+          <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-md">
+            Verifying your access permissions...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasPermission('SETTINGS_EDIT')) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
         <div className="text-center space-y-4 sm:space-y-6">
@@ -49,7 +70,7 @@ const Settings = () => {
             Access Denied
           </h1>
           <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-md">
-            Only administrators can access the settings page.
+            You do not have permission to access the settings page.
           </p>
         </div>
       </div>
@@ -72,6 +93,15 @@ const Settings = () => {
     toast({
       title: "Defaults restored",
       description: "Light mode and auto-assign have been reset to defaults.",
+    });
+  };
+
+  const handleRefreshPermissions = async () => {
+    clearCache();
+    await refreshPermissions();
+    toast({
+      title: "Permissions Refreshed",
+      description: "Your permissions have been refreshed from the server.",
     });
   };
 
@@ -99,6 +129,18 @@ const Settings = () => {
                   Manage your BugRicer application configuration
                 </p>
               </div>
+              <div className="flex items-center gap-4">
+                <Button
+                  onClick={handleRefreshPermissions}
+                  variant="outline"
+                  className="gap-2"
+                  title="Refresh your permissions from the server"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span className="hidden sm:inline">Refresh Permissions</span>
+                  <span className="sm:hidden">Refresh</span>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -119,7 +161,7 @@ const Settings = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
             <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <TabsList className="grid w-full grid-cols-3 h-14 bg-transparent p-1">
+              <TabsList className="grid w-full grid-cols-4 h-14 bg-transparent p-1">
                 <TabsTrigger
                   value="general"
                   className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
@@ -143,6 +185,14 @@ const Settings = () => {
                   <Megaphone className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   <span className="hidden sm:inline">Announcements</span>
                   <span className="sm:hidden">News</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="roles"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">Roles</span>
+                  <span className="sm:hidden">Roles</span>
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -239,6 +289,12 @@ const Settings = () => {
           <TabsContent value="announcements" className="space-y-6 sm:space-y-8">
             <div className="space-y-4 sm:space-y-6">
               <AnnouncementManager />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="roles" className="space-y-6 sm:space-y-8">
+            <div className="space-y-4 sm:space-y-6">
+              <RolesTab />
             </div>
           </TabsContent>
         </Tabs>

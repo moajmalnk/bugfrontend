@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { feedbackService, type FeedbackStats } from '@/services/feedbackService';
 import { toast } from '@/hooks/use-toast';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
@@ -27,9 +28,31 @@ const RATING_LABELS = ['Very Dissatisfied', 'Dissatisfied', 'Neutral', 'Satisfie
 
 export default function FeedbackStats() {
   const { currentUser } = useAuth();
+  const { hasPermission, isLoading: isLoadingPermissions } = usePermissions(null);
   const [stats, setStats] = useState<FeedbackStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [feedbackToDelete, setFeedbackToDelete] = useState<string | null>(null);
+
+  // Fetch stats effect - must be before early returns
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setIsLoading(true);
+        const data = await feedbackService.getFeedbackStats();
+        setStats(data);
+      } catch (error) {
+        console.error('Error fetching feedback stats:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load feedback statistics.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
 
   // Undo delete hook
   const {
@@ -50,7 +73,7 @@ export default function FeedbackStats() {
             variant: 'default',
           });
           // Refresh stats
-          fetchStats();
+          window.location.reload();
         } catch (error) {
           console.error('Error deleting feedback:', error);
           toast({
@@ -72,8 +95,23 @@ export default function FeedbackStats() {
     },
   });
 
-  // Check if user is admin
-  if (currentUser?.role !== 'admin') {
+  // Check for USERS_VIEW permission (feedbacks are typically viewable by users who can view users)
+  if (isLoadingPermissions) {
+    return (
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+            <p className="text-muted-foreground">
+              Verifying your access permissions...
+            </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!hasPermission('USERS_VIEW')) {
     return (
       <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
         <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
@@ -85,7 +123,7 @@ export default function FeedbackStats() {
               </div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Access Denied</h1>
               <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                You need admin privileges to view feedback statistics.
+                You do not have permission to view feedback statistics.
               </p>
             </div>
           </div>
@@ -93,23 +131,6 @@ export default function FeedbackStats() {
       </main>
     );
   }
-
-  const fetchStats = async () => {
-    try {
-      setIsLoading(true);
-      const data = await feedbackService.getFeedbackStats();
-      setStats(data);
-    } catch (error) {
-      console.error('Error fetching feedback stats:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load feedback statistics.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleDeleteClick = (feedbackId: string) => {
     setFeedbackToDelete(feedbackId);
@@ -130,10 +151,6 @@ export default function FeedbackStats() {
       ),
     });
   };
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
 
   const getRatingColor = (rating: number) => {
     switch (rating) {
@@ -193,7 +210,7 @@ export default function FeedbackStats() {
                 No feedback has been submitted yet.
               </p>
               <Button 
-                onClick={fetchStats} 
+                onClick={() => window.location.reload()} 
                 variant="outline"
                 size="lg"
                 className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
@@ -256,7 +273,7 @@ export default function FeedbackStats() {
         </div>
 
         {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="group relative overflow-hidden rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-[1.02] hover:-translate-y-1">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-indigo-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-indigo-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <div className="relative p-6">

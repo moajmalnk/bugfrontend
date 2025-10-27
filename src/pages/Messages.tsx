@@ -3,6 +3,7 @@ import { ChatInterface } from "@/components/messaging/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { ChatGroup } from "@/types";
 import { 
   MessageCircle, 
@@ -15,7 +16,8 @@ import {
   Users,
   Shield,
   FileText,
-  FolderOpen
+  FolderOpen,
+  Lock
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -24,6 +26,7 @@ import { toast } from "sonner";
 
 const Messages = () => {
   const { currentUser } = useAuth();
+  const { hasPermission, isLoading: isLoadingPermissions } = usePermissions(null);
   const [selectedGroup, setSelectedGroup] = useState<ChatGroup | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -128,6 +131,43 @@ const Messages = () => {
       }
     }
   };
+
+  // Check for MESSAGING_VIEW permission
+  if (isLoadingPermissions) {
+    return (
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+            <p className="text-muted-foreground">
+              Verifying your access permissions...
+            </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!hasPermission('MESSAGING_VIEW')) {
+    return (
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                <Lock className="h-10 w-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Access Denied</h3>
+              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                You do not have permission to view messages.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
