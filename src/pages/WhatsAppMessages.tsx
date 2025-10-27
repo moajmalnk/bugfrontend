@@ -4,12 +4,14 @@ import { ProfessionalMessageComposer } from "@/components/ui/ProfessionalMessage
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { whatsappMessageService } from "@/services/whatsappMessageService";
 import { MessageCircle, Users, Lock } from "lucide-react";
 import { useState } from "react";
 
 export default function WhatsAppMessages() {
   const { currentUser } = useAuth();
+  const { hasPermission, isLoading } = usePermissions(null);
   const [activeTab, setActiveTab] = useState<"single" | "bulk">("single");
 
   const handleSendMessage = async (phone: string, message: string) => {
@@ -93,7 +95,16 @@ export default function WhatsAppMessages() {
         </div>
 
         {/* Main Content */}
-        {currentUser?.role !== "admin" ? (
+        {isLoading ? (
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Loading permissions...
+              </p>
+            </div>
+          </div>
+        ) : !hasPermission('MESSAGING_CREATE') ? (
           <div className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
@@ -102,7 +113,7 @@ export default function WhatsAppMessages() {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Access Restricted</h3>
               <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                You need admin permissions to send messages.
+                You do not have permission to send messages.
               </p>
             </div>
           </div>

@@ -30,11 +30,12 @@ import { toast } from "@/components/ui/use-toast";
 import { UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, UserPlus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { permissionService } from "@/services/permissionService";
 
-// Define the form schema
+// Define the form schema - role validation will be done dynamically
 const userFormSchema = z.object({
   username: z
     .string()
@@ -46,8 +47,8 @@ const userFormSchema = z.object({
   password: z
     .string()
     .min(6, { message: "Password must be at least 6 characters" }),
-  role: z.enum(["admin", "developer", "tester"], {
-    required_error: "Please select a role",
+  role: z.string().min(1, {
+    message: "Please select a role",
   }),
   phone: z.string().optional(),
 });
@@ -70,6 +71,35 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
     phone: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
+
+  // Load roles on mount
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const data = await permissionService.getRoles();
+        setRoles(data);
+        // Set default role after loading
+        if (data.length > 0 && !form.getValues("role")) {
+          form.setValue("role", data[data.length - 1].role_name.toLowerCase());
+        }
+      } catch (error) {
+        console.error("Failed to load roles:", error);
+        // Fallback to basic roles if API fails
+        const fallbackRoles = [
+          { id: 1, role_name: "Admin" },
+          { id: 2, role_name: "Developer" },
+          { id: 3, role_name: "Tester" },
+        ];
+        setRoles(fallbackRoles);
+        if (!form.getValues("role")) {
+          form.setValue("role", fallbackRoles[fallbackRoles.length - 1].role_name.toLowerCase());
+        }
+      }
+    };
+    loadRoles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Initialize the form
   const form = useForm<UserFormValues>({
@@ -78,20 +108,26 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
       username: "",
       email: "",
       password: "",
-      role: "tester",
+      role: roles.length > 0 ? roles[0].role_name.toLowerCase() : "",
     },
   });
 
   const handleAddUser = async (userData: UserFormValues): Promise<boolean> => {
     try {
+      // Find the role_id from the selected role name
+      const selectedRole = roles.find(
+        (r) => r.role_name.toLowerCase() === userData.role.toLowerCase()
+      );
+      
       const payload = {
         username: userData.username,
         email: userData.email,
         password: userData.password,
         role: userData.role,
+        role_id: selectedRole?.id,
         phone: userData.phone && userData.phone.trim() ? "+91" + userData.phone.trim() : undefined,
       };
-      const success = await onUserAdd(payload);
+      const success = await onUserAdd(payload as any);
       return success;
     } catch (error) {
       // Error logic...
@@ -233,9 +269,14 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                       <SelectContent position="popper" className="z-[70]">
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="developer">Developer</SelectItem>
-                        <SelectItem value="tester">Tester</SelectItem>
+                        {roles.map((role) => (
+                          <SelectItem
+                            key={role.id}
+                            value={role.role_name.toLowerCase()}
+                          >
+                            {role.role_name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
