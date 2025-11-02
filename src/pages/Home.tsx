@@ -66,11 +66,6 @@ const Home = () => {
       description: "Role-based permissions, data encryption, and secure authentication"
     },
     {
-      icon: Clock,
-      title: "Time Tracking",
-      description: "Monitor work hours and project time allocation"
-    },
-    {
       icon: TrendingUp,
       title: "Progress Tracking",
       description: "Daily updates and work logs for transparent progress monitoring"

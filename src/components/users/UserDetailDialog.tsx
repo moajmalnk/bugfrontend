@@ -180,6 +180,52 @@ export function UserDetailDialog({
     }
   };
 
+  // Calculate user status based on last_active_at
+  const getUserStatus = (): 'active' | 'idle' | 'offline' => {
+    if (!user.last_active_at) return 'offline';
+    
+    const lastActive = new Date(user.last_active_at);
+    const now = new Date();
+    const diffSeconds = Math.floor((now.getTime() - lastActive.getTime()) / 1000);
+    
+    if (diffSeconds < 120) return 'active';
+    if (diffSeconds < 900) return 'idle'; // 15 minutes
+    return 'offline';
+  };
+
+  const userStatus = user.status || getUserStatus();
+
+  const getStatusConfig = (status: 'active' | 'idle' | 'offline') => {
+    switch (status) {
+      case 'active':
+        return {
+          label: 'Active',
+          color: 'bg-green-500',
+          ring: 'ring-green-500/50',
+          textColor: 'text-green-500',
+          pulse: true,
+        };
+      case 'idle':
+        return {
+          label: 'Idle',
+          color: 'bg-yellow-500',
+          ring: 'ring-yellow-500/50',
+          textColor: 'text-yellow-500',
+          pulse: false,
+        };
+      case 'offline':
+        return {
+          label: 'Offline',
+          color: 'bg-gray-500',
+          ring: 'ring-gray-500/50',
+          textColor: 'text-gray-500',
+          pulse: false,
+        };
+    }
+  };
+
+  const statusConfig = getStatusConfig(userStatus);
+
   const handleGenerateDashboardLink = async () => {
     if (loggedInUserRole !== "admin") {
       toast({
@@ -215,7 +261,7 @@ export function UserDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-full max-w-[95vw] sm:max-w-lg p-0 flex flex-col"
+        className="w-full max-w-[95vw] sm:max-w-2xl lg:max-w-4xl p-0 flex flex-col"
         style={{ maxHeight: "90vh" }}
       >
         <DialogHeader className="bg-muted/30 px-6 py-4 border-b flex-shrink-0 text-left">
@@ -237,64 +283,136 @@ export function UserDetailDialog({
           </Button>
         </DialogClose>
 
-        {/* User Header */}
-        <div className="flex flex-col sm:flex-row items-center gap-6 px-6 pt-6 pb-4 flex-shrink-0">
-          <div className="flex-shrink-0">
-            <img
-              src={user.avatar}
-              alt={`${user.name}'s avatar`}
-              className="h-24 w-24 rounded-full border-4 border-primary/20 shadow-md"
-            />
-          </div>
-          <div className="flex-1 min-w-0 text-center sm:text-left">
-            <h3 className="text-2xl font-bold truncate">{user.name}</h3>
-            <div className="flex items-center justify-center sm:justify-start mt-1 text-muted-foreground gap-2">
-              {getRoleIcon(user.role)}
-              <span className="capitalize font-medium text-lg">
-                {user.role}
-              </span>
+        {/* User Header - Enhanced Professional Design (Mobile Optimized) */}
+        <div className="relative bg-gradient-to-br from-muted/50 via-muted/30 to-background px-4 sm:px-6 pt-4 sm:pt-6 pb-4 sm:pb-6 flex-shrink-0 border-b">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+            {/* Avatar with Status Indicator */}
+            <div className="relative flex-shrink-0">
+              <div className="relative">
+                <img
+                  src={user.avatar}
+                  alt={`${user.name}'s avatar`}
+                  className="h-20 w-20 sm:h-28 sm:w-28 rounded-full border-2 sm:border-4 border-background shadow-xl ring-2 sm:ring-4 ring-primary/10"
+                />
+                {/* Status Badge */}
+                <div className={`absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-5 h-5 sm:w-7 sm:h-7 ${statusConfig.color} rounded-full border-2 sm:border-4 border-background shadow-lg flex items-center justify-center ${statusConfig.pulse ? 'animate-pulse' : ''}`}>
+                  <div className={`w-2 h-2 sm:w-3 sm:h-3 ${statusConfig.color} rounded-full ${statusConfig.ring} ring-1 sm:ring-2 ${statusConfig.pulse ? 'animate-ping' : ''}`}></div>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col items-center sm:items-start gap-1 mt-3 text-sm text-muted-foreground">
-              <span className="flex items-center gap-2">
-                <AtSign className="h-4 w-4" />
-                {user.username}
-              </span>
-              <span className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                {user.email}
-              </span>
-              {user.phone && (
-                <span className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  {user.phone}
-                </span>
-              )}
-              {user.created_at && (
-                <span className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Joined {format(new Date(user.created_at), "PPP")}
-                </span>
-              )}
+
+            {/* User Information */}
+            <div className="flex-1 min-w-0 text-center sm:text-left space-y-2 sm:space-y-3 w-full">
+              {/* Name and Role Row */}
+              <div className="space-y-1.5 sm:space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                  <h3 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                    {user.name}
+                  </h3>
+                  {/* Status Badge - Hidden on mobile, visible on desktop */}
+                  <div className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${statusConfig.color} text-white shadow-md ${statusConfig.pulse ? 'animate-pulse' : ''}`}>
+                    <span className={`w-2 h-2 rounded-full ${statusConfig.pulse ? 'animate-pulse' : ''}`}></span>
+                    {statusConfig.label}
+                  </div>
+                </div>
+                
+                {/* Role Badge */}
+                <div className="flex flex-col sm:flex-row items-center sm:items-center justify-center sm:justify-start gap-1.5 sm:gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-muted/60 rounded-lg border border-border/50">
+                    {getRoleIcon(user.role)}
+                    <span className="capitalize font-semibold text-sm sm:text-base text-foreground">
+                      {user.role}
+                    </span>
+                  </div>
+                  {user.last_active_at && (
+                    <span className="text-[10px] sm:text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(user.last_active_at), { addSuffix: true })}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Contact Information Grid - Two Rows (Fully Responsive) */}
+              <div className="flex flex-col gap-2 sm:gap-3 pt-1.5 sm:pt-2">
+                {/* First Row: Username and Phone */}
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/40 rounded-lg border border-border/30 hover:bg-muted/60 transition-colors min-w-0">
+                    <div className="p-1 sm:p-1.5 bg-primary/10 rounded-md flex-shrink-0">
+                      <AtSign className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Username</p>
+                      <p className="text-[10px] sm:text-sm font-medium text-foreground truncate">{user.username}</p>
+                    </div>
+                  </div>
+
+                  {user.phone ? (
+                    <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/40 rounded-lg border border-border/30 hover:bg-muted/60 transition-colors min-w-0">
+                      <div className="p-1 sm:p-1.5 bg-primary/10 rounded-md flex-shrink-0">
+                        <Phone className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Phone</p>
+                        <p className="text-[10px] sm:text-sm font-medium text-foreground truncate">{user.phone}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div></div>
+                  )}
+                </div>
+
+                {/* Second Row: Email and Join Date */}
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/40 rounded-lg border border-border/30 hover:bg-muted/60 transition-colors min-w-0">
+                    <div className="p-1 sm:p-1.5 bg-primary/10 rounded-md flex-shrink-0">
+                      <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Email</p>
+                      <p className="text-[10px] sm:text-sm font-medium text-foreground truncate">{user.email}</p>
+                    </div>
+                  </div>
+
+                  {user.created_at ? (
+                    <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/40 rounded-lg border border-border/30 hover:bg-muted/60 transition-colors min-w-0">
+                      <div className="p-1 sm:p-1.5 bg-primary/10 rounded-md flex-shrink-0">
+                        <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Joined</p>
+                        <p className="text-[10px] sm:text-sm font-medium text-foreground truncate">{format(new Date(user.created_at), "PPP")}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div></div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Scrollable content */}
-        <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
-          {/* Action Buttons */}
-          <div className="flex flex-col gap-3">
-            {/* First Row - 3 buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto custom-scrollbar flex-1">
+          {/* Action Buttons - Single Professional Row */}
+          <div className="w-full">
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
+              {/* Edit User */}
               <EditUserDialog
                 user={user}
                 onUserUpdate={onUserUpdate}
                 loggedInUserRole={loggedInUserRole}
                 trigger={
-                  <Button variant="outline" className="w-full">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 flex items-center justify-center gap-2 h-10 transition-all hover:scale-[1.02] min-w-0"
+                  >
                     Edit User
                   </Button>
                 }
               />
+              
+              {/* Change Password */}
               <ChangePasswordDialog
                 user={user}
                 onPasswordChange={handlePasswordChange}
@@ -302,7 +420,7 @@ export function UserDetailDialog({
                   <DialogTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-full"
+                      className="flex-1 flex items-center justify-center gap-2 h-10 transition-all hover:scale-[1.02] min-w-0"
                       title="Change Password"
                     >
                       Change Password
@@ -310,10 +428,27 @@ export function UserDetailDialog({
                   </DialogTrigger>
                 }
               />
+              
+              {/* Manage Permissions */}
+              {hasPermission('USERS_MANAGE_PERMISSIONS') && (
+                <Button
+                  variant="outline"
+                  className="flex-1 flex items-center justify-center gap-2 h-10 transition-all hover:scale-[1.02] min-w-0"
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate(`/${loggedInUserRole}/users/${user.id}/permissions`);
+                  }}
+                >
+                  <Key className="h-4 w-4" />
+                  Permissions
+                </Button>
+              )}
+              
+              {/* Dashboard (Admin only) */}
               {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
                 <Button
                   variant="outline"
-                  className="w-full flex items-center justify-center gap-2"
+                  className="flex-1 flex items-center justify-center gap-2 h-10 transition-all hover:scale-[1.02] min-w-0"
                   onClick={handleGenerateDashboardLink}
                   disabled={isGeneratingLink}
                   title="Open user's dashboard in a new tab"
@@ -326,23 +461,8 @@ export function UserDetailDialog({
                   Dashboard
                 </Button>
               )}
-            </div>
-            
-            {/* Second Row - 2 buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {hasPermission('USERS_MANAGE_PERMISSIONS') && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    onOpenChange(false);
-                    navigate(`/${loggedInUserRole}/users/${user.id}/permissions`);
-                  }}
-                >
-                  <Key className="h-4 w-4 mr-2" />
-                  Manage Permissions
-                </Button>
-              )}
+              
+              {/* Delete User (Admin only) */}
               {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
                 <DeleteUserDialog
                   user={user}
@@ -353,7 +473,7 @@ export function UserDetailDialog({
                   trigger={
                     <Button
                       variant="destructive"
-                      className="w-full"
+                      className="flex-1 flex items-center justify-center gap-2 h-10 transition-all hover:scale-[1.02] min-w-0"
                       title={
                         user.role === "admin"
                           ? "Administrators cannot be deleted"

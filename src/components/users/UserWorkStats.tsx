@@ -91,6 +91,18 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
 
   const { current_period, period_trend } = stats;
 
+  // Deduplicate period_trend by period identifier to ensure each period appears only once
+  // Use a Map with period.period as key (unique identifier) to efficiently remove duplicates
+  const periodMap = new Map<string, typeof period_trend[0]>();
+  period_trend.forEach(period => {
+    // Use period.period as the unique key (fallback to period_name if period is missing)
+    const key = period.period || period.period_name;
+    if (!periodMap.has(key)) {
+      periodMap.set(key, period);
+    }
+  });
+  const uniquePeriodTrend = Array.from(periodMap.values());
+
   if (compact) {
     return (
       <div className="flex items-center gap-3 text-sm">
@@ -161,7 +173,7 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
               <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Work Trend</h4>
             </div>
             <div className="space-y-3">
-              {period_trend.slice(0, 6).map((period, index) => (
+              {uniquePeriodTrend.slice(0, 6).map((period, index) => (
                 <div key={period.period} className="group p-3 rounded-xl bg-gradient-to-r from-gray-50/50 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/20 hover:from-gray-100/70 hover:to-blue-100/50 dark:hover:from-gray-700/50 dark:hover:to-blue-800/30 transition-all duration-200 border border-gray-200/30 dark:border-gray-700/30">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -178,25 +190,29 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 text-xs">
+                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 text-[10px] sm:text-xs">
                     <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      <span className="text-gray-600 dark:text-gray-400">Completed</span>
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-gray-600 dark:text-gray-400 hidden sm:inline">Completed</span>
+                      <span className="text-gray-600 dark:text-gray-400 sm:hidden">Completed</span>
                       <span className="font-medium text-red-600 dark:text-red-400">{period.task_counts.completed}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      <span className="text-gray-600 dark:text-gray-400">Pending</span>
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-gray-600 dark:text-gray-400 hidden sm:inline">Pending</span>
+                      <span className="text-gray-600 dark:text-gray-400 sm:hidden">Pending</span>
                       <span className="font-medium text-yellow-600 dark:text-yellow-400">{period.task_counts.pending}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-gray-600 dark:text-gray-400">Ongoing</span>
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-gray-600 dark:text-gray-400 hidden sm:inline">Ongoing</span>
+                      <span className="text-gray-600 dark:text-gray-400 sm:hidden">Ongoing</span>
                       <span className="font-medium text-blue-600 dark:text-blue-400">{period.task_counts.ongoing}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                      <span className="text-gray-600 dark:text-gray-400">Upcoming</span>
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-gray-600 dark:text-gray-400 hidden sm:inline">Upcoming</span>
+                      <span className="text-gray-600 dark:text-gray-400 sm:hidden">Upcoming</span>
                       <span className="font-medium text-purple-600 dark:text-purple-400">{period.task_counts.upcoming}</span>
                     </div>
                   </div>

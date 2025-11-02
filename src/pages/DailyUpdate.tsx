@@ -151,11 +151,9 @@ export default function DailyUpdate() {
     return `${name} ${y} (${hours} hours) (${days} days)`;
   }
 
-  function isCurrentMonth(submissionDate: string) {
-    const submission = new Date(submissionDate);
-    const current = new Date();
-    return submission.getFullYear() === current.getFullYear() && 
-           submission.getMonth() === current.getMonth();
+  function isToday(submissionDate: string) {
+    const today = todayYMD();
+    return submissionDate === today;
   }
 
   function formatSubmissionText(s: any) {
@@ -469,8 +467,8 @@ export default function DailyUpdate() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        {/* Edit button - only for current month */}
-                        {isCurrentMonth(s.submission_date) && (
+                        {/* Edit button - only for today */}
+                        {isToday(s.submission_date) && (
                           <Button 
                             variant="outline" 
                             size="sm" 

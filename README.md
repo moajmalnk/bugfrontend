@@ -28,7 +28,6 @@ A modern, high-performance React application built with TypeScript for the BugRi
 - **Project Dashboard**: Comprehensive project overview with analytics and activity feeds
 - **Real-time Messaging**: In-app messaging with text, files, and voice notes
 - **Task Management**: Full task lifecycle with assignment, tracking, and completion
-- **Time Tracking**: Check-in/check-out system with session management
 - **Meeting Integration**: Video conferencing and meeting management
 - **Activity Feed**: Real-time activity logging and notifications
 - **User Management**: Role-based user interface with permission management

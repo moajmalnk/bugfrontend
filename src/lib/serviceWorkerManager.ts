@@ -263,13 +263,8 @@ export async function initializeServiceWorker(): Promise<void> {
     if (registration) {
       // console.log('[SW Manager] Service worker initialized successfully');
       
-      // Set up update notifications
-      serviceWorkerManager.onUpdateAvailable(() => {
-        // Show user notification about available update
-        if (window.confirm('A new version is available. Would you like to update?')) {
-          serviceWorkerManager.skipWaiting();
-        }
-      });
+      // Set up update notifications (popup removed per user request)
+      // Updates will be applied automatically when service worker activates
 
       // Set up network status handling
       serviceWorkerManager.onOffline(() => {

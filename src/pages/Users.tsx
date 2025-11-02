@@ -385,6 +385,31 @@ const Users = () => {
     });
   };
 
+  // Calculate user counts for each role
+  const adminCount = users.filter(u => u.role === "admin").length;
+  const developerCount = users.filter(u => u.role === "developer").length;
+  const testerCount = users.filter(u => u.role === "tester").length;
+  const othersCount = users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length;
+
+  // Determine which tabs to show
+  const visibleTabs = [];
+  if (adminCount > 0) visibleTabs.push({ value: "admins", count: adminCount });
+  if (developerCount > 0) visibleTabs.push({ value: "developers", count: developerCount });
+  if (testerCount > 0) visibleTabs.push({ value: "testers", count: testerCount });
+  if (othersCount > 0) visibleTabs.push({ value: "others", count: othersCount });
+
+  // Get the first visible tab if current tab has no users
+  const isValidTab = visibleTabs.some(tab => tab.value === tabFromUrl);
+  const defaultTab = visibleTabs.length > 0 ? visibleTabs[0].value : "admins";
+  const activeTab = isValidTab ? tabFromUrl : defaultTab;
+
+  // Redirect to valid tab if current tab has no users
+  useEffect(() => {
+    if (!isValidTab && visibleTabs.length > 0 && tabFromUrl !== defaultTab) {
+      setSearchParams({ tab: defaultTab }, { replace: true });
+    }
+  }, [isValidTab, visibleTabs.length, defaultTab, tabFromUrl, setSearchParams]);
+
   const totalFiltered = filteredUsers.length;
   const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
@@ -475,26 +500,32 @@ const Users = () => {
 
       {/* Professional Tabs */}
       <Tabs
-        value={tabFromUrl}
+        value={activeTab}
         onValueChange={handleTabChange}
         className="w-full"
       >
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <TabsList className="grid w-full grid-cols-4 h-14 bg-transparent p-1">
-            {/* Admins tab with Shield icon and blue styling */}
-<TabsTrigger
-  value="admins"
-  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
->
-  <Shield className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-  <span className="hidden sm:inline">Admins</span>
-  <span className="sm:hidden">Admins</span>
-  <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
-    {users.filter(u => u.role === "admin").length}
-  </span>
-</TabsTrigger>
+              <TabsList 
+                className="grid w-full h-14 bg-transparent p-1"
+                style={{ gridTemplateColumns: `repeat(${visibleTabs.length || 1}, minmax(0, 1fr))` }}
+              >
+            {/* Conditionally render tabs only if they have users */}
+            {adminCount > 0 && (
+              <TabsTrigger
+                value="admins"
+                className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+              >
+                <Shield className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <span className="hidden sm:inline">Admins</span>
+                <span className="sm:hidden">Admins</span>
+                <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
+                  {adminCount}
+                </span>
+              </TabsTrigger>
+            )}
+            {developerCount > 0 && (
               <TabsTrigger
                 value="developers"
                 className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
@@ -503,9 +534,11 @@ const Users = () => {
                 <span className="hidden sm:inline">Developers</span>
                 <span className="sm:hidden">Devs</span>
                 <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
-                  {users.filter(u => u.role === "developer").length}
+                  {developerCount}
                 </span>
               </TabsTrigger>
+            )}
+            {testerCount > 0 && (
               <TabsTrigger
                 value="testers"
                 className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
@@ -514,9 +547,11 @@ const Users = () => {
                 <span className="hidden sm:inline">Testers</span>
                 <span className="sm:hidden">Testers</span>
                 <span className="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-bold">
-                  {users.filter(u => u.role === "tester").length}
+                  {testerCount}
                 </span>
               </TabsTrigger>
+            )}
+            {othersCount > 0 && (
               <TabsTrigger
                 value="others"
                 className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
@@ -525,25 +560,35 @@ const Users = () => {
                 <span className="hidden sm:inline">Others</span>
                 <span className="sm:hidden">Others</span>
                 <span className="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold">
-                  {users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length}
+                  {othersCount}
                 </span>
               </TabsTrigger>
+            )}
             </TabsList>
           </div>
         </div>
 
-        <TabsContent value="developers" className="space-y-6 sm:space-y-8">
-          {renderUsersContent()}
-        </TabsContent>
-        <TabsContent value="testers" className="space-y-6 sm:space-y-8">
-          {renderUsersContent()}
-        </TabsContent>
-        <TabsContent value="admins" className="space-y-6 sm:space-y-8">
-          {renderUsersContent()}
-        </TabsContent>
-        <TabsContent value="others" className="space-y-6 sm:space-y-8">
-          {renderUsersContent()}
-        </TabsContent>
+        {/* Only show TabsContent for tabs that have users */}
+        {developerCount > 0 && (
+          <TabsContent value="developers" className="space-y-6 sm:space-y-8">
+            {renderUsersContent()}
+          </TabsContent>
+        )}
+        {testerCount > 0 && (
+          <TabsContent value="testers" className="space-y-6 sm:space-y-8">
+            {renderUsersContent()}
+          </TabsContent>
+        )}
+        {adminCount > 0 && (
+          <TabsContent value="admins" className="space-y-6 sm:space-y-8">
+            {renderUsersContent()}
+          </TabsContent>
+        )}
+        {othersCount > 0 && (
+          <TabsContent value="others" className="space-y-6 sm:space-y-8">
+            {renderUsersContent()}
+          </TabsContent>
+        )}
       </Tabs>
     </section>
   </main>
@@ -1138,74 +1183,95 @@ const Users = () => {
 
         {/* Professional Tabs */}
         <Tabs
-          value={tabFromUrl}
+          value={activeTab}
           onValueChange={handleTabChange}
           className="w-full"
         >
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
             <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <TabsList className="grid w-full grid-cols-4 h-14 bg-transparent p-1">
-                <TabsTrigger
-                  value="developers"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Code2 className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Developers</span>
-                  <span className="sm:hidden">Devs</span>
-                  <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
-                    {users.filter(u => u.role === "developer").length}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="testers"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Bug className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Testers</span>
-                  <span className="sm:hidden">Testers</span>
-                  <span className="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-bold">
-                    {users.filter(u => u.role === "tester").length}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="admins"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Shield className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Admins</span>
-                  <span className="sm:hidden">Admins</span>
-                  <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
-                    {users.filter(u => u.role === "admin").length}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="others"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <UserRound className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Others</span>
-                  <span className="sm:hidden">Others</span>
-                  <span className="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold">
-                    {users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length}
-                  </span>
-                </TabsTrigger>
+              <TabsList 
+                className="grid w-full h-14 bg-transparent p-1"
+                style={{ gridTemplateColumns: `repeat(${visibleTabs.length || 1}, minmax(0, 1fr))` }}
+              >
+                {/* Conditionally render tabs only if they have users */}
+                {developerCount > 0 && (
+                  <TabsTrigger
+                    value="developers"
+                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                  >
+                    <Code2 className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    <span className="hidden sm:inline">Developers</span>
+                    <span className="sm:hidden">Devs</span>
+                    <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
+                      {developerCount}
+                    </span>
+                  </TabsTrigger>
+                )}
+                {testerCount > 0 && (
+                  <TabsTrigger
+                    value="testers"
+                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                  >
+                    <Bug className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    <span className="hidden sm:inline">Testers</span>
+                    <span className="sm:hidden">Testers</span>
+                    <span className="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-bold">
+                      {testerCount}
+                    </span>
+                  </TabsTrigger>
+                )}
+                {adminCount > 0 && (
+                  <TabsTrigger
+                    value="admins"
+                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                  >
+                    <Shield className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    <span className="hidden sm:inline">Admins</span>
+                    <span className="sm:hidden">Admins</span>
+                    <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
+                      {adminCount}
+                    </span>
+                  </TabsTrigger>
+                )}
+                {othersCount > 0 && (
+                  <TabsTrigger
+                    value="others"
+                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                  >
+                    <UserRound className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    <span className="hidden sm:inline">Others</span>
+                    <span className="sm:hidden">Others</span>
+                    <span className="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold">
+                      {othersCount}
+                    </span>
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
           </div>
 
-          <TabsContent value="developers" className="space-y-6 sm:space-y-8">
-            {renderUsersContent()}
-          </TabsContent>
-          <TabsContent value="testers" className="space-y-6 sm:space-y-8">
-            {renderUsersContent()}
-          </TabsContent>
-          <TabsContent value="admins" className="space-y-6 sm:space-y-8">
-            {renderUsersContent()}
-          </TabsContent>
-          <TabsContent value="others" className="space-y-6 sm:space-y-8">
-            {renderUsersContent()}
-          </TabsContent>
+          {/* Only show TabsContent for tabs that have users */}
+          {developerCount > 0 && (
+            <TabsContent value="developers" className="space-y-6 sm:space-y-8">
+              {renderUsersContent()}
+            </TabsContent>
+          )}
+          {testerCount > 0 && (
+            <TabsContent value="testers" className="space-y-6 sm:space-y-8">
+              {renderUsersContent()}
+            </TabsContent>
+          )}
+          {adminCount > 0 && (
+            <TabsContent value="admins" className="space-y-6 sm:space-y-8">
+              {renderUsersContent()}
+            </TabsContent>
+          )}
+          {othersCount > 0 && (
+            <TabsContent value="others" className="space-y-6 sm:space-y-8">
+              {renderUsersContent()}
+            </TabsContent>
+          )}
         </Tabs>
       </section>
 

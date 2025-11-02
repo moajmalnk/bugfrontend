@@ -128,7 +128,6 @@ const MyTasks = lazy(() =>
 );
 const DailyUpdate = lazy(() => import("@/pages/DailyUpdate"));
 const DailyWorkUpdate = lazy(() => import("@/pages/DailyWorkUpdate"));
-const TimeTracking = lazy(() => import("@/pages/TimeTracking"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
 const DocsSetupError = lazy(() => import("@/pages/DocsSetupError"));
@@ -255,7 +254,6 @@ const RouteConfig = () => {
           <Route path="my-tasks" element={<MyTasks />} />
           <Route path="daily-update" element={<DailyUpdate />} />
           <Route path="daily-work-update" element={<DailyWorkUpdate />} />
-          <Route path="time-tracking" element={<TimeTracking />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
           <Route path="bugdocs" element={<BugDocsPage />} />
           {/* Redirect from /:role to /:role/projects */}

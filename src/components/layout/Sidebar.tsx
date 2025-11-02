@@ -9,7 +9,6 @@ import {
   Bell,
   Bug,
   CheckCircle,
-  Clock,
   FolderKanban,
   Menu,
   MessageCircle,
@@ -185,14 +184,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
             
-            {/* Time Tracking - Hide for testers */}
-            {role !== 'tester' && (
-              <NavLink
-                to="/time-tracking"
-                icon={<Clock className="h-5 w-5" />}
-                label="Time Tracking"
-              />
-            )}
           </div>
 
           {/* Administration Section - Only show if user has at least one admin permission */}

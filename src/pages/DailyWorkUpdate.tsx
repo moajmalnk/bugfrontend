@@ -7,12 +7,11 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, ArrowLeft, Plus, Bell, Play, Pause, Square } from 'lucide-react';
+import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, ArrowLeft, Plus, Bell } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { TimePicker } from '@/components/ui/TimePicker';
 import { HourPicker } from '@/components/ui/HourPicker';
 import { useAuth } from '@/context/AuthContext';
-import { timeTrackingService, TimeSession } from '@/services/timeTrackingService';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
@@ -56,11 +55,6 @@ export default function DailyWorkUpdate() {
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<string>('');
   
-  // Time tracking state
-  const [currentSession, setCurrentSession] = useState<TimeSession | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(false);
-  const [liveDuration, setLiveDuration] = useState(0);
-
   // Calculate overtime automatically
   const overtimeHours = useMemo(() => {
     const hours = Number(form.hours_today);
@@ -257,23 +251,6 @@ export default function DailyWorkUpdate() {
     })();
   }, [isEditing, editId]);
 
-  // Load current session on component mount
-  useEffect(() => {
-    loadCurrentSession();
-  }, []);
-
-  // Update live timer every second
-  useEffect(() => {
-    if (!currentSession || !currentSession.is_active) return;
-    
-    const interval = setInterval(() => {
-      const duration = timeTrackingService.calculateLiveDuration(currentSession);
-      setLiveDuration(duration);
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, [currentSession]);
-
   async function startEdit(t: UserTask) {
     setEditingTaskId((t.id as number) ?? null);
     setEditingTitle(t.title || '');
@@ -301,106 +278,6 @@ export default function DailyWorkUpdate() {
     setPendingTasks((prev) => prev.filter(pt => pt.id !== t.id));
     const updated: UserTask = { ...t, status: 'done' } as UserTask;
     setCompletedTasks((prev) => [updated, ...prev].slice(0, 5));
-  }
-
-  // Time tracking functions
-  async function loadCurrentSession() {
-    try {
-      setSessionLoading(true);
-      const session = await timeTrackingService.getCurrentSession();
-      setCurrentSession(session);
-      
-      if (session) {
-        const duration = timeTrackingService.calculateLiveDuration(session);
-        setLiveDuration(duration);
-        
-        // Auto-populate form fields from session
-        if (!isEditing) {
-          const checkInTime = new Date(session.check_in_time);
-          const timeString = `${String(checkInTime.getHours()).padStart(2, '0')}:${String(checkInTime.getMinutes()).padStart(2, '0')}:00`;
-          setForm(prev => ({
-            ...prev,
-            start_time: timeString,
-            submission_date: session.submission_date
-          }));
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load current session:', error);
-    } finally {
-      setSessionLoading(false);
-    }
-  }
-
-  async function handleCheckIn() {
-    try {
-      setSessionLoading(true);
-      const result = await timeTrackingService.checkIn({
-        submission_date: form.submission_date,
-        session_notes: 'Daily work session'
-      });
-      
-      await loadCurrentSession();
-      const checkInTime = new Date(result.check_in_time).toLocaleTimeString('en-IN', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        second: '2-digit',
-        hour12: true,
-        timeZone: 'Asia/Kolkata'
-      });
-      toast({ title: 'Checked in successfully', description: `Started at ${checkInTime}` });
-    } catch (error: any) {
-      toast({ title: 'Failed to check in', description: error.message, variant: 'destructive' });
-    } finally {
-      setSessionLoading(false);
-    }
-  }
-
-  async function handleCheckOut() {
-    try {
-      setSessionLoading(true);
-      const result = await timeTrackingService.checkOut();
-      
-      // Auto-populate hours from session
-      setForm(prev => ({
-        ...prev,
-        hours_today: result.total_hours
-      }));
-      
-      setCurrentSession(null);
-      setLiveDuration(0);
-      toast({ title: 'Checked out successfully', description: `Worked for ${timeTrackingService.formatDuration(result.net_duration)}` });
-    } catch (error: any) {
-      toast({ title: 'Failed to check out', description: error.message, variant: 'destructive' });
-    } finally {
-      setSessionLoading(false);
-    }
-  }
-
-  async function handlePause() {
-    try {
-      setSessionLoading(true);
-      await timeTrackingService.pauseSession({ pause_reason: 'break' });
-      await loadCurrentSession();
-      toast({ title: 'Session paused' });
-    } catch (error: any) {
-      toast({ title: 'Failed to pause session', description: error.message, variant: 'destructive' });
-    } finally {
-      setSessionLoading(false);
-    }
-  }
-
-  async function handleResume() {
-    try {
-      setSessionLoading(true);
-      await timeTrackingService.resumeSession();
-      await loadCurrentSession();
-      toast({ title: 'Session resumed' });
-    } catch (error: any) {
-      toast({ title: 'Failed to resume session', description: error.message, variant: 'destructive' });
-    } finally {
-      setSessionLoading(false);
-    }
   }
 
   return (
@@ -540,89 +417,6 @@ export default function DailyWorkUpdate() {
                         />
                       </div>
                     </div>
-                  </div>
-
-                  {/* Time Tracking Widget */}
-                  <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-emerald-50 dark:from-blue-950/20 dark:to-emerald-950/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-1.5 bg-blue-500 rounded-lg">
-                        <Clock className="h-4 w-4 text-white" />
-                      </div>
-                      <h3 className="text-sm font-bold text-blue-800 dark:text-blue-200">Time Tracking</h3>
-                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        currentSession?.is_paused ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                        currentSession?.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                        'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                      }`}>
-                        {timeTrackingService.getSessionStatus(currentSession)}
-                      </div>
-                    </div>
-                    
-                    {currentSession ? (
-                      <div className="space-y-4">
-                        {/* Live Timer */}
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {timeTrackingService.formatDuration(liveDuration)}
-                          </div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400">
-                            {currentSession.is_paused ? 'Paused' : 'Active'} • Started at {new Date(currentSession.check_in_time).toLocaleTimeString('en-IN', { 
-                              hour: '2-digit', 
-                              minute: '2-digit', 
-                              second: '2-digit',
-                              hour12: true,
-                              timeZone: 'Asia/Kolkata'
-                            })}
-                          </div>
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <div className="flex gap-2 justify-center">
-                          {currentSession.is_paused ? (
-                            <Button
-                              onClick={handleResume}
-                              disabled={sessionLoading}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              <Play className="h-4 w-4 mr-2" />
-                              Resume
-                            </Button>
-                          ) : (
-                            <Button
-                              onClick={handlePause}
-                              disabled={sessionLoading}
-                              className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                            >
-                              <Pause className="h-4 w-4 mr-2" />
-                              Pause
-                            </Button>
-                          )}
-                          
-                          <Button
-                            onClick={handleCheckOut}
-                            disabled={sessionLoading}
-                            variant="destructive"
-                          >
-                            <Square className="h-4 w-4 mr-2" />
-                            Check Out
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                          Start tracking your work time
-                        </div>
-                        <Button
-                          onClick={handleCheckIn}
-                          disabled={sessionLoading}
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          <Play className="h-4 w-4 mr-2" />
-                          Check In
-                        </Button>
-                      </div>
-                    )}
                   </div>
 
                   {/* Overtime Breakdown Display */}
