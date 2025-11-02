@@ -28,13 +28,16 @@ import {
   Phone,
   Shield,
   X,
+  Key,
 } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
 import { UserWorkStats } from "./UserWorkStats";
 import { ActiveHours } from "./ActiveHours";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export interface DeleteUserDialogProps {
   user: User;
@@ -103,6 +106,8 @@ export function UserDetailDialog({
   onPasswordChange: (userId: string, newPassword: string) => Promise<void>;
 }) {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const { hasPermission } = usePermissions(null);
   const [stats, setStats] = useState<UserStats>({
     total_projects: 0,
     total_bugs: 0,
@@ -277,71 +282,91 @@ export function UserDetailDialog({
         {/* Scrollable content */}
         <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <EditUserDialog
-              user={user}
-              onUserUpdate={onUserUpdate}
-              loggedInUserRole={loggedInUserRole}
-              trigger={
-                <Button variant="outline" className="w-full">
-                  Edit User
-                </Button>
-              }
-            />
-            <ChangePasswordDialog
-              user={user}
-              onPasswordChange={handlePasswordChange}
-              trigger={
-                <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    title="Change Password"
-                  >
-                    Change Password
-                  </Button>
-                </DialogTrigger>
-              }
-            />
-            {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
-              <Button
-                variant="outline"
-                className="w-full flex items-center justify-center gap-2"
-                onClick={handleGenerateDashboardLink}
-                disabled={isGeneratingLink}
-                title="Open user's dashboard in a new tab"
-              >
-                {isGeneratingLink ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ExternalLink className="h-4 w-4" />
-                )}
-                User Dashboard
-              </Button>
-            )}
-            {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
-              <DeleteUserDialog
+          <div className="flex flex-col gap-3">
+            {/* First Row - 3 buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <EditUserDialog
                 user={user}
-                onUserDelete={async (userId, force) => {
-                  await onUserDelete(userId, force);
-                  onOpenChange(false);
-                }}
+                onUserUpdate={onUserUpdate}
+                loggedInUserRole={loggedInUserRole}
                 trigger={
-                  <Button
-                    variant="destructive"
-                    className="w-full"
-                    title={
-                      user.role === "admin"
-                        ? "Administrators cannot be deleted"
-                        : "Delete User"
-                    }
-                    disabled={user.role === "admin"}
-                  >
-                    Delete User
+                  <Button variant="outline" className="w-full">
+                    Edit User
                   </Button>
                 }
               />
-            )}
+              <ChangePasswordDialog
+                user={user}
+                onPasswordChange={handlePasswordChange}
+                trigger={
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      title="Change Password"
+                    >
+                      Change Password
+                    </Button>
+                  </DialogTrigger>
+                }
+              />
+              {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
+                <Button
+                  variant="outline"
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={handleGenerateDashboardLink}
+                  disabled={isGeneratingLink}
+                  title="Open user's dashboard in a new tab"
+                >
+                  {isGeneratingLink ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4" />
+                  )}
+                  Dashboard
+                </Button>
+              )}
+            </div>
+            
+            {/* Second Row - 2 buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {hasPermission('USERS_MANAGE_PERMISSIONS') && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate(`/${loggedInUserRole}/users/${user.id}/permissions`);
+                  }}
+                >
+                  <Key className="h-4 w-4 mr-2" />
+                  Manage Permissions
+                </Button>
+              )}
+              {loggedInUserRole === "admin" && currentUser?.id !== user.id && (
+                <DeleteUserDialog
+                  user={user}
+                  onUserDelete={async (userId, force) => {
+                    await onUserDelete(userId, force);
+                    onOpenChange(false);
+                  }}
+                  trigger={
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      title={
+                        user.role === "admin"
+                          ? "Administrators cannot be deleted"
+                          : "Delete User"
+                      }
+                      disabled={user.role === "admin"}
+                    >
+                      Delete User
+                    </Button>
+                  }
+                />
+              )}
+            </div>
           </div>
 
           {/* Work Statistics */}

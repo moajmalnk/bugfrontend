@@ -129,6 +129,7 @@ const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
 const DocsSetupError = lazy(() => import("@/pages/DocsSetupError"));
 const BugDocsPage = lazy(() => import("@/pages/BugDocsPage"));
+const UserPermissions = lazy(() => import("@/pages/UserPermissions"));
 
 // Component to handle role-neutral bug redirects
 const BugRedirect = () => {
@@ -229,6 +230,7 @@ const RouteConfig = () => {
           <Route path="bugs/new" element={<NewBug />} />
           <Route path="activity" element={<Activity />} />
           <Route path="users" element={<Users />} />
+          <Route path="users/:userId/permissions" element={<UserPermissions />} />
           <Route path="fixes" element={<Fixes />} />
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />

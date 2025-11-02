@@ -2,7 +2,9 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
-import { cn } from "@/lib/utils";
+import { cn, getEffectiveRole } from "@/lib/utils";
+import { PermissionGuard } from "@/components/PermissionGuard";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   Bell,
   Bug,
@@ -23,7 +25,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 
 interface SidebarProps {
   className?: string;
@@ -36,7 +38,8 @@ const defaultAvatar =
 export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
   const location = useLocation();
-  const role = currentUser?.role;
+  const { hasPermission } = usePermissions(null);
+  const role = getEffectiveRole(currentUser || {});
 
   const isActive = (path: string) => {
     if (!role) return false;
@@ -159,68 +162,107 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               label="BugMeet"
             />
             
-            {/* Daily Update, My Tasks & BugDocs - Only for Admins and Developers */}
-            {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
-              <>
-               <NavLink
-                  to="/my-tasks?tab=shared-tasks"
-                  icon={<ListTodo className="h-5 w-5" />}
-                  label="BugToDo"
-                />
-                <NavLink
-                  to="/daily-update"
-                  icon={<Calendar className="h-5 w-5" />}
-                  label="BugUpdate"
-                />
-                
-              </>
+            {/* Daily Update, My Tasks & BugDocs - Permission-based access */}
+            {(hasPermission('TASKS_VIEW_ALL') || hasPermission('TASKS_VIEW_ASSIGNED') || hasPermission('TASKS_CREATE')) && (
+              <NavLink
+                to="/my-tasks?tab=shared-tasks"
+                icon={<ListTodo className="h-5 w-5" />}
+                label="BugToDo"
+              />
+            )}
+            
+            {(hasPermission('DAILY_UPDATE_CREATE') || hasPermission('DAILY_UPDATE_VIEW') || hasPermission('UPDATES_VIEW') || hasPermission('UPDATES_CREATE')) && (
+              <NavLink
+                to="/daily-update"
+                icon={<Calendar className="h-5 w-5" />}
+                label="BugUpdate"
+              />
             )}
           </div>
 
-          {/* Admin Section */}
-          {currentUser?.role === "admin" && (
-            <>
-              <Separator className="my-4" />
-              <div className="space-y-1">
-                <div className="px-3 py-1">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Administration
-                  </h3>
+          {/* Administration Section - Only show if user has at least one admin permission */}
+          {(() => {
+            // Check if user has at least one admin-level permission
+            const hasUsersPermission = role === "admin";
+            const hasMessagingView = hasPermission('MESSAGING_VIEW');
+            const hasMessagingCreate = hasPermission('MESSAGING_CREATE');
+            const hasFeedbackView = hasPermission('FEEDBACK_VIEW');
+            const hasActivityView = hasPermission('ACTIVITY_VIEW');
+            const hasSettingsEdit = hasPermission('SETTINGS_EDIT');
+
+            const hasAnyAdminLinks = hasUsersPermission || hasMessagingView || hasMessagingCreate || 
+                                    hasFeedbackView || hasActivityView || hasSettingsEdit;
+
+            // Show Administration section if user has ANY admin permission OR is super admin
+            if (!hasAnyAdminLinks) {
+              return null;
+            }
+
+            return (
+              <>
+                <Separator className="my-4" />
+                <div className="space-y-1">
+                  <div className="px-3 py-1">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Administration
+                    </h3>
+                  </div>
+
+                  {/* Users Link - Only for Admins */}
+                  {hasUsersPermission && (
+                    <NavLink
+                      to="/users"
+                      icon={<Users className="h-5 w-5" />}
+                      label="Users"
+                    />
+                  )}
+
+                  {/* Messaging Links */}
+                  {hasMessagingView && (
+                    <NavLink
+                      to="/messages"
+                      icon={<MessageSquare className="h-5 w-5" />}
+                      label="BugMessage"
+                    />
+                  )}
+
+                  {hasMessagingCreate && (
+                    <NavLink
+                      to="/whatsapp-messages"
+                      icon={<MessageCircle className="h-5 w-5" />}
+                      label="WhatsApp"
+                    />
+                  )}
+
+                  {/* Feedback and Activity */}
+                  {hasFeedbackView && (
+                    <NavLink
+                      to="/feedback-stats"
+                      icon={<BarChart3 className="h-5 w-5" />}
+                      label="Feedbacks"
+                    />
+                  )}
+
+                  {hasActivityView && (
+                    <NavLink
+                      to="/activity"
+                      icon={<Activity className="h-5 w-5" />}
+                      label="Activities"
+                    />
+                  )}
+
+                  {/* Settings */}
+                  {hasSettingsEdit && (
+                    <NavLink
+                      to="/settings"
+                      icon={<Settings className="h-5 w-5" />}
+                      label="Settings"
+                    />
+                  )}
                 </div>
-                <NavLink
-                  to="/users"
-                  icon={<Users className="h-5 w-5" />}
-                  label="Users"
-                />
-                <NavLink
-                  to="/messages"
-                  icon={<MessageSquare className="h-5 w-5" />}
-                  label="BugMessage"
-                />
-                <NavLink
-                  to="/whatsapp-messages"
-                  icon={<MessageCircle className="h-5 w-5" />}
-                  label="WhatsApp"
-                />
-                <NavLink
-                  to="/feedback-stats"
-                  icon={<BarChart3 className="h-5 w-5" />}
-                  label="Feedbacks"
-                />
-                <NavLink
-                  to="/activity"
-                  icon={<Activity className="h-5 w-5" />}
-                  label="Activities"
-                />
-                <NavLink
-                  to="/settings"
-                  icon={<Settings className="h-5 w-5" />}
-                  label="Settings"
-                />
-              </div>
-              <Separator className="my-4" />
-            </>
-          )}
+              </>
+            );
+          })()}
         </div>
       </ScrollArea>
 
@@ -247,7 +289,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               {currentUser?.username || "BugRicer"}
             </p>
             <p className="text-xs text-muted-foreground capitalize truncate">
-              {currentUser?.role || "BugRicer"}
+              {role || "BugRicer"}
             </p>
           </div>
         </Link>

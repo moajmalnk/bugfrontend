@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { userService } from "@/services/userService";
+import { permissionService } from "@/services/permissionService";
 import { User } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pencil, X } from "lucide-react";
@@ -43,7 +44,7 @@ const userFormSchema = z.object({
       message: "Username can only contain letters, numbers, and underscores",
     }),
   email: z.string().email({ message: "Invalid email address" }),
-  role: z.enum(["admin", "developer", "tester"], {
+  role: z.string().min(1, {
     required_error: "Please select a role",
   }),
   phone: z.string().optional(),
@@ -66,9 +67,30 @@ export function EditUserDialog({
 }: EditUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
   const [formData, setFormData] = useState({
     ...user,
   });
+
+  // Load roles on mount
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const data = await permissionService.getRoles();
+        setRoles(data);
+      } catch (error) {
+        console.error("Failed to load roles:", error);
+        // Fallback to default roles
+        const fallbackRoles = [
+          { id: 1, role_name: "Admin" },
+          { id: 2, role_name: "Developer" },
+          { id: 3, role_name: "Tester" },
+        ];
+        setRoles(fallbackRoles);
+      }
+    };
+    loadRoles();
+  }, []);
 
   // Initialize the form
   const form = useForm<UserFormValues>({
@@ -76,7 +98,7 @@ export function EditUserDialog({
     defaultValues: {
       username: user.username || "",
       email: user.email,
-      role: user.role,
+      role: user.role || "tester",
       phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
     },
   });
@@ -86,7 +108,7 @@ export function EditUserDialog({
     form.reset({
       username: user.username || "",
       email: user.email,
-      role: user.role,
+      role: user.role || "tester",
       phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
     });
   }, [user, form]);
@@ -94,11 +116,17 @@ export function EditUserDialog({
   const onSubmit = async (data: UserFormValues) => {
     setIsSubmitting(true);
     try {
+      // Find the selected role to get role_id
+      const selectedRole = roles.find(
+        (r) => r.role_name.toLowerCase() === data.role.toLowerCase()
+      );
+
       // Call the update service
       await userService.updateUser(user.id, {
         username: data.username,
         email: data.email,
         role: data.role,
+        role_id: selectedRole?.id,
         phone: data.phone ? "+91" + data.phone : "",
       });
 
@@ -221,10 +249,12 @@ export function EditUserDialog({
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="developer">Developer</SelectItem>
-                      <SelectItem value="tester">Tester</SelectItem>
+                    <SelectContent position="popper" className="z-[70]">
+                      {roles.map((role) => (
+                        <SelectItem key={role.id} value={role.role_name.toLowerCase()}>
+                          {role.role_name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

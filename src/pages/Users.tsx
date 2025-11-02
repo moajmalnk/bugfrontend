@@ -14,8 +14,10 @@ import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { UserDetailDialog } from "@/components/users/UserDetailDialog";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { useAuth } from "@/context/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { ENV } from "@/lib/env";
+import { getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
 import { Bug, Code2, Shield, UserRound, Undo2 } from "lucide-react";
@@ -114,6 +116,8 @@ interface NewUser {
 
 const Users = () => {
   const { currentUser } = useAuth();
+  const { hasPermission, isLoading: isLoadingPermissions } = usePermissions(null);
+  const effectiveRole = getEffectiveRole(currentUser || {});
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -219,6 +223,12 @@ const Users = () => {
       filtered = filtered.filter(user => user.role === "tester");
     } else if (tabFromUrl === "admins") {
       filtered = filtered.filter(user => user.role === "admin");
+    } else if (tabFromUrl === "others") {
+      // Show users with custom roles (role_id not 1, 2, or 3)
+      filtered = filtered.filter(user => {
+        const hasCustomRole = user.role_id && ![1, 2, 3].includes(user.role_id);
+        return hasCustomRole;
+      });
     }
 
     setFilteredUsers(filtered);
@@ -382,13 +392,36 @@ const Users = () => {
   );
   const totalPages = Math.ceil(totalFiltered / itemsPerPage);
 
-  // Only admin should access this page
-  if (currentUser?.role !== "admin") {
+  // Check for USERS_VIEW permission OR admin role
+  if (isLoadingPermissions) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+        <p className="text-muted-foreground">
+          Verifying your access permissions...
+        </p>
+      </div>
+    );
+  }
+
+  // Only admins can access Users page
+  if (effectiveRole !== 'admin') {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
         <p className="text-muted-foreground">
           Only administrators can access the user management page.
+        </p>
+      </div>
+    );
+  }
+
+  if (!hasPermission('USERS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+        <p className="text-muted-foreground">
+          You do not have permission to access the user management page.
         </p>
       </div>
     );
@@ -449,7 +482,7 @@ const Users = () => {
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <TabsList className="grid w-full grid-cols-3 h-14 bg-transparent p-1">
+              <TabsList className="grid w-full grid-cols-4 h-14 bg-transparent p-1">
             {/* Admins tab with Shield icon and blue styling */}
 <TabsTrigger
   value="admins"
@@ -484,6 +517,17 @@ const Users = () => {
                   {users.filter(u => u.role === "tester").length}
                 </span>
               </TabsTrigger>
+              <TabsTrigger
+                value="others"
+                className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+              >
+                <UserRound className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <span className="hidden sm:inline">Others</span>
+                <span className="sm:hidden">Others</span>
+                <span className="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold">
+                  {users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length}
+                </span>
+              </TabsTrigger>
             </TabsList>
           </div>
         </div>
@@ -495,6 +539,9 @@ const Users = () => {
           {renderUsersContent()}
         </TabsContent>
         <TabsContent value="admins" className="space-y-6 sm:space-y-8">
+          {renderUsersContent()}
+        </TabsContent>
+        <TabsContent value="others" className="space-y-6 sm:space-y-8">
           {renderUsersContent()}
         </TabsContent>
       </Tabs>
@@ -1035,7 +1082,7 @@ const Users = () => {
               variant: "destructive",
             });
           }}
-          loggedInUserRole={currentUser.role}
+          loggedInUserRole={effectiveRole}
         />
         )}
       </>
@@ -1098,7 +1145,7 @@ const Users = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
             <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <TabsList className="grid w-full grid-cols-3 h-14 bg-transparent p-1">
+              <TabsList className="grid w-full grid-cols-4 h-14 bg-transparent p-1">
                 <TabsTrigger
                   value="developers"
                   className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
@@ -1132,6 +1179,17 @@ const Users = () => {
                     {users.filter(u => u.role === "admin").length}
                   </span>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="others"
+                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                >
+                  <UserRound className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="hidden sm:inline">Others</span>
+                  <span className="sm:hidden">Others</span>
+                  <span className="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold">
+                    {users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length}
+                  </span>
+                </TabsTrigger>
               </TabsList>
             </div>
           </div>
@@ -1143,6 +1201,9 @@ const Users = () => {
             {renderUsersContent()}
           </TabsContent>
           <TabsContent value="admins" className="space-y-6 sm:space-y-8">
+            {renderUsersContent()}
+          </TabsContent>
+          <TabsContent value="others" className="space-y-6 sm:space-y-8">
             {renderUsersContent()}
           </TabsContent>
         </Tabs>
@@ -1164,7 +1225,7 @@ const Users = () => {
               variant: "destructive",
             });
           }}
-          loggedInUserRole={currentUser.role}
+          loggedInUserRole={effectiveRole}
         />
       )}
       </main>
