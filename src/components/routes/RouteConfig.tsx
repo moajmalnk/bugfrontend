@@ -132,6 +132,7 @@ const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
 const DocsSetupError = lazy(() => import("@/pages/DocsSetupError"));
 const BugDocsPage = lazy(() => import("@/pages/BugDocsPage"));
+const ProjectDocumentsPage = lazy(() => import("@/pages/ProjectDocumentsPage"));
 const UserPermissions = lazy(() => import("@/pages/UserPermissions"));
 
 // Component to handle role-neutral bug redirects
@@ -256,6 +257,7 @@ const RouteConfig = () => {
           <Route path="daily-work-update" element={<DailyWorkUpdate />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
           <Route path="bugdocs" element={<BugDocsPage />} />
+          <Route path="bugdocs/project/:projectId" element={<ProjectDocumentsPage />} />
           {/* Redirect from /:role to /:role/projects */}
           <Route index element={<Navigate to="projects" replace />} />
         </Route>

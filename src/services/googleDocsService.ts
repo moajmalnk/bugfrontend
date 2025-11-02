@@ -15,6 +15,7 @@ export interface BugDocument {
 
 export interface GoogleDocsConnectionStatus {
   connected: boolean;
+  email?: string | null;
 }
 
 export interface CreateDocumentResponse {
@@ -34,6 +35,10 @@ export interface UserDocument {
   updated_at: string;
   last_accessed_at: string | null;
   template_name: string | null;
+  project_id: string | null;
+  project_name: string | null;
+  creator_user_id?: string;
+  creator_name?: string | null;
 }
 
 export interface Template {
@@ -50,8 +55,9 @@ export interface Template {
 class GoogleDocsService {
   /**
    * Check if user has connected their Google account
+   * Returns connection status and email if connected
    */
-  async checkConnection(): Promise<boolean> {
+  async checkConnection(): Promise<GoogleDocsConnectionStatus> {
     try {
       console.log('🔍 Checking Google Docs connection...');
       const response = await apiClient.get<{
@@ -59,22 +65,60 @@ class GoogleDocsService {
         data: GoogleDocsConnectionStatus;
       }>('/docs/check-connection.php');
       
-      const connected = response.data.data?.connected || false;
-      console.log('🔗 Connection check result:', connected);
+      const result = {
+        connected: response.data.data?.connected || false,
+        email: response.data.data?.email || null
+      };
+      console.log('🔗 Connection check result:', result);
       console.log('🔍 Debug info:', response.data);
-      return connected;
+      return result;
     } catch (error) {
       console.error('❌ Failed to check Google Docs connection:', error);
-      return false;
+      return { connected: false, email: null };
+    }
+  }
+
+  /**
+   * Disconnect Google account
+   */
+  async disconnect(): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🔌 Disconnecting Google account...');
+      const response = await apiClient.post<{
+        success: boolean;
+        message: string;
+      }>('/oauth/disconnect.php');
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to disconnect');
+      }
+      
+      console.log('✅ Google account disconnected successfully');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to disconnect Google account:', error);
+      throw new Error(error.response?.data?.message || 'Failed to disconnect Google account');
     }
   }
 
   /**
    * Get the OAuth authorization URL
+   * @param token JWT token to pass as state
+   * @param returnUrl Optional return URL to redirect to after OAuth callback
    */
-  getAuthUrl(token?: string): string {
+  getAuthUrl(token?: string, returnUrl?: string): string {
     const baseUrl = `${ENV.API_URL}/oauth/auth`;
     if (token) {
+      if (returnUrl) {
+        // Encode both token and return_url as JSON, then base64 encode
+        const stateData = {
+          jwt_token: token,
+          return_url: returnUrl
+        };
+        const encodedState = btoa(JSON.stringify(stateData));
+        return `${baseUrl}?state=${encodeURIComponent(encodedState)}`;
+      }
+      // Just pass token as before for backward compatibility
       return `${baseUrl}?state=${encodeURIComponent(token)}`;
     }
     return baseUrl;
@@ -164,7 +208,8 @@ class GoogleDocsService {
   async createGeneralDocument(
     docTitle: string,
     templateId?: number,
-    docType: string = 'general'
+    docType: string = 'general',
+    projectId?: string | null
   ): Promise<{ success: boolean; id: number; document_url: string; document_title: string }> {
     try {
       const response = await apiClient.post<{
@@ -177,6 +222,7 @@ class GoogleDocsService {
         doc_title: docTitle,
         template_id: templateId,
         doc_type: docType,
+        project_id: projectId || null,
       });
 
       if (!response.data.success) {
@@ -191,16 +237,144 @@ class GoogleDocsService {
   }
 
   /**
-   * List all general documents for the current user
+   * Get documents for a specific project
    */
-  async listGeneralDocuments(includeArchived: boolean = false): Promise<UserDocument[]> {
+  async getDocumentsByProject(projectId: string, includeArchived: boolean = false): Promise<{
+    documents: UserDocument[];
+    project_id: string;
+    project_name: string | null;
+    count: number;
+  }> {
     try {
-      console.log('🔍 Fetching general documents, includeArchived:', includeArchived);
+      console.log('🔍 Fetching documents for project:', projectId);
+      const url = `/docs/get-by-project.php?project_id=${encodeURIComponent(projectId)}&include_archived=${includeArchived}`;
+      const response = await apiClient.get<{
+        success: boolean;
+        documents: UserDocument[];
+        project_id: string;
+        project_name: string | null;
+        count: number;
+      }>(url);
+
+      if (!response.data.success) {
+        throw new Error('Failed to fetch project documents');
+      }
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to get documents by project:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch project documents');
+    }
+  }
+
+  /**
+   * Get all documents (Admin only) - grouped by project
+   */
+  async getAllDocuments(includeArchived: boolean = false): Promise<{
+    documents: Array<{
+      project_id: string | null;
+      project_name: string;
+      documents: UserDocument[];
+    }>;
+    count: number;
+  }> {
+    try {
+      console.log('🔍 Fetching all documents (admin)');
+      const url = `/docs/get-all-docs.php?include_archived=${includeArchived}`;
+      const response = await apiClient.get<{
+        success: boolean;
+        documents: Array<{
+          project_id: string | null;
+          project_name: string;
+          documents: UserDocument[];
+        }>;
+        count: number;
+      }>(url);
+
+      if (!response.data.success) {
+        throw new Error('Failed to fetch all documents');
+      }
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Failed to get all documents:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch all documents');
+    }
+  }
+
+  /**
+   * Get shared documents (Developers/Testers) - from projects user is member of
+   */
+  async getSharedDocuments(includeArchived: boolean = false): Promise<UserDocument[]> {
+    try {
+      console.log('🔍 Fetching shared documents');
+      const url = `/docs/get-shared-docs.php?include_archived=${includeArchived}`;
       const response = await apiClient.get<{
         success: boolean;
         documents: UserDocument[];
         count: number;
-      }>(`/docs/list-general-docs.php?include_archived=${includeArchived}`);
+      }>(url);
+
+      if (!response.data.success) {
+        throw new Error('Failed to fetch shared documents');
+      }
+
+      return response.data.documents || [];
+    } catch (error: any) {
+      console.error('❌ Failed to get shared documents:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get projects with document counts for card display
+   */
+  async getProjectsWithDocumentCounts(): Promise<Array<{
+    id: string;
+    name: string;
+    description: string;
+    status: string;
+    document_count: number;
+  }>> {
+    try {
+      console.log('🔍 Fetching projects with document counts');
+      const response = await apiClient.get<{
+        success: boolean;
+        projects: Array<{
+          id: string;
+          name: string;
+          description: string;
+          status: string;
+          document_count: number;
+        }>;
+      }>('/docs/get-projects-with-counts.php');
+
+      if (!response.data.success) {
+        throw new Error('Failed to fetch projects');
+      }
+
+      return response.data.projects || [];
+    } catch (error: any) {
+      console.error('❌ Failed to get projects with counts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * List all general documents for the current user
+   */
+  async listGeneralDocuments(includeArchived: boolean = false, projectId?: string | null): Promise<UserDocument[]> {
+    try {
+      console.log('🔍 Fetching general documents, includeArchived:', includeArchived, 'projectId:', projectId);
+      let url = `/docs/list-general-docs.php?include_archived=${includeArchived}`;
+      if (projectId) {
+        url += `&project_id=${encodeURIComponent(projectId)}`;
+      }
+      const response = await apiClient.get<{
+        success: boolean;
+        documents: UserDocument[];
+        count: number;
+      }>(url);
 
       console.log('📄 API response:', response.data);
 

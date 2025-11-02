@@ -3,10 +3,19 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { createMeeting, getMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2 } from "lucide-react";
+import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2, RefreshCw } from "lucide-react";
+import { googleDocsService } from "@/services/googleDocsService";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ENV } from "@/lib/env";
@@ -176,6 +185,13 @@ export default function MeetLobby() {
   const [deletingMeetingId, setDeletingMeetingId] = useState<string | null>(null);
   const [deletedMeeting, setDeletedMeeting] = useState<RunningMeeting | null>(null);
   const navigate = useNavigate();
+  
+  // Google connection state
+  const [isConnected, setIsConnected] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true);
+  const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   // Undo delete functionality
   const undoDelete = useUndoDelete({
@@ -682,6 +698,89 @@ export default function MeetLobby() {
     });
   };
 
+  // Check Google connection status
+  const checkConnection = async () => {
+    setIsCheckingConnection(true);
+    try {
+      console.log('Checking Google connection for Meet...');
+      const result = await googleDocsService.checkConnection();
+      console.log('Connection status:', result);
+      setIsConnected(result.connected);
+      setConnectedEmail(result.email || null);
+      
+      // If connected, clear any error
+      if (result.connected) {
+        setError(null);
+      }
+      
+      return result.connected;
+    } catch (error) {
+      console.error('Failed to check Google connection:', error);
+      setIsConnected(false);
+      setConnectedEmail(null);
+      return false;
+    } finally {
+      setIsCheckingConnection(false);
+    }
+  };
+
+  // Check connection on mount
+  useEffect(() => {
+    checkConnection();
+  }, []);
+
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      await googleDocsService.disconnect();
+      setIsConnected(false);
+      setConnectedEmail(null);
+      setShowDisconnectDialog(false);
+      setError("Please connect your Google account first to view meetings.");
+      toast.success("Google account disconnected successfully.");
+      // Clear meetings list
+      setRunningMeets([]);
+      setCompletedMeets([]);
+    } catch (error: any) {
+      console.error('Failed to disconnect:', error);
+      toast.error(error.message || "Failed to disconnect Google account");
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  const handleConnect = async () => {
+    try {
+      // Get current user ID from JWT token
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Please log in first");
+        return;
+      }
+      
+      // Decode JWT to get user ID
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const userId = payload.user_id;
+      
+      // Build return URL based on current environment
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const returnUrl = isLocal 
+        ? `http://localhost:8080${window.location.pathname}`
+        : `https://bugs.bugricer.com${window.location.pathname}`;
+      
+      // Check if we're in production or local
+      const isProduction = !isLocal;
+      const reauthUrl = isProduction 
+        ? `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl)}`
+        : `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl)}`;
+      // Open in same window for OAuth flow, not new window
+      window.location.href = reauthUrl;
+    } catch (error) {
+      console.error('Error getting user ID:', error);
+      toast.error("Error getting user information");
+    }
+  };
+
   // Check for OAuth success/error parameters
   useEffect(() => {
     const checkGoogleConnection = () => {
@@ -696,6 +795,8 @@ export default function MeetLobby() {
         window.history.replaceState({}, document.title, window.location.pathname);
         // Clear any existing error state
         setError(null);
+        // Refresh connection status
+        checkConnection();
         // Refresh meetings after a short delay to ensure token is saved
         setTimeout(() => {
           console.log("🔄 Refreshing meetings after Google connection...");
@@ -707,6 +808,7 @@ export default function MeetLobby() {
         setError(`Google connection failed: ${decodeURIComponent(googleError)}`);
         // Clear the URL parameters
         window.history.replaceState({}, document.title, window.location.pathname);
+        checkConnection(); // Refresh connection status
         return true; // Indicate we handled the error
       }
       return false; // No OAuth parameters found
@@ -1007,6 +1109,57 @@ export default function MeetLobby() {
           </div>
         )}
 
+        {/* Google Connected Status */}
+        {!isCheckingConnection && isConnected && !error && (
+          <div className="relative overflow-hidden mb-6">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-emerald-50/30 to-teal-50/50 dark:from-green-950/20 dark:via-emerald-950/10 dark:to-teal-950/20 rounded-2xl"></div>
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="p-2 sm:p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-1 sm:mb-0">
+                      Google Account Connected
+                    </h3>
+                    {connectedEmail && (
+                      <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                        {connectedEmail}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-shrink-0 flex gap-3">
+                  <Button
+                    onClick={handleConnect}
+                    variant="outline"
+                    className="w-full sm:w-auto border-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reconnect
+                  </Button>
+                  <Button
+                    onClick={() => setShowDisconnectDialog(true)}
+                    variant="destructive"
+                    className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Google Connection Status */}
         {error && (error.includes("Please connect your Google account") || 
                   error.includes("re-authorize your Google account") ||
@@ -1042,31 +1195,7 @@ export default function MeetLobby() {
                 </div>
                 <div className="flex-shrink-0">
                   <Button
-                    onClick={async () => {
-                      try {
-                        // Get current user ID from JWT token
-                        const token = localStorage.getItem("token");
-                        if (!token) {
-                          toast.error("Please log in first");
-                          return;
-                        }
-                        
-                        // Decode JWT to get user ID
-                        const payload = JSON.parse(atob(token.split('.')[1]));
-                        const userId = payload.user_id;
-                        
-                        // Check if we're in production or local
-                        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-                        const reauthUrl = isProduction 
-                          ? `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}`
-                          : `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}`;
-                        // Open in same window for OAuth flow, not new window
-                        window.location.href = reauthUrl;
-                      } catch (error) {
-                        console.error('Error getting user ID:', error);
-                        toast.error("Error getting user information");
-                      }
-                    }}
+                    onClick={handleConnect}
                     className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3"
                   >
                     {error.includes("re-authorize") || error.includes("reconnect") || error.includes("Failed to obtain access token") ? "Re-authorize Google" : "Connect Google"}
@@ -1896,6 +2025,49 @@ export default function MeetLobby() {
         </Dialog>
 
       </section>
+
+      {/* Disconnect Confirmation Dialog */}
+      <Dialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disconnect Google Account?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to disconnect your Google account? This will revoke access to Google Calendar and you won't be able to create or manage meetings until you reconnect.
+            </DialogDescription>
+          </DialogHeader>
+          {connectedEmail && (
+            <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Account: <span className="font-semibold text-gray-900 dark:text-white">{connectedEmail}</span></p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDisconnectDialog(false)}
+              disabled={isDisconnecting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDisconnect}
+              disabled={isDisconnecting}
+            >
+              {isDisconnecting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Disconnecting...
+                </>
+              ) : (
+                <>
+                  <X className="h-4 w-4 mr-2" />
+                  Disconnect
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

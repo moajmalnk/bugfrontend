@@ -31,7 +31,7 @@ import { updateService } from "@/services/updateService";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { AlertCircle, Bell, Filter, Lock, Plus, Search, User, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 // Table row skeleton component for loading state
@@ -115,6 +115,7 @@ const Updates = () => {
   const [createdByFilter, setCreatedByFilter] = useState("all");
   const [typeOpen, setTypeOpen] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch updates from backend
   const {
@@ -281,7 +282,7 @@ const Updates = () => {
       className="w-full"
     >
       <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl pointer-events-none"></div>
         <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
           <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
         <TabsTrigger
@@ -309,7 +310,7 @@ const Updates = () => {
       <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
         {/* Enhanced Search and Filter Controls - Always show when tabs are visible */}
         <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none"></div>
           <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-4">
                       <div className="p-1.5 bg-green-500 rounded-lg">
@@ -320,13 +321,24 @@ const Updates = () => {
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search Bar */}
             <div className="flex-1 relative group">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search updates, projects, or creators..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setSearchTerm(newValue);
+                  // Maintain focus after state update
+                  requestAnimationFrame(() => {
+                    if (searchInputRef.current && document.activeElement !== searchInputRef.current) {
+                      searchInputRef.current.focus();
+                    }
+                  });
+                }}
                 className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                autoComplete="off"
               />
             </div>
 

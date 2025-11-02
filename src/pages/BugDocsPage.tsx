@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { getEffectiveRole } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,6 +30,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { googleDocsService, UserDocument, Template } from "@/services/googleDocsService";
+import { projectService } from "@/services/projectService";
+import { ProjectCardsGrid, ProjectWithCount } from "@/components/docs/ProjectCardsGrid";
 import {
   FileText,
   Plus,
@@ -46,30 +50,55 @@ import {
 import { formatDistanceToNow } from "date-fns";
 
 const BugDocsPage = () => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const userRole = currentUser ? getEffectiveRole(currentUser) : 'user';
+  const isAdmin = userRole === 'admin';
+  const isDevOrTester = userRole === 'developer' || userRole === 'tester';
+  
   const [documents, setDocuments] = useState<UserDocument[]>([]);
+  const [allDocumentsGrouped, setAllDocumentsGrouped] = useState<Array<{
+    project_id: string | null;
+    project_name: string;
+    documents: UserDocument[];
+  }>>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [projects, setProjects] = useState<ProjectWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
+  const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   
   // Delete confirmation state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<UserDocument | null>(null);
+  
+  // Disconnect confirmation state
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   // Form state
   const [docTitle, setDocTitle] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("0");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 
   // Tab and filter state
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") || "all-docs";
+  // Set default tab based on role
+  const getDefaultTab = () => {
+    if (isAdmin) return "all-docs";
+    if (isDevOrTester) return "shared-docs";
+    return "my-docs";
+  };
+  const initialTab = searchParams.get("tab") || getDefaultTab();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
 
   useEffect(() => {
     loadData();
@@ -83,16 +112,45 @@ const BugDocsPage = () => {
     }
   }, [isConnected]);
 
+  // Reload documents when tab changes
+  useEffect(() => {
+    if (isConnected && !isCheckingConnection) {
+      loadDocuments();
+    }
+  }, [activeTab, isConnected]);
+
   // Debug document count changes
   useEffect(() => {
     console.log('📊 Document count changed:', documents.length);
   }, [documents.length]);
+
+  const loadProjects = async () => {
+    setIsLoadingProjects(true);
+    try {
+      const projsWithCounts = await googleDocsService.getProjectsWithDocumentCounts();
+      setProjects(projsWithCounts);
+    } catch (error: any) {
+      console.error("Error loading projects:", error);
+      // Fallback to regular project service
+      try {
+        const projs = await projectService.getProjects();
+        setProjects(projs.map(p => ({ ...p, document_count: 0 })));
+      } catch (fallbackError) {
+        console.error("Error loading projects fallback:", fallbackError);
+      }
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
 
   const loadData = async () => {
     console.log('🔄 Starting loadData...');
     setIsLoading(true);
     setIsCheckingConnection(true);
     try {
+      // Load projects (always load, doesn't require Google connection)
+      await loadProjects();
+      
       // Check connection first
       const connected = await checkConnection();
       console.log('🔗 Connection result:', connected);
@@ -116,14 +174,41 @@ const BugDocsPage = () => {
   const checkConnection = async () => {
     try {
       console.log('Checking Google Docs connection...');
-      const connected = await googleDocsService.checkConnection();
-      console.log('Connection status:', connected);
-      setIsConnected(connected);
-      return connected;
+      const result = await googleDocsService.checkConnection();
+      console.log('Connection status:', result);
+      setIsConnected(result.connected);
+      setConnectedEmail(result.email || null);
+      return result.connected;
     } catch (error) {
       console.error('Failed to check Google Docs connection:', error);
       setIsConnected(false);
+      setConnectedEmail(null);
       return false;
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      await googleDocsService.disconnect();
+      setIsConnected(false);
+      setConnectedEmail(null);
+      setShowDisconnectDialog(false);
+      toast({
+        title: "Disconnected",
+        description: "Google account has been disconnected successfully.",
+      });
+      // Refresh documents list to clear any cached data
+      await loadDocuments();
+    } catch (error: any) {
+      console.error('Failed to disconnect:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to disconnect Google account",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDisconnecting(false);
     }
   };
 
@@ -131,16 +216,37 @@ const BugDocsPage = () => {
     // Get JWT token to pass as state parameter
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     
-    // Navigate to Google OAuth with JWT token as state
-    const authUrl = googleDocsService.getAuthUrl(token);
+    // Build return URL based on current environment
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const returnUrl = isLocal 
+      ? `http://localhost:8080${window.location.pathname}`
+      : `https://bugs.bugricer.com${window.location.pathname}`;
+    
+    // Navigate to Google OAuth with JWT token and return URL as state
+    const authUrl = googleDocsService.getAuthUrl(token, returnUrl);
     window.location.href = authUrl;
   };
 
   const loadDocuments = async () => {
     try {
-      const docs = await googleDocsService.listGeneralDocuments();
+      let docs: UserDocument[] = [];
+      
+      if (activeTab === "my-docs") {
+        // Load user's own documents
+        docs = await googleDocsService.listGeneralDocuments();
+      } else if (activeTab === "all-docs" && isAdmin) {
+        // Load all documents grouped by project (for admin)
+        const result = await googleDocsService.getAllDocuments();
+        setAllDocumentsGrouped(result.documents);
+        // Flatten for display
+        docs = result.documents.flatMap(group => group.documents);
+      } else if (activeTab === "shared-docs" && isDevOrTester) {
+        // Load shared documents (from projects user is member of)
+        docs = await googleDocsService.getSharedDocuments();
+      }
+      
       setDocuments(docs);
-      console.log(`Loaded ${docs.length} documents`);
+      console.log(`Loaded ${docs.length} documents for tab: ${activeTab}`);
     } catch (error: any) {
       console.error("Error loading documents:", error);
       toast({
@@ -189,9 +295,17 @@ const BugDocsPage = () => {
       const templateId = selectedTemplateId && selectedTemplateId !== "0" 
         ? parseInt(selectedTemplateId) 
         : undefined;
+      
+      // Convert selectedProjectId - treat empty string as null (no project)
+      const projectId = selectedProjectId && selectedProjectId !== "" 
+        ? selectedProjectId 
+        : null;
+      
       const result = await googleDocsService.createGeneralDocument(
         docTitle.trim(),
-        templateId
+        templateId,
+        'general',
+        projectId
       );
 
       toast({
@@ -208,6 +322,7 @@ const BugDocsPage = () => {
       // Reset form and close modal
       setDocTitle("");
       setSelectedTemplateId("0");
+      setSelectedProjectId("");
       setIsCreateModalOpen(false);
     } catch (error: any) {
       toast({
@@ -294,13 +409,10 @@ const BugDocsPage = () => {
       filtered = filtered.filter(doc => 
         doc.doc_title.toLowerCase().includes(searchLower) ||
         doc.template_name?.toLowerCase().includes(searchLower) ||
-        doc.doc_type.toLowerCase().includes(searchLower)
+        doc.doc_type.toLowerCase().includes(searchLower) ||
+        doc.creator_name?.toLowerCase().includes(searchLower) ||
+        doc.project_name?.toLowerCase().includes(searchLower)
       );
-    }
-    
-    // Apply type filter
-    if (typeFilter !== "all") {
-      filtered = filtered.filter(doc => doc.doc_type === typeFilter);
     }
     
     // Apply date filter
@@ -331,36 +443,47 @@ const BugDocsPage = () => {
       });
     }
     
+    // Apply project filter
+    if (projectFilter !== "all") {
+      filtered = filtered.filter(doc => {
+        if (projectFilter === "none") {
+          return !doc.project_id || doc.project_id === null;
+        }
+        return doc.project_id === projectFilter;
+      });
+    }
+    
     // Sort by latest first (newest documents at the top)
     return filtered.sort((a, b) => {
       const dateA = new Date(a.created_at);
       const dateB = new Date(b.created_at);
       return dateB.getTime() - dateA.getTime(); // Descending order (latest first)
     });
-  }, [documents, activeTab, searchTerm, typeFilter, dateFilter]);
+  }, [documents, activeTab, searchTerm, dateFilter, projectFilter]);
 
-  // Get unique document types for filter
-  const uniqueTypes = useMemo(() => {
-    const types = documents
-      .map(doc => doc.doc_type)
-      .filter(Boolean)
-      .filter((type, index, arr) => arr.indexOf(type) === index);
-    return types.sort();
-  }, [documents]);
 
   // Get tab counts
   const getTabCount = (tabType: string) => {
-    const allCount = documents?.length || 0;
-    const myCount = documents?.length || 0; // For now, same as all
-    
     switch (tabType) {
       case "all-docs":
-        return allCount;
+        return isAdmin ? documents?.length || 0 : 0;
+      case "shared-docs":
+        return isDevOrTester ? documents?.length || 0 : 0;
       case "my-docs":
-        return myCount;
+        return documents?.length || 0;
       default:
         return 0;
     }
+  };
+
+  // Check if should show project cards
+  const shouldShowProjectCards = () => {
+    if (!isConnected) return false;
+    if (isAdmin && activeTab === "all-docs") {
+      // Show project cards in admin "All Docs" tab
+      return true;
+    }
+    return false;
   };
 
   // Keep tab in sync with URL changes (back/forward navigation)
@@ -395,28 +518,28 @@ const BugDocsPage = () => {
                 </p>
               </div>
               
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 sm:gap-4">
                 {isConnected && (
                   <>
                     <Button 
                       onClick={() => setIsCreateModalOpen(true)} 
                       size="lg"
-                      className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                      className="w-full xs:w-auto h-11 sm:h-12 px-4 sm:px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
                     >
-                      <Plus className="h-5 w-5 mr-2" />
-                      New Doc
+                      <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                      <span className="whitespace-nowrap">New Doc</span>
                     </Button>
                   </>
                 )}
                 
                 {isConnected && (
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
-                      <div className="p-1.5 bg-orange-500 rounded-lg">
-                        <FileText className="h-5 w-5 text-white" />
+                  <div className="flex items-center justify-center xs:justify-start gap-4">
+                    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
+                      <div className="p-1 sm:p-1.5 bg-orange-500 rounded-lg shrink-0">
+                        <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                       </div>
                       <div>
-                        <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                        <div className="text-xl sm:text-2xl font-bold text-orange-700 dark:text-orange-300">
                           {documents.length}
                         </div>
                       </div>
@@ -430,7 +553,9 @@ const BugDocsPage = () => {
 
 
         {/* Connection Status */}
-        {!isConnected && !isCheckingConnection && (
+        {!isCheckingConnection && (
+          <>
+            {!isConnected ? (
           <div className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-yellow-50/30 to-red-50/50 dark:from-orange-950/20 dark:via-yellow-950/10 dark:to-red-950/20 rounded-2xl"></div>
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
@@ -450,8 +575,89 @@ const BugDocsPage = () => {
                 <ExternalLink className="h-4 w-4 ml-2" />
               </Button>
             </div>
+              </div>
+            ) : (
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-emerald-50/30 to-teal-50/50 dark:from-green-950/20 dark:via-emerald-950/10 dark:to-teal-950/20 rounded-2xl"></div>
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                      <LinkIcon className="h-10 w-10 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Google Docs Connected</h3>
+                    {connectedEmail && (
+                      <div className="mb-6 px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Connected Account</p>
+                        <p className="text-base font-semibold text-gray-900 dark:text-white">{connectedEmail}</p>
           </div>
         )}
+                    <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                      <Button
+                        onClick={handleConnectGoogleDocs}
+                        variant="outline"
+                        className="h-12 px-8 border-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        <RefreshCw className="h-5 w-5 mr-2" />
+                        Reconnect
+                      </Button>
+                      <Button
+                        onClick={() => setShowDisconnectDialog(true)}
+                        variant="destructive"
+                        className="h-12 px-8 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        <X className="h-5 w-5 mr-2" />
+                        Disconnect
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Disconnect Confirmation Dialog */}
+        <Dialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Disconnect Google Account?</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to disconnect your Google account? This will revoke access to Google Docs and you won't be able to create or manage documents until you reconnect.
+              </DialogDescription>
+            </DialogHeader>
+            {connectedEmail && (
+              <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Account: <span className="font-semibold text-gray-900 dark:text-white">{connectedEmail}</span></p>
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowDisconnectDialog(false)}
+                disabled={isDisconnecting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+              >
+                {isDisconnecting ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Disconnecting...
+                  </>
+                ) : (
+                  <>
+                    <X className="h-4 w-4 mr-2" />
+                    Disconnect
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Documents Tabs */}
         {isConnected && (
@@ -470,35 +676,83 @@ const BugDocsPage = () => {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-orange-50/50 dark:from-gray-800/50 dark:to-orange-900/50 rounded-2xl"></div>
               <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-                <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
-                  <TabsTrigger
-                    value="all-docs"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">All Docs</span>
-                    <span className="sm:hidden">All</span>
-                    <span className="ml-2 px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-bold">
-                      {getTabCount("all-docs")}
-                    </span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="my-docs"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <User className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">My Docs</span>
-                    <span className="sm:hidden">My</span>
-                    <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
-                      {getTabCount("my-docs")}
-                    </span>
-                  </TabsTrigger>
+                <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-2' : 'grid-cols-2'} h-12 sm:h-14 bg-transparent p-1 gap-1`}>
+                  {isAdmin ? (
+                    <>
+                      <TabsTrigger
+                        value="all-docs"
+                        className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 sm:px-4"
+                      >
+                        <FileText className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
+                        <span className="hidden xs:inline">All Docs</span>
+                        <span className="xs:hidden">All</span>
+                        <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-[10px] sm:text-xs font-bold">
+                          {getTabCount("all-docs")}
+                        </span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="my-docs"
+                        className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 sm:px-4"
+                      >
+                        <User className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
+                        <span className="hidden xs:inline">My Docs</span>
+                        <span className="xs:hidden">My</span>
+                        <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-[10px] sm:text-xs font-bold">
+                          {getTabCount("my-docs")}
+                        </span>
+                      </TabsTrigger>
+                    </>
+                  ) : (
+                    <>
+                      <TabsTrigger
+                        value="shared-docs"
+                        className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 sm:px-4"
+                      >
+                        <FolderOpen className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
+                        <span className="hidden xs:inline">Shared Docs</span>
+                        <span className="xs:hidden">Shared</span>
+                        <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-[10px] sm:text-xs font-bold">
+                          {getTabCount("shared-docs")}
+                        </span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="my-docs"
+                        className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 sm:px-4"
+                      >
+                        <User className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
+                        <span className="hidden xs:inline">My Docs</span>
+                        <span className="xs:hidden">My</span>
+                        <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-[10px] sm:text-xs font-bold">
+                          {getTabCount("my-docs")}
+                        </span>
+                      </TabsTrigger>
+                    </>
+                  )}
                 </TabsList>
               </div>
             </div>
             
             <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
-              {/* Search and Filter Controls */}
+              {/* Project Cards View (Admin - All Docs) */}
+              {shouldShowProjectCards() && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      Projects
+                    </h2>
+                  </div>
+                  <ProjectCardsGrid 
+                    projects={projects} 
+                    isLoading={isLoadingProjects}
+                    onProjectClick={(projectId) => {
+                      navigate(`/${userRole}/bugdocs/project/${projectId}`);
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Search and Filter Controls - only show when not showing project cards */}
+              {!shouldShowProjectCards() && (
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
                 <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
@@ -513,38 +767,18 @@ const BugDocsPage = () => {
                     <div className="flex flex-col md:flex-row gap-4">
                       {/* Search Bar */}
                       <div className="flex-1 relative group">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                        <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
                         <input
                           type="text"
-                          placeholder="Search documents by title, template, or type..."
+                          placeholder="Search documents..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                          className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                         />
                       </div>
 
                       {/* Filter Controls */}
                       <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                        {/* Type Filter */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                            <Filter className="h-4 w-4 text-white" />
-                          </div>
-                          <Select value={typeFilter} onValueChange={setTypeFilter}>
-                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                              <SelectValue placeholder="Type" />
-                            </SelectTrigger>
-                            <SelectContent position="popper" className="z-[60]">
-                              <SelectItem value="all">All Types</SelectItem>
-                              {uniqueTypes.map((type) => (
-                                <SelectItem key={type} value={type}>
-                                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
                         {/* Date Filter */}
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
@@ -564,15 +798,36 @@ const BugDocsPage = () => {
                           </Select>
                         </div>
                         
+                        {/* Project Filter */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                            <FolderOpen className="h-4 w-4 text-white" />
+                          </div>
+                          <Select value={projectFilter} onValueChange={setProjectFilter}>
+                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                              <SelectValue placeholder="Project" />
+                            </SelectTrigger>
+                            <SelectContent position="popper" className="z-[60]">
+                              <SelectItem value="all">All Projects</SelectItem>
+                              <SelectItem value="none">No Project</SelectItem>
+                              {projects.map((project) => (
+                                <SelectItem key={project.id} value={project.id}>
+                                  {project.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
                         {/* Clear Filters Button */}
-                        {(searchTerm || typeFilter !== "all" || dateFilter !== "all") && (
+                        {(searchTerm || dateFilter !== "all" || projectFilter !== "all") && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
                               setSearchTerm("");
-                              setTypeFilter("all");
                               setDateFilter("all");
+                              setProjectFilter("all");
                             }}
                             className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                           >
@@ -584,8 +839,10 @@ const BugDocsPage = () => {
                   </div>
                 </div>
               </div>
+              )}
 
-              {/* Documents Content */}
+              {/* Documents Content - only show when not showing project cards */}
+              {!shouldShowProjectCards() && (
               <div className="space-y-4">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
@@ -629,52 +886,68 @@ const BugDocsPage = () => {
                         {/* Status indicator */}
                         <div className="absolute top-4 right-4 w-3 h-3 bg-orange-500 rounded-full shadow-lg"></div>
                         
-                        <div className="relative p-4 sm:p-6">
-                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div className="relative p-4 sm:p-5 md:p-6">
+                          <div className="flex flex-col gap-3 sm:gap-4">
                             <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
-                              <div className="text-2xl sm:text-3xl flex-shrink-0">{getDocTypeIcon(doc.doc_type)}</div>
+                              <div className="text-xl sm:text-2xl md:text-3xl flex-shrink-0">{getDocTypeIcon(doc.doc_type)}</div>
                               <div className="flex-1 min-w-0">
-                                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-700 dark:group-hover:text-orange-300 transition-colors truncate">
+                                <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-700 dark:group-hover:text-orange-300 transition-colors break-words">
                                   {doc.doc_title}
                                 </h3>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                <div className="flex flex-col gap-2 sm:gap-3 mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                                  {doc.project_name && (
+                                    <span className="flex items-center min-w-0">
+                                      <FolderOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 flex-shrink-0" />
+                                      <span className="truncate">{doc.project_name}</span>
+                                    </span>
+                                  )}
                                   {doc.template_name && (
-                                    <span className="flex items-center">
-                                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                                    <span className="flex items-center min-w-0">
+                                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 flex-shrink-0" />
                                       <span className="truncate">{doc.template_name}</span>
                                     </span>
                                   )}
-                                  <span className="flex items-center">
-                                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                                  {doc.creator_name && activeTab !== "my-docs" && (
+                                    <span className="flex items-center min-w-0">
+                                      <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 flex-shrink-0" />
+                                      <span className="truncate">By {doc.creator_name}</span>
+                                    </span>
+                                  )}
+                                  <span className="flex items-center min-w-0">
+                                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 flex-shrink-0" />
                                     <span className="truncate">Created {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}</span>
                                   </span>
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 sm:gap-2 flex-shrink-0">
+                            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 justify-end sm:justify-start">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleViewDocument(doc)}
-                                className="h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
+                                className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
                               >
-                                <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                <span className="hidden sm:inline">View</span>
-                                <span className="sm:hidden">View</span>
+                                <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                                <span className="sm:inline">View</span>
                               </Button>
                               <Button
                                 variant="destructive"
                                 size="sm"
                                 onClick={() => handleDeleteClick(doc)}
                                 disabled={isDeleting === doc.id}
-                                className="h-9 sm:h-10 w-9 sm:w-auto px-2 sm:px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                                className="flex-1 sm:flex-initial h-9 sm:h-10 w-auto px-3 sm:px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                               >
                                 {isDeleting === doc.id ? (
-                                  <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                                  <>
+                                    <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin sm:mr-1" />
+                                    <span className="hidden sm:inline">Delete</span>
+                                  </>
                                 ) : (
-                                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <>
+                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                                    <span className="sm:inline">Delete</span>
+                                  </>
                                 )}
-                                <span className="hidden sm:inline ml-1">Delete</span>
                               </Button>
                             </div>
                           </div>
@@ -684,6 +957,7 @@ const BugDocsPage = () => {
                   </div>
                 )}
               </div>
+              )}
             </TabsContent>
           </Tabs>
         )}
@@ -752,6 +1026,29 @@ const BugDocsPage = () => {
                   </p>
                 )}
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="project" className="text-sm font-medium">Project (Optional)</Label>
+              <Select
+                value={selectedProjectId || "none"}
+                onValueChange={(value) => setSelectedProjectId(value === "none" ? "" : value)}
+                disabled={isCreating}
+              >
+                <SelectTrigger id="project" className="w-full">
+                  <SelectValue placeholder="No project (general document)" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[200px] overflow-y-auto">
+                  <SelectItem value="none">No project (general document)</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Associate this document with a project for better organization
+              </p>
             </div>
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">

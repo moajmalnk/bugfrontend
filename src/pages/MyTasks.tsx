@@ -834,18 +834,20 @@ export default function MyTasks() {
 
         {/* Search & Filters */}
         <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-xl"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/40 dark:border-gray-700/40 rounded-xl p-4 sm:p-6">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
             <div className="space-y-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-blue-600 rounded-lg">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 bg-blue-500 rounded-lg">
                   <Search className="h-4 w-4 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Search Bar */}
+                <div className="flex-1 relative group">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                     <input
                     id="tasks-search"
                     type="text"
@@ -855,11 +857,15 @@ export default function MyTasks() {
                       if (activeTab === 'my-tasks') setMyFilter((f) => ({ ...f, q: e.target.value }));
                       else setSharedFilter((f) => ({ ...f, q: e.target.value }));
                     }}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                    className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-purple-600 rounded-lg shrink-0">
+
+                {/* Filter Controls */}
+                <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                  {/* Status Filter */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
                     <Filter className="h-4 w-4 text-white" />
                   </div>
                   <Select
@@ -869,16 +875,35 @@ export default function MyTasks() {
                       else setSharedFilter({ ...sharedFilter, status: value === 'all' ? undefined : value });
                     }}
                   >
-                    <SelectTrigger className="w-full sm:w-[140px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500">
-                      <SelectValue placeholder="All statuses" />
+                      <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent position="popper" className="z-[60]">
-                      <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="all">All Status</SelectItem>
                       {statuses.map((s) => (
                         <SelectItem key={s} value={s}>{s.replace('_',' ')}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  </div>
+
+                  {/* Clear Filters Button */}
+                  {((activeTab === 'my-tasks' && (myFilter.q || myFilter.status)) || (activeTab === 'shared-tasks' && (sharedFilter.q || sharedFilter.status))) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (activeTab === 'my-tasks') {
+                          setMyFilter({});
+                        } else {
+                          setSharedFilter({});
+                        }
+                      }}
+                      className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                    >
+                      Clear
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1098,34 +1123,69 @@ export default function MyTasks() {
 
           {/* Search & Filters */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-xl"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/40 dark:border-gray-700/40 rounded-xl p-4 sm:p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-blue-600 rounded-lg">
-                  <Search className="h-5 w-5 text-white" />
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
+            <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 bg-blue-500 rounded-lg">
+                    <Search className="h-4 w-4 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
               </div>
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
+                
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Search Bar */}
+                  <div className="flex-1 relative group">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input
                       id="shared-tasks-search"
-                      placeholder="Search shared tasks..."
+                      type="text"
+                      placeholder="Search shared tasks by title or description..."
                       value={sharedSearchTerm}
                       onChange={(e) => setSharedSearchTerm(e.target.value)}
-                      className="pl-10"
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                     />
                   </div>
-                  <div className="flex gap-2">
+
+                  {/* Filter Controls */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Status Filter */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                        <Filter className="h-4 w-4 text-white" />
+                      </div>
+                      <Select
+                        value={sharedFilter.status || 'all'}
+                        onValueChange={(value) => {
+                          setSharedFilter({ ...sharedFilter, status: value === 'all' ? undefined : value });
+                        }}
+                      >
+                        <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All Status</SelectItem>
+                          {sharedStatuses.map((s) => (
+                            <SelectItem key={s} value={s}>{s.replace('_',' ')}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Clear Filters Button */}
+                    {(sharedSearchTerm || sharedFilter.status) && (
                     <Button
                       variant="outline"
-                      onClick={() => setSharedSearchTerm("")}
-                      className="px-4"
+                        size="sm"
+                        onClick={() => {
+                          setSharedSearchTerm("");
+                          setSharedFilter({});
+                        }}
+                        className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                     >
                       Clear
                     </Button>
+                    )}
                   </div>
                 </div>
               </div>

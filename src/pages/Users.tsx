@@ -132,10 +132,37 @@ const Users = () => {
   // Undo delete hook
   const undoDelete = useUndoDelete({
     duration: 10,
-    onConfirm: () => {
+    onConfirm: async () => {
       if (userToDelete) {
-        performActualDelete(userToDelete.id);
+        try {
+          await performActualDelete(userToDelete.id, false);
+          setUserToDelete(null);
+        } catch (error: any) {
+          // If deletion fails due to dependencies, show error and keep user in state
+          if (
+            error.message?.includes("associated data") ||
+            error.message?.includes("Cannot delete user")
+          ) {
+            toast({
+              title: "Cannot Delete User",
+              description: error.message || "This user has associated data that must be removed first.",
+              variant: "destructive",
+              duration: 5000,
+            });
+            // Reset the undo state since deletion failed
+            undoDelete.cancelCountdown();
+            setUserToDelete(null);
+          } else {
+            // Other errors
+            toast({
+              title: "Deletion Failed",
+              description: error.message || "Failed to delete user. Please try again.",
+              variant: "destructive",
+            });
+            undoDelete.cancelCountdown();
         setUserToDelete(null);
+          }
+        }
       }
     },
     onUndo: () => {
@@ -1117,7 +1144,16 @@ const Users = () => {
           open={!!selectedUser}
           onOpenChange={(open) => !open && setSelectedUser(null)}
           onUserUpdate={handleUpdateUser}
-          onUserDelete={handleDeleteUser}
+          onUserDelete={async (userId: string, force = false) => {
+            try {
+              await performActualDelete(userId, force);
+              // Close dialog after successful deletion
+              setSelectedUser(null);
+            } catch (error: any) {
+              // Errors are already handled in performActualDelete, just re-throw for dialog to handle
+              throw error;
+            }
+          }}
           onPasswordChange={async (userId: string, newPassword: string) => {
             // You may want to implement this or pass a real handler
             // For now, just show a toast or do nothing

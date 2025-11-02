@@ -2,11 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/use-toast";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { useAuth } from "@/context/AuthContext";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
+import { API_BASE_URL } from "@/lib/env";
 import { userService } from "@/services/userService";
 import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
 import { formatDistanceToNow } from "date-fns";
 import {
   ArrowRight,
@@ -17,6 +20,7 @@ import {
   Instagram,
   Linkedin,
   Link as LinkIcon,
+  Lock,
   LogOut,
   Mail,
   MapPin,
@@ -139,6 +143,8 @@ export default function Profile() {
   const [activitySort, setActivitySort] = useState<"newest" | "oldest">("newest");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
 
   // Fetch user statistics
   const { data: userStats, isLoading: isLoadingStats } = useQuery({
@@ -167,6 +173,58 @@ export default function Profile() {
     // // console.log("Updated user data received in handleUserUpdate:", updatedUser);
     updateCurrentUser(updatedUser);
   };
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handlePasswordReset = useCallback(async () => {
+    if (!currentUser?.email) {
+      toast({
+        title: "Error",
+        description: "Email address not found. Cannot reset password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!validateEmail(currentUser.email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please ensure your email address is valid",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/forgot_password.php`, { 
+        email: currentUser.email.trim().toLowerCase() 
+      });
+      
+      const data = response.data as any;
+      if (data.success) {
+        toast({
+          title: "Reset Link Sent",
+          description: "A password reset link has been sent to your email address. Please check your inbox.",
+          variant: "default",
+        });
+        setShowPasswordResetConfirm(false);
+      } else {
+        throw new Error(data.message || "Failed to send reset link");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || error.message || "Failed to send reset link. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResettingPassword(false);
+    }
+  }, [currentUser?.email]);
 
   // Filter and paginate recent activity
   const filteredActivity = useMemo(() => {
@@ -305,20 +363,6 @@ export default function Profile() {
               </div>
               
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <EditUserDialog
-                  user={currentUser}
-                  onUserUpdate={handleUserUpdate}
-                  loggedInUserRole={currentUser.role}
-                  trigger={
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="h-12 px-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                    >
-                      Edit
-                    </Button>
-                  }
-                />
                 <Button
                   variant="outline"
                   size="lg"
@@ -360,6 +404,53 @@ export default function Profile() {
                 className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base"
               >
                 Yes, Logout
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+        {/* Password Reset Confirmation Modal */}
+        {showPasswordResetConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 transition-colors p-3 sm:p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-4 sm:p-6 w-[95vw] max-w-md mx-auto animate-fadeIn">
+              <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
+                Reset Password
+              </h2>
+              <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 dark:text-gray-300">
+                A password reset link will be sent to your email address:{" "}
+                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                  {currentUser?.email}
+                </span>
+                . Please check your inbox and follow the instructions to reset your password.
+              </p>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowPasswordResetConfirm(false)}
+                  disabled={isResettingPassword}
+                  className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={handlePasswordReset}
+                  disabled={isResettingPassword}
+                  className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white"
+                >
+                  {isResettingPassword ? (
+                    <>
+                      <Lock className="w-4 h-4 mr-2 animate-pulse" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 mr-2" />
+                      Send Reset Link
+                    </>
+                  )}
               </Button>
             </div>
           </div>
@@ -531,6 +622,40 @@ export default function Profile() {
                   <span className="text-xs sm:text-sm md:text-base font-medium break-all min-w-0 flex-1">{currentUser.phone}</span>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Action Buttons Section */}
+          <Card className="md:col-span-3 shadow-sm hover:shadow-md transition-all duration-200">
+            <CardContent className="p-6 sm:p-8 lg:p-10">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+                <EditUserDialog
+                  user={currentUser}
+                  onUserUpdate={handleUserUpdate}
+                  loggedInUserRole={currentUser.role}
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="w-full sm:w-auto min-w-[200px] sm:min-w-[220px] h-12 sm:h-14 px-8 sm:px-10 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2"
+                    >
+                      <User className="w-4 h-4 sm:w-5 sm:h-5" />
+                      Edit Profile
+                    </Button>
+                  }
+                />
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setShowPasswordResetConfirm(true)}
+                  disabled={isResettingPassword}
+                  className="w-full sm:w-auto min-w-[200px] sm:min-w-[220px] h-12 sm:h-14 px-8 sm:px-10 border-2 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                  aria-label="Reset Password"
+                >
+                  <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                  {isResettingPassword ? "Sending..." : "Reset Password"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

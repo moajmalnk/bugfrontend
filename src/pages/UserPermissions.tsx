@@ -6,7 +6,7 @@ import { permissionService } from "@/services/permissionService";
 import { Permission, User, UserRole } from "@/types";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, AlertCircle, Shield } from "lucide-react";
+import { ArrowLeft, Save, AlertCircle, Shield, ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +26,7 @@ export function UserPermissions() {
   const [permissions, setPermissions] = useState<Record<string, PermissionState[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
@@ -205,6 +206,19 @@ export function UserPermissions() {
     0
   );
 
+  const toggleCategory = (category: string) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set<string>();
+      // If the clicked category is already open, close it. Otherwise, open only this category (close others)
+      if (!prev.has(category)) {
+        newSet.add(category);
+      }
+      return newSet;
+    });
+  };
+
+  const isCategoryExpanded = (category: string) => expandedCategories.has(category);
+
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
@@ -290,20 +304,40 @@ export function UserPermissions() {
         {/* Permissions by Category */}
         {Object.entries(permissions).map(([category, perms]) => {
           const overrideCount = perms.filter((p) => p.override !== 'none').length;
+          const isExpanded = isCategoryExpanded(category);
           return (
             <div key={category} className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 via-purple-50/30 to-indigo-50/50 dark:from-gray-800/50 dark:via-purple-900/20 dark:to-indigo-900/20 rounded-2xl"></div>
-              <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
-                <div className="bg-gradient-to-r from-gray-50/80 to-purple-50/80 dark:from-gray-800/80 dark:to-purple-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-6 py-5">
+              <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300">
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="w-full bg-gradient-to-r from-gray-50/80 to-purple-50/80 dark:from-gray-800/80 dark:to-purple-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-6 py-5 hover:from-gray-100/90 hover:to-purple-100/90 dark:hover:from-gray-700/90 dark:hover:to-purple-800/90 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 rounded-t-2xl"
+                >
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">{category}</h3>
-                    <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800">
-                      {overrideCount} {overrideCount === 1 ? 'override' : 'overrides'} set
-                    </Badge>
+                    <div className="flex items-center gap-3">
+                      <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                        <ChevronDown className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">{category}</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 font-semibold">
+                        {overrideCount} {overrideCount === 1 ? 'override' : 'overrides'} set
+                      </Badge>
+                      <Badge variant="outline" className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 font-semibold">
+                        {perms.length} {perms.length === 1 ? 'permission' : 'permissions'}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-3">
+                </button>
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  {isExpanded && (
+                    <div className="p-6">
+                      <div className="space-y-3">
                     {perms.map((permState) => {
                       const effective = getEffectiveState(permState);
                       return (
@@ -406,7 +440,9 @@ export function UserPermissions() {
                         </div>
                       );
                     })}
-                  </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
