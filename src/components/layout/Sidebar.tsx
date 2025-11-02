@@ -9,6 +9,7 @@ import {
   Bell,
   Bug,
   CheckCircle,
+  Clock,
   FolderKanban,
   Menu,
   MessageCircle,
@@ -150,20 +151,25 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               icon={<Bell className="h-5 w-5" />}
               label="Updates"
             />
-            <NavLink
-              to="/bugdocs"
-              icon={<FileText className="h-5 w-5" />}
-              label="BugDocs"
-            />
-            {/* BugMeet */}
-            <NavLink
-              to="/meet?tab=shared-meets"
-              icon={<Video className="h-5 w-5" />}
-              label="BugMeet"
-            />
+            {/* BugDocs - Hide for testers */}
+            {role !== 'tester' && (
+              <NavLink
+                to="/bugdocs"
+                icon={<FileText className="h-5 w-5" />}
+                label="BugDocs"
+              />
+            )}
+            {/* BugMeet - Hide for testers */}
+            {role !== 'tester' && (
+              <NavLink
+                to="/meet?tab=shared-meets"
+                icon={<Video className="h-5 w-5" />}
+                label="BugMeet"
+              />
+            )}
             
-            {/* Daily Update, My Tasks & BugDocs - Permission-based access */}
-            {(hasPermission('TASKS_VIEW_ALL') || hasPermission('TASKS_VIEW_ASSIGNED') || hasPermission('TASKS_CREATE')) && (
+            {/* Daily Update, My Tasks & BugDocs - Permission-based access, hide for testers */}
+            {role !== 'tester' && (hasPermission('TASKS_VIEW_ALL') || hasPermission('TASKS_VIEW_ASSIGNED') || hasPermission('TASKS_CREATE')) && (
               <NavLink
                 to="/my-tasks?tab=shared-tasks"
                 icon={<ListTodo className="h-5 w-5" />}
@@ -171,11 +177,20 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
             
-            {(hasPermission('DAILY_UPDATE_CREATE') || hasPermission('DAILY_UPDATE_VIEW') || hasPermission('UPDATES_VIEW') || hasPermission('UPDATES_CREATE')) && (
+            {role !== 'tester' && (hasPermission('DAILY_UPDATE_CREATE') || hasPermission('DAILY_UPDATE_VIEW') || hasPermission('UPDATES_VIEW') || hasPermission('UPDATES_CREATE')) && (
               <NavLink
                 to="/daily-update"
                 icon={<Calendar className="h-5 w-5" />}
                 label="BugUpdate"
+              />
+            )}
+            
+            {/* Time Tracking - Hide for testers */}
+            {role !== 'tester' && (
+              <NavLink
+                to="/time-tracking"
+                icon={<Clock className="h-5 w-5" />}
+                label="Time Tracking"
               />
             )}
           </div>

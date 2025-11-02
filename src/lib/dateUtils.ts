@@ -13,11 +13,24 @@ export interface DateDisplayOptions {
 
 /**
  * Safely parse a date string and convert to local timezone
+ * Handles IST times stored from backend (Asia/Kolkata timezone)
  */
 export function safeParseDate(dateString: string | Date): Date {
   if (dateString instanceof Date) return dateString;
   if (!dateString) return new Date();
   try {
+    // If the string looks like it's in format "YYYY-MM-DD HH:MM:SS" (without timezone)
+    // and doesn't have 'Z' or timezone offset, treat it as IST time
+    if (typeof dateString === 'string') {
+      // Check if it matches MySQL datetime format (YYYY-MM-DD HH:MM:SS)
+      const mysqlDateTimePattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+      if (mysqlDateTimePattern.test(dateString) && !dateString.includes('T') && !dateString.includes('Z') && !dateString.includes('+') && !dateString.includes('-', 10)) {
+        // Parse as IST time by appending timezone info
+        const dateWithTz = dateString.replace(' ', 'T') + '+05:30';
+        const parsed = parseISO(dateWithTz);
+        return isValid(parsed) ? parsed : new Date(dateString);
+      }
+    }
     const parsed = parseISO(dateString);
     return isValid(parsed) ? parsed : new Date(dateString);
   } catch {
@@ -201,7 +214,10 @@ export function formatDateProfessional(
   
   let date: Date;
   try {
-    date = typeof dateString === 'string' ? parseISO(dateString) : dateString;
+    date = safeParseDate(dateString);
+    if (!isValid(date)) {
+      return 'Invalid date';
+    }
   } catch {
     return 'Invalid date';
   }
@@ -230,20 +246,20 @@ export function formatDateProfessional(
     // Yesterday
     if (isYesterday(date)) {
       return includeTime 
-        ? `Yesterday at ${format(date, 'HH:mm')}`
+        ? `Yesterday at ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}`
         : 'Yesterday';
     }
     
     // This year
     if (isThisYear(date)) {
       return includeTime
-        ? format(date, 'MMM d \'at\' HH:mm')
+        ? `${format(date, 'MMM d')} at ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}`
         : format(date, 'MMM d');
     }
     
     // Previous years
     return includeTime
-      ? format(date, 'MMM d, yyyy \'at\' HH:mm')
+      ? `${format(date, 'MMM d, yyyy')} at ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}`
       : format(date, 'MMM d, yyyy');
   }
 
@@ -253,7 +269,7 @@ export function formatDateProfessional(
   }
 
   return includeTime
-    ? format(date, 'MMM d, yyyy \'at\' HH:mm')
+    ? `${format(date, 'MMM d, yyyy')} at ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}`
     : format(date, 'MMM d, yyyy');
 }
 
@@ -271,15 +287,18 @@ export function formatDetailedDate(dateString: string): string {
  * Format for tooltips and hover states
  */
 export function formatTooltipDate(dateString: string): string {
-  const date = parseISO(dateString);
-  return format(date, 'EEEE, MMMM d, yyyy \'at\' h:mm a');
+  const date = safeParseDate(dateString);
+  // Format with IST timezone
+  const datePart = date.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' });
+  const timePart = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+  return `${datePart} at ${timePart}`;
 }
 
 /**
  * Get a short time representation for compact displays
  */
 export function formatCompactTime(dateString: string): string {
-  const date = parseISO(dateString);
+  const date = safeParseDate(dateString);
   const now = new Date();
   const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
   
@@ -298,7 +317,4 @@ export function formatCompactTime(dateString: string): string {
   }
   
   return format(date, 'MMM d');
-}
-
-const date = parseISO('2024-06-27T12:56:00Z');
-console.log(format(date, 'PPpp')); // Local time 
+} 

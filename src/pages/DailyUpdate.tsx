@@ -176,6 +176,14 @@ export default function DailyUpdate() {
       `📅 Date: ${dateText}\n` +
       `🕘 Start Time: ${startText}\n` +
       `⏱ Today's Working Hours: ${Number(s.hours_today || 0)} Hours`;
+    
+    // Add overtime breakdown if applicable
+    const overtimeHours = Number(s.overtime_hours || 0);
+    if (overtimeHours > 0) {
+      const regularHours = Math.min(Number(s.hours_today || 0), 8);
+      body += `\n📊 Regular Hours: ${regularHours} Hours`;
+      body += `\n⏰ Overtime Hours: ${overtimeHours} Hours`;
+    }
 
     // Totals for CODO period
     const since = getCodoPeriodStart(s.submission_date);
@@ -453,6 +461,11 @@ export default function DailyUpdate() {
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {s.start_time ? `Started at ${s.start_time}` : 'No start time'} • {s.hours_today ?? 0} hours
+                          {Number(s.overtime_hours || 0) > 0 && (
+                            <span className="ml-2 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium">
+                              +{s.overtime_hours}h OT
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1">

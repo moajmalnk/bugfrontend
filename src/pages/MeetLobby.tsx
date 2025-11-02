@@ -684,26 +684,47 @@ export default function MeetLobby() {
 
   // Check for OAuth success/error parameters
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const googleConnected = urlParams.get('google_connected');
-    const googleError = urlParams.get('google_error');
+    const checkGoogleConnection = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const googleConnected = urlParams.get('google_connected');
+      const googleError = urlParams.get('google_error');
+      
+      if (googleConnected === 'true') {
+        console.log("✅ Google account connected successfully! Refreshing meetings...");
+        toast.success("Google account connected successfully! You can now create and manage meetings.");
+        // Clear the URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
+        // Clear any existing error state
+        setError(null);
+        // Refresh meetings after a short delay to ensure token is saved
+        setTimeout(() => {
+          console.log("🔄 Refreshing meetings after Google connection...");
+          fetchRunningMeets(true); // Force refresh
+        }, 1500); // Increased delay to ensure backend has saved tokens
+        return true; // Indicate we handled the connection
+      } else if (googleError) {
+        console.error("❌ Google connection failed:", googleError);
+        setError(`Google connection failed: ${decodeURIComponent(googleError)}`);
+        // Clear the URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return true; // Indicate we handled the error
+      }
+      return false; // No OAuth parameters found
+    };
     
-    if (googleConnected === 'true') {
-      toast.success("Google account connected successfully! You can now create and manage meetings.");
-      // Clear the URL parameters
-      window.history.replaceState({}, document.title, window.location.pathname);
-      // Clear any existing error state
-      setError(null);
-      // Refresh meetings after a short delay to ensure token is saved
-      setTimeout(() => {
-        fetchRunningMeets();
-      }, 1000);
-    } else if (googleError) {
-      setError(`Google connection failed: ${decodeURIComponent(googleError)}`);
-      // Clear the URL parameters
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
+    // Check immediately on mount
+    checkGoogleConnection();
+    
+    // Also listen for popstate events (back/forward navigation)
+    const handlePopState = () => {
+      checkGoogleConnection();
+    };
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [fetchRunningMeets]); // Keep fetchRunningMeets in dependencies
 
   // Fetch running meets on component mount with progressive loading
   useEffect(() => {
@@ -988,7 +1009,10 @@ export default function MeetLobby() {
 
         {/* Google Connection Status */}
         {error && (error.includes("Please connect your Google account") || 
-                  error.includes("re-authorize your Google account")) && (
+                  error.includes("re-authorize your Google account") ||
+                  error.includes("Failed to obtain access token") ||
+                  error.includes("reconnect Google account") ||
+                  error.includes("not connected Google")) && (
           <div className="relative overflow-hidden mb-6">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-2xl"></div>
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/50 rounded-2xl p-4 sm:p-6 lg:p-8">
@@ -1006,10 +1030,10 @@ export default function MeetLobby() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-1 sm:mb-0">
-                      {error.includes("re-authorize") ? "Google Account Re-authorization Required" : "Google Account Required"}
+                      {error.includes("re-authorize") || error.includes("reconnect") || error.includes("Failed to obtain access token") ? "Google Account Re-authorization Required" : "Google Account Required"}
                     </h3>
                     <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
-                      {error.includes("re-authorize") 
+                      {error.includes("re-authorize") || error.includes("reconnect") || error.includes("Failed to obtain access token")
                         ? "Re-authorize your Google account to access calendar features for meeting management"
                         : "Connect your Google account to create and manage meetings"
                       }
@@ -1032,11 +1056,12 @@ export default function MeetLobby() {
                         const userId = payload.user_id;
                         
                         // Check if we're in production or local
-                        const isProduction = window.location.hostname !== 'localhost';
+                        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
                         const reauthUrl = isProduction 
-                          ? `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${userId}`
-                          : `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php`;
-                        window.open(reauthUrl, '_blank');
+                          ? `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}`
+                          : `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}`;
+                        // Open in same window for OAuth flow, not new window
+                        window.location.href = reauthUrl;
                       } catch (error) {
                         console.error('Error getting user ID:', error);
                         toast.error("Error getting user information");
@@ -1044,7 +1069,7 @@ export default function MeetLobby() {
                     }}
                     className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3"
                   >
-                    {error.includes("re-authorize") ? "Re-authorize Google" : "Connect Google"}
+                    {error.includes("re-authorize") || error.includes("reconnect") || error.includes("Failed to obtain access token") ? "Re-authorize Google" : "Connect Google"}
                   </Button>
                 </div>
               </div>

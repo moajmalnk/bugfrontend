@@ -1788,7 +1788,17 @@ const Login = () => {
                 dangerouslySetInnerHTML={{ __html: privacyPolicyContent }}
               />
             </div>
-            <div className="flex justify-end p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
+            <div className="flex justify-between items-center p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowPrivacyPolicy(false);
+                  navigate('/privacy-policy');
+                }}
+                className="px-4 sm:px-6 h-9 sm:h-10 text-sm touch-manipulation"
+              >
+                More
+              </Button>
               <Button
                 onClick={() => setShowPrivacyPolicy(false)}
                 className="px-4 sm:px-6 h-9 sm:h-10 text-sm touch-manipulation"
@@ -1822,7 +1832,17 @@ const Login = () => {
                 dangerouslySetInnerHTML={{ __html: termsOfUseContent }}
               />
             </div>
-            <div className="flex justify-end p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
+            <div className="flex justify-between items-center p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowTermsOfUse(false);
+                  navigate('/terms-of-use');
+                }}
+                className="px-4 sm:px-6 h-9 sm:h-10 text-sm touch-manipulation"
+              >
+                More
+              </Button>
               <Button
                 onClick={() => setShowTermsOfUse(false)}
                 className="px-4 sm:px-6 h-9 sm:h-10 text-sm touch-manipulation"

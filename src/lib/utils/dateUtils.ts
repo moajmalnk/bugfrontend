@@ -14,19 +14,24 @@ export const formatLocalDate = (
   format: 'date' | 'time' | 'datetime' | 'relative' = 'datetime'
 ): string => {
   try {
-    // Parse the date string and create a Date object
-    const date = new Date(dateString);
+    let date: Date;
+    
+    // Handle date strings that are in IST format (YYYY-MM-DD HH:MM:SS without timezone)
+    if (typeof dateString === 'string' && !dateString.includes('T') && !dateString.includes('Z') && !dateString.includes('+') && !dateString.includes('-', 10)) {
+      // Parse as IST time by appending timezone info
+      const dateWithTz = dateString.replace(' ', 'T') + '+05:30';
+      date = new Date(dateWithTz);
+    } else {
+      date = new Date(dateString);
+    }
     
     // Check if the date is valid
     if (isNaN(date.getTime())) {
       return 'Invalid Date';
     }
 
-    // Convert UTC to Asia/Calcutta timezone (UTC+5:30)
-    // Step 1: Get the UTC time by removing the browser's local timezone offset
-    // Step 2: Add 5.5 hours (5 hours 30 minutes) to convert to Asia/Calcutta timezone
-    const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
-    const calcuttaTime = new Date(utcTime + (5.5 * 60 * 60000));
+    // Use the date directly since it's already parsed with IST timezone
+    const calcuttaTime = date;
 
     switch (format) {
       case 'date':
@@ -37,21 +42,26 @@ export const formatLocalDate = (
         });
 
       case 'time':
-        return calcuttaTime.toLocaleTimeString('en-US', {
+        return calcuttaTime.toLocaleTimeString('en-IN', {
           hour: '2-digit',
           minute: '2-digit',
+          second: '2-digit',
           hour12: true,
+          timeZone: 'Asia/Kolkata',
         });
 
       case 'datetime':
-        return calcuttaTime.toLocaleDateString('en-US', {
+        return calcuttaTime.toLocaleDateString('en-IN', {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
-        }) + ', ' + calcuttaTime.toLocaleTimeString('en-US', {
+          timeZone: 'Asia/Kolkata',
+        }) + ', ' + calcuttaTime.toLocaleTimeString('en-IN', {
           hour: '2-digit',
           minute: '2-digit',
+          second: '2-digit',
           hour12: true,
+          timeZone: 'Asia/Kolkata',
         });
 
       case 'relative':

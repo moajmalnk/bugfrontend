@@ -124,7 +124,7 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
         <div className="flex items-center justify-center space-x-2 text-xs">
           <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
             <div className="h-2 w-2 bg-orange-500 rounded-full shadow-sm"></div>
-            <span className="text-orange-700 dark:text-orange-400 font-medium">Connect to create BugDocs</span>
+            <span className="text-orange-700 dark:text-orange-400 font-medium">Connect to BugDocs</span>
           </div>
         </div>
       </div>

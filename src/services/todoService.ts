@@ -18,6 +18,7 @@ export type WorkSubmission = {
   submission_date: string; // YYYY-MM-DD
   start_time?: string; // HH:mm:ss
   hours_today: number;
+  overtime_hours?: number;
   total_working_days?: number | null;
   total_hours_cumulative?: number | null;
   completed_tasks?: string;
