@@ -2,6 +2,7 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import Login from "@/pages/Login";
+import Home from "@/pages/Home";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/NotFound";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
@@ -183,6 +184,8 @@ const RouteConfig = () => {
 
   return (
     <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/home" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
@@ -260,16 +263,6 @@ const RouteConfig = () => {
         </Route>
       )}
 
-      {/* Redirect root to projects or login */}
-      <Route
-        path="/"
-        element={
-          <Navigate
-            to={isAuthenticated && role ? `/${role}/projects` : "/login"}
-            replace
-          />
-        }
-      />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
