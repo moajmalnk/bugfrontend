@@ -50,6 +50,15 @@ export default function MyTasks() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showAllAssignees, setShowAllAssignees] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<'details' | 'members'>('details');
+  
+  // Auto-refresh states
+  const [isRefreshingMyTasks, setIsRefreshingMyTasks] = useState(false);
+  const [isRefreshingSharedTasks, setIsRefreshingSharedTasks] = useState(false);
+  const [lastRefreshMyTasks, setLastRefreshMyTasks] = useState<Date | null>(null);
+  const [lastRefreshSharedTasks, setLastRefreshSharedTasks] = useState<Date | null>(null);
+  
+  // Auto-refresh configuration (in milliseconds)
+  const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 
   // Filter users by role (exclude testers)
   const filteredUsers = useMemo(() => {
@@ -120,7 +129,18 @@ export default function MyTasks() {
   // Helper function to get multiple assigned users
   const getAssignedUsers = (task: SharedTask) => {
     if (task.assigned_to_ids && task.assigned_to_ids.length > 0) {
-      return task.assigned_to_ids.map(id => users.find(u => u.id === id)).filter(Boolean);
+      // Remove duplicates by converting to Set and back to array
+      const uniqueIds = Array.from(new Set(task.assigned_to_ids));
+      const foundUsers = uniqueIds.map(id => users.find(u => u.id === id)).filter(Boolean);
+      // Additional deduplication based on user id to handle edge cases
+      const seen = new Set();
+      return foundUsers.filter(user => {
+        if (seen.has(user.id)) {
+          return false;
+        }
+        seen.add(user.id);
+        return true;
+      });
     } else if (task.assigned_to) {
       const user = users.find(u => u.id === task.assigned_to);
       return user ? [user] : [];
@@ -163,28 +183,54 @@ export default function MyTasks() {
     },
   });
 
-  async function load() {
+  async function load(silent = false) {
     try {
-      setMyLoading(true);
+      if (!silent) {
+        setMyLoading(true);
+      } else {
+        setIsRefreshingMyTasks(true);
+      }
       const res: ApiResponse<UserTask[]> = await listMyTasks(myFilter);
       const data = (res as any).data ?? res;
       setItems(Array.isArray(data) ? data : []);
+      if (silent) {
+        setLastRefreshMyTasks(new Date());
+      }
     } catch (e: any) {
-      setError(e?.message || 'Failed to load tasks');
+      if (!silent) {
+        setError(e?.message || 'Failed to load tasks');
+      }
     } finally {
-      setMyLoading(false);
+      if (!silent) {
+        setMyLoading(false);
+      } else {
+        setIsRefreshingMyTasks(false);
+      }
     }
   }
 
-  async function loadSharedTasks() {
+  async function loadSharedTasks(silent = false) {
     try {
-      setSharedLoading(true);
+      if (!silent) {
+        setSharedLoading(true);
+      } else {
+        setIsRefreshingSharedTasks(true);
+      }
       const tasks = await sharedTaskService.getSharedTasks(sharedFilter.status);
       setSharedTasks(tasks);
+      if (silent) {
+        setLastRefreshSharedTasks(new Date());
+      }
     } catch (e: any) {
-      setError(e?.message || 'Failed to load shared tasks');
+      if (!silent) {
+        setError(e?.message || 'Failed to load shared tasks');
+      }
     } finally {
-      setSharedLoading(false);
+      if (!silent) {
+        setSharedLoading(false);
+      } else {
+        setIsRefreshingSharedTasks(false);
+      }
     }
   }
 
@@ -207,7 +253,11 @@ export default function MyTasks() {
       const data = await response.json();
       if (data.success) {
         // Include all user roles: admin, developer, and tester
-        setUsers(data.data);
+        // Remove duplicates based on user id
+        const uniqueUsers = Array.from(
+          new Map(data.data.map((user: any) => [user.id, user])).values()
+        );
+        setUsers(uniqueUsers);
       }
     } catch (e: any) {
       console.error('Failed to load users:', e);
@@ -232,6 +282,8 @@ export default function MyTasks() {
   useEffect(() => {
     load();
     loadSharedTasks();
+    setLastRefreshMyTasks(new Date());
+    setLastRefreshSharedTasks(new Date());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -246,6 +298,56 @@ export default function MyTasks() {
     if (urlTab !== activeTab) setActiveTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Auto-refresh for My Tasks
+  useEffect(() => {
+    // Don't refresh if modal is open, detail view is open, or user is not on my-tasks tab
+    if (modalOpen || detailOpen || activeTab !== 'my-tasks' || submitting) {
+      return;
+    }
+
+    // Set initial last refresh time
+    if (!lastRefreshMyTasks) {
+      setLastRefreshMyTasks(new Date());
+    }
+
+    const intervalId = setInterval(() => {
+      // Double check conditions before refreshing
+      if (!modalOpen && !detailOpen && activeTab === 'my-tasks' && !submitting) {
+        load(true); // Silent refresh
+      }
+    }, AUTO_REFRESH_INTERVAL);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, modalOpen, detailOpen, submitting, myFilter]);
+
+  // Auto-refresh for Shared Tasks
+  useEffect(() => {
+    // Don't refresh if modal is open, detail view is open, or user is not on shared-tasks tab
+    if (sharedModalOpen || sharedDetailOpen || activeTab !== 'shared-tasks' || submitting) {
+      return;
+    }
+
+    // Set initial last refresh time
+    if (!lastRefreshSharedTasks) {
+      setLastRefreshSharedTasks(new Date());
+    }
+
+    const intervalId = setInterval(() => {
+      // Double check conditions before refreshing
+      if (!sharedModalOpen && !sharedDetailOpen && activeTab === 'shared-tasks' && !submitting) {
+        loadSharedTasks(true); // Silent refresh
+      }
+    }, AUTO_REFRESH_INTERVAL);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, sharedModalOpen, sharedDetailOpen, submitting, sharedFilter]);
 
   const statuses = useMemo(() => ['in_progress', 'todo', 'blocked', 'done'], []);
   const sharedStatuses = useMemo(() => ['pending', 'in_progress', 'completed', 'approved'], []);
@@ -289,6 +391,7 @@ export default function MyTasks() {
       }
       setModalOpen(false);
       await load();
+      await loadSharedTasks(true); // Refresh shared tasks in background to update counters
     } catch (e: any) {
       setError(e?.message || 'Failed to save');
     } finally {
@@ -452,6 +555,7 @@ export default function MyTasks() {
       setSharedModalOpen(false);
       setSelectedUsers([]); // Clear selections
       await loadSharedTasks();
+      await load(true); // Refresh my tasks in background to update counters
     } catch (e: any) {
       console.error('Error creating shared task:', e);
       setError(e?.message || 'Failed to save');
@@ -766,7 +870,7 @@ export default function MyTasks() {
                 >
                   <div className="flex items-center gap-3">
                     <Plus className="h-5 w-5" />
-                    <span>{activeTab === 'my-tasks' ? 'New Task' : 'New Shared Task'}</span>
+                    <span>{activeTab === 'my-tasks' ? 'New Task' : 'Shared Task'}</span>
                   </div>
                 </Button>
                 
@@ -836,13 +940,13 @@ export default function MyTasks() {
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
           <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 bg-blue-500 rounded-lg">
-                  <Search className="h-4 w-4 text-white" />
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 bg-blue-500 rounded-lg">
+                    <Search className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-              </div>
               
               <div className="flex flex-col md:flex-row gap-4">
                 {/* Search Bar */}
@@ -1129,9 +1233,9 @@ export default function MyTasks() {
                 <div className="flex items-center gap-2 mb-4">
                   <div className="p-1.5 bg-blue-500 rounded-lg">
                     <Search className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-              </div>
                 
                 <div className="flex flex-col lg:flex-row gap-4">
                   {/* Search Bar */}
@@ -1292,33 +1396,74 @@ export default function MyTasks() {
 
                       {/* Task Information */}
                       <div className="mt-1 p-2 sm:p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/20 hover:bg-gray-100/80 dark:hover:bg-gray-800/30 transition-colors duration-200">
-                        <div className="space-y-2">
-                          {/* First Row - Assigned Info */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-primary" />
-                              <span className="text-sm sm:text-base font-medium">
-                                Assigned
-                              </span>
+                        <div className="space-y-3">
+                          {/* Creator Info */}
+                          <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-2">
+                              <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400" />
+                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Creator</span>
                             </div>
-                            <div className="flex items-center gap-1" title="Assigned To">
-                              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
-                              <span className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-[100px]">
-                                {(() => {
-                                  const assignedUsers = getAssignedUsers(t);
-                                  if (assignedUsers.length === 0) return 'No assignees';
-                                  if (assignedUsers.length === 1) return assignedUsers[0].name;
-                                  return `${assignedUsers.length} users`;
-                                })()}
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                                {t.created_by_name?.charAt(0).toUpperCase() || '?'}
+                              </div>
+                              <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate max-w-[100px] sm:max-w-[120px]">
+                                {t.created_by_name || 'Unknown'}
                               </span>
                             </div>
                           </div>
-                          {/* Second Row - Date Info */}
-                          <div className="flex items-center justify-end">
-                            <div className="flex items-center gap-1" title="Created Date">
-                              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
-                              <span className="text-xs sm:text-sm">
-                                {new Date(t.created_at).toLocaleDateString()}
+                          
+                          {/* Assigned Members Info */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
+                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Assigned</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                {(() => {
+                                  const assignedUsers = getAssignedUsers(t);
+                                  const completedCount = assignedUsers.filter(u => t.completed_assignee_ids?.includes(u.id)).length;
+                                  const totalCount = assignedUsers.length;
+                                  
+                                  if (totalCount === 0) {
+                                    return (
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">No assignees</span>
+                                    );
+                                  }
+                                  
+                                  return (
+                                    <>
+                                      <div className="w-7 h-7 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                                        {totalCount}
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
+                                          {totalCount} member{totalCount > 1 ? 's' : ''}
+                                        </span>
+                                        <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                          {completedCount}/{totalCount} completed
+                                        </span>
+                                      </div>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Created Date & Time */}
+                          <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Created</span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
+                                {t.created_at ? new Date(t.created_at).toLocaleDateString() : 'N/A'}
+                              </span>
+                              <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                {t.created_at ? new Date(t.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                               </span>
                             </div>
                           </div>
@@ -1979,7 +2124,131 @@ export default function MyTasks() {
                     />
                   </div>
 
-                {/* Assigned To */}
+                {/* Project Selection */}
+                  <div>
+                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Project <span className="text-red-500">*</span>
+                    </Label>
+                  <Select
+                      value={editingShared?.project_ids?.[0] || ''}
+                      onValueChange={(value) => setEditingShared({ ...editingShared, project_ids: value ? [value] : [] } as SharedTask)}
+                  >
+                      <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
+                        <SelectValue placeholder="Select a project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600"></div>
+                              {project.name}
+                            </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  </div>
+
+                {/* Due Date */}
+                  <div>
+                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Due Date
+                    </Label>
+                    <DatePicker
+                      value={editingShared?.due_date || ''}
+                      onChange={(value) => setEditingShared({ ...editingShared, due_date: value } as SharedTask)}
+                      placeholder="Select due date"
+                  />
+                  </div>
+
+                {/* Priority */}
+                    <div>
+                      <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Priority
+                      </Label>
+                  <Select
+                    value={editingShared?.priority || "medium"}
+                    onValueChange={(value) => setEditingShared({ ...editingShared, priority: value } as SharedTask)}
+                  >
+                    <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
+                      <SelectValue>
+                        {editingShared?.priority && (
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              editingShared.priority === 'low' ? 'bg-green-500' :
+                              editingShared.priority === 'medium' ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}></div>
+                            <span className="capitalize">{editingShared.priority} Priority</span>
+                          </div>
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low" className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span>Low Priority</span>
+                      </SelectItem>
+                      <SelectItem value="medium" className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <span>Medium Priority</span>
+                      </SelectItem>
+                      <SelectItem value="high" className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                        <span>High Priority</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  </div>
+
+                {/* Status - Only visible when editing */}
+                {editingShared?.id && (
+                  <div>
+                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Status
+                    </Label>
+                    <Select
+                      value={editingShared?.status || "pending"}
+                      onValueChange={(value) => setEditingShared({ ...editingShared, status: value } as SharedTask)}
+                    >
+                      <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
+                        <SelectValue>
+                          {editingShared?.status && (
+                            <div className="flex items-center gap-2">
+                              <div className={`w-3 h-3 rounded-full ${
+                                editingShared.status === 'pending' ? 'bg-gray-500' :
+                                editingShared.status === 'in_progress' ? 'bg-blue-500' :
+                                editingShared.status === 'completed' ? 'bg-green-500' :
+                                'bg-purple-500'
+                              }`}></div>
+                              <span className="capitalize">{editingShared.status.replace('_', ' ')}</span>
+                            </div>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending" className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                          <span>Pending</span>
+                        </SelectItem>
+                        <SelectItem value="in_progress" className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                          <span>In Progress</span>
+                        </SelectItem>
+                        <SelectItem value="completed" className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          <span>Completed</span>
+                        </SelectItem>
+                        <SelectItem value="approved" className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                          <span>Approved</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Assign To */}
                   <div>
                     <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Assign To <span className="text-red-500">*</span>
@@ -2154,130 +2423,6 @@ export default function MyTasks() {
                       )}
                     </div>
                   </div>
-
-                {/* Project Selection */}
-                  <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Project <span className="text-red-500">*</span>
-                    </Label>
-                  <Select
-                      value={editingShared?.project_ids?.[0] || ''}
-                      onValueChange={(value) => setEditingShared({ ...editingShared, project_ids: value ? [value] : [] } as SharedTask)}
-                  >
-                      <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
-                        <SelectValue placeholder="Select a project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {projects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600"></div>
-                              {project.name}
-                            </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  </div>
-
-                {/* Due Date */}
-                  <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Due Date
-                    </Label>
-                    <DatePicker
-                      value={editingShared?.due_date || ''}
-                      onChange={(value) => setEditingShared({ ...editingShared, due_date: value } as SharedTask)}
-                      placeholder="Select due date"
-                  />
-                  </div>
-
-                {/* Priority */}
-                    <div>
-                      <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Priority
-                      </Label>
-                  <Select
-                    value={editingShared?.priority || "medium"}
-                    onValueChange={(value) => setEditingShared({ ...editingShared, priority: value } as SharedTask)}
-                  >
-                    <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
-                      <SelectValue>
-                        {editingShared?.priority && (
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${
-                              editingShared.priority === 'low' ? 'bg-green-500' :
-                              editingShared.priority === 'medium' ? 'bg-yellow-500' :
-                              'bg-red-500'
-                            }`}></div>
-                            <span className="capitalize">{editingShared.priority} Priority</span>
-                          </div>
-                        )}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low" className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span>Low Priority</span>
-                      </SelectItem>
-                      <SelectItem value="medium" className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        <span>Medium Priority</span>
-                      </SelectItem>
-                      <SelectItem value="high" className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span>High Priority</span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  </div>
-
-                {/* Status - Only visible when editing */}
-                {editingShared?.id && (
-                  <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Status
-                    </Label>
-                    <Select
-                      value={editingShared?.status || "pending"}
-                      onValueChange={(value) => setEditingShared({ ...editingShared, status: value } as SharedTask)}
-                    >
-                      <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
-                        <SelectValue>
-                          {editingShared?.status && (
-                            <div className="flex items-center gap-2">
-                              <div className={`w-3 h-3 rounded-full ${
-                                editingShared.status === 'pending' ? 'bg-gray-500' :
-                                editingShared.status === 'in_progress' ? 'bg-blue-500' :
-                                editingShared.status === 'completed' ? 'bg-green-500' :
-                                'bg-purple-500'
-                              }`}></div>
-                              <span className="capitalize">{editingShared.status.replace('_', ' ')}</span>
-                            </div>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending" className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                          <span>Pending</span>
-                        </SelectItem>
-                        <SelectItem value="in_progress" className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                          <span>In Progress</span>
-                        </SelectItem>
-                        <SelectItem value="completed" className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                          <span>Completed</span>
-                        </SelectItem>
-                        <SelectItem value="approved" className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                          <span>Approved</span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
                 </div>
 
                 {/* Actions */}
@@ -2609,6 +2754,8 @@ export default function MyTasks() {
                                       {completedAt && (
                                         <span className="text-xs text-gray-500 dark:text-gray-400">
                                           {new Date(completedAt).toLocaleDateString()}
+                                          <br />
+                                          {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                       )}
                                     </div>
@@ -2624,52 +2771,6 @@ export default function MyTasks() {
                                 <div className="text-base font-medium text-blue-700 dark:text-blue-300">
                                   {remainingCount} more assignee{remainingCount > 1 ? 's' : ''}
                                 </div>
-                              </div>
-                            )}
-                            {showAllAssignees && remainingCount > 0 && (
-                              <div className="max-h-40 overflow-y-auto hide-scrollbar space-y-2">
-                                {assignedUsers.slice(2).map((user) => {
-                                  const isCompleted = selectedShared.completed_assignee_ids?.includes(user.id) || false;
-                                  const completedAt = selectedShared.completion_details?.[user.id];
-                                  
-                                  return (
-                                    <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
-                                      <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-semibold shadow-sm">
-                                        {user.name.charAt(0).toUpperCase()}
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                                          {user.name}
-                                        </div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                          {user.email}
-                                        </div>
-                                      </div>
-                                      <div className="flex flex-col items-end gap-1">
-                                        <Badge 
-                                          variant="outline" 
-                                          className={`text-xs ${
-                                            isCompleted 
-                                              ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' 
-                                              : 'bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-800 dark:text-gray-400'
-                                          }`}
-                                        >
-                                          {isCompleted ? (
-                                            <div className="flex items-center gap-1">
-                                              <CheckCircle2 className="h-3 w-3" />
-                                              Completed
-                                            </div>
-                                          ) : 'Pending'}
-                                        </Badge>
-                                        {completedAt && (
-                                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                                            {new Date(completedAt).toLocaleDateString()}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
                               </div>
                             )}
                           </>
