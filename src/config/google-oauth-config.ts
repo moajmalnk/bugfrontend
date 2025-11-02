@@ -11,22 +11,51 @@ export const GOOGLE_OAUTH_CONFIG = {
   development: {
     // Add these URLs to your Google OAuth Client's authorized origins
     authorizedOrigins: [
+      // Standard localhost ports
+      'http://localhost',
+      'http://localhost:80',
+      'http://localhost:3000',
+      'http://localhost:5173',
       'http://localhost:8080',
       'http://localhost:8084',
-      'http://localhost:3000',
+      // 127.0.0.1 variants
+      'http://127.0.0.1',
+      'http://127.0.0.1:80',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5173',
       'http://127.0.0.1:8080',
       'http://127.0.0.1:8084',
-      'http://127.0.0.1:3000'
+      // XAMPP default paths
+      'http://localhost/BugRicer',
+      'http://localhost/BugRicer/frontend',
+      'http://127.0.0.1/BugRicer',
+      'http://127.0.0.1/BugRicer/frontend'
     ],
     
     // Add these URLs to your Google OAuth Client's authorized redirect URIs
     authorizedRedirectUris: [
+      // Standard ports
+      'http://localhost/login',
+      'http://localhost:3000/login',
+      'http://localhost:5173/login',
       'http://localhost:8080/login',
       'http://localhost:8084/login',
-      'http://localhost:3000/login',
+      // 127.0.0.1 variants
+      'http://127.0.0.1/login',
+      'http://127.0.0.1:3000/login',
+      'http://127.0.0.1:5173/login',
       'http://127.0.0.1:8080/login',
       'http://127.0.0.1:8084/login',
-      'http://127.0.0.1:3000/login'
+      // XAMPP paths
+      'http://localhost/BugRicer/login',
+      'http://localhost/BugRicer/frontend/login',
+      'http://127.0.0.1/BugRicer/login',
+      'http://127.0.0.1/BugRicer/frontend/login',
+      // OAuth callback paths
+      'http://localhost/auth/callback',
+      'http://localhost:8080/auth/callback',
+      'http://127.0.0.1/auth/callback',
+      'http://127.0.0.1:8080/auth/callback'
     ]
   },
   

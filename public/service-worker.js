@@ -26,12 +26,20 @@ const EXCLUDE_FROM_CACHE = [
   'ms-browser-extension://',
   // Dev servers and hot-reload endpoints (Vite/React Refresh)
   'http://localhost:8080',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:8080',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
   '/@vite/client',
   '/@react-refresh',
-  '/sockjs-node/',
+  '/src/',
+  '/client',
+  'sockjs-node/',
   '/hot-update',
   '.hot-update.',
-  '/src/',
+  '/assets/',
+  'accounts.google.com', // Never cache Google OAuth requests
 ];
 
 /**
@@ -49,8 +57,18 @@ function shouldCache(request) {
     }
   }
 
-  // Never intercept localhost dev server requests
-  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+  // Never intercept localhost dev server requests (including Vite client)
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.port === '8080' || url.port === '3000' || url.port === '5173') {
+    return false;
+  }
+  
+  // Never cache Vite client module or any client.* files
+  if (url.pathname.includes('/client') || url.pathname.includes('@vite/client') || url.pathname.includes('@react-refresh')) {
+    return false;
+  }
+  
+  // Never cache Google OAuth endpoints
+  if (url.hostname.includes('google.com') || url.hostname.includes('googleapis.com')) {
     return false;
   }
 

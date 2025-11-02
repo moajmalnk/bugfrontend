@@ -36,6 +36,8 @@ import { ModernErrorBoundary } from "@/components/error/ModernErrorBoundary";
 import { SEOHead } from "@/components/seo/SEOHead";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
+// Import troubleshooting tool (makes it available globally in console)
+import '@/utils/googleOAuthTroubleshoot';
 import { ProfessionalRefreshButton } from '@/components/ui/ProfessionalRefreshButton';
 import { RefreshKeyboardShortcuts } from '@/components/ui/RefreshKeyboardShortcuts';
 

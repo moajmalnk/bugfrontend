@@ -1,7 +1,6 @@
 import React from 'react';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
-import { GOOGLE_OAUTH_SETUP } from '@/utils/googleOAuthSetup';
-import { oauthDiagnostic } from '@/utils/oauthDiagnostic';
+import { googleOAuthDiagnostic } from '@/utils/googleOAuthDiagnostic';
 
 interface GoogleSignInButtonProps {
   onSuccess: (credentialResponse: CredentialResponse) => void;
@@ -10,32 +9,42 @@ interface GoogleSignInButtonProps {
 }
 
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSuccess, onError, variant = 'full' }) => {
-  // Suppress Google OAuth console errors
+  // Handle Google OAuth errors
   React.useEffect(() => {
     const originalError = console.error;
     const originalWarn = console.warn;
     
-    console.error = (...args) => {
-      // Filter out Google OAuth related errors
+    const handleError = (...args: any[]) => {
       const errorMessage = args[0]?.toString() || '';
-      if (errorMessage.includes('GSI_LOGGER') || 
-          errorMessage.includes('accounts.google.com') ||
-          errorMessage.includes('Cross-Origin-Opener-Policy')) {
-        return; // Suppress these errors
+      
+      // Detect Google OAuth origin rejection
+      if ((errorMessage.includes('GSI_LOGGER') || errorMessage.includes('accounts.google.com')) && 
+          (errorMessage.includes('origin') || errorMessage.includes('client ID') || 
+           errorMessage.includes('not allowed') || errorMessage.includes('403'))) {
+        setTimeout(() => {
+          googleOAuthDiagnostic.logRejectionError();
+        }, 200);
       }
+      
       originalError.apply(console, args);
     };
 
-    console.warn = (...args) => {
-      // Filter out Google OAuth related warnings
-      const warningMessage = args[0]?.toString() || '';
-      if (warningMessage.includes('GSI_LOGGER') || 
-          warningMessage.includes('accounts.google.com') ||
-          warningMessage.includes('Cross-Origin-Opener-Policy')) {
-        return; // Suppress these warnings
+    const handleWarn = (...args: any[]) => {
+      const warnMessage = args[0]?.toString() || '';
+      
+      // Treat Google OAuth warnings as errors
+      if ((warnMessage.includes('GSI_LOGGER') || warnMessage.includes('accounts.google.com')) && 
+          (warnMessage.includes('origin') || warnMessage.includes('client ID') || 
+           warnMessage.includes('not allowed') || warnMessage.includes('403'))) {
+        handleError(...args);
+        return;
       }
+      
       originalWarn.apply(console, args);
     };
+
+    console.error = handleError;
+    console.warn = handleWarn;
 
     return () => {
       console.error = originalError;
@@ -66,24 +75,14 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
           <GoogleLogin
             onSuccess={onSuccess}
             onError={() => {
-              console.error('Google OAuth Error');
-              
-              // Run diagnostic to get current origin info
-              const diagnostic = oauthDiagnostic.logDiagnostic();
-              
-              if (diagnostic.needsSetup) {
-                onError({
-                  type: 'setup_required',
-                  message: `Google OAuth not configured for ${diagnostic.origin}. Please check the console for setup instructions.`,
-                  setup: diagnostic.instructions,
-                  currentOrigin: diagnostic.origin
-                });
-              } else {
-                onError({
-                  type: 'oauth_error',
-                  message: 'Google Sign-In failed. Please try again or use another login method.'
-                });
-              }
+              const diagnostic = googleOAuthDiagnostic.getSetupInstructionsForRejection();
+              onError({
+                type: 'setup_required',
+                message: `Google OAuth Setup Required: Origin "${diagnostic.currentOrigin}" is not authorized. Check browser console (F12) for setup instructions.`,
+                setup: diagnostic.instructions,
+                currentOrigin: diagnostic.currentOrigin,
+                clientId: googleOAuthDiagnostic.clientId
+              });
             }}
             useOneTap={false}
             theme="outline"
@@ -105,7 +104,16 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
     <div className="flex justify-center mt-3">
       <GoogleLogin
         onSuccess={onSuccess}
-        onError={() => onError({})}
+        onError={() => {
+          const diagnostic = googleOAuthDiagnostic.getSetupInstructionsForRejection();
+          onError({
+            type: 'setup_required',
+            message: `Google OAuth Setup Required: Origin "${diagnostic.currentOrigin}" is not authorized. Check browser console (F12) for setup instructions.`,
+            setup: diagnostic.instructions,
+            currentOrigin: diagnostic.currentOrigin,
+            clientId: googleOAuthDiagnostic.clientId
+          });
+        }}
         useOneTap={false}
         theme="outline"
         size="large"
@@ -113,10 +121,8 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ onSucces
         logo_alignment="left"
         text="signin_with"
         width="280"
-        // Add these props to help with development and caching issues
         ux_mode="popup"
         auto_select={false}
-        // Force refresh of the button to avoid caching issues
         key={`google-login-${Math.random()}`}
       />
     </div>

@@ -758,11 +758,6 @@ const Projects = () => {
 
   const hasActiveFilters = searchQuery || statusFilter !== "all" || dateFilter !== "all";
 
-  // Debug dialog state changes
-  useEffect(() => {
-    console.log("Dialog state changed to:", isDeleteDialogOpen);
-  }, [isDeleteDialogOpen]);
-
   // Fetch bugs after membership is determined
   useEffect(() => {
     if (projects.length > 0 && Object.keys(userProjectMemberships).length > 0) {
