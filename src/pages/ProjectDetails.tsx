@@ -40,6 +40,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import { ENV } from "@/lib/env";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import {
@@ -452,10 +453,23 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
   const [bugs, setBugs] = useState<BugType[]>([]);
   const [loading, setLoading] = useState(true);
   const [skeletonLoading, setSkeletonLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>(initialStatus || "all");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
+  
+  // Use persisted filters hook with project-specific key
+  const [filters, setFilter, clearFilters] = usePersistedFilters(`project_bugs_${projectId || 'default'}`, {
+    searchTerm: "",
+    priorityFilter: "all",
+    statusFilter: initialStatus || "all",
+    projectFilter: "all",
+  });
+  const searchTerm = filters.searchTerm || "";
+  const priorityFilter = filters.priorityFilter || "all";
+  const statusFilter = filters.statusFilter || initialStatus || "all";
+  const projectFilter = filters.projectFilter || "all";
+  
+  const setSearchTerm = (value: string) => setFilter("searchTerm", value);
+  const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
+  const setStatusFilter = (value: string) => setFilter("statusFilter", value);
+  const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const [activeTab, setActiveTab] = useState(initialTab || "all-bugs");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -742,10 +756,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setSearchTerm("");
-                              setPriorityFilter("all");
-                              setStatusFilter("all");
-                              setProjectFilter("all");
+                              clearFilters();
                             }}
                             className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                           >
@@ -1518,10 +1529,23 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
   const [bugs, setBugs] = useState<BugType[]>([]);
   const [loading, setLoading] = useState(true);
   const [skeletonLoading, setSkeletonLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>(initialStatus || "all");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
+  
+  // Use persisted filters hook with project-specific key
+  const [filters, setFilter, clearFilters] = usePersistedFilters(`project_fixes_${projectId || 'default'}`, {
+    searchTerm: "",
+    priorityFilter: "all",
+    statusFilter: initialStatus || "all",
+    projectFilter: "all",
+  });
+  const searchTerm = filters.searchTerm || "";
+  const priorityFilter = filters.priorityFilter || "all";
+  const statusFilter = filters.statusFilter || initialStatus || "all";
+  const projectFilter = filters.projectFilter || "all";
+  
+  const setSearchTerm = (value: string) => setFilter("searchTerm", value);
+  const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
+  const setStatusFilter = (value: string) => setFilter("statusFilter", value);
+  const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const [activeTab, setActiveTab] = useState(initialTab || "all-fixes");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -1805,10 +1829,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setSearchTerm("");
-                              setPriorityFilter("all");
-                              setStatusFilter("all");
-                              setProjectFilter("all");
+                              clearFilters();
                             }}
                             className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                           >
@@ -2578,9 +2599,20 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
   const [updates, setUpdates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [skeletonLoading, setSkeletonLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [createdByFilter, setCreatedByFilter] = useState<string>("all");
+  
+  // Use persisted filters hook with project-specific key
+  const [filters, setFilter, clearFilters] = usePersistedFilters(`project_updates_${projectId || 'default'}`, {
+    searchTerm: "",
+    typeFilter: "all",
+    createdByFilter: "all",
+  });
+  const searchTerm = filters.searchTerm || "";
+  const typeFilter = filters.typeFilter || "all";
+  const createdByFilter = filters.createdByFilter || "all";
+  
+  const setSearchTerm = (value: string) => setFilter("searchTerm", value);
+  const setTypeFilter = (value: string) => setFilter("typeFilter", value);
+  const setCreatedByFilter = (value: string) => setFilter("createdByFilter", value);
   const [activeTab, setActiveTab] = useState(initialTab || "all-updates");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -2909,9 +2941,7 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setSearchTerm("");
-                              setTypeFilter("all");
-                              setCreatedByFilter("all");
+                              clearFilters();
                             }}
                             className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                           >

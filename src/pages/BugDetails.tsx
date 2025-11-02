@@ -276,7 +276,7 @@ const BugDetails = () => {
 
   const canUpdateStatus =
     currentUser?.role === "admin" || currentUser?.role === "developer";
-  const canEditBug = currentUser?.role === "admin";
+  const canEditBug = currentUser?.role === "admin" || String(currentUser?.id) === String(bug.reported_by);
 
   const handleStatusUpdate = async (newStatus: BugStatus) => {
     try {

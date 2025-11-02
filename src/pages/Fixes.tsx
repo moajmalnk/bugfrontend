@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 
 // Enhanced table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -231,9 +232,20 @@ const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
 
 const Fixes = () => {
   const { currentUser } = useAuth();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("all");
-  const [projectFilter, setProjectFilter] = useState("all");
+  
+  // Use persisted filters hook
+  const [filters, setFilter, clearFilters] = usePersistedFilters("fixes", {
+    searchTerm: "",
+    priorityFilter: "all",
+    projectFilter: "all",
+  });
+  const searchTerm = filters.searchTerm || "";
+  const priorityFilter = filters.priorityFilter || "all";
+  const projectFilter = filters.projectFilter || "all";
+  
+  const setSearchTerm = (value: string) => setFilter("searchTerm", value);
+  const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
+  const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const [projects, setProjects] = useState<Project[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "all-fixes";
@@ -281,9 +293,9 @@ const Fixes = () => {
       projectFilter !== "all" &&
       !visibleProjects.some((p) => String(p.id) === String(projectFilter))
     ) {
-      setProjectFilter("all");
+      setFilter("projectFilter", "all");
     }
-  }, [visibleProjects, projectFilter]);
+  }, [visibleProjects, projectFilter, setFilter]);
 
   const filteredBugs = useMemo(() => {
     const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
@@ -459,9 +471,7 @@ const Fixes = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setSearchTerm("");
-                          setPriorityFilter("all");
-                          setProjectFilter("all");
+                          clearFilters();
                         }}
                         className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                       >
@@ -575,9 +585,7 @@ const Fixes = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setSearchTerm("");
-                          setPriorityFilter("all");
-                          setProjectFilter("all");
+                          clearFilters();
                         }}
                         className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                       >
@@ -607,9 +615,7 @@ const Fixes = () => {
                 size="lg"
                 className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                 onClick={() => {
-                  setSearchTerm("");
-                  setPriorityFilter("all");
-                  setProjectFilter("all");
+                  clearFilters();
                 }}
               >
                 <Link to={currentUser?.role ? `/${currentUser.role}/bugs/new` : "/bugs/new"}>

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 
 const Bugs = () => {
   const { currentUser } = useAuth();
@@ -34,10 +35,23 @@ const Bugs = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [skeletonLoading, setSkeletonLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
+  
+  // Use persisted filters hook
+  const [filters, setFilter, clearFilters] = usePersistedFilters("bugs", {
+    searchTerm: "",
+    priorityFilter: "all",
+    statusFilter: "all",
+    projectFilter: "all",
+  });
+  const searchTerm = filters.searchTerm || "";
+  const priorityFilter = filters.priorityFilter || "all";
+  const statusFilter = filters.statusFilter || "all";
+  const projectFilter = filters.projectFilter || "all";
+  
+  const setSearchTerm = (value: string) => setFilter("searchTerm", value);
+  const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
+  const setStatusFilter = (value: string) => setFilter("statusFilter", value);
+  const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -63,9 +77,9 @@ const Bugs = () => {
       projectFilter !== "all" &&
       !visibleProjects.some((p) => String(p.id) === String(projectFilter))
     ) {
-      setProjectFilter("all");
+      setFilter("projectFilter", "all");
     }
-  }, [visibleProjects, projectFilter]);
+  }, [visibleProjects, projectFilter, setFilter]);
 
   useEffect(() => {
     fetchBugs();
@@ -441,10 +455,7 @@ const Bugs = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                setSearchTerm("");
-                                setPriorityFilter("all");
-                                setStatusFilter("all");
-                                setProjectFilter("all");
+                                clearFilters();
                               }}
                               className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                             >
@@ -869,10 +880,7 @@ const Bugs = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setSearchTerm("");
-                              setPriorityFilter("all");
-                              setStatusFilter("all");
-                              setProjectFilter("all");
+                              clearFilters();
                             }}
                             className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                           >

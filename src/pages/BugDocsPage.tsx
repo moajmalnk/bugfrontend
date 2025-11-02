@@ -575,7 +575,7 @@ const BugDocsPage = () => {
                 <ExternalLink className="h-4 w-4 ml-2" />
               </Button>
             </div>
-              </div>
+          </div>
             ) : (
               <div className="relative overflow-hidden mb-6">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-emerald-50/30 to-teal-50/50 dark:from-green-950/20 dark:via-emerald-950/10 dark:to-teal-950/20 rounded-2xl"></div>

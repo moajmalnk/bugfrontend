@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { useAuth } from "@/context/AuthContext";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
@@ -11,6 +19,7 @@ import { userService } from "@/services/userService";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { formatDistanceToNow } from "date-fns";
+import { googleDocsService } from "@/services/googleDocsService";
 import {
   ArrowRight,
   Bug,
@@ -26,6 +35,8 @@ import {
   MapPin,
   Phone,
   User,
+  RefreshCw,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -145,6 +156,13 @@ export default function Profile() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
+  
+  // Google connection state
+  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const [isCheckingGoogleConnection, setIsCheckingGoogleConnection] = useState(true);
+  const [connectedGoogleEmail, setConnectedGoogleEmail] = useState<string | null>(null);
+  const [showDisconnectGoogleDialog, setShowDisconnectGoogleDialog] = useState(false);
+  const [isDisconnectingGoogle, setIsDisconnectingGoogle] = useState(false);
 
   // Fetch user statistics
   const { data: userStats, isLoading: isLoadingStats } = useQuery({
@@ -155,6 +173,123 @@ export default function Profile() {
         : Promise.reject("User not logged in"),
     enabled: !!currentUser?.id,
   });
+
+  // Check Google connection status
+  const checkGoogleConnection = useCallback(async () => {
+    setIsCheckingGoogleConnection(true);
+    try {
+      const result = await googleDocsService.checkConnection();
+      setIsGoogleConnected(result.connected);
+      setConnectedGoogleEmail(result.email || null);
+    } catch (error) {
+      console.error('Failed to check Google connection:', error);
+      setIsGoogleConnected(false);
+      setConnectedGoogleEmail(null);
+    } finally {
+      setIsCheckingGoogleConnection(false);
+    }
+  }, []);
+
+  // Check connection on mount
+  useEffect(() => {
+    if (currentUser?.id) {
+      checkGoogleConnection();
+    }
+  }, [currentUser?.id, checkGoogleConnection]);
+
+  // Check for OAuth success/error parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const googleConnected = urlParams.get('google_connected');
+    const googleError = urlParams.get('google_error');
+    
+    if (googleConnected === 'true') {
+      const email = urlParams.get('email');
+      toast({
+        title: "Success",
+        description: "Google account connected successfully!",
+      });
+      // Clear the URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refresh connection status
+      checkGoogleConnection();
+    } else if (googleError) {
+      toast({
+        title: "Error",
+        description: `Google connection failed: ${decodeURIComponent(googleError)}`,
+        variant: "destructive",
+      });
+      // Clear the URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+      checkGoogleConnection(); // Refresh connection status
+    }
+  }, [checkGoogleConnection]);
+
+  const handleConnectGoogle = useCallback(() => {
+    try {
+      // Get current user ID from JWT token
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Please log in first",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Decode JWT to get user ID
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const userId = payload.user_id;
+      
+      // Build return URL based on current environment
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const returnUrl = isLocal 
+        ? `http://localhost:8080${window.location.pathname}`
+        : `https://bugs.bugricer.com${window.location.pathname}`;
+      
+      // Check if we're in production or local
+      const isProduction = !isLocal;
+      const reauthUrl = isProduction 
+        ? `https://bugbackend.bugricer.com/api/oauth/production-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl)}`
+        : `http://localhost/BugRicer/backend/api/oauth/admin-reauth.php?user_id=${userId}&token=${encodeURIComponent(token)}&return_url=${encodeURIComponent(returnUrl)}`;
+      
+      // Navigate to reauth endpoint
+      window.location.href = reauthUrl;
+    } catch (error: any) {
+      console.error('Error connecting Google:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to initiate Google connection",
+        variant: "destructive",
+      });
+    }
+  }, []);
+
+  const handleDisconnectGoogle = useCallback(async () => {
+    setIsDisconnectingGoogle(true);
+    try {
+      await googleDocsService.disconnect();
+      setIsGoogleConnected(false);
+      setConnectedGoogleEmail(null);
+      setShowDisconnectGoogleDialog(false);
+      toast({
+        title: "Disconnected",
+        description: "Google account has been disconnected successfully.",
+      });
+      // Refresh connection status
+      await checkGoogleConnection();
+    } catch (error: any) {
+      console.error('Failed to disconnect:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to disconnect Google account",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDisconnectingGoogle(false);
+    }
+  }, [checkGoogleConnection]);
 
   // Remove the problematic useEffect that was causing infinite requests
   // The user data is already available from AuthContext and doesn't need to be refetched
@@ -627,8 +762,8 @@ export default function Profile() {
 
           {/* Action Buttons Section */}
           <Card className="md:col-span-3 shadow-sm hover:shadow-md transition-all duration-200">
-            <CardContent className="p-6 sm:p-8 lg:p-10">
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+            <CardContent className="p-6">
+              <div className="flex flex-wrap items-center justify-center gap-3">
                 <EditUserDialog
                   user={currentUser}
                   onUserUpdate={handleUserUpdate}
@@ -636,26 +771,67 @@ export default function Profile() {
                   trigger={
                     <Button
                       variant="outline"
-                      size="lg"
-                      className="w-full sm:w-auto min-w-[200px] sm:min-w-[220px] h-12 sm:h-14 px-8 sm:px-10 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2"
+                      className="h-10 px-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
                     >
-                      <User className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <User className="w-4 h-4" />
                       Edit Profile
                     </Button>
                   }
                 />
                 <Button
                   variant="outline"
-                  size="lg"
                   onClick={() => setShowPasswordResetConfirm(true)}
                   disabled={isResettingPassword}
-                  className="w-full sm:w-auto min-w-[200px] sm:min-w-[220px] h-12 sm:h-14 px-8 sm:px-10 border-2 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                  className="h-10 px-6 border-2 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   aria-label="Reset Password"
                 >
-                  <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Lock className="w-4 h-4" />
                   {isResettingPassword ? "Sending..." : "Reset Password"}
                 </Button>
+                {!isCheckingGoogleConnection && (
+                  <>
+                    {!isGoogleConnected ? (
+                      <Button
+                        variant="outline"
+                        onClick={handleConnectGoogle}
+                        className="h-10 px-6 border-2 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                        aria-label="Connect with Google"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        Connect with Google
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowDisconnectGoogleDialog(true)}
+                        className="h-10 px-6 border-2 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                        aria-label="Disconnect Google"
+                      >
+                        <X className="w-4 h-4" />
+                        Disconnect Google
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
+              {isGoogleConnected && connectedGoogleEmail && (
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                    <span className="font-medium">Connected: <span className="text-foreground">{connectedGoogleEmail}</span></span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1198,6 +1374,49 @@ export default function Profile() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Disconnect Google Confirmation Dialog */}
+        <Dialog open={showDisconnectGoogleDialog} onOpenChange={setShowDisconnectGoogleDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Disconnect Google Account?</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to disconnect your Google account? This will revoke access to Google Docs and Calendar. You won't be able to create or manage documents and meetings until you reconnect.
+              </DialogDescription>
+            </DialogHeader>
+            {connectedGoogleEmail && (
+              <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Account: <span className="font-semibold text-gray-900 dark:text-white">{connectedGoogleEmail}</span></p>
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowDisconnectGoogleDialog(false)}
+                disabled={isDisconnectingGoogle}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDisconnectGoogle}
+                disabled={isDisconnectingGoogle}
+              >
+                {isDisconnectingGoogle ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Disconnecting...
+                  </>
+                ) : (
+                  <>
+                    <X className="h-4 w-4 mr-2" />
+                    Disconnect
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </section>
     </main>
   );

@@ -1335,6 +1335,9 @@ export default function MyTasks() {
                                         (t.assigned_to_ids && t.assigned_to_ids.includes(currentUser?.id || ''));
                       const isApproved = t.status === 'approved';
                       const isCompleted = t.status === 'completed';
+                      // Check if current user has completed their part of the task
+                      const currentUserCompleted = currentUser?.id && 
+                                                    t.completed_assignee_ids?.includes(currentUser.id);
 
                       const buttons = [];
 
@@ -1351,62 +1354,12 @@ export default function MyTasks() {
                         )
                       });
 
-                      // If task is approved: Show View, Edit, Delete (for creator) OR View only (for assignees)
-                      if (isApproved) {
-                        if (isCreator) {
-                          buttons.push({
-                            component: (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => openEditShared(t)} 
-                                className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-                              >
-                                Edit
-                              </Button>
-                            )
-                          });
-                          buttons.push({
-                            component: sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
-                              <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
-                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                                <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                                  {undoDeleteSharedTask.timeLeft}s
-                                </span>
-                              </div>
-                            ) : (
-                              <Button 
-                                variant="destructive"
-                                size="sm" 
-                                onClick={() => onDeleteShared(t.id)} 
-                                className="w-full h-11 font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
-                              >
-                                Delete
-                              </Button>
-                            )
-                          });
-                        }
-                      }
-                      // If task is completed but not approved
-                      else if (isCompleted && !isApproved) {
-                        // For assignees (but not creator): Show Incomplete button
-                        if (isAssignee && !isCreator) {
-                          buttons.push({
-                            component: (
-                              <Button 
-                                size="sm" 
-                                onClick={() => uncompleteSharedTask(t)} 
-                                className="w-full h-11 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-                              >
-                                Incomplete
-                              </Button>
-                            )
-                          });
-                        }
-                        // For creator: Show Incomplete (if also assignee), Approve, Edit, and Delete buttons
-                        if (isCreator) {
-                          // Only add Incomplete if creator is also an assignee
-                          if (isAssignee) {
+                      // If task is not approved
+                      if (!isApproved) {
+                        // For assignees: Show Complete or Incomplete button based on their completion status
+                        if (isAssignee) {
+                          if (currentUserCompleted) {
+                            // User has completed, show Incomplete button (unless task is approved)
                             buttons.push({
                               component: (
                                 <Button 
@@ -1418,10 +1371,25 @@ export default function MyTasks() {
                                 </Button>
                               )
                             });
+                          } else {
+                            // User has not completed, show Complete button
+                            buttons.push({
+                              component: (
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => markSharedCompleted(t)} 
+                                  className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                                >
+                                  Complete
+                                </Button>
+                              )
+                            });
                           }
-                          // Only show Approve button when all assigned members have completed
-                          const allMembersCompleted = t.assigned_to_ids?.every(id => t.completed_assignee_ids?.includes(id)) || false;
-                          if (allMembersCompleted) {
+                        }
+                        // For creator: Show Approve (if all completed), Edit, and Delete buttons
+                        if (isCreator) {
+                          // Only show Approve button when task is completed (all members completed)
+                          if (isCompleted) {
                             buttons.push({
                               component: (
                                 <Button 
@@ -1466,24 +1434,8 @@ export default function MyTasks() {
                             )
                           });
                         }
-                      }
-                      // If task is not completed and not approved
-                      else {
-                        // For assignees: Show Complete and View buttons
-                        if (isAssignee) {
-                          buttons.push({
-                            component: (
-                              <Button 
-                                size="sm" 
-                                onClick={() => markSharedCompleted(t)} 
-                                className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-                              >
-                                Complete
-                              </Button>
-                            )
-                          });
-                        }
-                        // For creator: Show Edit and Delete buttons
+                      } else {
+                        // Task is approved - only creator gets Edit/Delete, no Incomplete button for anyone
                         if (isCreator) {
                           buttons.push({
                             component: (

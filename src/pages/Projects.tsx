@@ -57,6 +57,7 @@ import {
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
+import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 
 // Enhanced Professional Project Card Skeleton with animations
 const ProjectCardSkeleton = ({ index = 0 }: { index?: number }) => (
@@ -140,9 +141,20 @@ const Projects = () => {
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [skeletonLoading, setSkeletonLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<string>("all");
+  
+  // Use persisted filters hook
+  const [filters, setFilter, clearFilters] = usePersistedFilters("projects", {
+    searchQuery: "",
+    statusFilter: "all",
+    dateFilter: "all",
+  });
+  const searchQuery = filters.searchQuery || "";
+  const statusFilter = filters.statusFilter || "all";
+  const dateFilter = filters.dateFilter || "all";
+  
+  const setSearchQuery = (value: string) => setFilter("searchQuery", value);
+  const setStatusFilter = (value: string) => setFilter("statusFilter", value);
+  const setDateFilter = (value: string) => setFilter("dateFilter", value);
   const { currentUser } = useAuth();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -750,11 +762,7 @@ const Projects = () => {
     setSearchParams({ tab });
   };
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setStatusFilter("all");
-    setDateFilter("all");
-  };
+  // clearFilters is now provided by usePersistedFilters hook
 
   const hasActiveFilters = searchQuery || statusFilter !== "all" || dateFilter !== "all";
 

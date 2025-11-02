@@ -33,6 +33,7 @@ import { format } from "date-fns";
 import { AlertCircle, Bell, Filter, Lock, Plus, Search, User, X } from "lucide-react";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -110,9 +111,20 @@ const Updates = () => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [createdByFilter, setCreatedByFilter] = useState("all");
+  
+  // Use persisted filters hook
+  const [filters, setFilter, clearFilters] = usePersistedFilters("updates", {
+    searchTerm: "",
+    typeFilter: "all",
+    createdByFilter: "all",
+  });
+  const searchTerm = filters.searchTerm || "";
+  const typeFilter = filters.typeFilter || "all";
+  const createdByFilter = filters.createdByFilter || "all";
+  
+  const setSearchTerm = (value: string) => setFilter("searchTerm", value);
+  const setTypeFilter = (value: string) => setFilter("typeFilter", value);
+  const setCreatedByFilter = (value: string) => setFilter("createdByFilter", value);
   const [typeOpen, setTypeOpen] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -404,9 +416,7 @@ const Updates = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setSearchTerm("");
-                    setTypeFilter("all");
-                    setCreatedByFilter("all");
+                    clearFilters();
                   }}
                   className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                 >
