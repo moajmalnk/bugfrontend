@@ -305,7 +305,7 @@ export default function FeedbackStats() {
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {averageRating ? averageRating.toFixed(1) : 'N/A'}
+                    {averageRating ? averageRating.toFixed(1) : '0.0'}
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
                     Average Rating
@@ -354,7 +354,7 @@ export default function FeedbackStats() {
                   <div className="text-3xl font-bold text-gray-900 dark:text-white">
                     {totalSubmissions > 0 
                       ? `${Math.round(((parseInt(String(statistics.five_star_count)) + parseInt(String(statistics.four_star_count))) / totalSubmissions) * 100)}%`
-                      : 'N/A'
+                      : '0%'
                     }
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
