@@ -144,7 +144,7 @@ const NewBug = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["projects"],
+    queryKey: ["projects", currentUser?.id], // Include user ID in query key to prevent cross-user caching
     queryFn: async () => {
       const token = localStorage.getItem("token");
       const response = await axios.get<ApiResponse<Project[]>>(
@@ -156,27 +156,15 @@ const NewBug = () => {
         }
       );
       if (response.data.success) {
-        const allProjects = response.data.data;
-        if (currentUser?.role === "admin") {
-          return allProjects; // Admin sees all projects
-        }
-        return allProjects.filter((project: any) => {
-          if (Array.isArray(project.members)) {
-            // If array of IDs
-            if (typeof project.members[0] === "string") {
-              return project.members.includes(currentUser.id);
-            }
-            // If array of objects
-            return project.members.some(
-              (m) => m.id === currentUser.id || m.user_id === currentUser.id
-            );
-          }
-          // fallback: show if user is creator
-          return project.created_by === currentUser.id;
-        });
+        // Backend already handles filtering:
+        // - Admins get all projects
+        // - Other users (developers, testers) get only projects they are assigned to via project_members table
+        // - Impersonation mode is handled correctly by backend
+        return response.data.data;
       }
       throw new Error(response.data.message || "Failed to fetch projects");
     },
+    enabled: !!currentUser, // Only fetch when user is available
   });
 
   // Voice recording functions - using proven approach from working VoiceRecorder components
@@ -514,11 +502,14 @@ const NewBug = () => {
           : voiceNote.blob.type.includes("mp4")
           ? "mp4"
           : "wav";
-        formData.append(
-          `voice_notes[]`,
-          voiceNote.blob,
-          `${voiceNote.name}.${fileExtension}`
-        );
+        
+        // Use the Blob directly - FormData.append() can accept Blob with optional filename
+        const fileName = `${voiceNote.name || `voice_note_${index + 1}`}.${fileExtension}`;
+        
+        // Append Blob directly (FormData.append accepts Blob as second parameter)
+        // Cast to any to allow filename parameter (supported by browsers)
+        (formData.append as any)(`voice_notes[]`, voiceNote.blob, fileName);
+        console.log(`Added voice note ${index + 1}: ${fileName}, Size: ${voiceNote.blob.size}, Type: ${voiceNote.blob.type}`);
       });
 
       const response = await apiClient.post('/bugs/create.php', formData, {
@@ -590,7 +581,7 @@ const NewBug = () => {
                 notificationSettings.newBugNotifications
               ) {
                 // Get project name for WhatsApp message
-                const selectedProject = projects?.find(
+                const selectedProject = (projects as Project[])?.find(
                   (p) => p.id === projectId
                 );
 
@@ -955,12 +946,12 @@ const NewBug = () => {
                             <SelectItem value="error" disabled>
                               Error loading projects
                             </SelectItem>
-                          ) : projects?.length === 0 ? (
+                          ) : (projects as Project[])?.length === 0 ? (
                             <SelectItem value="none" disabled>
                               No projects available
                             </SelectItem>
                           ) : (
-                            projects?.map((project: Project) => (
+                            (projects as Project[])?.map((project: Project) => (
                               <SelectItem key={project.id} value={project.id}>
                                 {project.name}
                               </SelectItem>

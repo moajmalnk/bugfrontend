@@ -4,6 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import Login from "@/pages/Login";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/NotFound";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsOfUse from "@/pages/TermsOfUse";
 import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 import MeetLobby from "@/pages/MeetLobby";
@@ -125,6 +127,7 @@ const MyTasks = lazy(() =>
 );
 const DailyUpdate = lazy(() => import("@/pages/DailyUpdate"));
 const DailyWorkUpdate = lazy(() => import("@/pages/DailyWorkUpdate"));
+const TimeTracking = lazy(() => import("@/pages/TimeTracking"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
 const DocsSetupError = lazy(() => import("@/pages/DocsSetupError"));
@@ -182,6 +185,8 @@ const RouteConfig = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/terms-of-use" element={<TermsOfUse />} />
 
       {/* Google Docs OAuth callback routes */}
       <Route
@@ -247,6 +252,7 @@ const RouteConfig = () => {
           <Route path="my-tasks" element={<MyTasks />} />
           <Route path="daily-update" element={<DailyUpdate />} />
           <Route path="daily-work-update" element={<DailyWorkUpdate />} />
+          <Route path="time-tracking" element={<TimeTracking />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
           <Route path="bugdocs" element={<BugDocsPage />} />
           {/* Redirect from /:role to /:role/projects */}

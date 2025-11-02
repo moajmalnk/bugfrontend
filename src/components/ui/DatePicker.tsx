@@ -11,17 +11,29 @@ type Props = {
   placeholder?: string;
   className?: string;
   disableFuture?: boolean;
+  allowOnlyTodayAndYesterday?: boolean;
 };
 
-export function DatePicker({ value, onChange, placeholder = 'Pick a date', className, disableFuture }: Props) {
+export function DatePicker({ value, onChange, placeholder = 'Pick a date', className, disableFuture, allowOnlyTodayAndYesterday }: Props) {
   const selectedDate = useMemo(() => (value ? new Date(value) : undefined), [value]);
   const [open, setOpen] = useState(false);
   const disabled = useMemo(() => {
+    if (allowOnlyTodayAndYesterday) {
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      return {
+        before: yesterday,
+        after: today
+      } as any;
+    }
+    
     if (!disableFuture) return undefined;
     const today = new Date();
     today.setHours(0,0,0,0);
     return { after: today } as any;
-  }, [disableFuture]);
+  }, [disableFuture, allowOnlyTodayAndYesterday]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
