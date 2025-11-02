@@ -182,7 +182,7 @@ const FixBug = () => {
             ...bug,
             id: bug.id,
             status: "fixed",
-            updated_by_name: currentUser?.name || "Bug Ricer",
+            updated_by_name: currentUser?.name || "BugRicer",
           });
         }
 
@@ -192,7 +192,7 @@ const FixBug = () => {
             bug.title,
             bug.id,
             status,
-            currentUser?.name || "Bug Ricer"
+            currentUser?.name || "BugRicer"
           );
         }
 

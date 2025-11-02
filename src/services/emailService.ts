@@ -63,12 +63,12 @@ export const sendEmailNotification = async (
 // const description = data.description || "No description provided.";
 
 // Define currentUser or get it from your authentication/user context
-// const currentUser = { name: "Bug Ricer" }; // Replace this with actual user fetching logic
+// const currentUser = { name: "BugRicer" }; // Replace this with actual user fetching logic
 
 // await sendEmailNotification(
 //   testerEmails,
 //   `New Bug Reported: ${name}`,
-//   `<b>${name}</b><br/>${description}<br/><br/>Reported by: ${currentUser?.name || "Bug Ricer"}`,
+//   `<b>${name}</b><br/>${description}<br/><br/>Reported by: ${currentUser?.name || "BugRicer"}`,
 //   data.attachments || []
 // );
 
@@ -140,7 +140,7 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
               <!-- Header -->
               <div style="background-color: #65a30d; color: #ffffff; padding: 20px; text-align: center;">
                  <h1 style="margin: 0; font-size: 24px; display: flex; align-items: center; justify-content: center;">
-                  <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f41e/32.png" alt="Bug Ricer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
+                  <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f41e/32.png" alt="BugRicer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
                   BugRicer Alert
                 </h1>
                 <p style="margin: 5px 0 0 0; font-size: 16px;">Bug Fixed</p>
@@ -169,7 +169,7 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>New Status:</strong> <span style="font-weight: normal; text-transform: capitalize; color: #65a30d;">Fixed</span></p>
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString()}</span></p>
-                <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated By:</strong> <span style="font-weight: normal;">${bug.updated_by_name || 'Bug Ricer User'}</span></p>
+                <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated By:</strong> <span style="font-weight: normal;">${bug.updated_by_name || 'BugRicer User'}</span></p>
                 <p style="margin-top: 18px; text-align: center;">
                   <a href="${bugLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 500; font-size: 16px;">View Bug Details</a>
                 </p>
@@ -177,8 +177,8 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
               
               <!-- Footer -->
               <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
-                <p style="margin: 0;">This is an automated notification from Bug Ricer. Please do not reply to this email.</p>
-                <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} Bug Ricer. All rights reserved.</p>
+                <p style="margin: 0;">This is an automated notification from BugRicer. Please do not reply to this email.</p>
+                <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} BugRicer. All rights reserved.</p>
               </div>
               
             </div>
@@ -220,13 +220,13 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
 //   description: "This is a sample bug description.",
 //   priority: "High",
 //   status: "Fixed",
-//   updated_by_name: currentUser?.name || "Bug Ricer"
+//   updated_by_name: currentUser?.name || "BugRicer"
 // };
 
 // await sendBugStatusUpdateNotification({
 //   ...bug,
 //   status: bug.status,
-//   updated_by_name: currentUser?.name || "Bug Ricer" // Include updater name
+//   updated_by_name: currentUser?.name || "BugRicer" // Include updater name
 // });
 
 // Add function to send new bug notification
@@ -259,7 +259,7 @@ export const sendNewBugNotification = async (bug: any) => {
               <!-- Header -->
               <div style="background-color: #dc2626; color: #ffffff; padding: 20px; text-align: center;">
                  <h1 style="margin: 0; font-size: 24px; display: flex; align-items: center; justify-content: center;">
-                  <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f41e/32.png" alt="Bug Ricer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
+                  <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f41e/32.png" alt="BugRicer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
                   BugRicer Alert
                 </h1>
                 <p style="margin: 5px 0 0 0; font-size: 16px;">New Bug Reported</p>
@@ -287,7 +287,7 @@ export const sendNewBugNotification = async (bug: any) => {
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Status:</strong> <span style="font-weight: normal; text-transform: capitalize; color: #dc2626;">Pending</span></p>
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Reported On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString()}</span></p>
-                <p style="font-size: 14px; margin-bottom: 0;"><strong>Reported By:</strong> <span style="font-weight: normal;">${bug.reported_by_name || 'Bug Ricer User'}</span></p>
+                <p style="font-size: 14px; margin-bottom: 0;"><strong>Reported By:</strong> <span style="font-weight: normal;">${bug.reported_by_name || 'BugRicer User'}</span></p>
                 <p style="margin-top: 18px; text-align: center;">
                   <a href="${bugLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 500; font-size: 16px;">View Bug Details</a>
                 </p>
@@ -295,8 +295,8 @@ export const sendNewBugNotification = async (bug: any) => {
               
               <!-- Footer -->
               <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
-                <p style="margin: 0;">This is an automated notification from Bug Ricer. Please do not reply to this email.</p>
-                <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} Bug Ricer. All rights reserved.</p>
+                <p style="margin: 0;">This is an automated notification from BugRicer. Please do not reply to this email.</p>
+                <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} BugRicer. All rights reserved.</p>
               </div>
               
             </div>
@@ -368,7 +368,7 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
               <!-- Header -->
               <div style="background-color: #2563eb; color: #ffffff; padding: 20px; text-align: center;">
                  <h1 style="margin: 0; font-size: 24px; display: flex; align-items: center; justify-content: center;">
-                  <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f41e/32.png" alt="Bug Ricer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
+                  <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f41e/32.png" alt="BugRicer Logo" style="width: 30px; height: 30px; margin-right: 10px; vertical-align: middle;">
                   BugRicer Alert
                 </h1>
                 <p style="margin: 5px 0 0 0; font-size: 16px;">Bug Update</p>
@@ -396,7 +396,7 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
                 ${statusChangeContent}
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString()}</span></p>
-                <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated By:</strong> <span style="font-weight: normal;">${bug.updated_by_name || 'Bug Ricer User'}</span></p>
+                <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated By:</strong> <span style="font-weight: normal;">${bug.updated_by_name || 'BugRicer User'}</span></p>
                 <p style="margin-top: 18px; text-align: center;">
                   <a href="${bugLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 500; font-size: 16px;">View Bug Details</a>
                 </p>
@@ -404,8 +404,8 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
               
               <!-- Footer -->
               <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
-                <p style="margin: 0;">This is an automated notification from Bug Ricer. Please do not reply to this email.</p>
-                <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} Bug Ricer. All rights reserved.</p>
+                <p style="margin: 0;">This is an automated notification from BugRicer. Please do not reply to this email.</p>
+                <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} BugRicer. All rights reserved.</p>
               </div>
               
             </div>
@@ -474,15 +474,15 @@ export const sendNewUpdateNotification = async (update: any) => {
                 <p style="white-space: pre-line; margin-bottom: 15px; font-size: 14px;">${update.description || "No description provided."}</p>
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Type:</strong> <span style="font-weight: normal; text-transform: capitalize;">${update.type}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Created On:</strong> <span style="font-weight: normal;">${new Date(update.created_at).toLocaleString()}</span></p>
-                <p style="font-size: 14px; margin-bottom: 0;"><strong>Created By:</strong> <span style="font-weight: normal;">${update.created_by || 'Bug Ricer User'}</span></p>
+                <p style="font-size: 14px; margin-bottom: 0;"><strong>Created By:</strong> <span style="font-weight: normal;">${update.created_by || 'BugRicer User'}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Project:</strong> <span style="font-weight: normal;">${update.project_name || 'BugRicer Project'}</span></p>
                 <p style="margin-top: 18px; text-align: center;">
                   <a href="${updateLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 500; font-size: 16px;">View Update Details</a>
                 </p>
               </div>
               <div style="background-color: #f8fafc; color: #64748b; padding: 20px; text-align: center; font-size: 12px;">
-                <p style="margin: 0;">This is an automated notification from Bug Ricer. Please do not reply to this email.</p>
-                <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} Bug Ricer. All rights reserved.</p>
+                <p style="margin: 0;">This is an automated notification from BugRicer. Please do not reply to this email.</p>
+                <p style="margin: 5px 0 0 0;">&copy; ${new Date().getFullYear()} BugRicer. All rights reserved.</p>
               </div>
             </div>
           </div>

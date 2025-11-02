@@ -310,7 +310,7 @@ const BugDetails = () => {
           const bugData = {
             ...bug,
             status: newStatus,
-            updated_by_name: currentUser?.name || "Bug Ricer", // Include updater name in notification
+            updated_by_name: currentUser?.name || "BugRicer", // Include updater name in notification
           };
 
           // Send email notification
@@ -321,7 +321,7 @@ const BugDetails = () => {
             bug.title,
             bug.id,
             newStatus,
-            currentUser?.name || "Bug Ricer User"
+            currentUser?.name || "BugRicer User"
           );
           //console.log("Broadcast notification sent for status change");
 
@@ -336,7 +336,7 @@ const BugDetails = () => {
               bugId: bug.id,
               status: newStatus,
               priority: bug.priority,
-              updatedBy: currentUser?.name || "Bug Ricer User",
+              updatedBy: currentUser?.name || "BugRicer User",
               projectName: bug.project_name || bug.project_id,
             });
             // console.log("WhatsApp share opened for status change");

@@ -82,7 +82,7 @@ export const BugDetailsCard = ({
             updatedBug.title,
             updatedBug.id,
             value,
-            currentUser?.name || "Bug Ricer User"
+            currentUser?.name || "BugRicer User"
           );
           //.log("Broadcast notification sent for status change");
         } catch (broadcastError) {
@@ -100,7 +100,7 @@ export const BugDetailsCard = ({
             bugId: updatedBug.id,
             status: value,
             priority: updatedBug.priority,
-            updatedBy: currentUser?.name || "Bug Ricer User",
+            updatedBy: currentUser?.name || "BugRicer User",
             projectName: updatedBug.project_name || updatedBug.project_id,
           });
           //.log("WhatsApp share opened for status change");

@@ -554,7 +554,7 @@ const NewBug = () => {
               actual_result: actualResult,
               priority: priority,
               status: "pending",
-              reported_by_name: currentUser?.name || "Bug Ricer User",
+              reported_by_name: currentUser?.name || "BugRicer",
               attachments: uploadedAttachments,
               id: bugId,
               project_id: projectId,
@@ -570,7 +570,7 @@ const NewBug = () => {
               await broadcastNotificationService.broadcastNewBug(
                 name,
                 bugId,
-                currentUser?.name || "Bug Ricer User"
+                currentUser?.name || "BugRicer"
               );
               // console.log("Broadcast notification sent for new bug");
 
@@ -592,7 +592,7 @@ const NewBug = () => {
                   description: description,
                   expectedResult: expectedResult,
                   actualResult: actualResult,
-                  reportedBy: currentUser?.name || "Bug Ricer User",
+                  reportedBy: currentUser?.name || "BugRicer",
                   projectName: selectedProject?.name || "BugRicer Project",
                 });
                 // console.log("WhatsApp share opened for new bug");
