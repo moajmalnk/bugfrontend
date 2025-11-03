@@ -106,18 +106,18 @@ export default function DailyUpdate() {
   };
 
   function computeTotalsInRange(list: any[], from: string, to: string) {
-    const fromTs = new Date(from).getTime();
-    const toTs = new Date(to).getTime();
-    let days = 0;
+    // Compare YYYY-MM-DD strings directly to avoid timezone drift
+    const dateSet = new Set<string>();
     let hours = 0;
     for (const s of list) {
-      const t = new Date(s.submission_date).getTime();
-      if (t >= fromTs && t <= toTs) {
-        days += 1;
+      const d = String(s.submission_date || "");
+      if (!d) continue;
+      if (d >= from && d <= to) {
+        dateSet.add(d);
         hours += Number(s.hours_today || 0);
       }
     }
-    return { days, hours };
+    return { days: dateSet.size, hours };
   }
 
   function getMonthRange(dateStr: string) {
@@ -136,19 +136,66 @@ export default function DailyUpdate() {
     return { monthHours: totals.hours, monthDays: totals.days };
   }, [submissions]);
 
+  // Get CODO period key (YYYY-MM) for a given submission date
+  // CODO periods: 6th of month to 5th of next month
+  // Dates 1-5 belong to previous month's CODO period
+  // Dates 6-31 belong to current month's CODO period
   function monthKey(dateStr: string) {
-    const d = new Date(dateStr);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const d = new Date(dateStr + 'T00:00:00');
+    const day = d.getDate();
+    let year = d.getFullYear();
+    let month = d.getMonth() + 1;
+    
+    // If date is 1-5, it belongs to previous month's CODO period
+    if (day <= 5) {
+      month = month - 1;
+      if (month === 0) {
+        month = 12;
+        year = year - 1;
+      }
+    }
+    
+    return `${year}-${String(month).padStart(2, '0')}`;
+  }
+
+  // Get CODO period range for a given month (YYYY-MM format)
+  // Returns dates from 6th of that month to 5th of next month
+  function getCodoPeriodForMonth(monthKey: string) {
+    const [y, m] = monthKey.split('-').map(Number);
+    const monthIndex = m - 1;
+    
+    // Start: 6th of the given month
+    const startDate = `${y}-${String(m).padStart(2, '0')}-06`;
+    
+    // End: 5th of next month
+    let nextYear = y;
+    let nextMonth = m + 1;
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextYear = y + 1;
+    }
+    const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-05`;
+    
+    return { from: startDate, to: endDate };
+  }
+
+  // Format date for display (e.g., "October 6" or "November 5")
+  function formatDateForDisplay(dateStr: string) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const monthName = d.toLocaleDateString(undefined, { month: 'long' });
+    const day = d.getDate();
+    return `${monthName} ${day}`;
   }
 
   function monthLabel(key: string, list: any[]) {
-    const [y,m] = key.split('-').map(Number);
-    const d = new Date(y, (m||1)-1, 1);
-    const name = d.toLocaleDateString(undefined, { month: 'short' }).toLowerCase();
-    const rangeStart = new Date(y, (m||1)-1, 1).toISOString().slice(0,10);
-    const rangeEnd = new Date(y, (m||1), 0).toISOString().slice(0,10);
-    const { days, hours } = computeTotalsInRange(list, rangeStart, rangeEnd);
-    return `${name} ${y} (${hours} hours) (${days} days)`;
+    const { from, to } = getCodoPeriodForMonth(key);
+    const { days, hours } = computeTotalsInRange(list, from, to);
+    
+    // Format the date range for display
+    const startDisplay = formatDateForDisplay(from);
+    const endDisplay = formatDateForDisplay(to);
+    
+    return `${startDisplay} to ${endDisplay} (${hours} hours) (${days} ${days === 1 ? 'day' : 'days'})`;
   }
 
   function isToday(submissionDate: string) {
@@ -370,29 +417,64 @@ export default function DailyUpdate() {
           }}
           className="w-full"
         >
+          {/* Professional tab bar with sliding indicator */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
-            <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
-                <TabsTrigger
-                  value="all-submissions"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Bell className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">All Submissions</span>
-                  <span className="sm:hidden">All</span>
-                  <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">{getTabCount("all-submissions")}</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="today-submissions"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Today Submissions</span>
-                  <span className="sm:hidden">Today</span>
-                  <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-green-300 rounded-full text-xs font-bold">{getTabCount("today-submissions")}</span>
-                </TabsTrigger>
-              </TabsList>
+            <div className="relative rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm p-2">
+              <div className="relative">
+                {/* indicator */}
+                <div
+                  className={`absolute top-1 bottom-1 left-1 w-1/2 rounded-xl bg-white dark:bg-gray-800 shadow-lg border border-gray-200/70 dark:border-gray-700/70 transition-transform duration-300 ease-out ${
+                    activeTab === 'all-submissions' ? 'translate-x-0' : 'translate-x-full'
+                  }`}
+                  aria-hidden="true"
+                />
+                {/* tab buttons */}
+                <div className="relative grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'all-submissions'}
+                    onClick={() => {
+                      setActiveTab('all-submissions');
+                      setSearchParams((prev) => {
+                        const p = new URLSearchParams(prev);
+                        p.set('tab', 'all-submissions');
+                        return p as any;
+                      });
+                    }}
+                    className="z-10 h-12 sm:h-14 px-3 sm:px-4 rounded-xl text-sm sm:text-base font-semibold flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="hidden sm:inline">All Submissions</span>
+                    <span className="sm:hidden">All</span>
+                    <span className="ml-2 px-2 py-1 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                      {getTabCount('all-submissions')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'today-submissions'}
+                    onClick={() => {
+                      setActiveTab('today-submissions');
+                      setSearchParams((prev) => {
+                        const p = new URLSearchParams(prev);
+                        p.set('tab', 'today-submissions');
+                        return p as any;
+                      });
+                    }}
+                    className="z-10 h-12 sm:h-14 px-3 sm:px-4 rounded-xl text-sm sm:text-base font-semibold flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="hidden sm:inline">Today Submissions</span>
+                    <span className="sm:hidden">Today</span>
+                    <span className="ml-2 px-2 py-1 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-green-300">
+                      {getTabCount('today-submissions')}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -450,7 +532,12 @@ export default function DailyUpdate() {
               </div>
             ) : (
               <div className={`grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8 ${activeTab === "today-submissions" ? "lg:grid-cols-1" : "lg:grid-cols-2"}`}>
-                    {filteredSubmissions.filter(s => !activeMonth || monthKey(s.submission_date)===activeMonth).map((s) => (
+                    {filteredSubmissions.filter(s => {
+                      if (!activeMonth) return true;
+                      const { from, to } = getCodoPeriodForMonth(activeMonth);
+                      const submissionDate = String(s.submission_date || "");
+                      return submissionDate >= from && submissionDate <= to;
+                    }).map((s) => (
                   <div key={s.id ?? s.submission_date} className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-6 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div>
