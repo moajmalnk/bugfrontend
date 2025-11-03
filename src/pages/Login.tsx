@@ -928,18 +928,20 @@ const Login = () => {
   `;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-3 sm:p-4 md:p-6 lg:p-8 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative">
       {/* Subtle background pattern */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.05)_1px,transparent_0)] dark:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)] [background-size:20px_20px]" />
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.05)_1px,transparent_0)] dark:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)] [background-size:20px_20px] pointer-events-none z-0" />
       
       {/* Floating elements for depth - hidden on mobile for performance */}
-      <div className="hidden sm:block absolute top-20 left-10 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl animate-pulse"></div>
-      <div className="hidden sm:block absolute bottom-20 right-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      <div className="hidden sm:block fixed top-20 left-10 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl animate-pulse pointer-events-none z-0"></div>
+      <div className="hidden sm:block fixed bottom-20 right-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl animate-pulse delay-1000 pointer-events-none z-0"></div>
       
-      <div className="w-full max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl relative z-10">
-        <div className={`bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/50 transition-all duration-700 ${
-          isAnimating ? 'scale-105 shadow-2xl' : 'hover:shadow-2xl'
-        }`}>
+      {/* Centered content wrapper with scrolling support */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-3 sm:p-4 md:p-6 lg:p-8">
+        <div className="w-full max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl">
+          <div className={`bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-xl border border-white/20 dark:border-slate-700/50 transition-all duration-700 ${
+            isAnimating ? 'scale-105 shadow-2xl' : 'hover:shadow-2xl'
+          }`}>
           {/* Header Section */}
           <div className="text-center px-4 sm:px-6 md:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6">
             <div className="relative inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl sm:rounded-2xl shadow-lg mb-4 sm:mb-6 transform hover:scale-105 transition-all duration-300 group">
@@ -1713,7 +1715,7 @@ const Login = () => {
 
           {/* Footer */}
           <div className="px-4 sm:px-6 md:px-8 pb-6 sm:pb-8 text-center space-y-3 sm:space-y-4">
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-6 text-xs">
+            <div className="flex flex-row justify-center items-center gap-3 sm:gap-6 text-xs">
               <button
                 onClick={() => setShowPrivacyPolicy(true)}
                 className="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 flex items-center gap-1 touch-manipulation"
@@ -1721,7 +1723,7 @@ const Login = () => {
                 <FileText className="h-3 w-3" />
                 Privacy Policy
               </button>
-              <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
+              <span className="text-slate-300 dark:text-slate-600">•</span>
               <button
                 onClick={() => setShowTermsOfUse(true)}
                 className="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 flex items-center gap-1 touch-manipulation"
@@ -1734,6 +1736,7 @@ const Login = () => {
               © 2025 BugRicer | CODO AI Innovations
             </p>
           </div>
+        </div>
         </div>
       </div>
 
