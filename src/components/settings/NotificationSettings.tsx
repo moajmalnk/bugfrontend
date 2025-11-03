@@ -591,13 +591,13 @@ export function NotificationSettingsCard() {
               onClick={handleCancelDisableEmail}
               className="w-full sm:w-auto"
             >
-              Keep Email Notifications
+              Keep Email
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDisableEmail}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto"
             >
-              Disable Email Notifications
+              Disable Email
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
