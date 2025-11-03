@@ -4,7 +4,25 @@ import { useAuth } from "@/context/AuthContext";
 import { getEffectiveRole } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
-import { googleDocsService, UserDocument } from "@/services/googleDocsService";
+import { googleDocsService, UserDocument, Template } from "@/services/googleDocsService";
+import { projectService } from "@/services/projectService";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   FileText,
   ExternalLink,
@@ -18,15 +36,9 @@ import {
   ArrowLeft,
   ChevronRight,
   User,
+  Edit,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const ProjectDocumentsPage = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -40,6 +52,18 @@ const ProjectDocumentsPage = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<UserDocument | null>(null);
   
+  // Edit document state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [documentToEdit, setDocumentToEdit] = useState<UserDocument | null>(null);
+  const [editDocTitle, setEditDocTitle] = useState("");
+  const [editSelectedProjectId, setEditSelectedProjectId] = useState<string>("");
+  const [editSelectedTemplateId, setEditSelectedTemplateId] = useState<string>("0");
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Templates and projects for edit dialog
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  
   // Filter state
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
@@ -49,7 +73,22 @@ const ProjectDocumentsPage = () => {
     if (projectId) {
       loadProjectDocuments();
     }
+    // Load templates and projects for edit dialog
+    loadTemplatesAndProjects();
   }, [projectId]);
+
+  const loadTemplatesAndProjects = async () => {
+    try {
+      const [temps, projs] = await Promise.all([
+        googleDocsService.listTemplates(),
+        projectService.getProjects()
+      ]);
+      setTemplates(temps);
+      setProjects(projs);
+    } catch (error) {
+      console.error("Error loading templates and projects:", error);
+    }
+  };
 
   const loadProjectDocuments = async () => {
     if (!projectId) return;
@@ -102,6 +141,71 @@ const ProjectDocumentsPage = () => {
       });
     } finally {
       setIsDeleting(null);
+    }
+  };
+
+  const handleEditClick = (doc: UserDocument) => {
+    setDocumentToEdit(doc);
+    setEditDocTitle(doc.doc_title);
+    setEditSelectedProjectId(doc.project_id || "none");
+    // Note: template_id might not be in UserDocument interface, use null check
+    setEditSelectedTemplateId((doc as any).template_id ? (doc as any).template_id.toString() : "0");
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditCancel = () => {
+    setIsEditDialogOpen(false);
+    setDocumentToEdit(null);
+    setEditDocTitle("");
+    setEditSelectedProjectId("");
+    setEditSelectedTemplateId("0");
+  };
+
+  const handleEditConfirm = async () => {
+    if (!documentToEdit || !editDocTitle.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a document title",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      // Convert selected values
+      const projectId = editSelectedProjectId && editSelectedProjectId !== "none" ? editSelectedProjectId : null;
+      const templateId = editSelectedTemplateId && editSelectedTemplateId !== "0" ? parseInt(editSelectedTemplateId) : null;
+      
+      await googleDocsService.updateDocument(
+        documentToEdit.id, 
+        editDocTitle.trim(),
+        projectId,
+        templateId
+      );
+
+      toast({
+        title: "Success",
+        description: `Document updated successfully.`,
+      });
+
+      // Reload documents list
+      await loadProjectDocuments();
+
+      // Close dialog and reset state
+      setIsEditDialogOpen(false);
+      setDocumentToEdit(null);
+      setEditDocTitle("");
+      setEditSelectedProjectId("");
+      setEditSelectedTemplateId("0");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update document",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -391,17 +495,26 @@ const ProjectDocumentsPage = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewDocument(doc)}
-                          className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
+                          className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
                         >
                           <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
                           <span className="sm:inline">View</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditClick(doc)}
+                          className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
+                        >
+                          <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                          <span className="sm:inline">Edit</span>
                         </Button>
                         <Button
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDeleteClick(doc)}
                           disabled={isDeleting === doc.id}
-                          className="flex-1 sm:flex-initial h-9 sm:h-10 w-auto px-3 sm:px-4 text-xs sm:text-sm"
+                          className="flex-1 sm:flex-initial h-9 sm:h-10 w-auto px-3 sm:px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                         >
                           {isDeleting === doc.id ? (
                             <>
@@ -423,6 +536,174 @@ const ProjectDocumentsPage = () => {
             </div>
           )}
         </div>
+
+        {/* Edit Document Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl">Edit Document</DialogTitle>
+              <DialogDescription className="text-sm sm:text-base">
+                Update the document title, project, and template
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-doc-title" className="text-sm font-medium">Document Title *</Label>
+                <Input
+                  id="edit-doc-title"
+                  placeholder="Enter document title..."
+                  value={editDocTitle}
+                  onChange={(e) => setEditDocTitle(e.target.value)}
+                  disabled={isUpdating}
+                  className="w-full"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isUpdating && editDocTitle.trim()) {
+                      handleEditConfirm();
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-template" className="text-sm font-medium">Template (Optional)</Label>
+                <Select
+                  value={editSelectedTemplateId}
+                  onValueChange={setEditSelectedTemplateId}
+                  disabled={isUpdating}
+                >
+                  <SelectTrigger id="edit-template" className="w-full">
+                    <SelectValue placeholder="No template" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
+                    <SelectItem value="0">No template</SelectItem>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id.toString()}>
+                        <div className="flex flex-col items-start">
+                          <span>{template.template_name}</span>
+                          {!template.is_configured && (
+                            <span className="text-orange-500 text-xs">
+                              (not configured)
+                            </span>
+                          )}
+                          {template.is_configured && template.description && (
+                            <span className="text-muted-foreground text-xs">
+                              ({template.category})
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-project" className="text-sm font-medium">Project (Optional)</Label>
+                <Select
+                  value={editSelectedProjectId || "none"}
+                  onValueChange={(value) => setEditSelectedProjectId(value === "none" ? "" : value)}
+                  disabled={isUpdating}
+                >
+                  <SelectTrigger id="edit-project" className="w-full">
+                    <SelectValue placeholder="No project (general document)" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
+                    <SelectItem value="none">No project (general document)</SelectItem>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={handleEditCancel}
+                disabled={isUpdating}
+                className="w-full sm:w-auto order-2 sm:order-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleEditConfirm}
+                disabled={isUpdating || !editDocTitle.trim()}
+                className="w-full sm:w-auto order-1 sm:order-2"
+              >
+                {isUpdating ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Update Document
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl">Delete Document</DialogTitle>
+              <DialogDescription className="text-sm sm:text-base">
+                Are you sure you want to delete "{documentToDelete?.doc_title}"? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="rounded-full bg-destructive/20 p-2 flex-shrink-0">
+                    <Trash2 className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-sm mb-1">Warning</h4>
+                    <p className="text-sm text-muted-foreground">
+                      This will permanently delete the document from both BugRicer and Google Drive. 
+                      This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setDocumentToDelete(null);
+                }}
+                disabled={isDeleting !== null}
+                className="w-full sm:w-auto order-2 sm:order-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting !== null}
+                className="w-full sm:w-auto order-1 sm:order-2"
+              >
+                {isDeleting !== null ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Document
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </section>
     </main>
   );

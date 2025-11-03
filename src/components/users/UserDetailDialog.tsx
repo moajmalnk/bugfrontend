@@ -423,7 +423,7 @@ export function UserDetailDialog({
                       className="flex-1 flex items-center justify-center gap-2 h-10 transition-all hover:scale-[1.02] min-w-0"
                       title="Change Password"
                     >
-                      Change Password
+                      Password
                     </Button>
                   </DialogTrigger>
                 }

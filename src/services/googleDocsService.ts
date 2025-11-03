@@ -392,6 +392,38 @@ class GoogleDocsService {
   }
 
   /**
+   * Update a document title, project, and template
+   */
+  async updateDocument(
+    documentId: number, 
+    newTitle: string, 
+    projectId?: string | null, 
+    templateId?: number | null
+  ): Promise<{ success: boolean; message: string; data?: { id: number; doc_title: string } }> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean;
+        message: string;
+        data?: { id: number; doc_title: string };
+      }>(`/docs/update-general-doc.php?id=${documentId}`, {
+        id: documentId,
+        doc_title: newTitle,
+        project_id: projectId || null,
+        template_id: templateId || null,
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to update document');
+      }
+
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to update document:', error);
+      throw new Error(error.response?.data?.message || 'Failed to update document');
+    }
+  }
+
+  /**
    * Delete a general document
    */
   async deleteDocument(documentId: number): Promise<{ success: boolean; message: string }> {

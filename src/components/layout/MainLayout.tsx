@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu, X, Bug } from "lucide-react";
+import { Menu, Bug } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FirebaseListener from "../messaging/FirebaseListener";
@@ -11,6 +11,7 @@ import AnnouncementPopup from "../ui/AnnouncementPopup";
 import { ImpersonateBanner } from "../ui/ImpersonateBanner";
 import { Sidebar } from "./Sidebar";
 import FeedbackWidget from "../feedback/FeedbackWidget";
+import { NotificationPopover } from "@/components/notifications/NotificationPopover";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -119,18 +120,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               </div>
             </div>
             
-            {/* Close button when sidebar is open */}
-            {sidebarOpen && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(false)}
-                aria-label="Close sidebar"
-                className="h-9 w-9 hover:bg-accent/80"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            )}
+            {/* Notification bell - replaces close button in mobile/tablet view */}
+            <NotificationPopover />
           </div>
           
           {/* Main content area */}

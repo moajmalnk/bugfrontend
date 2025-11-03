@@ -16,7 +16,6 @@ import {
   Video,
   Settings,
   Users,
-  X,
   FileText,
   ListTodo,
   BarChart3,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { NotificationPopover } from "@/components/notifications/NotificationPopover";
 
 interface SidebarProps {
   className?: string;
@@ -114,13 +114,19 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     >
       {/* Header */}
       <div className="flex-shrink-0 p-6 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
-            <Bug className="h-6 w-6 text-primary" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
+              <Bug className="h-6 w-6 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-bold text-foreground truncate">BugRicer</h2>
+              <p className="text-xs text-muted-foreground">Bug Tracking System</p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold text-foreground truncate">BugRicer</h2>
-            <p className="text-xs text-muted-foreground">Bug Tracking System</p>
+          {/* Notification Icon - Desktop sidebar only */}
+          <div className="flex-shrink-0">
+            <NotificationPopover />
           </div>
         </div>
       </div>
@@ -359,19 +365,6 @@ export default function MainLayout({ children }) {
               <span className="font-bold text-lg text-foreground">BugRicer</span>
             </div>
           </div>
-          
-          {/* Close button when sidebar is open */}
-          {sidebarOpen && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(false)}
-              aria-label="Close sidebar"
-              className="h-9 w-9 hover:bg-accent/80"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          )}
         </div>
         
         {/* Main content area */}

@@ -179,6 +179,132 @@ class NotificationService {
       'status_change'
     );
   }
+
+  // API methods for fetching and managing notifications
+  async getUserNotifications(limit: number = 50, offset: number = 0): Promise<any[]> {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return [];
+      }
+
+      const { ENV } = await import('@/lib/env');
+      const apiUrl = ENV.API_URL;
+      
+      const response = await fetch(`${apiUrl}/notifications/get_all.php?limit=${limit}&offset=${offset}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.success ? data.data.notifications : [];
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
+  }
+
+  async getUnreadCount(): Promise<number> {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return 0;
+      }
+
+      const { ENV } = await import('@/lib/env');
+      const apiUrl = ENV.API_URL;
+      
+      const response = await fetch(`${apiUrl}/notifications/unread_count.php`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.success ? data.data.unread_count : 0;
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      return 0;
+    }
+  }
+
+  async markAsRead(notificationId: number | number[]): Promise<boolean> {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return false;
+      }
+
+      const { ENV } = await import('@/lib/env');
+      const apiUrl = ENV.API_URL;
+      
+      const body = Array.isArray(notificationId)
+        ? { notification_ids: notificationId }
+        : { notification_id: notificationId };
+      
+      const response = await fetch(`${apiUrl}/notifications/mark_read.php`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      return false;
+    }
+  }
+
+  async markAllAsRead(): Promise<boolean> {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return false;
+      }
+
+      const { ENV } = await import('@/lib/env');
+      const apiUrl = ENV.API_URL;
+      
+      const response = await fetch(`${apiUrl}/notifications/mark_all_read.php`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      return false;
+    }
+  }
 }
 
 export interface NotificationSettings {
