@@ -116,12 +116,12 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
       <div className="flex-shrink-0 p-6 pb-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
-              <Bug className="h-6 w-6 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-bold text-foreground truncate">BugRicer</h2>
-              <p className="text-xs text-muted-foreground">Bug Tracking System</p>
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
+            <Bug className="h-6 w-6 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold text-foreground truncate">BugRicer</h2>
+            <p className="text-xs text-muted-foreground">Bug Tracking System</p>
             </div>
           </div>
           {/* Notification Icon - Desktop sidebar only */}

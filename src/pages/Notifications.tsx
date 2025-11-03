@@ -1,15 +1,31 @@
-import { Bell, BellRing, Check, Trash2 } from 'lucide-react';
+import { Bell, BellRing, Check, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useNotifications } from '@/context/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { useState } from 'react';
+import { toast } from '@/components/ui/use-toast';
 
 export default function Notifications() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications } = useNotifications();
   const { currentUser } = useAuth();
   const role = currentUser?.role;
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  const [showMarkAllDialog, setShowMarkAllDialog] = useState(false);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -94,6 +110,51 @@ export default function Notifications() {
       if (path) {
         window.location.href = path;
       }
+    } else if (notification.bug_id && role) {
+      // Fallback to bug_id if entity_type is not set
+      window.location.href = `/${role}/bugs/${notification.bug_id}`;
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    setIsMarkingAll(true);
+    try {
+      await markAllAsRead();
+      toast({
+        title: 'Success',
+        description: 'All notifications marked as read',
+        variant: 'default',
+      });
+      setShowMarkAllDialog(false);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to mark all notifications as read',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsMarkingAll(false);
+    }
+  };
+
+  const handleClearAll = async () => {
+    setIsClearing(true);
+    try {
+      await clearNotifications();
+      toast({
+        title: 'Success',
+        description: 'All notifications cleared successfully',
+        variant: 'default',
+      });
+      setShowClearDialog(false);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to clear notifications',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -125,27 +186,45 @@ export default function Notifications() {
 
         {/* Action buttons */}
         {notifications.length > 0 && (
-          <div className="flex items-center justify-between p-4 bg-card rounded-lg border mb-4">
-            <div className="flex gap-2">
+          <div className="flex items-center justify-between p-4 bg-card rounded-lg border mb-4 shadow-sm">
+            <div className="flex gap-2 flex-wrap">
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={markAllAsRead}
-                disabled={unreadCount === 0}
-                className="h-9 px-4 text-sm font-medium hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                onClick={() => unreadCount > 0 ? setShowMarkAllDialog(true) : null}
+                disabled={unreadCount === 0 || isMarkingAll}
+                className="h-9 px-4 text-sm font-medium hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Check className="h-4 w-4 mr-2" />
-                Mark all read
+                {isMarkingAll ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Marking...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Mark all read
+                  </>
+                )}
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={clearNotifications}
-                disabled={notifications.length === 0}
-                className="h-9 px-4 text-sm font-medium hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                onClick={() => setShowClearDialog(true)}
+                disabled={notifications.length === 0 || isClearing}
+                className="h-9 px-4 text-sm font-medium hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Clear all
+                {isClearing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Clearing...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear all
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -165,15 +244,16 @@ export default function Notifications() {
             </p>
           </div>
         ) : (
-          <div className="max-h-[75vh] overflow-y-auto">
+          <div className="max-h-[75vh] overflow-y-auto custom-scrollbar pr-1">
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {notifications.map((notification, index) => (
                 <div
                   key={notification.id}
                   className={cn(
-                    "group relative p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 cursor-pointer",
+                    "group relative p-5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 cursor-pointer animate-in fade-in slide-in-from-top-2",
                     !notification.read && "bg-blue-50/50 dark:bg-blue-900/10 border-l-4 border-l-blue-500"
                   )}
+                  style={{ animationDelay: `${index * 50}ms` }}
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start gap-4">
@@ -218,6 +298,66 @@ export default function Notifications() {
           </div>
         )}
       </div>
+
+      {/* Mark All Read Confirmation Dialog */}
+      <AlertDialog open={showMarkAllDialog} onOpenChange={setShowMarkAllDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark All as Read?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to mark all {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''} as read? 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isMarkingAll}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleMarkAllAsRead}
+              disabled={isMarkingAll}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isMarkingAll ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Marking...
+                </>
+              ) : (
+                'Mark All Read'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear All Confirmation Dialog */}
+      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear All Notifications?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete all {notifications.length} notification{notifications.length !== 1 ? 's' : ''}? 
+              This action cannot be undone and will permanently remove all your notifications.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearAll}
+              disabled={isClearing}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isClearing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Clearing...
+                </>
+              ) : (
+                'Clear All'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

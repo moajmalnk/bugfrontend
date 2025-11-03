@@ -19,7 +19,7 @@ import { googleDocsService } from "@/services/googleDocsService";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ENV } from "@/lib/env";
-import axios from "axios";
+import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 
@@ -239,24 +239,12 @@ export default function MeetLobby() {
     setRunningMeets(prev => [optimisticMeeting, ...prev]);
     
     try {
-      // Get the JWT token from localStorage
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("Please log in to create meetings");
-      }
-
       console.log("🔄 Creating new meeting...");
-      // Call the Google Meet API endpoint
-      const response = await axios.post(
-        `${ENV.API_URL}/meet/create-space.php`,
+      // Call the Google Meet API endpoint (apiClient handles token and impersonation automatically)
+      const response = await apiClient.post(
+        `/meet/create-space.php`,
         {
           meeting_title: title || "BugMeet Session"
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
         }
       );
 
@@ -371,20 +359,10 @@ export default function MeetLobby() {
     setLoadingMeets(true);
     const requestPromise = (async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("Please log in to view meetings");
-      }
-
         console.log("🔄 Fetching running meets...");
-      const response = await axios.get(
-        `${ENV.API_URL}/meet/get-running-meets.php`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        }
+      // apiClient handles token and impersonation automatically
+      const response = await apiClient.get(
+        `/meet/get-running-meets.php`
       );
 
       const data = response.data as RunningMeetsResponse;
@@ -448,20 +426,10 @@ export default function MeetLobby() {
   const fetchMeetingDetails = async (meetingId: string) => {
     setLoadingDetails(true);
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("Please log in to view meeting details");
-      }
-
       console.log("🔄 Fetching meeting details for ID:", meetingId);
-      const response = await axios.get(
-        `${ENV.API_URL}/meet/get-meeting-details.php?meeting_id=${meetingId}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        }
+      // apiClient handles token and impersonation automatically
+      const response = await apiClient.get(
+        `/meet/get-meeting-details.php?meeting_id=${meetingId}`
       );
 
       const data = response.data as MeetingDetailsResponse;
@@ -522,20 +490,10 @@ export default function MeetLobby() {
   const performActualDelete = async (meetingId: string) => {
     setDeletingMeetingId(meetingId);
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("Please log in to delete meetings");
-      }
-
       console.log("🔄 Actually deleting meeting with ID:", meetingId);
-      const response = await axios.delete(
-        `${ENV.API_URL}/meet/delete-meeting.php?meeting_id=${meetingId}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        }
+      // apiClient handles token and impersonation automatically
+      const response = await apiClient.delete(
+        `/meet/delete-meeting.php?meeting_id=${meetingId}`
       );
 
       const data = response.data as DeleteMeetingResponse;
@@ -751,15 +709,16 @@ export default function MeetLobby() {
 
   const handleConnect = async () => {
     try {
-      // Get current user ID from JWT token
-      const token = localStorage.getItem("token");
+      // Get current user ID from JWT token (check sessionStorage first for impersonation tokens)
+      const token = sessionStorage.getItem("token") || localStorage.getItem("token");
       if (!token) {
         toast.error("Please log in first");
         return;
       }
       
-      // Decode JWT to get user ID
+      // Decode JWT to get user ID (use impersonated user's ID if in impersonation mode)
       const payload = JSON.parse(atob(token.split('.')[1]));
+      // In impersonation mode, user_id is the impersonated user's ID
       const userId = payload.user_id;
       
       // Build return URL based on current environment
@@ -856,33 +815,13 @@ export default function MeetLobby() {
   const fetchTeamMembers = useCallback(async () => {
     setLoadingUsers(true);
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("Please log in to view team members");
-      }
-
       console.log("🔄 Fetching team members...");
       
-      // Fetch all three types of users in parallel
+      // Fetch all three types of users in parallel (apiClient handles token and impersonation automatically)
       const [adminsResponse, developersResponse, testersResponse] = await Promise.all([
-        axios.get(`${ENV.API_URL}/get_all_admins.php`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        }),
-        axios.get(`${ENV.API_URL}/get_all_developers.php`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        }),
-        axios.get(`${ENV.API_URL}/get_all_testers.php`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        })
+        apiClient.get(`/get_all_admins.php`),
+        apiClient.get(`/get_all_developers.php`),
+        apiClient.get(`/get_all_testers.php`)
       ]);
 
       const adminsData = adminsResponse.data as TeamMembersResponse;

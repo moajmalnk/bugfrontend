@@ -1,14 +1,18 @@
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNotifications } from '@/context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useContext } from 'react';
+import { NotificationContext } from '@/context/NotificationContext';
 
 export function NotificationPopover() {
-  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const role = currentUser?.role;
+  
+  // Safely access the notification context - if not available, use default value
+  const notificationContext = useContext(NotificationContext);
+  const unreadCount = notificationContext?.unreadCount ?? 0;
 
   const handleClick = () => {
     if (role) {

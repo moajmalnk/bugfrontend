@@ -180,32 +180,65 @@ class NotificationService {
     );
   }
 
+  // Helper function to get token and check for impersonation
+  private getTokenAndImpersonationHeaders(): { token: string | null; headers: Record<string, string> } {
+    // Check sessionStorage first (for impersonation tokens), then localStorage
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      
+      // Check if this is an impersonation token and add headers
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        // If this is a dashboard access token with admin_id, we're impersonating
+        if (payload.purpose === 'dashboard_access' && payload.admin_id && payload.user_id) {
+          // Add impersonation headers so backend knows to use the impersonated user's ID
+          headers['X-Impersonate-User'] = payload.user_id;
+          headers['X-User-Id'] = payload.user_id;
+        }
+      } catch (e) {
+        // Ignore token parsing errors, continue with normal flow
+      }
+    }
+
+    return { token, headers };
+  }
+
   // API methods for fetching and managing notifications
   async getUserNotifications(limit: number = 50, offset: number = 0): Promise<any[]> {
     try {
-      const token = localStorage.getItem('token');
+      const { token, headers } = this.getTokenAndImpersonationHeaders();
       if (!token) {
-        console.warn('NotificationService: No token found in localStorage');
+        console.warn('NotificationService: No token found');
         return [];
       }
 
       const { ENV } = await import('@/lib/env');
       const apiUrl = ENV.API_URL;
-      const url = `${apiUrl}/notifications/get_all.php?limit=${limit}&offset=${offset}`;
+      // Add impersonation query param if needed
+      let url = `${apiUrl}/notifications/get_all.php?limit=${limit}&offset=${offset}`;
+      
+      // Add impersonation query param if headers indicate impersonation
+      if (headers['X-Impersonate-User']) {
+        const separator = url.includes('?') ? '&' : '?';
+        url = `${url}${separator}impersonate=${encodeURIComponent(headers['X-Impersonate-User'])}`;
+      }
       
       // Debug logging (only in development)
       if (import.meta.env.DEV) {
         console.log('NotificationService: Fetching from URL:', url);
         console.log('NotificationService: API URL:', apiUrl);
         console.log('NotificationService: Token exists:', !!token);
+        console.log('NotificationService: Impersonation headers:', headers['X-Impersonate-User'] || 'none');
       }
       
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers
       });
 
       if (!response.ok) {
@@ -254,7 +287,7 @@ class NotificationService {
 
   async getUnreadCount(): Promise<number> {
     try {
-      const token = localStorage.getItem('token');
+      const { token, headers } = this.getTokenAndImpersonationHeaders();
       if (!token) {
         return 0;
       }
@@ -262,12 +295,15 @@ class NotificationService {
       const { ENV } = await import('@/lib/env');
       const apiUrl = ENV.API_URL;
       
-      const response = await fetch(`${apiUrl}/notifications/unread_count.php`, {
+      // Add impersonation query param if needed
+      let url = `${apiUrl}/notifications/unread_count.php`;
+      if (headers['X-Impersonate-User']) {
+        url = `${url}?impersonate=${encodeURIComponent(headers['X-Impersonate-User'])}`;
+      }
+      
+      const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers
       });
 
       if (!response.ok) {
@@ -284,7 +320,7 @@ class NotificationService {
 
   async markAsRead(notificationId: number | number[]): Promise<boolean> {
     try {
-      const token = localStorage.getItem('token');
+      const { token, headers } = this.getTokenAndImpersonationHeaders();
       if (!token) {
         return false;
       }
@@ -292,16 +328,23 @@ class NotificationService {
       const { ENV } = await import('@/lib/env');
       const apiUrl = ENV.API_URL;
       
-      const body = Array.isArray(notificationId)
+      const body: any = Array.isArray(notificationId)
         ? { notification_ids: notificationId }
         : { notification_id: notificationId };
       
-      const response = await fetch(`${apiUrl}/notifications/mark_read.php`, {
+      // Add impersonation user ID to body if needed
+      if (headers['X-Impersonate-User']) {
+        body.impersonate_user_id = headers['X-Impersonate-User'];
+      }
+      
+      let url = `${apiUrl}/notifications/mark_read.php`;
+      if (headers['X-Impersonate-User']) {
+        url = `${url}?impersonate=${encodeURIComponent(headers['X-Impersonate-User'])}`;
+      }
+      
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify(body)
       });
 
@@ -319,7 +362,7 @@ class NotificationService {
 
   async markAllAsRead(): Promise<boolean> {
     try {
-      const token = localStorage.getItem('token');
+      const { token, headers } = this.getTokenAndImpersonationHeaders();
       if (!token) {
         return false;
       }
@@ -327,12 +370,20 @@ class NotificationService {
       const { ENV } = await import('@/lib/env');
       const apiUrl = ENV.API_URL;
       
-      const response = await fetch(`${apiUrl}/notifications/mark_all_read.php`, {
+      let url = `${apiUrl}/notifications/mark_all_read.php`;
+      if (headers['X-Impersonate-User']) {
+        url = `${url}?impersonate=${encodeURIComponent(headers['X-Impersonate-User'])}`;
+      }
+      
+      const body: any = {};
+      if (headers['X-Impersonate-User']) {
+        body.impersonate_user_id = headers['X-Impersonate-User'];
+      }
+      
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers,
+        body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined
       });
 
       if (!response.ok) {
@@ -343,6 +394,44 @@ class NotificationService {
       return data.success;
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
+      return false;
+    }
+  }
+
+  async deleteAll(): Promise<boolean> {
+    try {
+      const { token, headers } = this.getTokenAndImpersonationHeaders();
+      if (!token) {
+        return false;
+      }
+
+      const { ENV } = await import('@/lib/env');
+      const apiUrl = ENV.API_URL;
+      
+      let url = `${apiUrl}/notifications/delete_all.php`;
+      if (headers['X-Impersonate-User']) {
+        url = `${url}?impersonate=${encodeURIComponent(headers['X-Impersonate-User'])}`;
+      }
+      
+      const body: any = {};
+      if (headers['X-Impersonate-User']) {
+        body.impersonate_user_id = headers['X-Impersonate-User'];
+      }
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error deleting all notifications:', error);
       return false;
     }
   }

@@ -24,7 +24,7 @@ interface NotificationContextType {
   clearNotifications: () => void;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+export const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -152,17 +152,28 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setUnreadCount(0);
     
     // Update on server
-    await notificationService.markAllAsRead();
+    const success = await notificationService.markAllAsRead();
     
-    // Refresh to get accurate count
-    const count = await notificationService.getUnreadCount();
-    setUnreadCount(count);
-  }, []);
+    if (success) {
+      // Refresh to get accurate count and state
+      await fetchNotifications();
+    } else {
+      // Revert optimistic update on failure
+      await fetchNotifications();
+    }
+  }, [fetchNotifications]);
 
-  const clearNotifications = useCallback(() => {
+  const clearNotifications = useCallback(async () => {
+    // Optimistic update
     setNotifications([]);
     setUnreadCount(0);
-  }, []);
+    
+    // Delete on server
+    await notificationService.deleteAll();
+    
+    // Refresh to get accurate state
+    await fetchNotifications();
+  }, [fetchNotifications]);
 
   return (
     <NotificationContext.Provider

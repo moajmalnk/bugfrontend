@@ -222,8 +222,8 @@ const BugDocsPage = () => {
   };
 
   const handleConnectGoogleDocs = () => {
-    // Get JWT token to pass as state parameter
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    // Get JWT token to pass as state parameter (check sessionStorage first for impersonation tokens)
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     
     // Build return URL based on current environment
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -232,6 +232,7 @@ const BugDocsPage = () => {
       : `https://bugs.bugricer.com${window.location.pathname}`;
     
     // Navigate to Google OAuth with JWT token and return URL as state
+    // In impersonation mode, the token's user_id is the impersonated user's ID
     const authUrl = googleDocsService.getAuthUrl(token, returnUrl);
     window.location.href = authUrl;
   };
