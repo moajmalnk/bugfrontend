@@ -1,6 +1,5 @@
 import { Bell, BellRing, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useNotifications } from '@/context/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -166,7 +165,7 @@ export default function Notifications() {
             </p>
           </div>
         ) : (
-          <ScrollArea className="max-h-[600px]">
+          <div className="max-h-[75vh] overflow-y-auto">
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {notifications.map((notification, index) => (
                 <div
@@ -216,7 +215,7 @@ export default function Notifications() {
                 </div>
               ))}
             </div>
-          </ScrollArea>
+          </div>
         )}
       </div>
     </div>
