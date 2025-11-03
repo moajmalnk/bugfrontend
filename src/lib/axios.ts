@@ -3,9 +3,6 @@ import { ENV } from './env';
 
 export const apiClient = axios.create({
   baseURL: ENV.API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
   withCredentials: false, // Changed to false to avoid CORS issues
   timeout: 30000, // 30 second timeout
 });
@@ -13,6 +10,14 @@ export const apiClient = axios.create({
 // Request interceptor for debugging and impersonation
 apiClient.interceptors.request.use(
   (config) => {
+    // Set Content-Type only if not FormData (FormData needs browser to set boundary)
+    if (!(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json';
+    } else {
+      // Remove Content-Type header for FormData - browser will set it with boundary
+      delete config.headers['Content-Type'];
+    }
+    
     // console.log('API Request:', {
     //   url: config.url,
     //   method: config.method,

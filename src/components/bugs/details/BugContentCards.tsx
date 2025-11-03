@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import { Bug } from "@/types";
+import { ENV } from "@/lib/env";
 import {
   Briefcase,
   Calendar,
@@ -32,17 +33,25 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
 
   // Robust media URL helpers (use PHP endpoints to avoid CORS and set headers)
-  const apiBaseUrl =
-    import.meta.env.VITE_API_URL || "http://localhost/BugRicer/backend/api";
+  // Use ENV.API_URL from env.ts to ensure consistency with backend
+  const apiBaseUrl = ENV.API_URL;
 
-  const buildImageUrl = (path: string) =>
-    /^https?:\/\//i.test(path)
-      ? path
-      : `${apiBaseUrl}/image.php?path=${encodeURIComponent(path)}`;
-  const buildAudioUrl = (path: string) =>
-    /^https?:\/\//i.test(path)
-      ? path
-      : `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(path)}&bug_id=${encodeURIComponent(bug.id)}`;
+  const buildImageUrl = (path: string) => {
+    if (/^https?:\/\//i.test(path)) {
+      return path;
+    }
+    const url = `${apiBaseUrl}/image.php?path=${encodeURIComponent(path)}`;
+    console.log('🖼️ Building image URL:', { path, apiBaseUrl, url });
+    return url;
+  };
+  const buildAudioUrl = (path: string) => {
+    if (/^https?:\/\//i.test(path)) {
+      return path;
+    }
+    const url = `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(path)}&bug_id=${encodeURIComponent(bug.id)}`;
+    console.log('🎵 Building audio URL:', { path, apiBaseUrl, url });
+    return url;
+  };
   const buildDownloadUrl = (path: string, name?: string) => {
     const base = `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(
       path
@@ -298,6 +307,19 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
   const allAttachments = Array.isArray((bug as any).attachments)
     ? ((bug as any).attachments as any[])
     : [];
+  
+  // Debug: Log attachments and API URL
+  console.log('📎 BugContentCards Debug:', {
+    apiBaseUrl,
+    attachmentsCount: allAttachments.length,
+    attachments: allAttachments.map(a => ({
+      id: a.id,
+      file_name: a.file_name,
+      file_path: a.file_path,
+      file_type: a.file_type
+    })),
+    bugId: bug.id
+  });
 
   // If no attachments in main array, fallback to legacy structure (for backward compatibility)
   const fallbackAttachments = allAttachments.length === 0 ? [

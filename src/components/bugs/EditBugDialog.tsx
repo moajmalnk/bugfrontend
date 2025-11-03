@@ -657,24 +657,48 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
         formData.append("attachments_to_delete", JSON.stringify(attachmentsToDelete));
       }
 
+      // Don't set Content-Type header - let browser set it with boundary for multipart/form-data
       const response = await apiClient.post<ApiResponse<Bug>>(
         "/bugs/update.php",
         formData,
         {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
           timeout: 60000, // 60 second timeout for file uploads
+          // Let axios/browser handle Content-Type automatically for FormData
         }
       );
+      
+      // Log debug info if available
+      if ((response.data as any)._debug) {
+        console.log('🔧 Update Debug Info:', (response.data as any)._debug);
+        console.log('🔧 Files Received Details:', {
+          screenshots: (response.data as any)._debug.files_received?.screenshots,
+          files: (response.data as any)._debug.files_received?.files,
+          voice_notes: (response.data as any)._debug.files_received?.voice_notes,
+          has_files: (response.data as any)._debug.files_received?.has_files,
+          method: (response.data as any)._debug.method_used
+        });
+      }
+      
+      // Also log what we're sending
+      console.log('📤 Sending FormData:', {
+        screenshots_count: screenshots.length,
+        files_count: files.length,
+        voice_notes_count: voiceNotes.length,
+        formData_keys: Array.from(formData.keys())
+      });
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to update bug");
       }
 
+      // Update the cache directly with the response data (includes attachments)
+      if (response.data.data) {
+        queryClient.setQueryData(["bug", bug.id], response.data.data);
+      }
+
       // Send notification if status changed to "fixed"
       if (values.status === "fixed" && bug.status !== "fixed") {
-        const updatedBug = {
+        const updatedBug = response.data.data || {
           ...bug,
           title: values.title,
           description: values.description,
@@ -701,7 +725,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
         });
       }
 
-      // Invalidate and refetch queries
+      // Invalidate and refetch queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["bug", bug.id] });
       queryClient.invalidateQueries({ queryKey: ["bugs"] });
 

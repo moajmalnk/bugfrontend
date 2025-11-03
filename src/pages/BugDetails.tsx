@@ -18,7 +18,6 @@ import { notificationService } from "@/services/notificationService";
 import { whatsappService } from "@/services/whatsappService";
 import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
 import { apiClient } from "@/lib/axios";
 import { ArrowLeft, ArrowRight, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -153,21 +152,31 @@ const BugDetails = () => {
   } = useQuery({
     queryKey: ["bug", bugId],
     queryFn: async () => {
-      const token = localStorage.getItem("token");
-      const response = await axios.get<ApiResponse<Bug>>(
-        `${ENV.API_URL}/bugs/get.php?id=${bugId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      // apiClient handles token and impersonation automatically
+      const response = await apiClient.get<ApiResponse<Bug>>(
+        `/bugs/get.php?id=${bugId}`
       );
       if (response.data.success) {
+        console.log('🔍 BugDetails: Fetched bug data:', {
+          bugId,
+          hasAttachments: !!response.data.data?.attachments,
+          attachmentsCount: response.data.data?.attachments?.length || 0,
+          attachments: response.data.data?.attachments,
+          screenshots: response.data.data?.screenshots,
+          files: response.data.data?.files,
+          debug: response.data.data?._debug,
+          fullResponse: response.data.data
+        });
+        
+        // If debug info exists, log it prominently
+        if (response.data.data?._debug) {
+          console.warn('🐛 Backend Debug Info:', response.data.data._debug);
+        }
         return response.data.data;
       }
       throw new Error(response.data.message || "Failed to fetch bug details");
     },
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    staleTime: 0, // Always refetch when invalidated to show latest attachments
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (renamed from cacheTime in v5)
   });
 
