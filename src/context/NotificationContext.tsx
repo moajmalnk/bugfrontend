@@ -37,34 +37,47 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {
     if (!currentUser) {
+      console.log('NotificationContext: No currentUser, skipping fetch');
       return;
     }
 
     try {
+      console.log('NotificationContext: Fetching notifications...');
       const apiNotifications = await notificationService.getUserNotifications(50, 0);
+      console.log('NotificationContext: Received notifications:', {
+        count: apiNotifications.length,
+        sample: apiNotifications[0] || null,
+        all: apiNotifications
+      });
       
       // Map API notifications to our Notification type
       const mappedNotifications: Notification[] = apiNotifications.map((n: any) => ({
         id: n.id,
-        title: n.title,
-        message: n.message,
+        title: n.title || 'Notification',
+        message: n.message || '',
         type: n.type || 'info',
-        read: n.read || false,
-        createdAt: n.createdAt || n.created_at,
+        read: n.read === true || n.read === 1 || n.read === '1',
+        createdAt: n.createdAt || n.created_at || new Date().toISOString(),
         entity_type: n.entity_type,
         entity_id: n.entity_id,
         project_id: n.project_id
       }));
 
+      console.log('NotificationContext: Mapped notifications:', {
+        count: mappedNotifications.length,
+        sample: mappedNotifications[0] || null
+      });
+
       setNotifications(mappedNotifications);
       
       // Get unread count
       const count = await notificationService.getUnreadCount();
+      console.log('NotificationContext: Unread count:', count);
       setUnreadCount(count);
       
       lastFetchTimeRef.current = new Date();
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('NotificationContext: Error fetching notifications:', error);
     }
   }, [currentUser]);
 
