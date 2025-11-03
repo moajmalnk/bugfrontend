@@ -185,13 +185,22 @@ class NotificationService {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
+        console.warn('NotificationService: No token found in localStorage');
         return [];
       }
 
       const { ENV } = await import('@/lib/env');
       const apiUrl = ENV.API_URL;
+      const url = `${apiUrl}/notifications/get_all.php?limit=${limit}&offset=${offset}`;
       
-      const response = await fetch(`${apiUrl}/notifications/get_all.php?limit=${limit}&offset=${offset}`, {
+      // Debug logging (only in development)
+      if (import.meta.env.DEV) {
+        console.log('NotificationService: Fetching from URL:', url);
+        console.log('NotificationService: API URL:', apiUrl);
+        console.log('NotificationService: Token exists:', !!token);
+      }
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -200,13 +209,45 @@ class NotificationService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Try to get error details
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+          console.error('NotificationService: API Error Response:', errorData);
+        } catch (e) {
+          const errorText = await response.text();
+          console.error('NotificationService: API Error Text:', errorText);
+        }
+        
+        console.error('NotificationService: Request failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          message: errorMessage
+        });
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      return data.success ? data.data.notifications : [];
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+      
+      // Debug successful response
+      if (import.meta.env.DEV) {
+        console.log('NotificationService: Response:', {
+          success: data.success,
+          count: data.data?.notifications?.length || 0,
+          notifications: data.data?.notifications
+        });
+      }
+      
+      return data.success ? (data.data?.notifications || []) : [];
+    } catch (error: any) {
+      console.error('NotificationService: Error fetching notifications:', {
+        error: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       return [];
     }
   }
