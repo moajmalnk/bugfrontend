@@ -1045,62 +1045,33 @@ const Login = () => {
                       )}
                     </button>
                     {/* Google Sign-In Button */}
-                    <div className="relative group">
-                      <GoogleSignInButton
-                        variant="icon"
-                        onSuccess={handleGoogleLogin}
-                        onError={(error) => {
-                          console.error('Google OAuth Error:', error);
+                    <GoogleSignInButton
+                      variant="icon"
+                      onSuccess={handleGoogleLogin}
+                      onError={(error) => {
+                        console.error('Google OAuth Error:', error);
+                        
+                        if (error?.type === 'setup_required') {
+                          toast({
+                            title: "Google OAuth Setup Required",
+                            description: `Google Sign-In is not configured for your current domain (${error.currentOrigin}). Please check the console for setup instructions or contact support.`,
+                            variant: "destructive",
+                          });
                           
-                          if (error?.type === 'setup_required') {
-                            toast({
-                              title: "Google OAuth Setup Required",
-                              description: `Google Sign-In is not configured for your current domain (${error.currentOrigin}). Please check the console for setup instructions or contact support.`,
-                              variant: "destructive",
-                            });
-                            
-                            // Clear cache and suggest refresh
-                            setTimeout(() => {
-                              clearGoogleOAuthCache();
-                            }, 1000);
-                          } else {
-                            const errorMessage = handleGoogleOAuthError(error);
-                            toast({
-                              title: "Google Sign-In Error",
-                              description: errorMessage,
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                      />
-                      {/* Tooltip - Hidden on mobile, shown on hover for desktop */}
-                      <div className="hidden sm:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                        <div className="text-center">
-                          <div className="font-semibold mb-1">Google Sign-In</div>
-                          <div className="text-slate-300">
-                            Press <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-xs">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-xs">Shift</kbd> + <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-xs">R</kbd> to refresh if needed
-                          </div>
-                          <div className="text-slate-400 text-xs mt-1">
-                            Currently in debugging mode
-                          </div>
-                        </div>
-                        {/* Arrow */}
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900 dark:border-t-slate-700"></div>
-                      </div>
-                      
-                      {/* Mobile-friendly info - shown on mobile */}
-                      <div className="sm:hidden absolute -top-16 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-slate-900 dark:bg-slate-700 text-white text-xs rounded shadow-lg z-50 whitespace-nowrap">
-                        <div className="text-center">
-                          <div className="font-semibold">Google Sign-In</div>
-                          <div className="text-slate-300">Debug mode</div>
-                          <div className="text-slate-400 text-xs mt-1">
-                            <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-xs">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-xs">Shift</kbd> + <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-xs">R</kbd>
-                          </div>
-                        </div>
-                        {/* Arrow */}
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-slate-900 dark:border-t-slate-700"></div>
-                      </div>
-                    </div>
+                          // Clear cache and suggest refresh
+                          setTimeout(() => {
+                            clearGoogleOAuthCache();
+                          }, 1000);
+                        } else {
+                          const errorMessage = handleGoogleOAuthError(error);
+                          toast({
+                            title: "Google Sign-In Error",
+                            description: errorMessage,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    />
                   </div>
                 </div>
               )}
