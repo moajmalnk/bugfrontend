@@ -76,10 +76,13 @@ export function ScreenshotViewer({
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
   const [showZoomSlider, setShowZoomSlider] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [containerDimensions, setContainerDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const imageDisplayAreaRef = useRef<HTMLDivElement>(null);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -94,8 +97,38 @@ export function ScreenshotViewer({
       setImagePosition({ x: 0, y: 0 });
       setShowZoomSlider(false);
       setShowDeleteDialog(false);
+      setImageDimensions(null);
     }
   }, [open, initialIndex]);
+
+  // Update container dimensions on resize and when dialog opens
+  useEffect(() => {
+    if (!open) return;
+
+    const updateContainerDimensions = () => {
+      if (imageDisplayAreaRef.current) {
+        const rect = imageDisplayAreaRef.current.getBoundingClientRect();
+        setContainerDimensions({
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    };
+
+    // Initial update
+    updateContainerDimensions();
+
+    // Update on window resize
+    window.addEventListener('resize', updateContainerDimensions);
+    
+    // Update when image loads
+    const timeoutId = setTimeout(updateContainerDimensions, 100);
+
+    return () => {
+      window.removeEventListener('resize', updateContainerDimensions);
+      clearTimeout(timeoutId);
+    };
+  }, [open, imageLoaded, showInfo]);
 
 
   // Handle fullscreen changes
@@ -113,6 +146,14 @@ export function ScreenshotViewer({
   const currentScreenshot = screenshots[currentIndex];
   const imageUrl = `${import.meta.env.VITE_API_URL}/image.php?path=${encodeURIComponent(currentScreenshot.file_path)}`;
 
+  // Reset image dimensions when screenshot changes
+  useEffect(() => {
+    setImageDimensions(null);
+    setImageLoaded(false);
+    setImageError(false);
+    setImagePosition({ x: 0, y: 0 });
+  }, [currentIndex]);
+
   const goToPrevious = useCallback(() => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : screenshots.length - 1));
   }, [screenshots.length]);
@@ -123,25 +164,16 @@ export function ScreenshotViewer({
 
   // Enhanced zoom functions with smooth transitions
   const zoomIn = useCallback(() => {
-    setZoomLevel((prev) => {
-      const newZoom = Math.min(prev + 25, 500);
-      console.log("Zooming in from", prev, "to", newZoom);
-      return newZoom;
-    });
+    setZoomLevel((prev) => Math.min(prev + 25, 500));
   }, []);
 
   const zoomOut = useCallback(() => {
-    setZoomLevel((prev) => {
-      const newZoom = Math.max(prev - 25, 25);
-      console.log("Zooming out from", prev, "to", newZoom);
-      return newZoom;
-    });
+    setZoomLevel((prev) => Math.max(prev - 25, 25));
   }, []);
 
   const resetZoom = useCallback(() => {
     setZoomLevel(100);
     setImagePosition({ x: 0, y: 0 });
-    console.log("Reset zoom to 100%");
   }, []);
 
   const handleZoomChange = useCallback((value: number[]) => {
@@ -169,17 +201,9 @@ export function ScreenshotViewer({
       e.preventDefault();
       e.stopPropagation();
       if (e.deltaY < 0) {
-        setZoomLevel((prev) => {
-          const newZoom = Math.min(prev + 25, 500);
-          console.log("Zooming in from", prev, "to", newZoom);
-          return newZoom;
-        });
+        setZoomLevel((prev) => Math.min(prev + 25, 500));
       } else {
-        setZoomLevel((prev) => {
-          const newZoom = Math.max(prev - 25, 25);
-          console.log("Zooming out from", prev, "to", newZoom);
-          return newZoom;
-        });
+        setZoomLevel((prev) => Math.max(prev - 25, 25));
       }
     };
 
@@ -201,17 +225,9 @@ export function ScreenshotViewer({
       e.preventDefault();
       e.stopPropagation();
       if (e.deltaY < 0) {
-        setZoomLevel((prev) => {
-          const newZoom = Math.min(prev + 25, 500);
-          console.log("Zooming in from", prev, "to", newZoom);
-          return newZoom;
-        });
+        setZoomLevel((prev) => Math.min(prev + 25, 500));
       } else {
-        setZoomLevel((prev) => {
-          const newZoom = Math.max(prev - 25, 25);
-          console.log("Zooming out from", prev, "to", newZoom);
-          return newZoom;
-        });
+        setZoomLevel((prev) => Math.max(prev - 25, 25));
       }
     };
 
@@ -616,18 +632,50 @@ export function ScreenshotViewer({
   }, [open, showInfo, showZoomSlider, goToPrevious, goToNext, zoomIn, zoomOut, resetZoom, rotateRight, rotateLeft, toggleFullscreen, handleClose]);
 
 
+  // Helper function to calculate image container size based on aspect ratio
+  const calculateImageContainerSize = useCallback(() => {
+    if (!imageDimensions || !containerDimensions.width || !containerDimensions.height) {
+      return { width: '100%', height: '100%' };
+    }
+
+    const containerAspect = containerDimensions.width / containerDimensions.height;
+    const imageAspect = imageDimensions.width / imageDimensions.height;
+
+    // Calculate size to fit within container while maintaining aspect ratio
+    let width: number | string;
+    let height: number | string;
+
+    if (imageAspect > containerAspect) {
+      // Image is wider - fit to width
+      width = containerDimensions.width;
+      height = containerDimensions.width / imageAspect;
+    } else {
+      // Image is taller - fit to height
+      height = containerDimensions.height;
+      width = containerDimensions.height * imageAspect;
+    }
+
+    return { width, height };
+  }, [imageDimensions, containerDimensions]);
+
   // Helper function to constrain image position within container bounds
   const constrainImagePosition = useCallback((x: number, y: number) => {
     if (zoomLevel <= 100) return { x: 0, y: 0 };
     
-    // Get container bounds (accounting for dialog padding and headers)
-    const containerWidth = window.innerWidth * 0.95;
-    const containerHeight = window.innerHeight * 0.95;
+    if (!imageDimensions || !containerDimensions.width || !containerDimensions.height) {
+      return { x: 0, y: 0 };
+    }
+
+    const containerSize = calculateImageContainerSize();
+    const containerWidth = typeof containerSize.width === 'number' ? containerSize.width : containerDimensions.width;
+    const containerHeight = typeof containerSize.height === 'number' ? containerSize.height : containerDimensions.height;
     
     // Calculate maximum allowed positions to keep image within bounds
-    // Since we're using 100% dimensions, we need to account for the zoom scale
-    const maxX = Math.max(0, (containerWidth * (zoomLevel / 100 - 1)) / 2);
-    const maxY = Math.max(0, (containerHeight * (zoomLevel / 100 - 1)) / 2);
+    const scaledWidth = containerWidth * (zoomLevel / 100);
+    const scaledHeight = containerHeight * (zoomLevel / 100);
+    
+    const maxX = Math.max(0, (scaledWidth - containerDimensions.width) / 2);
+    const maxY = Math.max(0, (scaledHeight - containerDimensions.height) / 2);
     const minX = -maxX;
     const minY = -maxY;
     
@@ -636,50 +684,18 @@ export function ScreenshotViewer({
     const constrainedY = Math.max(minY, Math.min(maxY, y));
     
     return { x: constrainedX, y: constrainedY };
-  }, [zoomLevel]);
-
-  // Debug: Log the container dimensions
-  const deviceType = window.innerWidth < 768 ? 'Mobile' : window.innerWidth < 1024 ? 'Tablet' : 'Desktop';
-  
-  console.log("Screenshot container:", {
-    containerSize: "100% × 100%",
-    deviceType,
-    availableWidth: window.innerWidth * 0.95,
-    availableHeight: window.innerHeight * 0.95,
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight,
-    spaceUtilization: "MAXIMIZED - Using 100% width and height of available container space",
-  });
-
-  // Debug: Log when zoom or rotation changes
-  useEffect(() => {
-    if (open) {
-      console.log("🔍 Transform updated:", {
-        zoomLevel,
-        rotation,
-        imagePosition,
-        scale: zoomLevel / 100,
-        transform: `scale(${
-          zoomLevel / 100
-        }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
-          imagePosition.y
-        }px)`,
-        containerSize: "100% × 100%",
-      });
-      
-      // Force a re-render check
-      console.log("🎯 Component should re-render with new transform");
-    }
-  }, [zoomLevel, rotation, imagePosition, open]);
+  }, [zoomLevel, imageDimensions, containerDimensions, calculateImageContainerSize]);
 
   // Constrain image position when zoom or rotation changes to prevent overflow
   useEffect(() => {
     if (open && zoomLevel > 100) {
       const constrainedPosition = constrainImagePosition(imagePosition.x, imagePosition.y);
       if (constrainedPosition.x !== imagePosition.x || constrainedPosition.y !== imagePosition.y) {
-        console.log("🔒 Constraining position:", imagePosition, "→", constrainedPosition);
         setImagePosition(constrainedPosition);
       }
+    } else if (zoomLevel <= 100) {
+      // Reset position when zoom is reset
+      setImagePosition({ x: 0, y: 0 });
     }
   }, [zoomLevel, rotation, open, constrainImagePosition, imagePosition]);
 
@@ -689,10 +705,10 @@ export function ScreenshotViewer({
       <DialogDescription className="sr-only">
         Interactive screenshot viewer with zoom, pan, and navigation controls
       </DialogDescription>
-      <DialogContent className="fixed left-[50%] top-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] gap-4 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-w-[95vw] max-h-[95vh] p-0 bg-background/95 backdrop-blur-md border-0 shadow-2xl">
+      <DialogContent className="fixed left-[50%] top-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] gap-4 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-w-[95vw] max-h-[95vh] h-[95vh] sm:h-[90vh] md:h-[85vh] p-0 bg-background/95 backdrop-blur-md border-0 shadow-2xl">
         <div 
           ref={containerRef}
-          className="flex flex-col h-full relative"
+          className="flex flex-col h-full relative overflow-hidden"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -701,17 +717,17 @@ export function ScreenshotViewer({
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border-b bg-gradient-to-r from-background via-muted/20 to-background backdrop-blur-sm"
+            className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-3 md:p-4 border-b bg-gradient-to-r from-background via-muted/20 to-background backdrop-blur-sm shrink-0"
           >
             {/* Left Section - Title and Info */}
-            <div className="flex items-center gap-3 mb-3 sm:mb-0">
-              <div className="flex items-center gap-2">
-                <FileImage className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-foreground">
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <FileImage className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                <h2 className="text-base sm:text-lg font-semibold text-foreground truncate">
                   Screenshot Preview
                 </h2>
               </div>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-[10px] sm:text-xs flex-shrink-0">
                 {currentIndex + 1} of {screenshots.length}
               </Badge>
             </div>
@@ -743,18 +759,12 @@ export function ScreenshotViewer({
 
             {/* Right Section - Controls */}
             <div className="flex items-center gap-1">
-              {/* Enhanced Zoom Controls */}
-              <div className="hidden sm:flex items-center gap-1">
+              {/* Enhanced Zoom Controls - Desktop */}
+              <div className="hidden md:flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    console.log(
-                      "Zoom out button clicked, current zoom:",
-                      zoomLevel
-                    );
-                    zoomOut();
-                  }}
+                  onClick={zoomOut}
                   disabled={zoomLevel <= 25}
                   className="h-8 w-8 p-0"
                   title="Zoom Out (-)"
@@ -776,13 +786,7 @@ export function ScreenshotViewer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    console.log(
-                      "Zoom in button clicked, current zoom:",
-                      zoomLevel
-                    );
-                    zoomIn();
-                  }}
+                  onClick={zoomIn}
                   disabled={zoomLevel >= 500}
                   className="h-8 w-8 p-0"
                   title="Zoom In (+)"
@@ -792,13 +796,7 @@ export function ScreenshotViewer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    console.log(
-                      "Reset zoom button clicked, current zoom:",
-                      zoomLevel
-                    );
-                    resetZoom();
-                  }}
+                  onClick={resetZoom}
                   className="h-8 w-8 p-0"
                   title="Reset Zoom (0)"
                 >
@@ -806,13 +804,47 @@ export function ScreenshotViewer({
                 </Button>
               </div>
 
+              {/* Mobile Zoom Controls */}
+              <div className="flex md:hidden items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={zoomOut}
+                  disabled={zoomLevel <= 25}
+                  className="h-7 w-7 p-0"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="h-3.5 w-3.5" />
+                </Button>
+                <Badge
+                  variant="outline"
+                  className={`text-xs font-mono px-1.5 py-0.5 ${
+                    zoomLevel > 100 
+                      ? "bg-primary/20 border-primary/50 text-primary font-bold" 
+                      : ""
+                  }`}
+                >
+                  {zoomLevel}%
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={zoomIn}
+                  disabled={zoomLevel >= 500}
+                  className="h-7 w-7 p-0"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+
               <Separator
                 orientation="vertical"
-                className="h-6 hidden sm:block"
+                className="h-6 hidden md:block"
               />
 
-              {/* Enhanced Rotation Controls */}
-              <div className="hidden sm:flex items-center gap-1">
+              {/* Enhanced Rotation Controls - Desktop */}
+              <div className="hidden md:flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -843,88 +875,91 @@ export function ScreenshotViewer({
 
               <Separator
                 orientation="vertical"
-                className="h-6 hidden sm:block"
+                className="h-6 hidden md:block"
               />
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={downloadScreenshot}
-                  className="h-8 w-8 p-0"
-                  title="Download"
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
+              <div className="flex items-center gap-0.5 sm:gap-1">
+                {/* Desktop-only buttons */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={copyScreenshot}
-                  className="h-8 w-8 p-0"
+                  className="h-7 w-7 sm:h-8 sm:w-8 p-0 hidden sm:flex"
                   title="Copy"
                 >
-                  <Copy className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={shareScreenshot}
-                  className="h-8 w-8 p-0"
-                  title="Share"
-                >
-                  <Share2 className="h-4 w-4" />
+                  <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={printScreenshot}
-                  className="h-8 w-8 p-0"
+                  className="h-7 w-7 sm:h-8 sm:w-8 p-0 hidden md:flex"
                   title="Print"
                 >
-                  <Printer className="h-4 w-4" />
+                  <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button>
+                
+                {/* Always visible buttons */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={downloadScreenshot}
+                  className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                  title="Download"
+                >
+                  <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={shareScreenshot}
+                  className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                  title="Share"
+                >
+                  <Share2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowInfo(!showInfo)}
-                  className={`h-8 w-8 p-0 ${
+                  className={`h-7 w-7 sm:h-8 sm:w-8 p-0 ${
                     showInfo ? "bg-primary/10 text-primary" : ""
                   }`}
-                  title="Info (I)"
+                  title="Info"
                 >
-                  <Info className="h-4 w-4" />
+                  <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={toggleFullscreen}
-                  className="h-8 w-8 p-0"
-                  title="Fullscreen (F)"
+                  className="h-7 w-7 sm:h-8 sm:w-8 p-0 hidden sm:flex"
+                  title="Fullscreen"
                 >
                   {isFullscreen ? (
-                    <Minimize2 className="h-4 w-4" />
+                    <Minimize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   ) : (
-                    <Maximize2 className="h-4 w-4" />
+                    <Maximize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   )}
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={deleteScreenshot}
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive"
                   title="Delete"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleClose}
-                  className="h-8 w-8 p-0"
-                  title="Close (Esc)"
+                  className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                  title="Close"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
               </div>
             </div>
@@ -935,16 +970,16 @@ export function ScreenshotViewer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="flex flex-col sm:flex-row sm:items-center justify-between px-3 sm:px-4 py-2 bg-gradient-to-r from-muted/10 via-muted/20 to-muted/10 border-b text-xs sm:text-sm"
+            className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-muted/10 via-muted/20 to-muted/10 border-b text-[10px] sm:text-xs md:text-sm shrink-0"
           >
-            <div className="flex items-center gap-2 mb-2 sm:mb-0">
-              <Smartphone className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span className="font-medium">
-                BugRicer | {currentScreenshot.project_name || "CODO AI Innovations"}
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-0 flex-wrap">
+              <Smartphone className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-primary flex-shrink-0" />
+              <span className="font-medium truncate max-w-[120px] sm:max-w-none">
+                BugRicer{currentScreenshot.project_name ? ` | ${currentScreenshot.project_name}` : ''}
               </span>
-              <Separator orientation="vertical" className="h-3" />
-              <span className="font-mono">
-                Full Container
+              <Separator orientation="vertical" className="h-3 hidden sm:block" />
+              <span className="font-mono hidden sm:inline">
+                Container
               </span>
               <Separator orientation="vertical" className="h-3" />
               <span className="font-mono">{zoomLevel}%</span>
@@ -957,8 +992,8 @@ export function ScreenshotViewer({
             </div>
 
             {/* Mobile Navigation Hint */}
-            <div className="sm:hidden text-muted-foreground text-xs">
-              Swipe left/right to navigate • Pinch to zoom • Double tap to reset
+            <div className="sm:hidden text-muted-foreground text-[10px] mb-1.5">
+              Swipe • Pinch • Double tap
             </div>
 
             {/* Desktop Navigation */}
@@ -988,7 +1023,8 @@ export function ScreenshotViewer({
 
           {/* Enhanced Image Display with Pan Support */}
         <div
-          className="flex-1 flex items-center justify-center bg-gradient-to-br from-muted/20 via-background to-muted/20 relative"
+          ref={imageDisplayAreaRef}
+          className="flex-1 flex items-center justify-center bg-gradient-to-br from-muted/20 via-background to-muted/20 relative overflow-hidden"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -999,19 +1035,19 @@ export function ScreenshotViewer({
               : zoomLevel > 100
               ? "grab"
               : "default",
-            overflow: "hidden", // Keep content within container bounds
-            minHeight: "100%",
+            minHeight: 0,
           }}
         >
             <div
               key={`${currentIndex}`}
               ref={imageContainerRef}
               className="relative bg-white rounded-xl shadow-2xl transition-all duration-300 border border-border/50"
-              title={`Container: 100%×100% | Zoom: ${zoomLevel}% | Rot: ${rotation}°`}
+              title={`Zoom: ${zoomLevel}% | Rot: ${rotation}°`}
               onDoubleClick={handleDoubleClick}
               style={{
-                width: "100%",
-                height: "100%",
+                ...calculateImageContainerSize(),
+                maxWidth: '100%',
+                maxHeight: '100%',
                 transform: `scale(${
                   zoomLevel / 100
                 }) rotate(${rotation}deg) translate(${imagePosition.x}px, ${
@@ -1032,26 +1068,38 @@ export function ScreenshotViewer({
                 ref={imageRef}
                 src={imageUrl}
                 alt={`Screenshot ${currentIndex + 1}`}
-                className="transition-opacity duration-300 opacity-100"
+                className="transition-opacity duration-300 opacity-100 w-full h-full"
                 style={{
                   width: "100%",
                   height: "100%",
                   objectFit: "contain",
                   pointerEvents: "none",
+                  display: "block",
                 }}
                 onLoad={() => {
-                  setImageLoaded(true);
-                  setImageError(false);
-                  // Debug: Log actual image dimensions
-                  console.log("Image loaded with dimensions:", {
-                    naturalWidth: imageRef.current?.naturalWidth,
-                    naturalHeight: imageRef.current?.naturalHeight,
-                    appliedSize: "100% × 100%",
-                  });
+                  if (imageRef.current) {
+                    const naturalWidth = imageRef.current.naturalWidth;
+                    const naturalHeight = imageRef.current.naturalHeight;
+                    setImageDimensions({ width: naturalWidth, height: naturalHeight });
+                    setImageLoaded(true);
+                    setImageError(false);
+                    
+                    // Update container dimensions after image loads
+                    setTimeout(() => {
+                      if (imageDisplayAreaRef.current) {
+                        const rect = imageDisplayAreaRef.current.getBoundingClientRect();
+                        setContainerDimensions({
+                          width: rect.width,
+                          height: rect.height,
+                        });
+                      }
+                    }, 50);
+                  }
                 }}
                 onError={() => {
                   setImageError(true);
                   setImageLoaded(false);
+                  setImageDimensions(null);
                 }}
               />
 
@@ -1141,8 +1189,8 @@ export function ScreenshotViewer({
               )}
             </AnimatePresence>
 
-            {/* Debug Transform Info */}
-            <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 text-xs font-mono">
+            {/* Debug Transform Info - Desktop Only */}
+            <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 text-xs font-mono hidden lg:block">
               <div className="flex flex-col gap-1 text-foreground">
                 <div className="flex items-center gap-2">
                   <Search className="h-3 w-3 text-primary" />
@@ -1162,10 +1210,13 @@ export function ScreenshotViewer({
 
             {/* Zoom and Rotation Hints */}
             {zoomLevel > 100 && (
-              <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 text-xs text-muted-foreground">
+              <div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <Search className="h-3 w-3" />
-                  <span>Drag to pan • Scroll to zoom • Double-click to reset • R/L to rotate</span>
+                  <Search className="h-3 w-3 flex-shrink-0" />
+                  <span className="text-[10px] sm:text-xs">
+                    <span className="hidden sm:inline">Drag to pan • Scroll to zoom • Double-click to reset • R/L to rotate</span>
+                    <span className="sm:hidden">Drag to pan • Pinch to zoom • Double-tap to reset</span>
+                  </span>
                 </div>
               </div>
             )}
