@@ -2454,39 +2454,38 @@ export default function MyTasks() {
         {/* Professional Shared Task Detail Modal */}
         <Dialog open={sharedDetailOpen} onOpenChange={setSharedDetailOpen}>
           <DialogContent 
-            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-2xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !ml-0"
-            style={{ marginLeft: '0 !important' }}
+            className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-xl hide-scrollbar"
             aria-describedby="shared-task-detail-description"
           >
-            <DialogHeader className="relative">
-              <DialogTitle className="flex items-center gap-3 pr-12">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600">
-                  <ListChecks className="h-5 w-5 text-white" />
-            </div>
-                <span className="text-lg sm:text-xl font-semibold line-clamp-2">
+            <DialogHeader className="relative pb-4">
+              <DialogTitle className="flex items-center gap-2 sm:gap-3 pr-8 sm:pr-12">
+                <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600 shrink-0">
+                  <ListChecks className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                </div>
+                <span className="text-base sm:text-lg md:text-xl font-semibold line-clamp-2 break-words">
                   {selectedShared?.title}
                 </span>
               </DialogTitle>
-              <p id="shared-task-detail-description" className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              <p id="shared-task-detail-description" className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
                 View detailed information about this shared task including assignee, status, and progress.
               </p>
               <Button
                 onClick={() => setSharedDetailOpen(false)}
                 variant="ghost"
                 size="sm"
-                className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+                className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full shrink-0"
               >
                 <X className="h-4 w-4" />
               </Button>
             </DialogHeader>
 
             {selectedShared && (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* Status and Priority Badges */}
                 <div className="flex flex-wrap items-center gap-2">
                       <Badge 
                         variant="outline" 
-                        className={`capitalize text-xs ${
+                        className={`capitalize text-xs px-2 py-1 ${
                           selectedShared.status === 'approved' ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/20 dark:text-purple-400' :
                           selectedShared.status === 'completed' ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' :
                           selectedShared.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/20 dark:text-blue-400' :
@@ -2497,7 +2496,7 @@ export default function MyTasks() {
                       </Badge>
                       <Badge 
                         variant="outline" 
-                        className={`capitalize text-xs ${
+                        className={`capitalize text-xs px-2 py-1 ${
                           selectedShared.priority === 'high' ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/20 dark:text-red-400' :
                           selectedShared.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-400' :
                           'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400'
@@ -2512,32 +2511,33 @@ export default function MyTasks() {
                   <nav className="grid grid-cols-2 gap-0">
                     <button
                       onClick={() => setActiveDetailTab('details')}
-                      className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
+                      className={`py-2.5 sm:py-3 px-2 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors ${
                         activeDetailTab === 'details'
                           ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
                           : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-50/50 dark:hover:bg-gray-800/50'
                       }`}
                     >
-                      <div className="flex items-center justify-center gap-2">
-                        <ListChecks className="h-4 w-4" />
-                        Task Details
+                      <div className="flex items-center justify-center gap-1 sm:gap-2">
+                        <ListChecks className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                        <span className="truncate">Task Details</span>
                       </div>
                     </button>
                     <button
                       onClick={() => setActiveDetailTab('members')}
-                      className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
+                      className={`py-2.5 sm:py-3 px-2 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors ${
                         activeDetailTab === 'members'
                           ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
                           : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-50/50 dark:hover:bg-gray-800/50'
                       }`}
                     >
-                      <div className="flex items-center justify-center gap-2">
-                        <Users className="h-4 w-4" />
-                        Assigned Members
+                      <div className="flex items-center justify-center gap-1 sm:gap-2">
+                        <Users className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                        <span className="truncate hidden sm:inline">Assigned Members</span>
+                        <span className="truncate sm:hidden">Members</span>
                         {(() => {
                           const assignedUsers = getAssignedUsers(selectedShared);
                           return assignedUsers.length > 0 ? (
-                            <span className="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded-full">
+                            <span className="ml-0.5 sm:ml-1 px-1.5 sm:px-2 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded-full shrink-0">
                               {assignedUsers.length}
                             </span>
                           ) : null;
@@ -2549,18 +2549,18 @@ export default function MyTasks() {
 
                 {/* Tab Content */}
                 {activeDetailTab === 'details' && (
-                  <div className="space-y-6">
+                  <div className="space-y-4 sm:space-y-6">
                 {/* Description Section */}
                 {selectedShared.description && (
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                      <div className="p-1.5 bg-blue-600 rounded-lg">
-                        <FileText className="h-4 w-4 text-white" />
+                  <div className="space-y-2 sm:space-y-3">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="p-1 sm:p-1.5 bg-blue-600 rounded-lg shrink-0">
+                        <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                       </div>
                       Description
                     </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700">
+                      <p className="whitespace-pre-wrap text-xs sm:text-sm text-gray-700 dark:text-gray-300 leading-relaxed break-words">
                         {selectedShared.description}
                       </p>
                     </div>
@@ -2568,53 +2568,53 @@ export default function MyTasks() {
                 )}
 
                 {/* Task Information Grid */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                    <div className="p-1.5 bg-emerald-600 rounded-lg">
-                      <ListChecks className="h-4 w-4 text-white" />
+                <div className="space-y-3 sm:space-y-4">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="p-1 sm:p-1.5 bg-emerald-600 rounded-lg shrink-0">
+                      <ListChecks className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                     </div>
                     Task Information
                   </h3>
                   
-                      <div className="grid grid-cols-6 gap-4">
-                        {/* Left Column - Basic Info (3 columns) */}
-                        <div className="col-span-3 space-y-4">
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                          <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        {/* Left Column - Basic Info */}
+                        <div className="space-y-3 sm:space-y-4">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <div className="p-1 sm:p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg shrink-0">
+                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
                         </div>
                         <span className="text-gray-600 dark:text-gray-400">Created:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
+                        <span className="font-medium text-gray-900 dark:text-white break-words">
                           {new Date(selectedShared.created_at || '').toLocaleDateString()}
                         </span>
                     </div>
 
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                          <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <div className="p-1 sm:p-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg shrink-0">
+                          <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 dark:text-green-400" />
                         </div>
                         <span className="text-gray-600 dark:text-gray-400">Due Date:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
+                        <span className="font-medium text-gray-900 dark:text-white break-words">
                           {selectedShared.due_date ? new Date(selectedShared.due_date).toLocaleDateString() : 'No due date'}
                         </span>
                       </div>
 
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                              <ListChecks className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                          <div className="flex items-center gap-2 text-xs sm:text-sm">
+                            <div className="p-1 sm:p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg shrink-0">
+                              <ListChecks className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 dark:text-orange-400" />
                             </div>
                             <span className="text-gray-600 dark:text-gray-400">Priority:</span>
-                            <span className="font-medium text-gray-900 dark:text-white capitalize">
+                            <span className="font-medium text-gray-900 dark:text-white capitalize break-words">
                               {selectedShared.priority || 'medium'}
                             </span>
                     </div>
 
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                              <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <div className="p-1 sm:p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg shrink-0">
+                              <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400" />
                           </div>
                             <span className="text-gray-600 dark:text-gray-400">Project:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
+                        <span className="font-medium text-gray-900 dark:text-white break-words">
                               {(() => {
                                 if (selectedShared.project_ids && selectedShared.project_ids.length > 0) {
                                   const project = projects.find(p => p.id === selectedShared.project_ids[0]);
@@ -2626,40 +2626,40 @@ export default function MyTasks() {
                           </div>
                         </div>
                       
-                        {/* Right Column - Quick Assignee Summary (3 columns) */}
-                        <div className="col-span-3 space-y-3">
+                        {/* Right Column - Quick Assignee Summary */}
+                        <div className="space-y-2 sm:space-y-3">
                           <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                              <User className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            <div className="p-1 sm:p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg shrink-0">
+                              <User className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400" />
                           </div>
-                            <span className="text-gray-600 dark:text-gray-400 text-sm">Quick Summary:</span>
+                            <span className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">Quick Summary:</span>
                           </div>
                           
-                          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 sm:p-3">
                             {(() => {
                               const assignedUsers = getAssignedUsers(selectedShared);
                               if (assignedUsers.length === 0) {
                                 return (
                                   <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                                      <User className="h-3 w-3 text-gray-400" />
+                                    <div className="w-5 h-5 sm:w-6 sm:h-6 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center shrink-0">
+                                      <User className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-gray-400" />
                                     </div>
-                                    <span className="text-sm text-gray-500 dark:text-gray-400">No assignees</span>
+                                    <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">No assignees</span>
                                   </div>
                                 );
                               }
                               
                               return (
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="w-5 h-5 sm:w-6 sm:h-6 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0">
                                     {assignedUsers.length}
                                   </div>
-                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                  <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
                                     {assignedUsers.length} assignee{assignedUsers.length > 1 ? 's' : ''}
                         </span>
                                   <button
                                     onClick={() => setActiveDetailTab('members')}
-                                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors whitespace-nowrap"
                                   >
                                     View all →
                                   </button>
@@ -2674,11 +2674,11 @@ export default function MyTasks() {
                 )}
 
                 {activeDetailTab === 'members' && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                          <Users className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <div className="p-1 sm:p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg shrink-0">
+                          <Users className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400" />
                         </div>
                         Assigned Members
                       </h3>
@@ -2688,7 +2688,7 @@ export default function MyTasks() {
                           return (
                             <button
                               onClick={() => setShowAllAssignees(!showAllAssignees)}
-                              className="text-sm px-3 py-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors bg-blue-50 dark:bg-blue-900/20 rounded-md"
+                              className="text-xs sm:text-sm px-2 sm:px-3 py-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors bg-blue-50 dark:bg-blue-900/20 rounded-md whitespace-nowrap"
                             >
                               {showAllAssignees ? 'Show Less' : `Show All ${assignedUsers.length}`}
                             </button>
@@ -2723,22 +2723,22 @@ export default function MyTasks() {
                                 const completedAt = selectedShared.completion_details?.[user.id];
                                 
                                 return (
-                                  <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
-                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm">
+                                  <div key={user.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/70 transition-colors">
+                                    <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-semibold shadow-sm shrink-0">
                                       {user.name.charAt(0).toUpperCase()}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <div className="font-medium text-gray-900 dark:text-white text-base truncate">
+                                      <div className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">
                                         {user.name}
                                       </div>
-                                      <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                      <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
                                         {user.email}
                                       </div>
                                     </div>
-                                    <div className="flex flex-col items-end gap-1">
+                                    <div className="flex flex-col items-end gap-1 shrink-0">
                                       <Badge 
                                         variant="outline" 
-                                        className={`text-xs ${
+                                        className={`text-xs px-1.5 sm:px-2 py-0.5 ${
                                           isCompleted 
                                             ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400' 
                                             : 'bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-800 dark:text-gray-400'
@@ -2746,16 +2746,20 @@ export default function MyTasks() {
                                       >
                                         {isCompleted ? (
                                           <div className="flex items-center gap-1">
-                                            <CheckCircle2 className="h-3 w-3" />
-                                            Completed
+                                            <CheckCircle2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                            <span className="hidden sm:inline">Completed</span>
+                                            <span className="sm:hidden">Done</span>
                                           </div>
                                         ) : 'Pending'}
                                       </Badge>
                                       {completedAt && (
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                          {new Date(completedAt).toLocaleDateString()}
-                                          <br />
-                                          {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        <span className="text-xs text-gray-500 dark:text-gray-400 text-right">
+                                          <span className="hidden sm:inline">{new Date(completedAt).toLocaleDateString()}</span>
+                                          <span className="sm:hidden">{new Date(completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                          <br className="hidden sm:block" />
+                                          <span className="text-[10px] sm:text-xs">
+                                            {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                          </span>
                                         </span>
                                       )}
                                     </div>
@@ -2764,11 +2768,11 @@ export default function MyTasks() {
                               })}
                             </div>
                             {!showAllAssignees && remainingCount > 0 && (
-                              <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm">
+                              <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-semibold shadow-sm shrink-0">
                                   +{remainingCount}
                                 </div>
-                                <div className="text-base font-medium text-blue-700 dark:text-blue-300">
+                                <div className="text-sm sm:text-base font-medium text-blue-700 dark:text-blue-300">
                                   {remainingCount} more assignee{remainingCount > 1 ? 's' : ''}
                                 </div>
                               </div>
@@ -2781,7 +2785,7 @@ export default function MyTasks() {
                 )}
 
                 {/* Professional Actions */}
-                <div className="pt-6 border-t border-gray-200/60 dark:border-gray-700/60">
+                <div className="pt-4 sm:pt-6 border-t border-gray-200/60 dark:border-gray-700/60">
                   {(() => {
                     const buttons = [
                       // Close button (always present)
@@ -2790,7 +2794,7 @@ export default function MyTasks() {
                           <Button 
                             variant="outline" 
                             onClick={() => setSharedDetailOpen(false)} 
-                            className="w-full h-12 px-6 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
+                            className="w-full h-10 sm:h-12 px-4 sm:px-6 text-sm sm:text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
                           >
                             Close
                           </Button>
@@ -2805,9 +2809,9 @@ export default function MyTasks() {
                         setSharedDetailOpen(false);
                         openEditShared(selectedShared);
                       }} 
-                            className="w-full h-12 px-6 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
+                            className="w-full h-10 sm:h-12 px-4 sm:px-6 text-sm sm:text-base border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
                     >
-                      <Plus className="h-4 w-4 mr-2" />
+                      <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                       Edit Task
                     </Button>
                         )
@@ -2828,9 +2832,9 @@ export default function MyTasks() {
                             await onDeleteShared(selectedShared.id); 
                             setSharedDetailOpen(false); 
                           }} 
-                            className="w-full h-12 px-6 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
+                            className="w-full h-10 sm:h-12 px-4 sm:px-6 text-sm sm:text-base border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
                         >
-                            <X className="h-4 w-4 mr-2" />
+                            <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                           Delete
                         </Button>
                       )
@@ -2841,11 +2845,11 @@ export default function MyTasks() {
                     
                     // Professional responsive grid layout based on button count
                     const getGridClasses = () => {
-                      if (buttonCount === 1) return "grid grid-cols-1 gap-4";
-                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-4";
-                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4";
-                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-4";
-                      return "grid grid-cols-1 sm:grid-cols-2 gap-4";
+                      if (buttonCount === 1) return "grid grid-cols-1 gap-3 sm:gap-4";
+                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4";
+                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4";
+                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4";
+                      return "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4";
                     };
 
                     return (
