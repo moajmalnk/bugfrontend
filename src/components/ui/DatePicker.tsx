@@ -45,7 +45,15 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start" side="bottom" alignOffset={0}>
+      <PopoverContent 
+        className="w-auto p-0 max-w-[calc(100vw-2rem)] sm:max-w-[350px] overflow-hidden" 
+        align="start" 
+        side="bottom" 
+        alignOffset={0}
+        sideOffset={4}
+        collisionPadding={8}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <Calendar
           mode="single"
           selected={selectedDate}
