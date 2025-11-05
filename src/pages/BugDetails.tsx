@@ -20,7 +20,7 @@ import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/axios";
 import { ArrowLeft, ArrowRight, Lock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 interface ApiResponse<T> {
@@ -138,6 +138,7 @@ const BugDetails = () => {
   const [bugList, setBugList] = useState<Bug[]>([]);
   const [bugListLoading, setBugListLoading] = useState(true);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Check if user came from project page
   const fromProject = searchParams.get("from") === "project";
@@ -164,28 +165,27 @@ const BugDetails = () => {
           attachments: response.data.data?.attachments,
           screenshots: response.data.data?.screenshots,
           files: response.data.data?.files,
-          debug: response.data.data?._debug,
           fullResponse: response.data.data
         });
         
-        // If debug info exists, log it prominently
-        if (response.data.data?._debug) {
-          console.warn('🐛 Backend Debug Info:', response.data.data._debug);
-        }
         return response.data.data;
       }
       throw new Error(response.data.message || "Failed to fetch bug details");
     },
-    staleTime: 0, // Always refetch when invalidated to show latest attachments
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (renamed from cacheTime in v5)
+    staleTime: 30 * 1000, // Consider data fresh for 30 seconds (was 0)
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: false, // Don't refetch on mount if data exists
+    refetchOnWindowFocus: false, // Already set globally but be explicit
   });
 
   useEffect(() => {
     // Only refetch if we don't have cached data or if it's stale
+    // Remove refetch from dependencies to prevent loops
     if (!bug || isStale) {
       refetch();
     }
-  }, [bugId, refetch, bug, isStale]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bugId]); // Only depend on bugId, React Query will handle the rest
 
   // Set project ID when we first detect we're coming from a project page
   useEffect(() => {
@@ -443,48 +443,132 @@ const BugDetails = () => {
           <div className="relative w-full flex justify-center items-center gap-6 py-4 px-4">
             <button
               className="flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors"
-          onClick={() => {
-            if (prevBugId) {
-              let url = `/${role}/bugs/${prevBugId}`;
-              if (fromProject) {
-                url += '?from=project';
-              } else if (fromFixes) {
-                url += '?from=fixes';
-              }
-              navigate(url);
-            }
-          }}
-          disabled={!prevBugId || bugListLoading}
-          aria-label="Previous Bug"
-        >
-          <ArrowLeft className="mr-2 h-5 w-5" /> Previous
+              onClick={(e) => {
+                // Prevent rapid clicks
+                if (navigationTimeoutRef.current) {
+                  console.warn('⚠️ [BugDetails] Navigation already in progress, ignoring click');
+                  return;
+                }
+
+                console.group('🟢 [BugDetails] Previous Button Clicked');
+                console.log('Previous Bug ID:', prevBugId);
+                console.log('Bug List Loading:', bugListLoading);
+                console.log('Current Bug ID:', bugId);
+                console.log('From Project:', fromProject);
+                console.log('From Fixes:', fromFixes);
+                console.log('Role:', role);
+                
+                if (!prevBugId) {
+                  console.warn('⚠️ [BugDetails] No previous bug ID available');
+                  console.groupEnd();
+                  return;
+                }
+                
+                if (bugListLoading) {
+                  console.warn('⚠️ [BugDetails] Bug list is loading, navigation disabled');
+                  console.groupEnd();
+                  return;
+                }
+                
+                try {
+                  // Set timeout to prevent rapid clicks
+                  navigationTimeoutRef.current = setTimeout(() => {
+                    navigationTimeoutRef.current = null;
+                  }, 500);
+                  
+                  let url = `/${role}/bugs/${prevBugId}`;
+                  if (fromProject) {
+                    url += '?from=project';
+                  } else if (fromFixes) {
+                    url += '?from=fixes';
+                  }
+                  
+                  console.log('🔄 [BugDetails] Navigating to:', url);
+                  navigate(url);
+                  console.log('✅ [BugDetails] Navigation called successfully');
+                } catch (error) {
+                  console.error('❌ [BugDetails] Navigation error:', error);
+                  navigationTimeoutRef.current = null;
+                } finally {
+                  setTimeout(() => {
+                    console.log('🏁 [BugDetails] Previous button click handler completed');
+                    console.groupEnd();
+                  }, 100);
+                }
+              }}
+              disabled={!prevBugId || bugListLoading}
+              aria-label="Previous Bug"
+            >
+              <ArrowLeft className="mr-2 h-5 w-5" /> Previous
             </button>
             <span className="text-sm font-medium text-muted-foreground select-none">
-          {totalBugs > 0
-            ? fromFixes 
-              ? `Fixed Bug ${currentIndex + 1} of ${totalBugs}`
-              : `Bug ${currentIndex + 1} of ${totalBugs}`
-            : fromFixes 
-              ? "No fixed bugs"
-              : "No bugs"}
+              {totalBugs > 0
+                ? fromFixes 
+                  ? `Fixed Bug ${currentIndex + 1} of ${totalBugs}`
+                  : `Bug ${currentIndex + 1} of ${totalBugs}`
+                : fromFixes 
+                  ? "No fixed bugs"
+                  : "No bugs"}
             </span>
             <button
               className="flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors"
-          onClick={() => {
-            if (nextBugId) {
-              let url = `/${role}/bugs/${nextBugId}`;
-              if (fromProject) {
-                url += '?from=project';
-              } else if (fromFixes) {
-                url += '?from=fixes';
-              }
-              navigate(url);
-            }
-          }}
-          disabled={!nextBugId || bugListLoading}
-          aria-label="Next Bug"
-        >
-          Next <ArrowRight className="ml-2 h-5 w-5" />
+              onClick={(e) => {
+                // Prevent rapid clicks
+                if (navigationTimeoutRef.current) {
+                  console.warn('⚠️ [BugDetails] Navigation already in progress, ignoring click');
+                  return;
+                }
+
+                console.group('🟢 [BugDetails] Next Button Clicked');
+                console.log('Next Bug ID:', nextBugId);
+                console.log('Bug List Loading:', bugListLoading);
+                console.log('Current Bug ID:', bugId);
+                console.log('From Project:', fromProject);
+                console.log('From Fixes:', fromFixes);
+                console.log('Role:', role);
+                
+                if (!nextBugId) {
+                  console.warn('⚠️ [BugDetails] No next bug ID available');
+                  console.groupEnd();
+                  return;
+                }
+                
+                if (bugListLoading) {
+                  console.warn('⚠️ [BugDetails] Bug list is loading, navigation disabled');
+                  console.groupEnd();
+                  return;
+                }
+                
+                try {
+                  // Set timeout to prevent rapid clicks
+                  navigationTimeoutRef.current = setTimeout(() => {
+                    navigationTimeoutRef.current = null;
+                  }, 500);
+                  
+                  let url = `/${role}/bugs/${nextBugId}`;
+                  if (fromProject) {
+                    url += '?from=project';
+                  } else if (fromFixes) {
+                    url += '?from=fixes';
+                  }
+                  
+                  console.log('🔄 [BugDetails] Navigating to:', url);
+                  navigate(url);
+                  console.log('✅ [BugDetails] Navigation called successfully');
+                } catch (error) {
+                  console.error('❌ [BugDetails] Navigation error:', error);
+                  navigationTimeoutRef.current = null;
+                } finally {
+                  setTimeout(() => {
+                    console.log('🏁 [BugDetails] Next button click handler completed');
+                    console.groupEnd();
+                  }, 100);
+                }
+              }}
+              disabled={!nextBugId || bugListLoading}
+              aria-label="Next Bug"
+            >
+              Next <ArrowRight className="ml-2 h-5 w-5" />
             </button>
           </div>
         </div>

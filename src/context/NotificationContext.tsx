@@ -84,20 +84,25 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Initial fetch and setup polling
   useEffect(() => {
     if (currentUser) {
-      fetchNotifications();
-      
-      // Poll every 30 seconds for new notifications
-      pollingIntervalRef.current = setInterval(() => {
+      // Add a small delay to prevent multiple simultaneous fetches
+      const timeoutId = setTimeout(() => {
         fetchNotifications();
-      }, 30000);
+        
+        // Poll every 30 seconds for new notifications
+        pollingIntervalRef.current = setInterval(() => {
+          fetchNotifications();
+        }, 30000);
+      }, 100);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      };
     }
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
-  }, [currentUser, fetchNotifications]);
+  }, [currentUser?.id]); // Only depend on user ID, not the whole user object
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
     const newNotification: Notification = {

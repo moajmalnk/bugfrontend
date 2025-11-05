@@ -311,6 +311,42 @@ function AppContent() {
 
   const networkError = false; // Replace with actual network error logic
 
+  useEffect(() => {
+    // Monitor all button clicks globally
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const button = target.closest('button');
+      
+      if (button) {
+        console.log('🔘 [Global] Button clicked:', {
+          text: button.textContent?.trim(),
+          disabled: button.disabled,
+          ariaLabel: button.getAttribute('aria-label'),
+          className: button.className,
+          id: button.id,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Check if button becomes stuck after 3 seconds
+        setTimeout(() => {
+          if (button.disabled && button.textContent?.includes('Loading') || button.textContent?.includes('Creating')) {
+            console.warn('⚠️ [Global] Button still disabled/loading after 3s:', {
+              text: button.textContent?.trim(),
+              disabled: button.disabled,
+              className: button.className
+            });
+          }
+        }, 3000);
+      }
+    };
+    
+    document.addEventListener('click', handleGlobalClick, true);
+    
+    return () => {
+      document.removeEventListener('click', handleGlobalClick, true);
+    };
+  }, []);
+
   return (
     <>
       <SEOHead />
