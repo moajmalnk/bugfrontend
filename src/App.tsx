@@ -257,15 +257,29 @@ function AppContent() {
   };
 
   const handleNativeClick = (event: MouseEvent) => {
+    // Only close context menu if clicking outside of it
+    // Don't interfere with button clicks
+    const target = event.target as HTMLElement;
+    
+    // Check if click is on a button or interactive element
+    if (target.closest('button') || 
+        target.closest('[role="button"]') || 
+        target.closest('a') ||
+        target.closest('[onclick]')) {
+      // Let button handlers execute first
+      return;
+    }
+    
     setContextMenu({ mouseX: null, mouseY: null });
   };
 
   useEffect(() => {
     document.addEventListener('contextmenu', handleNativeContextMenu);
-    document.addEventListener('click', handleNativeClick);
+    // Use capture phase to check before button handlers
+    document.addEventListener('click', handleNativeClick, true);
     return () => {
       document.removeEventListener('contextmenu', handleNativeContextMenu);
-      document.removeEventListener('click', handleNativeClick);
+      document.removeEventListener('click', handleNativeClick, true);
     };
   }, []);
 
