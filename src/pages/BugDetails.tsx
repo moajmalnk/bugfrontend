@@ -188,35 +188,36 @@ const BugDetails = () => {
     const pathChanged = previousLocationRef.current !== currentPath;
     
     if (pathChanged) {
+      const pathBugId = currentPath.split('/bugs/')[1]?.split('?')[0];
+      const previousPathBugId = previousLocationRef.current.split('/bugs/')[1]?.split('?')[0];
+      
       console.log('📍 [BugDetails] Location changed:', {
         from: previousLocationRef.current,
         to: currentPath,
-        currentBugId: bugId,
-        navigatingTo: navigatingToBugIdRef.current
+        previousBugId: previousPathBugId,
+        currentBugId: pathBugId,
+        navigatingTo: navigatingToBugIdRef.current,
+        paramBugId: bugId
       });
+      
       previousLocationRef.current = currentPath;
       
-      // Extract bugId from path
-      const pathBugId = currentPath.split('/bugs/')[1]?.split('?')[0];
-      
       // Clear navigation state when location changes to target bug
-      if (navigatingToBugIdRef.current && pathBugId === navigatingToBugIdRef.current) {
-        console.log('✅ [BugDetails] Navigation completed, location changed to target bug:', pathBugId);
-        setIsNavigating(false);
-        navigatingToBugIdRef.current = null;
-        if (navigationTimeoutRef.current) {
-          clearTimeout(navigationTimeoutRef.current);
-          navigationTimeoutRef.current = null;
-        }
-      } else if (navigatingToBugIdRef.current) {
-        // If we're navigating but path changed to something else, clear state
-        if (pathBugId && pathBugId !== navigatingToBugIdRef.current) {
-          console.warn('⚠️ [BugDetails] Location changed but to different bug than expected:', {
+      if (navigatingToBugIdRef.current) {
+        if (pathBugId === navigatingToBugIdRef.current) {
+          console.log('✅ [BugDetails] Navigation completed successfully to:', pathBugId);
+          setIsNavigating(false);
+          navigatingToBugIdRef.current = null;
+          if (navigationTimeoutRef.current) {
+            clearTimeout(navigationTimeoutRef.current);
+            navigationTimeoutRef.current = null;
+          }
+        } else if (pathBugId && pathBugId !== navigatingToBugIdRef.current) {
+          console.warn('⚠️ [BugDetails] Navigation interrupted - location changed to different bug:', {
             expected: navigatingToBugIdRef.current,
-            actual: pathBugId,
-            clearingNavigationState: true
+            actual: pathBugId
           });
-          // Clear navigation state anyway - user navigated elsewhere
+          // Clear navigation state - user navigated elsewhere or navigation was interrupted
           setIsNavigating(false);
           navigatingToBugIdRef.current = null;
           if (navigationTimeoutRef.current) {
@@ -225,17 +226,16 @@ const BugDetails = () => {
           }
         }
       }
-    } else if (navigatingToBugIdRef.current) {
-      // Path didn't change but we're waiting for navigation
-      // Check if bugId param actually matches target (fallback)
-      if (bugId === navigatingToBugIdRef.current) {
-        console.log('✅ [BugDetails] Navigation completed, bugId param matches target:', bugId);
-        setIsNavigating(false);
-        navigatingToBugIdRef.current = null;
-        if (navigationTimeoutRef.current) {
-          clearTimeout(navigationTimeoutRef.current);
-          navigationTimeoutRef.current = null;
-        }
+    }
+    
+    // Fallback: Check if bugId param matches target (in case pathname didn't change but params did)
+    if (navigatingToBugIdRef.current && bugId === navigatingToBugIdRef.current) {
+      console.log('✅ [BugDetails] Navigation completed (param check), bugId matches target:', bugId);
+      setIsNavigating(false);
+      navigatingToBugIdRef.current = null;
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = null;
       }
     }
   }, [location.pathname, bugId]);
@@ -245,17 +245,6 @@ const BugDetails = () => {
     // Remove refetch from dependencies to prevent loops
     if (!bug || isStale) {
       refetch();
-    }
-    
-    // Also check if bugId matches the target (backup check)
-    if (navigatingToBugIdRef.current === bugId) {
-      console.log('✅ [BugDetails] Navigation completed, bugId matches target:', bugId);
-      setIsNavigating(false);
-      navigatingToBugIdRef.current = null;
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-        navigationTimeoutRef.current = null;
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bugId]); // Only depend on bugId, React Query will handle the rest
@@ -572,21 +561,8 @@ const BugDetails = () => {
                   }
                   
                   console.log('🔄 [BugDetails] Navigating to:', url);
-                  // Use replace: false to ensure navigation actually happens
                   navigate(url, { replace: false });
-                  console.log('✅ [BugDetails] Navigation called successfully');
-                  
-                  // Also check if we're already on this URL (in case navigation is instant)
-                  const currentUrl = window.location.pathname + window.location.search;
-                  if (currentUrl.includes(prevBugId)) {
-                    console.log('✅ [BugDetails] Already on target URL, navigation may be instant');
-                    setIsNavigating(false);
-                    navigatingToBugIdRef.current = null;
-                    if (navigationTimeoutRef.current) {
-                      clearTimeout(navigationTimeoutRef.current);
-                      navigationTimeoutRef.current = null;
-                    }
-                  }
+                  console.log('✅ [BugDetails] Navigation initiated');
                 } catch (error) {
                   console.error('❌ [BugDetails] Navigation error:', error);
                   setIsNavigating(false);
@@ -674,21 +650,8 @@ const BugDetails = () => {
                   }
                   
                   console.log('🔄 [BugDetails] Navigating to:', url);
-                  // Use replace: false to ensure navigation actually happens
                   navigate(url, { replace: false });
-                  console.log('✅ [BugDetails] Navigation called successfully');
-                  
-                  // Also check if we're already on this URL (in case navigation is instant)
-                  const currentUrl = window.location.pathname + window.location.search;
-                  if (currentUrl.includes(nextBugId)) {
-                    console.log('✅ [BugDetails] Already on target URL, navigation may be instant');
-                    setIsNavigating(false);
-                    navigatingToBugIdRef.current = null;
-                    if (navigationTimeoutRef.current) {
-                      clearTimeout(navigationTimeoutRef.current);
-                      navigationTimeoutRef.current = null;
-                    }
-                  }
+                  console.log('✅ [BugDetails] Navigation initiated');
                 } catch (error) {
                   console.error('❌ [BugDetails] Navigation error:', error);
                   setIsNavigating(false);
