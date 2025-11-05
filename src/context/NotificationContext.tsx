@@ -33,6 +33,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const settings = notificationService.getSettings();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastFetchTimeRef = useRef<Date>(new Date());
+  const isFetchingRef = useRef<boolean>(false);
 
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {
@@ -41,6 +42,21 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Prevent multiple simultaneous fetches
+    if (isFetchingRef.current) {
+      console.log('NotificationContext: Fetch already in progress, skipping');
+      return;
+    }
+
+    // Check if we fetched recently (within last 2 seconds)
+    const now = new Date();
+    const timeSinceLastFetch = now.getTime() - lastFetchTimeRef.current.getTime();
+    if (timeSinceLastFetch < 2000) {
+      console.log('NotificationContext: Recent fetch detected, skipping duplicate');
+      return;
+    }
+
+    isFetchingRef.current = true;
     try {
       console.log('NotificationContext: Fetching notifications...');
       const apiNotifications = await notificationService.getUserNotifications(50, 0);
@@ -78,6 +94,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       lastFetchTimeRef.current = new Date();
     } catch (error) {
       console.error('NotificationContext: Error fetching notifications:', error);
+    } finally {
+      isFetchingRef.current = false;
     }
   }, [currentUser]);
 

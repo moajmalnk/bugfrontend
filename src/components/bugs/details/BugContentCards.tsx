@@ -308,18 +308,20 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
     ? ((bug as any).attachments as any[])
     : [];
   
-  // Debug: Log attachments and API URL
-  console.log('📎 BugContentCards Debug:', {
-    apiBaseUrl,
-    attachmentsCount: allAttachments.length,
-    attachments: allAttachments.map(a => ({
-      id: a.id,
-      file_name: a.file_name,
-      file_path: a.file_path,
-      file_type: a.file_type
-    })),
-    bugId: bug.id
-  });
+  // Debug: Log attachments and API URL - only when bug.id or attachments change to prevent excessive logging
+  useEffect(() => {
+    console.log('📎 BugContentCards Debug:', {
+      apiBaseUrl,
+      attachmentsCount: allAttachments.length,
+      attachments: allAttachments.map(a => ({
+        id: a.id,
+        file_name: a.file_name,
+        file_path: a.file_path,
+        file_type: a.file_type
+      })),
+      bugId: bug.id
+    });
+  }, [bug.id, bug.attachments?.length, apiBaseUrl]); // Log when bug ID, attachment count, or API URL changes
 
   // If no attachments in main array, fallback to legacy structure (for backward compatibility)
   const fallbackAttachments = allAttachments.length === 0 ? [

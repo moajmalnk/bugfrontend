@@ -139,6 +139,8 @@ const BugDetails = () => {
   const [bugListLoading, setBugListLoading] = useState(true);
   const [projectId, setProjectId] = useState<string | null>(null);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const navigatingToBugIdRef = useRef<string | null>(null);
   
   // Check if user came from project page
   const fromProject = searchParams.get("from") === "project";
@@ -183,6 +185,17 @@ const BugDetails = () => {
     // Remove refetch from dependencies to prevent loops
     if (!bug || isStale) {
       refetch();
+    }
+    
+    // Clear navigation state when bugId changes (navigation completed)
+    if (navigatingToBugIdRef.current === bugId) {
+      setIsNavigating(false);
+      navigatingToBugIdRef.current = null;
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = null;
+      }
+      console.log('✅ [BugDetails] Navigation completed, bug loaded:', bugId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bugId]); // Only depend on bugId, React Query will handle the rest
@@ -444,8 +457,8 @@ const BugDetails = () => {
             <button
               className="flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors"
               onClick={(e) => {
-                // Prevent rapid clicks
-                if (navigationTimeoutRef.current) {
+                // Prevent clicks during navigation or while loading
+                if (isNavigating || navigationTimeoutRef.current) {
                   console.warn('⚠️ [BugDetails] Navigation already in progress, ignoring click');
                   return;
                 }
@@ -454,6 +467,7 @@ const BugDetails = () => {
                 console.log('Previous Bug ID:', prevBugId);
                 console.log('Bug List Loading:', bugListLoading);
                 console.log('Current Bug ID:', bugId);
+                console.log('Is Navigating:', isNavigating);
                 console.log('From Project:', fromProject);
                 console.log('From Fixes:', fromFixes);
                 console.log('Role:', role);
@@ -464,17 +478,31 @@ const BugDetails = () => {
                   return;
                 }
                 
-                if (bugListLoading) {
+                if (bugListLoading || isLoading) {
                   console.warn('⚠️ [BugDetails] Bug list is loading, navigation disabled');
                   console.groupEnd();
                   return;
                 }
                 
+                // Don't navigate if already on this bug
+                if (prevBugId === bugId) {
+                  console.warn('⚠️ [BugDetails] Already on this bug, ignoring navigation');
+                  console.groupEnd();
+                  return;
+                }
+                
                 try {
-                  // Set timeout to prevent rapid clicks
+                  // Set navigation state
+                  setIsNavigating(true);
+                  navigatingToBugIdRef.current = prevBugId;
+                  
+                  // Set timeout as backup (will be cleared when bug loads)
                   navigationTimeoutRef.current = setTimeout(() => {
+                    console.warn('⚠️ [BugDetails] Navigation timeout, clearing state');
+                    setIsNavigating(false);
+                    navigatingToBugIdRef.current = null;
                     navigationTimeoutRef.current = null;
-                  }, 500);
+                  }, 5000); // 5 second timeout
                   
                   let url = `/${role}/bugs/${prevBugId}`;
                   if (fromProject) {
@@ -488,7 +516,12 @@ const BugDetails = () => {
                   console.log('✅ [BugDetails] Navigation called successfully');
                 } catch (error) {
                   console.error('❌ [BugDetails] Navigation error:', error);
-                  navigationTimeoutRef.current = null;
+                  setIsNavigating(false);
+                  navigatingToBugIdRef.current = null;
+                  if (navigationTimeoutRef.current) {
+                    clearTimeout(navigationTimeoutRef.current);
+                    navigationTimeoutRef.current = null;
+                  }
                 } finally {
                   setTimeout(() => {
                     console.log('🏁 [BugDetails] Previous button click handler completed');
@@ -496,7 +529,7 @@ const BugDetails = () => {
                   }, 100);
                 }
               }}
-              disabled={!prevBugId || bugListLoading}
+              disabled={!prevBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Previous Bug"
             >
               <ArrowLeft className="mr-2 h-5 w-5" /> Previous
@@ -513,8 +546,8 @@ const BugDetails = () => {
             <button
               className="flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors"
               onClick={(e) => {
-                // Prevent rapid clicks
-                if (navigationTimeoutRef.current) {
+                // Prevent clicks during navigation or while loading
+                if (isNavigating || navigationTimeoutRef.current) {
                   console.warn('⚠️ [BugDetails] Navigation already in progress, ignoring click');
                   return;
                 }
@@ -523,6 +556,7 @@ const BugDetails = () => {
                 console.log('Next Bug ID:', nextBugId);
                 console.log('Bug List Loading:', bugListLoading);
                 console.log('Current Bug ID:', bugId);
+                console.log('Is Navigating:', isNavigating);
                 console.log('From Project:', fromProject);
                 console.log('From Fixes:', fromFixes);
                 console.log('Role:', role);
@@ -533,17 +567,31 @@ const BugDetails = () => {
                   return;
                 }
                 
-                if (bugListLoading) {
+                if (bugListLoading || isLoading) {
                   console.warn('⚠️ [BugDetails] Bug list is loading, navigation disabled');
                   console.groupEnd();
                   return;
                 }
                 
+                // Don't navigate if already on this bug
+                if (nextBugId === bugId) {
+                  console.warn('⚠️ [BugDetails] Already on this bug, ignoring navigation');
+                  console.groupEnd();
+                  return;
+                }
+                
                 try {
-                  // Set timeout to prevent rapid clicks
+                  // Set navigation state
+                  setIsNavigating(true);
+                  navigatingToBugIdRef.current = nextBugId;
+                  
+                  // Set timeout as backup (will be cleared when bug loads)
                   navigationTimeoutRef.current = setTimeout(() => {
+                    console.warn('⚠️ [BugDetails] Navigation timeout, clearing state');
+                    setIsNavigating(false);
+                    navigatingToBugIdRef.current = null;
                     navigationTimeoutRef.current = null;
-                  }, 500);
+                  }, 5000); // 5 second timeout
                   
                   let url = `/${role}/bugs/${nextBugId}`;
                   if (fromProject) {
@@ -557,7 +605,12 @@ const BugDetails = () => {
                   console.log('✅ [BugDetails] Navigation called successfully');
                 } catch (error) {
                   console.error('❌ [BugDetails] Navigation error:', error);
-                  navigationTimeoutRef.current = null;
+                  setIsNavigating(false);
+                  navigatingToBugIdRef.current = null;
+                  if (navigationTimeoutRef.current) {
+                    clearTimeout(navigationTimeoutRef.current);
+                    navigationTimeoutRef.current = null;
+                  }
                 } finally {
                   setTimeout(() => {
                     console.log('🏁 [BugDetails] Next button click handler completed');
@@ -565,7 +618,7 @@ const BugDetails = () => {
                   }, 100);
                 }
               }}
-              disabled={!nextBugId || bugListLoading}
+              disabled={!nextBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Next Bug"
             >
               Next <ArrowRight className="ml-2 h-5 w-5" />
