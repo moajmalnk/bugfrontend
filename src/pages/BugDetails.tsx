@@ -182,55 +182,36 @@ const BugDetails = () => {
     refetchOnWindowFocus: false, // Already set globally but be explicit
   });
 
-  // Track location changes to detect navigation completion
+  // Track location changes to detect navigation completion - Clean and efficient
   useEffect(() => {
     const currentPath = location.pathname;
     const pathChanged = previousLocationRef.current !== currentPath;
     
     if (pathChanged) {
       const pathBugId = currentPath.split('/bugs/')[1]?.split('?')[0];
-      const previousPathBugId = previousLocationRef.current.split('/bugs/')[1]?.split('?')[0];
-      
-      console.log('📍 [BugDetails] Location changed:', {
-        from: previousLocationRef.current,
-        to: currentPath,
-        previousBugId: previousPathBugId,
-        currentBugId: pathBugId,
-        navigatingTo: navigatingToBugIdRef.current,
-        paramBugId: bugId
-      });
-      
       previousLocationRef.current = currentPath;
       
-      // Clear navigation state when location changes to target bug
-      if (navigatingToBugIdRef.current) {
-        if (pathBugId === navigatingToBugIdRef.current) {
-          console.log('✅ [BugDetails] Navigation completed successfully to:', pathBugId);
-          setIsNavigating(false);
-          navigatingToBugIdRef.current = null;
-          if (navigationTimeoutRef.current) {
-            clearTimeout(navigationTimeoutRef.current);
-            navigationTimeoutRef.current = null;
-          }
-        } else if (pathBugId && pathBugId !== navigatingToBugIdRef.current) {
-          console.warn('⚠️ [BugDetails] Navigation interrupted - location changed to different bug:', {
-            expected: navigatingToBugIdRef.current,
-            actual: pathBugId
-          });
-          // Clear navigation state - user navigated elsewhere or navigation was interrupted
-          setIsNavigating(false);
-          navigatingToBugIdRef.current = null;
-          if (navigationTimeoutRef.current) {
-            clearTimeout(navigationTimeoutRef.current);
-            navigationTimeoutRef.current = null;
-          }
+      // Clear navigation state when we reach the target bug
+      if (navigatingToBugIdRef.current && pathBugId === navigatingToBugIdRef.current) {
+        setIsNavigating(false);
+        navigatingToBugIdRef.current = null;
+        if (navigationTimeoutRef.current) {
+          clearTimeout(navigationTimeoutRef.current);
+          navigationTimeoutRef.current = null;
+        }
+      } else if (navigatingToBugIdRef.current && pathBugId && pathBugId !== navigatingToBugIdRef.current) {
+        // Navigation was interrupted or redirected
+        setIsNavigating(false);
+        navigatingToBugIdRef.current = null;
+        if (navigationTimeoutRef.current) {
+          clearTimeout(navigationTimeoutRef.current);
+          navigationTimeoutRef.current = null;
         }
       }
     }
     
-    // Fallback: Check if bugId param matches target (in case pathname didn't change but params did)
+    // Fallback: Clear navigation state if bugId param matches target
     if (navigatingToBugIdRef.current && bugId === navigatingToBugIdRef.current) {
-      console.log('✅ [BugDetails] Navigation completed (param check), bugId matches target:', bugId);
       setIsNavigating(false);
       navigatingToBugIdRef.current = null;
       if (navigationTimeoutRef.current) {
@@ -504,84 +485,55 @@ const BugDetails = () => {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/40 to-orange-50/40 dark:from-gray-800/20 dark:to-orange-900/20" />
           <div className="relative w-full flex justify-center items-center gap-6 py-4 px-4">
             <button
-              className="flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors"
+              className={`flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-all duration-200 ${
+                isNavigating ? 'cursor-wait' : ''
+              }`}
               onClick={(e) => {
-                // Prevent clicks during navigation or while loading
-                if (isNavigating || navigationTimeoutRef.current) {
-                  console.warn('⚠️ [BugDetails] Navigation already in progress, ignoring click');
+                if (isNavigating || !prevBugId || bugListLoading || isLoading || prevBugId === bugId) {
                   return;
                 }
 
-                console.group('🟢 [BugDetails] Previous Button Clicked');
-                console.log('Previous Bug ID:', prevBugId);
-                console.log('Bug List Loading:', bugListLoading);
-                console.log('Current Bug ID:', bugId);
-                console.log('Is Navigating:', isNavigating);
-                console.log('From Project:', fromProject);
-                console.log('From Fixes:', fromFixes);
-                console.log('Role:', role);
+                setIsNavigating(true);
+                navigatingToBugIdRef.current = prevBugId;
                 
-                if (!prevBugId) {
-                  console.warn('⚠️ [BugDetails] No previous bug ID available');
-                  console.groupEnd();
-                  return;
-                }
-                
-                if (bugListLoading || isLoading) {
-                  console.warn('⚠️ [BugDetails] Bug list is loading, navigation disabled');
-                  console.groupEnd();
-                  return;
-                }
-                
-                // Don't navigate if already on this bug
-                if (prevBugId === bugId) {
-                  console.warn('⚠️ [BugDetails] Already on this bug, ignoring navigation');
-                  console.groupEnd();
-                  return;
-                }
-                
-                try {
-                  // Set navigation state
-                  setIsNavigating(true);
-                  navigatingToBugIdRef.current = prevBugId;
-                  
-                  // Set timeout as backup (will be cleared when bug loads)
-                  navigationTimeoutRef.current = setTimeout(() => {
-                    console.warn('⚠️ [BugDetails] Navigation timeout, clearing state');
-                    setIsNavigating(false);
-                    navigatingToBugIdRef.current = null;
-                    navigationTimeoutRef.current = null;
-                  }, 5000); // 5 second timeout
-                  
-                  let url = `/${role}/bugs/${prevBugId}`;
-                  if (fromProject) {
-                    url += '?from=project';
-                  } else if (fromFixes) {
-                    url += '?from=fixes';
-                  }
-                  
-                  console.log('🔄 [BugDetails] Navigating to:', url);
-                  navigate(url, { replace: false });
-                  console.log('✅ [BugDetails] Navigation initiated');
-                } catch (error) {
-                  console.error('❌ [BugDetails] Navigation error:', error);
+                // Backup timeout - clear after 3 seconds
+                navigationTimeoutRef.current = setTimeout(() => {
                   setIsNavigating(false);
                   navigatingToBugIdRef.current = null;
-                  if (navigationTimeoutRef.current) {
-                    clearTimeout(navigationTimeoutRef.current);
-                    navigationTimeoutRef.current = null;
-                  }
-                } finally {
+                  navigationTimeoutRef.current = null;
+                }, 3000);
+                
+                // Build URL
+                let url = `/${role}/bugs/${prevBugId}`;
+                if (fromProject) url += '?from=project';
+                else if (fromFixes) url += '?from=fixes';
+                
+                // Try React Router navigation first, fallback to window.location
+                try {
+                  navigate(url, { replace: false });
+                  // Fallback: If navigation doesn't work within 500ms, use window.location
                   setTimeout(() => {
-                    console.log('🏁 [BugDetails] Previous button click handler completed');
-                    console.groupEnd();
-                  }, 100);
+                    if (navigatingToBugIdRef.current === prevBugId && window.location.pathname !== url.split('?')[0]) {
+                      window.location.href = url;
+                    }
+                  }, 500);
+                } catch (error) {
+                  window.location.href = url;
                 }
               }}
               disabled={!prevBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Previous Bug"
             >
-              <ArrowLeft className="mr-2 h-5 w-5" /> Previous
+              {isNavigating && navigatingToBugIdRef.current === prevBugId ? (
+                <>
+                  <div className="mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <ArrowLeft className="mr-2 h-5 w-5" /> Previous
+                </>
+              )}
             </button>
             <span className="text-sm font-medium text-muted-foreground select-none">
               {totalBugs > 0
@@ -593,84 +545,55 @@ const BugDetails = () => {
                   : "No bugs"}
             </span>
             <button
-              className="flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors"
+              className={`flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-all duration-200 ${
+                isNavigating ? 'cursor-wait' : ''
+              }`}
               onClick={(e) => {
-                // Prevent clicks during navigation or while loading
-                if (isNavigating || navigationTimeoutRef.current) {
-                  console.warn('⚠️ [BugDetails] Navigation already in progress, ignoring click');
+                if (isNavigating || !nextBugId || bugListLoading || isLoading || nextBugId === bugId) {
                   return;
                 }
 
-                console.group('🟢 [BugDetails] Next Button Clicked');
-                console.log('Next Bug ID:', nextBugId);
-                console.log('Bug List Loading:', bugListLoading);
-                console.log('Current Bug ID:', bugId);
-                console.log('Is Navigating:', isNavigating);
-                console.log('From Project:', fromProject);
-                console.log('From Fixes:', fromFixes);
-                console.log('Role:', role);
+                setIsNavigating(true);
+                navigatingToBugIdRef.current = nextBugId;
                 
-                if (!nextBugId) {
-                  console.warn('⚠️ [BugDetails] No next bug ID available');
-                  console.groupEnd();
-                  return;
-                }
-                
-                if (bugListLoading || isLoading) {
-                  console.warn('⚠️ [BugDetails] Bug list is loading, navigation disabled');
-                  console.groupEnd();
-                  return;
-                }
-                
-                // Don't navigate if already on this bug
-                if (nextBugId === bugId) {
-                  console.warn('⚠️ [BugDetails] Already on this bug, ignoring navigation');
-                  console.groupEnd();
-                  return;
-                }
-                
-                try {
-                  // Set navigation state
-                  setIsNavigating(true);
-                  navigatingToBugIdRef.current = nextBugId;
-                  
-                  // Set timeout as backup (will be cleared when bug loads)
-                  navigationTimeoutRef.current = setTimeout(() => {
-                    console.warn('⚠️ [BugDetails] Navigation timeout, clearing state');
-                    setIsNavigating(false);
-                    navigatingToBugIdRef.current = null;
-                    navigationTimeoutRef.current = null;
-                  }, 5000); // 5 second timeout
-                  
-                  let url = `/${role}/bugs/${nextBugId}`;
-                  if (fromProject) {
-                    url += '?from=project';
-                  } else if (fromFixes) {
-                    url += '?from=fixes';
-                  }
-                  
-                  console.log('🔄 [BugDetails] Navigating to:', url);
-                  navigate(url, { replace: false });
-                  console.log('✅ [BugDetails] Navigation initiated');
-                } catch (error) {
-                  console.error('❌ [BugDetails] Navigation error:', error);
+                // Backup timeout - clear after 3 seconds
+                navigationTimeoutRef.current = setTimeout(() => {
                   setIsNavigating(false);
                   navigatingToBugIdRef.current = null;
-                  if (navigationTimeoutRef.current) {
-                    clearTimeout(navigationTimeoutRef.current);
-                    navigationTimeoutRef.current = null;
-                  }
-                } finally {
+                  navigationTimeoutRef.current = null;
+                }, 3000);
+                
+                // Build URL
+                let url = `/${role}/bugs/${nextBugId}`;
+                if (fromProject) url += '?from=project';
+                else if (fromFixes) url += '?from=fixes';
+                
+                // Try React Router navigation first, fallback to window.location
+                try {
+                  navigate(url, { replace: false });
+                  // Fallback: If navigation doesn't work within 500ms, use window.location
                   setTimeout(() => {
-                    console.log('🏁 [BugDetails] Next button click handler completed');
-                    console.groupEnd();
-                  }, 100);
+                    if (navigatingToBugIdRef.current === nextBugId && window.location.pathname !== url.split('?')[0]) {
+                      window.location.href = url;
+                    }
+                  }, 500);
+                } catch (error) {
+                  window.location.href = url;
                 }
               }}
               disabled={!nextBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Next Bug"
             >
-              Next <ArrowRight className="ml-2 h-5 w-5" />
+              {isNavigating && navigatingToBugIdRef.current === nextBugId ? (
+                <>
+                  <div className="ml-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  Next <ArrowRight className="ml-2 h-5 w-5" />
+                </>
+              )}
             </button>
           </div>
         </div>
