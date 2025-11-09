@@ -525,12 +525,12 @@ const BugDetails = () => {
                 setIsNavigating(true);
                 navigatingToBugIdRef.current = prevBugId;
                 
-                // Backup timeout - clear after 6 seconds
+                // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
                   if (navigatingToBugIdRef.current === prevBugId) {
                     clearNavigationState({ reason: "timeout", targetId: prevBugId });
                   }
-                }, 6000);
+                }, 2500);
                 
                 // Build URL
                 let url = `/${role}/bugs/${prevBugId}`;
@@ -555,7 +555,7 @@ const BugDetails = () => {
                   if (currentPathname !== targetPathname) {
                     window.location.assign(url);
                   }
-                }, 1500);
+                }, 400);
               }}
               disabled={!prevBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Previous Bug"
@@ -596,12 +596,12 @@ const BugDetails = () => {
                 setIsNavigating(true);
                 navigatingToBugIdRef.current = nextBugId;
                 
-                // Backup timeout - clear after 6 seconds
+                // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
                   if (navigatingToBugIdRef.current === nextBugId) {
                     clearNavigationState({ reason: "timeout", targetId: nextBugId });
                   }
-                }, 6000);
+                }, 2500);
                 
                 // Build URL
                 let url = `/${role}/bugs/${nextBugId}`;
@@ -626,7 +626,7 @@ const BugDetails = () => {
                   if (currentPathname !== targetPathname) {
                     window.location.assign(url);
                   }
-                }, 1500);
+                }, 400);
               }}
               disabled={!nextBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Next Bug"

@@ -40,18 +40,21 @@ import {
   File,
   FileImage,
   ImagePlus,
-  Mic,
   Paperclip,
   Pause,
   Play,
   Plus,
-  Square,
   Volume2,
   X,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { ENV } from "@/lib/env";
 import { useAuth } from "@/context/AuthContext";
+import {
+  RecordedVoiceNote,
+  WhatsAppVoiceRecorder,
+} from "@/components/voice/WhatsAppVoiceRecorder";
+import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 
 // Character limits
 const TITLE_MAX = 120;
@@ -70,6 +73,7 @@ interface VoiceNote {
   name: string;
   isPlaying: boolean;
   audioUrl?: string;
+  waveform?: number[];
 }
 
 interface Attachment {
@@ -137,16 +141,11 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
   const [existingAttachments, setExistingAttachments] = useState<Attachment[]>([]);
   const [attachmentsToDelete, setAttachmentsToDelete] = useState<string[]>([]);
 
-  // Voice recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
 
   // Refs for file inputs
   const screenshotInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -237,17 +236,8 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
         if (file.preview) URL.revokeObjectURL(file.preview);
       });
 
-      // Clean up current audio
-      if (currentAudio) {
-        currentAudio.pause();
-        setCurrentAudio(null);
-      }
-
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-      }
     };
-  }, [voiceNotes, currentAudio, screenshots, files]);
+  }, [voiceNotes, screenshots, files]);
 
   // File handling functions
   const handleScreenshotClick = () => {
@@ -449,96 +439,29 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Voice recording functions
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+  const handleVoiceRecorderComplete = ({
+    blob,
+    duration,
+    waveform,
+  }: RecordedVoiceNote) => {
+    const existingVoiceNotesCount = existingAttachments.filter((att) =>
+      att.file_type.startsWith("audio/")
+    ).length;
 
-      let mimeType = "";
-      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        mimeType = "audio/webm;codecs=opus";
-      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-        mimeType = "audio/webm";
-      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-        mimeType = "audio/mp4";
-      } else if (MediaRecorder.isTypeSupported("audio/ogg")) {
-        mimeType = "audio/ogg";
-      } else {
-        mimeType = "audio/wav";
-      }
+    const audioUrl = URL.createObjectURL(blob);
+    const voiceNote: VoiceNote = {
+      id: Date.now().toString(),
+      blob,
+      duration: Math.max(1, Math.round(duration || 0)),
+      name: `Voice Note ${
+        existingVoiceNotesCount + voiceNotes.length + 1
+      }`,
+      isPlaying: false,
+      audioUrl,
+      waveform,
+    };
 
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      const chunks: Blob[] = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-        }
-      };
-
-      recorder.onstop = () => {
-        const finalRecordingTime = recordingTime;
-        const audioBlob = new Blob(chunks, { type: mimeType || "audio/webm" });
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        // Calculate total voice notes including existing ones
-        const existingVoiceNotesCount = existingAttachments.filter(att => att.file_type.startsWith("audio/")).length;
-        
-        const voiceNote: VoiceNote = {
-          id: Date.now().toString(),
-          blob: audioBlob,
-          duration: finalRecordingTime > 0 ? finalRecordingTime : 1,
-          name: `Voice Note ${existingVoiceNotesCount + voiceNotes.length + 1}`,
-          isPlaying: false,
-          audioUrl: audioUrl,
-        };
-
-        setVoiceNotes((prev) => [...prev, voiceNote]);
-        setTimeout(() => {
-          setRecordingTime(0);
-        }, 100);
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      setMediaRecorder(recorder);
-      setRecordingTime(0);
-      recorder.start(1000);
-      setIsRecording(true);
-
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
-
-      setTimeout(() => {
-        if (isRecording) {
-          stopRecording();
-        }
-      }, 300000); // Auto-stop after 5 minutes
-    } catch (error) {
-      console.error("Error starting recording:", error);
-      toast({
-        title: "Recording Failed",
-        description: "Could not access microphone. Please check permissions.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.stop();
-      setIsRecording(false);
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-    }
+    setVoiceNotes((prev) => [...prev, voiceNote]);
   };
 
   const playVoiceNote = (voiceNote: VoiceNote) => {
@@ -1031,28 +954,17 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
 
                 {/* Voice Notes section */}
                 <div className="space-y-3">
-                  <Button
-                    type="button"
-                    variant={isRecording ? "destructive" : "outline"}
-                    className={`h-20 w-full flex flex-col items-center justify-center ${
-                      isRecording ? "animate-pulse" : "border-2 border-dashed"
-                    }`}
-                    onClick={isRecording ? stopRecording : startRecording}
+                  <WhatsAppVoiceRecorder
+                    onComplete={handleVoiceRecorderComplete}
+                    onCancel={() =>
+                      toast({
+                        title: "Recording cancelled",
+                        description: "Hold the mic icon to capture a new voice note.",
+                      })
+                    }
                     disabled={isSubmitting}
-                  >
-                    {isRecording ? (
-                      <>
-                        <Square className="h-5 w-5 mb-1" />
-                        <span className="text-sm">Stop Recording</span>
-                        <span className="text-xs mt-1">{formatTime(recordingTime)}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Mic className="h-5 w-5 mb-1" />
-                        <span className="text-sm">Record Voice</span>
-                      </>
-                    )}
-                  </Button>
+                    maxDuration={300}
+                  />
                   {voiceNotes.length > 0 && (
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-purple-700 dark:text-purple-400">New Voice Notes ({voiceNotes.length})</Label>

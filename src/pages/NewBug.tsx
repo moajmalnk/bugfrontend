@@ -35,15 +35,15 @@ import {
   File,
   FileImage,
   ImagePlus,
-  Mic,
   Paperclip,
-  Pause,
-  Play,
   Plus,
-  Square,
-  Volume2,
   X,
 } from "lucide-react";
+import {
+  RecordedVoiceNote,
+  WhatsAppVoiceRecorder,
+} from "@/components/voice/WhatsAppVoiceRecorder";
+import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import React, {
   ChangeEvent,
   FormEvent,
@@ -64,6 +64,7 @@ interface VoiceNote {
   name: string;
   isPlaying: boolean;
   audioUrl?: string;
+  waveform?: number[];
 }
 
 interface ApiResponse<T> {
@@ -99,23 +100,11 @@ const NewBug = () => {
   const [screenshots, setScreenshots] = useState<FileWithPreview[]>([]);
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
-
-  // Voice recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null
-  );
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(
-    null
-  );
-  const [showDuration, setShowDuration] = useState(false);
+  const [activeVoiceNoteId, setActiveVoiceNoteId] = useState<string | null>(null);
 
   // Refs for file inputs
   const screenshotInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup effect for blob URLs
   useEffect(() => {
@@ -131,13 +120,8 @@ const NewBug = () => {
         }
       });
 
-      // Clean up current audio
-      if (currentAudio) {
-        currentAudio.pause();
-        setCurrentAudio(null);
-      }
     };
-  }, [voiceNotes, currentAudio]);
+  }, [voiceNotes]);
 
   const {
     data: projects = [],
@@ -167,264 +151,25 @@ const NewBug = () => {
     enabled: !!currentUser, // Only fetch when user is available
   });
 
-  // Voice recording functions - using proven approach from working VoiceRecorder components
-  const startRecording = async () => {
-    try {
-      console.log("Starting voice recording...");
-
-      // Request microphone access with basic audio constraints
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      console.log("Microphone access granted");
-
-      // Use more compatible MIME type detection
-      let mimeType = "";
-      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        mimeType = "audio/webm;codecs=opus";
-      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-        mimeType = "audio/webm";
-      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-        mimeType = "audio/mp4";
-      } else if (MediaRecorder.isTypeSupported("audio/ogg")) {
-        mimeType = "audio/ogg";
-      } else {
-        mimeType = "audio/wav";
-      }
-
-      console.log("Using MIME type:", mimeType);
-
-      const recorder = new MediaRecorder(
-        stream,
-        mimeType ? { mimeType } : undefined
-      );
-      const chunks: Blob[] = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-          console.log(
-            "Audio chunk received, size:",
-            event.data.size,
-            "Total chunks:",
-            chunks.length
-          );
-        }
-      };
-
-      recorder.onstop = () => {
-        // Capture the recording time before it gets reset
-        const finalRecordingTime = recordingTime;
-        console.log("Recording stopped. Final time:", finalRecordingTime);
-
-        // Create blob with proper type
-        const audioBlob = new Blob(chunks, { type: mimeType || "audio/webm" });
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        console.log(
-          "Recording completed. Blob type:",
-          audioBlob.type,
-          "Size:",
-          audioBlob.size,
-          "Duration:",
-          finalRecordingTime
-        );
-
-        // Create voice note with captured duration (ensure minimum 1 second)
-        const voiceNote: VoiceNote = {
-          id: Date.now().toString(),
-          blob: audioBlob,
-          duration: finalRecordingTime > 0 ? finalRecordingTime : 1,
-          name: `Voice Note ${voiceNotes.length + 1}`,
-          isPlaying: false,
-          audioUrl: audioUrl,
-        };
-
-        console.log("=== VOICE NOTE CREATED ===");
-        console.log("Voice note object:", voiceNote);
-        console.log("Blob size:", audioBlob.size);
-        console.log("Blob type:", audioBlob.type);
-        console.log("Audio URL:", audioUrl);
-        console.log("Duration:", finalRecordingTime, "seconds");
-
-        // Add to voice notes
-        setVoiceNotes((prev) => {
-          const newList = [...prev, voiceNote];
-          console.log("Updated voice notes list:", newList);
-          return newList;
-        });
-
-        // Reset recording state with a small delay to ensure duration is captured
-        setTimeout(() => {
-          setAudioChunks([]);
-          setRecordingTime(0);
-        }, 100);
-        stream.getTracks().forEach((track) => track.stop());
-
-        setAudioChunks([]);
-        setRecordingTime(0);
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      setMediaRecorder(recorder);
-      setAudioChunks([]);
-      setRecordingTime(0);
-      recorder.start(1000);
-      setIsRecording(true);
-
-      // Start timer like working components
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
-
-      // Auto-stop after 5 minutes
-      setTimeout(() => {
-        if (isRecording) {
-          stopRecording();
-        }
-      }, 300000);
-    } catch (error) {
-      console.error("Error starting recording:", error);
-      toast({
-        title: "Recording Failed",
-        description:
-          "Could not access microphone. Please check permissions and try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorder && isRecording) {
-      console.log("Stopping recording, current time:", recordingTime);
-      mediaRecorder.stop();
-      setIsRecording(false);
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-      // Don't reset recordingTime here - let the onstop handler capture it
-    }
-  };
-
-  const playVoiceNote = (voiceNote: VoiceNote) => {
-    console.log("=== PLAY VOICE NOTE DEBUG ===");
-    console.log("Voice note:", voiceNote);
-    console.log("Current audio state:", currentAudio);
-    console.log("Current voice notes state:", voiceNotes);
-
-    if (!voiceNote.audioUrl) {
-      console.error("❌ No audio URL provided");
-      toast({
-        title: "Playback Error",
-        description: "Audio file not found. Please record again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log("✅ Audio URL exists:", voiceNote.audioUrl);
-
-    // Stop any currently playing audio
-    if (currentAudio) {
-      console.log("🛑 Stopping current audio");
-      currentAudio.pause();
-      setCurrentAudio(null);
-    }
-
-    // Set all voice notes to not playing first
-    console.log("🔄 Setting all voice notes to not playing");
-    setVoiceNotes((prev) => {
-      const updated = prev.map((vn) => ({ ...vn, isPlaying: false }));
-      console.log("Updated voice notes:", updated);
-      return updated;
-    });
-
-    // Create new audio element with the blob directly
-    console.log("🎵 Creating new audio element from blob");
-    const audio = new Audio();
-
-    // Create a new blob URL from the original blob to ensure it's valid
-    const newAudioUrl = URL.createObjectURL(voiceNote.blob);
-    console.log("🔄 Created new blob URL:", newAudioUrl);
-
-    audio.src = newAudioUrl;
-    setCurrentAudio(audio);
-
-    // Set this voice note as playing immediately
-    console.log("▶️ Setting voice note as playing:", voiceNote.id);
-    setVoiceNotes((prev) => {
-      const updated = prev.map((vn) => ({
-        ...vn,
-        isPlaying: vn.id === voiceNote.id,
-      }));
-      console.log("Updated voice notes after setting playing:", updated);
-      return updated;
-    });
-
-    // Set up event listeners
-    audio.onended = () => {
-      console.log("🏁 Audio playback ended");
-      setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
-      setCurrentAudio(null);
-      // Clean up the blob URL
-      URL.revokeObjectURL(newAudioUrl);
+  const handleVoiceRecorderComplete = ({
+    blob,
+    duration,
+    waveform,
+  }: RecordedVoiceNote) => {
+    const audioUrl = URL.createObjectURL(blob);
+    const voiceNote: VoiceNote = {
+      id: Date.now().toString(),
+      blob,
+      duration: Math.max(1, Math.round(duration || 0)),
+      name: `Voice Note ${voiceNotes.length + 1}`,
+      isPlaying: false,
+      audioUrl,
+      waveform,
     };
 
-    audio.onerror = (e) => {
-      console.error("❌ Audio playback error:", e);
-      setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
-      setCurrentAudio(null);
-      // Clean up the blob URL
-      URL.revokeObjectURL(newAudioUrl);
-    };
-
-    // Start playing
-    console.log("🚀 Starting audio playback");
-    audio
-      .play()
-      .then(() => {
-        console.log("✅ Audio playback started successfully");
-      })
-      .catch((error) => {
-        console.error("❌ Error playing audio:", error);
-        setVoiceNotes((prev) =>
-          prev.map((vn) => ({ ...vn, isPlaying: false }))
-        );
-        setCurrentAudio(null);
-        // Clean up the blob URL
-        URL.revokeObjectURL(newAudioUrl);
-      });
+    setVoiceNotes((prev) => [...prev, voiceNote]);
   };
 
-  const pauseVoiceNote = (voiceNote: VoiceNote) => {
-    console.log("=== PAUSE VOICE NOTE DEBUG ===");
-    console.log("Pausing voice note:", voiceNote.name);
-    console.log("Current audio state:", currentAudio);
-    console.log("Current voice notes state:", voiceNotes);
-
-    // Pause the current audio
-    if (currentAudio) {
-      console.log("🛑 Pausing current audio");
-      currentAudio.pause();
-      setCurrentAudio(null);
-    } else {
-      console.log("⚠️ No current audio to pause");
-    }
-
-    // Set all voice notes to not playing
-    console.log("🔄 Setting all voice notes to not playing");
-    setVoiceNotes((prev) => {
-      const updated = prev.map((vn) => ({ ...vn, isPlaying: false }));
-      console.log("Updated voice notes after pause:", updated);
-      return updated;
-    });
-  };
 
   const removeVoiceNote = (index: number) => {
     const voiceNote = voiceNotes[index];
@@ -436,14 +181,8 @@ const NewBug = () => {
         console.error("Error revoking blob URL:", error);
       }
     }
+    setActiveVoiceNoteId((prev) => (prev === voiceNote.id ? null : prev));
     setVoiceNotes((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const formatTime = (seconds: number) => {
-    if (seconds === 0) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -707,6 +446,7 @@ const NewBug = () => {
       if (vn.audioUrl) URL.revokeObjectURL(vn.audioUrl);
     });
     setVoiceNotes([]);
+    setActiveVoiceNoteId(null);
   };
 
   const handlePasteScreenshot = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -739,10 +479,6 @@ const NewBug = () => {
       voiceNotes.forEach((voiceNote) => {
         if (voiceNote.audioUrl) URL.revokeObjectURL(voiceNote.audioUrl);
       });
-
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-      }
     };
   }, [screenshots, files, voiceNotes]);
 
@@ -755,16 +491,6 @@ const NewBug = () => {
       );
     }
   }, [voiceNotes]);
-
-  // Cleanup currentAudio on unmount
-  useEffect(() => {
-    return () => {
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.src = "";
-      }
-    };
-  }, [currentAudio]);
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
@@ -1180,44 +906,17 @@ const NewBug = () => {
 
                       {/* Voice Notes section */}
                       <div className="space-y-4">
-                        <Button
-                          type="button"
-                          variant={isRecording ? "destructive" : "outline"}
-                          className={`h-28 w-full flex flex-col items-center justify-center transition-all duration-300 rounded-xl group ${
-                            isRecording
-                              ? "bg-red-500 hover:bg-red-600 text-white shadow-lg animate-pulse border-red-500"
-                              : "border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-950/20"
-                          }`}
-                          onClick={isRecording ? stopRecording : startRecording}
-                          disabled={isSubmitting}
-                          title={
-                            isRecording
-                              ? "Click to stop recording"
-                              : "Click to start recording"
+                        <WhatsAppVoiceRecorder
+                          onComplete={handleVoiceRecorderComplete}
+                          onCancel={() =>
+                            toast({
+                              title: "Recording cancelled",
+                              description: "Hold the mic to record a new voice note.",
+                            })
                           }
-                        >
-                          {isRecording ? (
-                            <>
-                              <div className="p-3 bg-red-600 rounded-full mb-3 animate-pulse">
-                                <Square className="h-6 w-6 text-white" />
-                              </div>
-                              <span className="font-semibold">Stop Recording</span>
-                              <span className="text-xs text-white/80 mt-1 font-mono">
-                                {formatTime(recordingTime)}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full mb-3 group-hover:bg-purple-200 dark:group-hover:bg-purple-800/40 transition-colors">
-                                <Mic className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                              </div>
-                              <span className="font-semibold text-gray-700 dark:text-gray-300">Record Voice Note</span>
-                              {/* <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                (Click to start)
-                              </span> */}
-                            </>
-                          )}
-                        </Button>
+                          disabled={isSubmitting}
+                          maxDuration={300}
+                        />
 
                         {/* Preview of voice notes */}
                         {voiceNotes.length > 0 && (
@@ -1236,59 +935,34 @@ const NewBug = () => {
                                 Clear All
                               </Button>
                             </div>
-                            <div className="space-y-2">
-                              {voiceNotes.map((voiceNote, index) => (
-                                <div
-                                  key={voiceNote.id}
-                                  className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
-                                >
-                                  <div className="flex items-center space-x-3 overflow-hidden">
-                                    <div className="h-10 w-10 flex items-center justify-center bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                                      <Volume2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="truncate font-medium text-gray-700 dark:text-gray-300">
-                                        {voiceNote.name}
-                                      </div>
-                                      <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                                        {formatTime(voiceNote.duration)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center space-x-1 flex-shrink-0">
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:text-blue-600 dark:hover:text-blue-400"
-                                      onClick={() => {
-                                        if (voiceNote.isPlaying) {
-                                          pauseVoiceNote(voiceNote);
-                                        } else {
-                                          playVoiceNote(voiceNote);
-                                        }
-                                      }}
-                                      title={voiceNote.isPlaying ? "Pause" : "Play"}
-                                    >
-                                      {voiceNote.isPlaying ? (
-                                        <Pause className="h-4 w-4" />
-                                      ) : (
-                                        <Play className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
-                                      onClick={() => removeVoiceNote(index)}
-                                      title="Remove voice note"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
+                            <div className="space-y-3">
+                              {voiceNotes.map((voiceNote, index) => {
+                                const voiceId = voiceNote.id;
+                                return (
+                                  <WhatsAppVoiceMessage
+                                    key={voiceId}
+                                    id={voiceId}
+                                    audioSource={voiceNote.blob}
+                                    duration={voiceNote.duration}
+                                    waveform={voiceNote.waveform}
+                                    accent="sent"
+                                    autoPlay
+                                    isActive={activeVoiceNoteId === voiceId}
+                                    onPlay={(id) => setActiveVoiceNoteId(id)}
+                                    onPause={(id) => {
+                                      if (id === activeVoiceNoteId) {
+                                        setActiveVoiceNoteId(null);
+                                      }
+                                    }}
+                                    onRemove={() => {
+                                      if (activeVoiceNoteId === voiceId) {
+                                        setActiveVoiceNoteId(null);
+                                      }
+                                      removeVoiceNote(index);
+                                    }}
+                                  />
+                                );
+                              })}
                             </div>
                           </div>
                         )}
