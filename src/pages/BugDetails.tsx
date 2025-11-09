@@ -20,7 +20,7 @@ import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/axios";
 import { ArrowLeft, ArrowRight, Lock } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 
 interface ApiResponse<T> {
@@ -144,6 +144,28 @@ const BugDetails = () => {
   const navigatingToBugIdRef = useRef<string | null>(null);
   const previousLocationRef = useRef<string>(location.pathname);
   
+  const clearNavigationState = useCallback(
+    (options?: { reason?: "success" | "timeout" | "cancelled"; targetId?: string }) => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = null;
+      }
+
+      navigatingToBugIdRef.current = null;
+      setIsNavigating(false);
+
+      if (options?.reason === "timeout") {
+        toast({
+          title: "Still loading",
+          description:
+            "Navigation is taking longer than expected. Please check your connection and try again.",
+          variant: "default",
+        });
+      }
+    },
+    [toast]
+  );
+
   // Check if user came from project page
   const fromProject = searchParams.get("from") === "project";
 
@@ -193,33 +215,18 @@ const BugDetails = () => {
       
       // Clear navigation state when we reach the target bug
       if (navigatingToBugIdRef.current && pathBugId === navigatingToBugIdRef.current) {
-        setIsNavigating(false);
-        navigatingToBugIdRef.current = null;
-        if (navigationTimeoutRef.current) {
-          clearTimeout(navigationTimeoutRef.current);
-          navigationTimeoutRef.current = null;
-        }
+        clearNavigationState({ reason: "success" });
       } else if (navigatingToBugIdRef.current && pathBugId && pathBugId !== navigatingToBugIdRef.current) {
         // Navigation was interrupted or redirected
-        setIsNavigating(false);
-        navigatingToBugIdRef.current = null;
-        if (navigationTimeoutRef.current) {
-          clearTimeout(navigationTimeoutRef.current);
-          navigationTimeoutRef.current = null;
-        }
+        clearNavigationState({ reason: "cancelled" });
       }
     }
     
     // Fallback: Clear navigation state if bugId param matches target
     if (navigatingToBugIdRef.current && bugId === navigatingToBugIdRef.current) {
-      setIsNavigating(false);
-      navigatingToBugIdRef.current = null;
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-        navigationTimeoutRef.current = null;
-      }
+      clearNavigationState({ reason: "success" });
     }
-  }, [location.pathname, bugId]);
+  }, [location.pathname, bugId, clearNavigationState]);
 
   useEffect(() => {
     // Only refetch if we don't have cached data or if it's stale
@@ -229,6 +236,17 @@ const BugDetails = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bugId]); // Only depend on bugId, React Query will handle the rest
+
+  useEffect(() => {
+    if (!isNavigating) {
+      return;
+    }
+
+    if (!isFetching && !isLoading) {
+      // Query finished (either success or error) – ensure buttons re-enable
+      clearNavigationState({ reason: "success" });
+    }
+  }, [isFetching, isLoading, isNavigating, clearNavigationState]);
 
   // Set project ID when we first detect we're coming from a project page
   useEffect(() => {
@@ -493,15 +511,19 @@ const BugDetails = () => {
                   return;
                 }
 
+                if (bugId === prevBugId) {
+                  return;
+                }
+
                 setIsNavigating(true);
                 navigatingToBugIdRef.current = prevBugId;
                 
-                // Backup timeout - clear after 3 seconds
+                // Backup timeout - clear after 6 seconds
                 navigationTimeoutRef.current = setTimeout(() => {
-                  setIsNavigating(false);
-                  navigatingToBugIdRef.current = null;
-                  navigationTimeoutRef.current = null;
-                }, 3000);
+                  if (navigatingToBugIdRef.current === prevBugId) {
+                    clearNavigationState({ reason: "timeout", targetId: prevBugId });
+                  }
+                }, 6000);
                 
                 // Build URL
                 let url = `/${role}/bugs/${prevBugId}`;
@@ -511,13 +533,8 @@ const BugDetails = () => {
                 // Try React Router navigation first, fallback to window.location
                 try {
                   navigate(url, { replace: false });
-                  // Fallback: If navigation doesn't work within 500ms, use window.location
-                  setTimeout(() => {
-                    if (navigatingToBugIdRef.current === prevBugId && window.location.pathname !== url.split('?')[0]) {
-                      window.location.href = url;
-                    }
-                  }, 500);
                 } catch (error) {
+                  clearNavigationState({ reason: "cancelled" });
                   window.location.href = url;
                 }
               }}
@@ -553,15 +570,19 @@ const BugDetails = () => {
                   return;
                 }
 
+                if (bugId === nextBugId) {
+                  return;
+                }
+
                 setIsNavigating(true);
                 navigatingToBugIdRef.current = nextBugId;
                 
-                // Backup timeout - clear after 3 seconds
+                // Backup timeout - clear after 6 seconds
                 navigationTimeoutRef.current = setTimeout(() => {
-                  setIsNavigating(false);
-                  navigatingToBugIdRef.current = null;
-                  navigationTimeoutRef.current = null;
-                }, 3000);
+                  if (navigatingToBugIdRef.current === nextBugId) {
+                    clearNavigationState({ reason: "timeout", targetId: nextBugId });
+                  }
+                }, 6000);
                 
                 // Build URL
                 let url = `/${role}/bugs/${nextBugId}`;
@@ -571,13 +592,8 @@ const BugDetails = () => {
                 // Try React Router navigation first, fallback to window.location
                 try {
                   navigate(url, { replace: false });
-                  // Fallback: If navigation doesn't work within 500ms, use window.location
-                  setTimeout(() => {
-                    if (navigatingToBugIdRef.current === nextBugId && window.location.pathname !== url.split('?')[0]) {
-                      window.location.href = url;
-                    }
-                  }, 500);
                 } catch (error) {
+                  clearNavigationState({ reason: "cancelled" });
                   window.location.href = url;
                 }
               }}
