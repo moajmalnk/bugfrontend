@@ -43,18 +43,23 @@ export function WhatsAppVoiceMessage({
   useEffect(() => {
     setIsPlaying(false);
     setCurrentTime(0);
+    setMediaDuration(0);
     if (typeof audioSource === "string") {
       setAudioUrl(audioSource);
-      setMediaDuration(duration || 0);
       return;
     }
     const url = URL.createObjectURL(audioSource);
     setAudioUrl(url);
-    setMediaDuration(duration || 0);
     return () => {
       URL.revokeObjectURL(url);
     };
-  }, [audioSource, duration]);
+  }, [audioSource]);
+
+  useEffect(() => {
+    if (typeof duration === "number" && duration > 0) {
+      setMediaDuration(duration);
+    }
+  }, [duration]);
 
   useEffect(() => {
     if (!audioUrl) return;

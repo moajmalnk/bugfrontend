@@ -27,6 +27,10 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
   const [voiceNoteDurations, setVoiceNoteDurations] = useState<{
     [key: string]: number;
   }>({});
+  useEffect(() => {
+    setActiveVoiceId(null);
+  }, [bug.id]);
+
   const [screenshotViewerOpen, setScreenshotViewerOpen] = useState(false);
   const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState(0);
 
