@@ -141,12 +141,17 @@ const BugDetails = () => {
   const [projectId, setProjectId] = useState<string | null>(null);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigationFallbackRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTargetUrlRef = useRef<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const navigatingToBugIdRef = useRef<string | null>(null);
   const previousLocationRef = useRef<string>(location.pathname);
   
   const clearNavigationState = useCallback(
-    (options?: { reason?: "success" | "timeout" | "cancelled"; targetId?: string }) => {
+    (options?: {
+      reason?: "success" | "timeout" | "cancelled";
+      targetId?: string;
+      targetUrl?: string;
+    }) => {
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
         navigationTimeoutRef.current = null;
@@ -167,6 +172,22 @@ const BugDetails = () => {
             "Navigation is taking longer than expected. Please check your connection and try again.",
           variant: "default",
         });
+
+        const fallbackUrl = options?.targetUrl ?? lastTargetUrlRef.current;
+        if (fallbackUrl) {
+          const pathname = fallbackUrl.split("?")[0];
+          if (window.location.pathname !== pathname) {
+            console.warn("BugDetails: navigation timeout fallback to full reload", {
+              targetUrl: fallbackUrl,
+              currentPath: window.location.pathname,
+            });
+            window.location.assign(fallbackUrl);
+          } else {
+            console.warn("BugDetails: navigation timeout on same path, forcing reload");
+            window.location.reload();
+          }
+          lastTargetUrlRef.current = null;
+        }
       }
     },
     [toast]
@@ -528,7 +549,11 @@ const BugDetails = () => {
                 // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
                   if (navigatingToBugIdRef.current === prevBugId) {
-                    clearNavigationState({ reason: "timeout", targetId: prevBugId });
+                    clearNavigationState({
+                      reason: "timeout",
+                      targetId: prevBugId,
+                      targetUrl: lastTargetUrlRef.current ?? url,
+                    });
                   }
                 }, 2500);
                 
@@ -536,6 +561,7 @@ const BugDetails = () => {
                 let url = `/${role}/bugs/${prevBugId}`;
                 if (fromProject) url += '?from=project';
                 else if (fromFixes) url += '?from=fixes';
+                lastTargetUrlRef.current = url;
                 
                 // Try React Router navigation first
                 try {
@@ -553,7 +579,12 @@ const BugDetails = () => {
                   const currentPathname = window.location.pathname;
                   const targetPathname = url.split("?")[0];
                   if (currentPathname !== targetPathname) {
+                    console.warn("BugDetails: navigation fallback triggered (prev bug)", {
+                      from: window.location.pathname,
+                      to: url,
+                    });
                     window.location.assign(url);
+                    lastTargetUrlRef.current = null;
                   }
                 }, 400);
               }}
@@ -599,7 +630,11 @@ const BugDetails = () => {
                 // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
                   if (navigatingToBugIdRef.current === nextBugId) {
-                    clearNavigationState({ reason: "timeout", targetId: nextBugId });
+                    clearNavigationState({
+                      reason: "timeout",
+                      targetId: nextBugId,
+                      targetUrl: lastTargetUrlRef.current ?? url,
+                    });
                   }
                 }, 2500);
                 
@@ -607,6 +642,7 @@ const BugDetails = () => {
                 let url = `/${role}/bugs/${nextBugId}`;
                 if (fromProject) url += '?from=project';
                 else if (fromFixes) url += '?from=fixes';
+                lastTargetUrlRef.current = url;
                 
                 // Try React Router navigation first
                 try {
@@ -624,7 +660,12 @@ const BugDetails = () => {
                   const currentPathname = window.location.pathname;
                   const targetPathname = url.split("?")[0];
                   if (currentPathname !== targetPathname) {
+                    console.warn("BugDetails: navigation fallback triggered (next bug)", {
+                      from: window.location.pathname,
+                      to: url,
+                    });
                     window.location.assign(url);
+                    lastTargetUrlRef.current = null;
                   }
                 }, 400);
               }}
