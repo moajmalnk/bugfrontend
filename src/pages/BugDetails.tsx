@@ -152,6 +152,8 @@ const BugDetails = () => {
       targetId?: string;
       targetUrl?: string;
     }) => {
+      lastTargetUrlRef.current = null;
+
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
         navigationTimeoutRef.current = null;
@@ -241,11 +243,14 @@ const BugDetails = () => {
       previousLocationRef.current = currentPath;
       
       // Clear navigation state when we reach the target bug
-      if (navigatingToBugIdRef.current && pathBugId === navigatingToBugIdRef.current) {
+        if (navigatingToBugIdRef.current && pathBugId === navigatingToBugIdRef.current) {
         clearNavigationState({ reason: "success" });
-      } else if (navigatingToBugIdRef.current && pathBugId && pathBugId !== navigatingToBugIdRef.current) {
+        } else if (navigatingToBugIdRef.current && pathBugId && pathBugId !== navigatingToBugIdRef.current) {
         // Navigation was interrupted or redirected
         clearNavigationState({ reason: "cancelled" });
+        } else if (navigatingToBugIdRef.current && !pathBugId) {
+          // Navigated away from bug detail routes entirely
+          clearNavigationState({ reason: "cancelled" });
       }
     }
     
@@ -275,6 +280,20 @@ const BugDetails = () => {
       clearNavigationState({ reason: "success" });
     }
   }, [isFetching, isLoading, isNavigating, bug?.id, clearNavigationState]);
+
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+      if (navigationFallbackRef.current) {
+        clearTimeout(navigationFallbackRef.current);
+      }
+      navigatingToBugIdRef.current = null;
+      lastTargetUrlRef.current = null;
+      setIsNavigating(false);
+    };
+  }, []);
 
   // Set project ID when we first detect we're coming from a project page
   useEffect(() => {
