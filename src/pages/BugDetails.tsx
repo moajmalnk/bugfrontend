@@ -248,11 +248,12 @@ const BugDetails = () => {
       return;
     }
 
-    if (!isFetching && !isLoading) {
-      // Query finished (either success or error) – ensure buttons re-enable
+    // Only treat as successful navigation when the loaded bug matches the intended target
+    const targetId = navigatingToBugIdRef.current;
+    if (!isFetching && !isLoading && targetId && bug?.id === targetId) {
       clearNavigationState({ reason: "success" });
     }
-  }, [isFetching, isLoading, isNavigating, clearNavigationState]);
+  }, [isFetching, isLoading, isNavigating, bug?.id, clearNavigationState]);
 
   // Set project ID when we first detect we're coming from a project page
   useEffect(() => {
