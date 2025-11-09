@@ -140,6 +140,7 @@ const BugDetails = () => {
   const [bugListLoading, setBugListLoading] = useState(true);
   const [projectId, setProjectId] = useState<string | null>(null);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const navigationFallbackRef = useRef<NodeJS.Timeout | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const navigatingToBugIdRef = useRef<string | null>(null);
   const previousLocationRef = useRef<string>(location.pathname);
@@ -149,6 +150,11 @@ const BugDetails = () => {
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
         navigationTimeoutRef.current = null;
+      }
+
+      if (navigationFallbackRef.current) {
+        clearTimeout(navigationFallbackRef.current);
+        navigationFallbackRef.current = null;
       }
 
       navigatingToBugIdRef.current = null;
@@ -530,13 +536,25 @@ const BugDetails = () => {
                 if (fromProject) url += '?from=project';
                 else if (fromFixes) url += '?from=fixes';
                 
-                // Try React Router navigation first, fallback to window.location
+                // Try React Router navigation first
                 try {
                   navigate(url, { replace: false });
                 } catch (error) {
                   clearNavigationState({ reason: "cancelled" });
                   window.location.href = url;
                 }
+
+                // Hard fallback: if client-side navigation fails silently (chunk load, cache, etc.)
+                if (navigationFallbackRef.current) {
+                  clearTimeout(navigationFallbackRef.current);
+                }
+                navigationFallbackRef.current = setTimeout(() => {
+                  const currentPathname = window.location.pathname;
+                  const targetPathname = url.split("?")[0];
+                  if (currentPathname !== targetPathname) {
+                    window.location.assign(url);
+                  }
+                }, 1500);
               }}
               disabled={!prevBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Previous Bug"
@@ -589,13 +607,25 @@ const BugDetails = () => {
                 if (fromProject) url += '?from=project';
                 else if (fromFixes) url += '?from=fixes';
                 
-                // Try React Router navigation first, fallback to window.location
+                // Try React Router navigation first
                 try {
                   navigate(url, { replace: false });
                 } catch (error) {
                   clearNavigationState({ reason: "cancelled" });
                   window.location.href = url;
                 }
+
+                // Hard fallback: if client-side navigation fails silently (chunk load, cache, etc.)
+                if (navigationFallbackRef.current) {
+                  clearTimeout(navigationFallbackRef.current);
+                }
+                navigationFallbackRef.current = setTimeout(() => {
+                  const currentPathname = window.location.pathname;
+                  const targetPathname = url.split("?")[0];
+                  if (currentPathname !== targetPathname) {
+                    window.location.assign(url);
+                  }
+                }, 1500);
               }}
               disabled={!nextBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Next Bug"
