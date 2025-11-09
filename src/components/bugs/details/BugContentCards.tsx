@@ -4,6 +4,7 @@ import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import { Bug } from "@/types";
 import { ENV } from "@/lib/env";
+import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import {
   Briefcase,
   Calendar,
@@ -12,8 +13,6 @@ import {
   Eye,
   File,
   FileImage,
-  Pause,
-  Play,
   User,
   Volume2,
 } from "lucide-react";
@@ -24,13 +23,12 @@ interface BugContentCardsProps {
 }
 
 export function BugContentCards({ bug }: BugContentCardsProps) {
-  const [playingVoiceNote, setPlayingVoiceNote] = useState<string | null>(null);
+  const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
   const [voiceNoteDurations, setVoiceNoteDurations] = useState<{
     [key: string]: number;
   }>({});
   const [screenshotViewerOpen, setScreenshotViewerOpen] = useState(false);
   const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState(0);
-  const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
 
   // Robust media URL helpers (use PHP endpoints to avoid CORS and set headers)
   // Use ENV.API_URL from env.ts to ensure consistency with backend
@@ -62,19 +60,6 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
   };
 
   // Cleanup audio elements when component unmounts
-  useEffect(() => {
-    return () => {
-      console.log("🧹 Cleaning up audio elements");
-      Object.values(audioRefs.current).forEach((audio) => {
-        if (audio) {
-          audio.pause();
-          audio.src = "";
-        }
-      });
-      audioRefs.current = {};
-    };
-  }, []);
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -149,143 +134,6 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
 
     extractDurations();
   }, [bug.attachments]);
-
-  const playVoiceNote = (attachmentId: string, audioUrl: string) => {
-    console.log("=== BUG DETAILS PLAY VOICE NOTE DEBUG ===");
-    console.log("Playing voice note:", attachmentId, "URL:", audioUrl);
-
-    // Test if the audio URL is accessible (for debugging)
-    fetch(audioUrl, { method: "HEAD" })
-      .then((response) => {
-        console.log(
-          "✅ Audio URL accessible:",
-          response.status,
-          response.statusText
-        );
-        console.log("📋 Response headers:", response.headers);
-        console.log("📋 Content-Type:", response.headers.get('content-type'));
-        console.log("📋 Content-Length:", response.headers.get('content-length'));
-      })
-      .catch((error) => {
-        console.error("❌ Audio URL not accessible:", error);
-        console.error("❌ Error details:", error.message);
-      });
-
-    // Stop any currently playing audio
-    if (playingVoiceNote && audioRefs.current[playingVoiceNote]) {
-      console.log("🛑 Stopping current audio:", playingVoiceNote);
-      audioRefs.current[playingVoiceNote].pause();
-      audioRefs.current[playingVoiceNote].currentTime = 0;
-    }
-
-    // Create new audio element if it doesn't exist
-    if (!audioRefs.current[attachmentId]) {
-      console.log("🎵 Creating new audio element for:", attachmentId);
-      const audio = new Audio();
-
-      audio.onended = () => {
-        console.log("🏁 Audio playback ended for:", attachmentId);
-        setPlayingVoiceNote(null);
-      };
-
-      audio.onerror = (e) => {
-        console.error("❌ Error playing voice note:", attachmentId, e);
-        console.error("❌ Audio error details:", {
-          originalError: e,
-          src: audio.src,
-          networkState: audio.networkState,
-          readyState: audio.readyState,
-          mediaError: audio.error,
-        });
-        setPlayingVoiceNote(null);
-      };
-
-      audio.onloadstart = () => {
-        console.log("📥 Audio loading started for:", attachmentId);
-      };
-
-      audio.oncanplay = () => {
-        console.log("✅ Audio can play for:", attachmentId);
-      };
-
-      audio.onloadedmetadata = () => {
-        console.log(
-          "📊 Audio metadata loaded for:",
-          attachmentId,
-          "Duration:",
-          audio.duration
-        );
-      };
-
-      audio.onload = () => {
-        console.log("📥 Audio load completed for:", attachmentId);
-      };
-
-      audio.oncanplaythrough = () => {
-        console.log("✅ Audio can play through for:", attachmentId);
-      };
-
-      audioRefs.current[attachmentId] = audio;
-    }
-
-    // Set the audio source and play
-    console.log("🎯 Setting audio source and playing:", attachmentId);
-    audioRefs.current[attachmentId].src = audioUrl;
-
-    // Add a small delay to ensure the source is set
-    setTimeout(() => {
-      audioRefs.current[attachmentId]
-        .play()
-        .then(() => {
-          console.log(
-            "✅ Audio playback started successfully for:",
-            attachmentId
-          );
-          setPlayingVoiceNote(attachmentId);
-        })
-        .catch((error) => {
-          console.error("❌ Error playing audio:", error);
-          console.error("❌ Play error details:", {
-            error: error,
-            src: audioRefs.current[attachmentId].src,
-            networkState: audioRefs.current[attachmentId].networkState,
-            readyState: audioRefs.current[attachmentId].readyState,
-          });
-
-          // Try fallback: download and play as blob
-          console.log("🔄 Trying fallback: download as blob");
-          fetch(audioUrl)
-            .then((response) => response.blob())
-            .then((blob) => {
-              const blobUrl = URL.createObjectURL(blob);
-              console.log("🔄 Created blob URL:", blobUrl);
-              audioRefs.current[attachmentId].src = blobUrl;
-              return audioRefs.current[attachmentId].play();
-            })
-            .then(() => {
-              console.log("✅ Fallback playback successful");
-              setPlayingVoiceNote(attachmentId);
-            })
-            .catch((fallbackError) => {
-              console.error("❌ Fallback also failed:", fallbackError);
-              setPlayingVoiceNote(null);
-            });
-        });
-    }, 100);
-  };
-
-  const pauseVoiceNote = (attachmentId: string) => {
-    console.log("=== BUG DETAILS PAUSE VOICE NOTE DEBUG ===");
-    console.log("Pausing voice note:", attachmentId);
-
-    if (audioRefs.current[attachmentId]) {
-      console.log("🛑 Pausing audio for:", attachmentId);
-      audioRefs.current[attachmentId].pause();
-      setPlayingVoiceNote(null);
-    } else {
-      console.log("⚠️ No audio element found for:", attachmentId);
-    }
-  };
 
   const downloadAttachment = (attachment: any) => {
     const link = document.createElement("a");
@@ -545,66 +393,42 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
           <CardContent className="relative">
             <div className="space-y-3">
               {voiceNotes.map((attachment, index) => {
-                const isPlaying = playingVoiceNote === attachment.id;
                 const audioUrl = buildAudioUrl(attachment.file_path);
                 const duration = voiceNoteDurations[attachment.id] || 0;
-
-                console.log("Voice note debug:", {
-                  id: attachment.id,
-                  fileName: attachment.file_name,
-                  filePath: attachment.file_path,
-                  apiBaseUrl: apiBaseUrl,
-                  audioUrl: audioUrl,
-                  isPlaying: isPlaying,
-                });
-
+                const voiceId = `bug-voice-${attachment.id}`;
                 return (
                   <div
                     key={attachment.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    className="space-y-2 rounded-lg border border-purple-100 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-900/20 p-3"
                   >
-                    <div className="flex items-center gap-3">
-                      <Volume2 className="w-8 h-8 text-blue-500" />
+                    <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-medium">
+                        <div className="font-medium text-gray-900 dark:text-white">
                           {attachment.file_name}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                           Voice Note {index + 1}
                         </div>
                       </div>
+                      <div className="h-8 w-8 flex items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/50">
+                        <Volume2 className="h-4 w-4 text-purple-600 dark:text-purple-300" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          isPlaying
-                            ? pauseVoiceNote(attachment.id)
-                            : playVoiceNote(attachment.id, audioUrl)
+                    <WhatsAppVoiceMessage
+                      id={voiceId}
+                      audioSource={audioUrl}
+                      duration={duration}
+                      accent="received"
+                      autoPlay
+                      isActive={activeVoiceId === voiceId}
+                      onPlay={(id) => setActiveVoiceId(id)}
+                      onPause={(id) => {
+                        if (id === activeVoiceId) {
+                          setActiveVoiceId(null);
                         }
-                        className="flex items-center gap-1"
-                      >
-                        {isPlaying ? (
-                          <>
-                            <Pause className="w-4 h-4" />
-                            Pause
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-4 h-4" />
-                            Play
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => downloadAttachment(attachment)}
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    </div>
+                      }}
+                      onDownload={() => downloadAttachment(attachment)}
+                    />
                   </div>
                 );
               })}

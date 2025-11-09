@@ -37,19 +37,24 @@ export function WhatsAppVoiceMessage({
   const [currentTime, setCurrentTime] = useState(0);
   const [speedIndex, setSpeedIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [mediaDuration, setMediaDuration] = useState(duration || 0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
     if (typeof audioSource === "string") {
       setAudioUrl(audioSource);
+      setMediaDuration(duration || 0);
       return;
     }
     const url = URL.createObjectURL(audioSource);
     setAudioUrl(url);
+    setMediaDuration(duration || 0);
     return () => {
       URL.revokeObjectURL(url);
     };
-  }, [audioSource]);
+  }, [audioSource, duration]);
 
   useEffect(() => {
     if (!audioUrl) return;
@@ -68,6 +73,9 @@ export function WhatsAppVoiceMessage({
     };
     const handleLoaded = () => {
       setIsLoading(false);
+      if (audio.duration && Number.isFinite(audio.duration)) {
+        setMediaDuration(audio.duration);
+      }
     };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
@@ -123,13 +131,20 @@ export function WhatsAppVoiceMessage({
     setSpeedIndex((prev) => (prev + 1) % SPEED_STEPS.length);
   };
 
-  const formattedDuration = useMemo(() => formatTime(duration), [duration]);
+  const formattedDuration = useMemo(
+    () => formatTime(mediaDuration || duration),
+    [mediaDuration, duration]
+  );
   const formattedCurrent = useMemo(
     () => formatTime(currentTime || 0),
     [currentTime]
   );
   const progress =
-    duration > 0 ? Math.min(1, (currentTime || 0) / duration) : isPlaying ? 0.1 : 0;
+    (mediaDuration || duration) > 0
+      ? Math.min(1, (currentTime || 0) / (mediaDuration || duration))
+      : isPlaying
+      ? 0.1
+      : 0;
 
   const bars = useMemo(() => {
     const source = waveform && waveform.length > 0 ? waveform : placeholderWaveform();

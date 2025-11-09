@@ -41,8 +41,6 @@ import {
   FileImage,
   ImagePlus,
   Paperclip,
-  Pause,
-  Play,
   Plus,
   Volume2,
   X,
@@ -293,125 +291,11 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
   };
 
   const removeExistingAttachment = (attachmentId: string) => {
+    setActiveVoiceId((prev) =>
+      prev === attachmentId || prev === `existing-${attachmentId}` ? null : prev
+    );
     setAttachmentsToDelete((prev) => [...prev, attachmentId]);
     setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
-  };
-
-  const playExistingVoiceNote = (attachment: Attachment) => {
-    if (!attachment.full_url) {
-      toast({
-        title: "Playback Error",
-        description: "Audio file not found.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log("=== PLAY EXISTING VOICE NOTE ===");
-    console.log("File name:", attachment.file_name);
-    console.log("File type:", attachment.file_type);
-    console.log("File path:", attachment.file_path);
-    console.log("Full URL:", attachment.full_url);
-
-    // Stop any currently playing audio
-    if (currentAudio) {
-      currentAudio.pause();
-      setCurrentAudio(null);
-    }
-
-    // Reset all voice notes playing state
-    setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
-    setExistingAttachments((prev) => prev.map((att) => ({ ...att, isPlaying: false })));
-
-    // Create new audio element
-    const audio = new Audio();
-    
-    // Set up event listeners before setting src
-    audio.onloadstart = () => {
-      console.log("Audio loading started");
-    };
-
-    audio.onloadedmetadata = () => {
-      console.log("Audio metadata loaded, duration:", audio.duration);
-    };
-
-    audio.oncanplay = () => {
-      console.log("Audio can play");
-    };
-
-    audio.onended = () => {
-      console.log("Audio playback ended");
-      setExistingAttachments((prev) => prev.map((att) => ({ ...att, isPlaying: false })));
-      setCurrentAudio(null);
-    };
-
-    audio.onerror = (e) => {
-      console.error("Audio error event:", e);
-      console.error("Audio error code:", audio.error?.code);
-      console.error("Audio error message:", audio.error?.message);
-      
-      setExistingAttachments((prev) => prev.map((att) => ({ ...att, isPlaying: false })));
-      setCurrentAudio(null);
-      
-      let errorMessage = "Failed to play audio file.";
-      if (audio.error) {
-        switch (audio.error.code) {
-          case 1:
-            errorMessage = "Audio loading aborted.";
-            break;
-          case 2:
-            errorMessage = "Network error while loading audio.";
-            break;
-          case 3:
-            errorMessage = "Audio decoding failed.";
-            break;
-          case 4:
-            errorMessage = "Audio format not supported.";
-            break;
-        }
-      }
-      
-      toast({
-        title: "Playback Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    };
-
-    // Set the source after event listeners are attached
-    audio.src = attachment.full_url;
-    setCurrentAudio(audio);
-
-    // Set this attachment as playing
-    setExistingAttachments((prev) =>
-      prev.map((att) => ({
-        ...att,
-        isPlaying: att.id === attachment.id,
-      }))
-    );
-
-    // Load and play
-    audio.load();
-    audio.play().then(() => {
-      console.log("Audio playback started successfully");
-    }).catch((error) => {
-      console.error("Error playing audio:", error);
-      setExistingAttachments((prev) => prev.map((att) => ({ ...att, isPlaying: false })));
-      setCurrentAudio(null);
-      toast({
-        title: "Playback Error",
-        description: error.message || "Failed to play audio file.",
-        variant: "destructive",
-      });
-    });
-  };
-
-  const pauseExistingVoiceNote = () => {
-    if (currentAudio) {
-      currentAudio.pause();
-      setCurrentAudio(null);
-    }
-    setExistingAttachments((prev) => prev.map((att) => ({ ...att, isPlaying: false })));
   };
 
   const viewImage = (imageUrl: string, fileName: string) => {
@@ -430,13 +314,6 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const formatTime = (seconds: number) => {
-    if (seconds === 0) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleVoiceRecorderComplete = ({
@@ -464,63 +341,6 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
     setVoiceNotes((prev) => [...prev, voiceNote]);
   };
 
-  const playVoiceNote = (voiceNote: VoiceNote) => {
-    if (!voiceNote.audioUrl) {
-      toast({
-        title: "Playback Error",
-        description: "Audio file not found.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (currentAudio) {
-      currentAudio.pause();
-      setCurrentAudio(null);
-    }
-
-    setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
-
-    const audio = new Audio();
-    const newAudioUrl = URL.createObjectURL(voiceNote.blob);
-    audio.src = newAudioUrl;
-    setCurrentAudio(audio);
-
-    setVoiceNotes((prev) =>
-      prev.map((vn) => ({
-        ...vn,
-        isPlaying: vn.id === voiceNote.id,
-      }))
-    );
-
-    audio.onended = () => {
-      setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
-      setCurrentAudio(null);
-      URL.revokeObjectURL(newAudioUrl);
-    };
-
-    audio.onerror = () => {
-      setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
-      setCurrentAudio(null);
-      URL.revokeObjectURL(newAudioUrl);
-    };
-
-    audio.play().catch((error) => {
-      console.error("Error playing audio:", error);
-      setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
-      setCurrentAudio(null);
-      URL.revokeObjectURL(newAudioUrl);
-    });
-  };
-
-  const pauseVoiceNote = () => {
-    if (currentAudio) {
-      currentAudio.pause();
-      setCurrentAudio(null);
-    }
-    setVoiceNotes((prev) => prev.map((vn) => ({ ...vn, isPlaying: false })));
-  };
-
   const removeVoiceNote = (index: number) => {
     const voiceNote = voiceNotes[index];
     if (voiceNote.audioUrl) {
@@ -530,6 +350,9 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
         console.error("Error revoking blob URL:", error);
       }
     }
+    setActiveVoiceId((prev) =>
+      prev === voiceNote.id ? null : prev
+    );
     setVoiceNotes((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -966,45 +789,35 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                     maxDuration={300}
                   />
                   {voiceNotes.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <Label className="text-sm font-medium text-purple-700 dark:text-purple-400">New Voice Notes ({voiceNotes.length})</Label>
-                      {voiceNotes.map((voiceNote, index) => (
-                        <div key={voiceNote.id} className="flex items-center justify-between rounded border p-2 text-sm">
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <Volume2 className="h-4 w-4 flex-shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-xs">{voiceNote.name}</div>
-                              <div className="text-xs text-gray-500">{formatTime(voiceNote.duration)}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => {
-                                if (voiceNote.isPlaying) {
-                                  pauseVoiceNote();
-                                } else {
-                                  playVoiceNote(voiceNote);
-                                }
-                              }}
-                            >
-                              {voiceNote.isPlaying ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => removeVoiceNote(index)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                      {voiceNotes.map((voiceNote, index) => {
+                        const voiceId = voiceNote.id;
+                        return (
+                          <WhatsAppVoiceMessage
+                            key={voiceId}
+                            id={voiceId}
+                            audioSource={voiceNote.blob}
+                            duration={voiceNote.duration}
+                            waveform={voiceNote.waveform}
+                            accent="sent"
+                            autoPlay
+                            isActive={activeVoiceId === voiceId}
+                            onPlay={(id) => setActiveVoiceId(id)}
+                            onPause={(id) => {
+                              if (id === activeVoiceId) {
+                                setActiveVoiceId(null);
+                              }
+                            }}
+                            onRemove={() => {
+                              if (activeVoiceId === voiceId) {
+                                setActiveVoiceId(null);
+                              }
+                              removeVoiceNote(index);
+                            }}
+                          />
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1031,64 +844,46 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                             Existing Voice Notes ({voiceNoteAttachments.length})
                           </Label>
                         </div>
-                        <div className="space-y-2">
-                          {voiceNoteAttachments.map((attachment, index) => (
-                            <div key={attachment.id} className="flex items-center gap-3 rounded-lg border border-purple-200 dark:border-purple-800 p-3 bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/50 dark:hover:bg-purple-900/30 transition-colors">
-                              <div className="h-12 w-12 flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 rounded-lg flex-shrink-0">
-                                <Volume2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                                  Voice Note {index + 1}
+                        <div className="space-y-3">
+                          {voiceNoteAttachments.map((attachment, index) => {
+                            const messageId = `existing-${attachment.id}`;
+                            const audioSource = attachment.full_url ?? `${ENV.API_URL}/${attachment.file_path}`;
+                            return (
+                              <div
+                                key={attachment.id}
+                                className="rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20 p-3 space-y-3"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                      Voice Note {index + 1}
+                                    </div>
+                                    <div className="text-xs text-purple-600 dark:text-purple-400">
+                                      {attachment.file_name}
+                                    </div>
+                                  </div>
+                                  <div className="h-8 w-8 flex items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/40">
+                                    <Volume2 className="h-4 w-4 text-purple-600 dark:text-purple-300" />
+                                  </div>
                                 </div>
-                                <div className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">
-                                  {attachment.file_name}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 flex-shrink-0">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:bg-purple-200 dark:hover:bg-purple-800 hover:text-purple-700 dark:hover:text-purple-300"
-                                  onClick={() => {
-                                    if (attachment.isPlaying) {
-                                      pauseExistingVoiceNote();
-                                    } else {
-                                      playExistingVoiceNote(attachment);
+                                <WhatsAppVoiceMessage
+                                  id={messageId}
+                                  audioSource={audioSource}
+                                  accent="received"
+                                  autoPlay
+                                  isActive={activeVoiceId === messageId}
+                                  onPlay={(id) => setActiveVoiceId(id)}
+                                  onPause={(id) => {
+                                    if (id === activeVoiceId) {
+                                      setActiveVoiceId(null);
                                     }
                                   }}
-                                  title={attachment.isPlaying ? "Pause" : "Play"}
-                                >
-                                  {attachment.isPlaying ? (
-                                    <Pause className="h-4 w-4" />
-                                  ) : (
-                                    <Play className="h-4 w-4" />
-                                  )}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:bg-green-50 dark:hover:bg-green-950/20 hover:text-green-600 dark:hover:text-green-400"
-                                  onClick={() => downloadAttachment(attachment)}
-                                  title="Download"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
-                                  onClick={() => removeExistingAttachment(attachment.id)}
-                                  title="Remove"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
+                                  onDownload={() => downloadAttachment(attachment)}
+                                  onRemove={() => removeExistingAttachment(attachment.id)}
+                                />
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
