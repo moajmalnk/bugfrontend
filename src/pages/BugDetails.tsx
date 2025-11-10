@@ -194,7 +194,7 @@ const BugDetails = () => {
     },
     [toast]
   );
-
+  
   // Check if user came from project page
   const fromProject = searchParams.get("from") === "project";
 
@@ -243,9 +243,9 @@ const BugDetails = () => {
       previousLocationRef.current = currentPath;
       
       // Clear navigation state when we reach the target bug
-        if (navigatingToBugIdRef.current && pathBugId === navigatingToBugIdRef.current) {
+      if (navigatingToBugIdRef.current && pathBugId === navigatingToBugIdRef.current) {
         clearNavigationState({ reason: "success" });
-        } else if (navigatingToBugIdRef.current && pathBugId && pathBugId !== navigatingToBugIdRef.current) {
+      } else if (navigatingToBugIdRef.current && pathBugId && pathBugId !== navigatingToBugIdRef.current) {
         // Navigation was interrupted or redirected
         clearNavigationState({ reason: "cancelled" });
         } else if (navigatingToBugIdRef.current && !pathBugId) {
