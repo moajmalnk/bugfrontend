@@ -23,9 +23,10 @@ import {
   Mic,
   Calendar,
 } from "lucide-react";
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState, useCallback } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
+import { useSafeNavigate } from "@/hooks/useSafeNavigate";
 
 interface SidebarProps {
   className?: string;
@@ -38,9 +39,9 @@ const defaultAvatar =
 export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
   const location = useLocation();
+  const safeNavigate = useSafeNavigate();
   const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
-  const navigate = useNavigate();
 
   const isActive = (path: string) => {
     if (!role) return false;
@@ -57,7 +58,15 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     );
   };
 
-  const NavButton = ({
+  const handleNavigation = useCallback(
+    (destination: string) => {
+      safeNavigate(destination);
+      closeSidebar?.();
+    },
+    [safeNavigate, closeSidebar]
+  );
+
+  const NavLink = ({
     to,
     icon,
     label,
@@ -67,20 +76,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     icon: JSX.Element;
     label: string;
     badge?: string | number;
-  }): JSX.Element => {
+  }) => {
     const destination = role ? `/${role}${to}` : to;
     const active = isActive(to);
-
-    const handleClick = () => {
-      if (!destination) return;
-      navigate(destination);
-      closeSidebar?.();
-    };
-
     return (
       <Button
-        type="button"
-        onClick={handleClick}
         variant="ghost"
         className={cn(
           "w-full justify-start h-11 px-3 py-2.5 transition-all duration-200 text-sm font-medium group relative",
@@ -88,6 +88,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
           "focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-accent/20",
           active && "bg-accent text-accent-foreground shadow-sm"
         )}
+        onClick={() => handleNavigation(destination)}
       >
         <div className="flex items-center w-full min-w-0">
           <div
@@ -150,29 +151,29 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
         <div className="space-y-6">
           {/* Main Navigation */}
           <div className="space-y-1">
-            <NavButton
+            <NavLink
               to="/projects"
               icon={<FolderKanban className="h-5 w-5" />}
               label="Projects"
             />
-            <NavButton
+            <NavLink
               to="/bugs"
               icon={<Bug className="h-5 w-5" />}
               label="Bugs"
             />
-            <NavButton
+            <NavLink
               to="/fixes"
               icon={<CheckCircle className="h-5 w-5" />}
               label="Fixes"
             />
-            <NavButton
+            <NavLink
               to="/updates"
               icon={<Bell className="h-5 w-5" />}
               label="Updates"
             />
             {/* BugDocs - Hide for testers */}
             {role !== 'tester' && (
-              <NavButton
+              <NavLink
                 to="/bugdocs"
                 icon={<FileText className="h-5 w-5" />}
                 label="BugDocs"
@@ -180,7 +181,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             )}
             {/* BugMeet - Hide for testers */}
             {role !== 'tester' && (
-              <NavButton
+              <NavLink
                 to="/meet?tab=shared-meets"
                 icon={<Video className="h-5 w-5" />}
                 label="BugMeet"
@@ -189,7 +190,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             
             {/* Daily Update, My Tasks & BugDocs - Permission-based access, hide for testers */}
             {role !== 'tester' && (hasPermission('TASKS_VIEW_ALL') || hasPermission('TASKS_VIEW_ASSIGNED') || hasPermission('TASKS_CREATE')) && (
-              <NavButton
+              <NavLink
                 to="/my-tasks?tab=shared-tasks"
                 icon={<ListTodo className="h-5 w-5" />}
                 label="BugToDo"
@@ -197,7 +198,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             )}
             
             {role !== 'tester' && (hasPermission('DAILY_UPDATE_CREATE') || hasPermission('DAILY_UPDATE_VIEW') || hasPermission('UPDATES_VIEW') || hasPermission('UPDATES_CREATE')) && (
-              <NavButton
+              <NavLink
                 to="/daily-update"
                 icon={<Calendar className="h-5 w-5" />}
                 label="BugUpdate"
@@ -236,7 +237,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
 
                   {/* Users Link - Only for Admins */}
                   {hasUsersPermission && (
-                    <NavButton
+                    <NavLink
                       to="/users"
                       icon={<Users className="h-5 w-5" />}
                       label="Users"
@@ -245,7 +246,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
 
                   {/* Messaging Links */}
                   {hasMessagingView && (
-                    <NavButton
+                    <NavLink
                       to="/messages"
                       icon={<MessageSquare className="h-5 w-5" />}
                       label="BugMessage"
@@ -253,7 +254,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   )}
 
                   {hasMessagingCreate && (
-                    <NavButton
+                    <NavLink
                       to="/whatsapp-messages"
                       icon={<MessageCircle className="h-5 w-5" />}
                       label="WhatsApp"
@@ -262,7 +263,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
 
                   {/* Feedback and Activity */}
                   {hasFeedbackView && (
-                    <NavButton
+                    <NavLink
                       to="/feedback-stats"
                       icon={<BarChart3 className="h-5 w-5" />}
                       label="Feedbacks"
@@ -270,7 +271,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                   )}
 
                   {hasActivityView && (
-                    <NavButton
+                    <NavLink
                       to="/activity"
                       icon={<Activity className="h-5 w-5" />}
                       label="Activities"
@@ -279,7 +280,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
 
                   {/* Settings */}
                   {hasSettingsEdit && (
-                    <NavButton
+                    <NavLink
                       to="/settings"
                       icon={<Settings className="h-5 w-5" />}
                       label="Settings"
