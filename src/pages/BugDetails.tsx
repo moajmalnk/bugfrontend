@@ -147,6 +147,7 @@ const BugDetails = () => {
   const navigatingToBugIdRef = useRef<string | null>(null);
   const previousLocationRef = useRef<string>(location.pathname);
   const exitReloadRef = useRef(false);
+  const chunkLoadErrorRef = useRef(false);
   const isBugRoute = useMemo(() => {
     const onBugRoute = location.pathname.includes("/bugs/");
     console.debug("[BugDetails] isBugRoute computed", {
@@ -156,6 +157,59 @@ const BugDetails = () => {
     return onBugRoute;
   }, [location.pathname]);
   
+  const markChunkLoadError = useCallback((maybeError: unknown) => {
+    if (!maybeError) {
+      return;
+    }
+
+    const extractMessage = (value: unknown): string | undefined => {
+      if (!value) return undefined;
+      if (typeof value === "string") return value;
+      if (value instanceof Error) return value.message;
+      if (typeof (value as { message?: string }).message === "string") {
+        return (value as { message: string }).message;
+      }
+      if (typeof (value as { reason?: unknown }).reason === "string") {
+        return (value as { reason: string }).reason;
+      }
+      const reasonMessage = (value as { reason?: { message?: string } })?.reason?.message;
+      if (typeof reasonMessage === "string") {
+        return reasonMessage;
+      }
+      return undefined;
+    };
+
+    const message = extractMessage(maybeError);
+    if (!message) {
+      return;
+    }
+
+    const normalizedMessage = message.toLowerCase();
+    if (normalizedMessage.includes("chunkloaderror") || normalizedMessage.includes("loading chunk")) {
+      chunkLoadErrorRef.current = true;
+      console.warn("[BugDetails] Detected chunk load error, enabling hard reload fallback", {
+        message,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      markChunkLoadError(event?.reason);
+    };
+    const handleErrorEvent = (event: ErrorEvent) => {
+      markChunkLoadError(event?.error ?? event?.message);
+    };
+
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    window.addEventListener("error", handleErrorEvent);
+
+    return () => {
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+      window.removeEventListener("error", handleErrorEvent);
+    };
+  }, [markChunkLoadError]);
+
   const clearNavigationState = useCallback(
     (options?: {
       reason?: "success" | "timeout" | "cancelled";
@@ -170,7 +224,7 @@ const BugDetails = () => {
       console.log("isNavigating (before reset)", isNavigating);
       console.groupEnd();
 
-      const fallbackUrl = options?.targetUrl ?? lastTargetUrlRef.current;
+      const fallbackUrl = options?.targetUrl ?? lastTargetUrlRef.current ?? undefined;
       
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
@@ -193,22 +247,18 @@ const BugDetails = () => {
           variant: "default",
         });
 
-        if (fallbackUrl) {
-          const pathname = fallbackUrl.split("?")[0];
-          if (window.location.pathname !== pathname) {
-            console.warn("BugDetails: navigation timeout fallback to full reload", {
-              targetUrl: fallbackUrl,
-              currentPath: window.location.pathname,
-            });
-            window.location.assign(fallbackUrl);
-          } else {
-            console.warn("BugDetails: navigation timeout on same path, forcing reload");
-            window.location.reload();
-          }
+        if (chunkLoadErrorRef.current && fallbackUrl) {
+          console.warn("BugDetails: navigation timeout with chunk error, forcing hard reload", {
+            targetUrl: fallbackUrl,
+            currentPath: window.location.pathname,
+          });
+          window.location.assign(fallbackUrl);
+          chunkLoadErrorRef.current = false;
         }
       }
       
       lastTargetUrlRef.current = null;
+      chunkLoadErrorRef.current = false;
     },
     [toast]
   );
@@ -284,6 +334,17 @@ const BugDetails = () => {
       clearNavigationState({ reason: "success" });
     }
   }, [location.pathname, bugId, clearNavigationState]);
+
+  useEffect(() => {
+    if (!isNavigating) {
+      return;
+    }
+
+    const targetId = navigatingToBugIdRef.current;
+    if (targetId && targetId === bugId) {
+      clearNavigationState({ reason: "success" });
+    }
+  }, [bugId, isNavigating, clearNavigationState]);
 
   useEffect(() => {
     // Only refetch if we don't have cached data or if it's stale
@@ -616,6 +677,7 @@ const BugDetails = () => {
                 
                 setIsNavigating(true);
                 navigatingToBugIdRef.current = prevBugId;
+                chunkLoadErrorRef.current = false;
                 
                 // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
@@ -636,22 +698,23 @@ const BugDetails = () => {
                   window.location.href = url;
                 }
 
-                // Hard fallback: if client-side navigation fails silently (chunk load, cache, etc.)
+                // Hard fallback: only reload if a chunk load error is detected
                 if (navigationFallbackRef.current) {
                   clearTimeout(navigationFallbackRef.current);
                 }
                 navigationFallbackRef.current = setTimeout(() => {
-                  const currentPathname = window.location.pathname;
-                  const targetPathname = url.split("?")[0];
-                  if (currentPathname !== targetPathname) {
-                    console.warn("BugDetails: navigation fallback triggered (prev bug)", {
-                      from: window.location.pathname,
-                      to: url,
-                    });
+                  if (!chunkLoadErrorRef.current) {
+                    return;
+                  }
+                  console.warn("BugDetails: chunk error fallback triggered (prev bug)", {
+                    from: window.location.pathname,
+                    to: url,
+                  });
                     window.location.assign(url);
                     lastTargetUrlRef.current = null;
-                  }
-                }, 400);
+                  chunkLoadErrorRef.current = false;
+                  navigationFallbackRef.current = null;
+                }, 800);
               }}
               disabled={!prevBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Previous Bug"
@@ -697,6 +760,7 @@ const BugDetails = () => {
                 
                 setIsNavigating(true);
                 navigatingToBugIdRef.current = nextBugId;
+                chunkLoadErrorRef.current = false;
                 
                 // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
@@ -717,22 +781,23 @@ const BugDetails = () => {
                   window.location.href = url;
                 }
 
-                // Hard fallback: if client-side navigation fails silently (chunk load, cache, etc.)
+                // Hard fallback: only reload if a chunk load error is detected
                 if (navigationFallbackRef.current) {
                   clearTimeout(navigationFallbackRef.current);
                 }
                 navigationFallbackRef.current = setTimeout(() => {
-                  const currentPathname = window.location.pathname;
-                  const targetPathname = url.split("?")[0];
-                  if (currentPathname !== targetPathname) {
-                    console.warn("BugDetails: navigation fallback triggered (next bug)", {
-                      from: window.location.pathname,
-                      to: url,
-                    });
+                  if (!chunkLoadErrorRef.current) {
+                    return;
+                  }
+                  console.warn("BugDetails: chunk error fallback triggered (next bug)", {
+                    from: window.location.pathname,
+                    to: url,
+                  });
                     window.location.assign(url);
                     lastTargetUrlRef.current = null;
-                  }
-                }, 400);
+                  chunkLoadErrorRef.current = false;
+                  navigationFallbackRef.current = null;
+                }, 800);
               }}
               disabled={!nextBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Next Bug"
