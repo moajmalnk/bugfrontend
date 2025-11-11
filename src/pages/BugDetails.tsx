@@ -561,7 +561,7 @@ const BugDetails = () => {
                 if (bugId === prevBugId) {
                   return;
                 }
-
+                
                 // Build URL
                 let url = `/${role}/bugs/${prevBugId}`;
                 if (fromProject) url += '?from=project';
@@ -642,7 +642,7 @@ const BugDetails = () => {
                 if (bugId === nextBugId) {
                   return;
                 }
-
+                
                 // Build URL
                 let url = `/${role}/bugs/${nextBugId}`;
                 if (fromProject) url += '?from=project';
