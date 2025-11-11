@@ -39,21 +39,85 @@ export function WhatsAppVoiceMessage({
   const [isLoading, setIsLoading] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(duration || 0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const derivedUrlRef = useRef<string | null>(null);
+  const [sourceLoading, setSourceLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setMediaDuration(0);
-    if (typeof audioSource === "string") {
-      setAudioUrl(audioSource);
-      return;
-    }
-    const url = URL.createObjectURL(audioSource);
-    setAudioUrl(url);
-    return () => {
-      URL.revokeObjectURL(url);
+    let cancelled = false;
+
+    const cleanupSource = () => {
+      if (derivedUrlRef.current) {
+        URL.revokeObjectURL(derivedUrlRef.current);
+        derivedUrlRef.current = null;
+      }
     };
-  }, [audioSource]);
+
+    const resolveSource = async () => {
+      cleanupSource();
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setLoadError(null);
+      setMediaDuration(duration || 0);
+
+      if (audioSource instanceof Blob) {
+        const url = URL.createObjectURL(audioSource);
+        if (!cancelled) {
+          derivedUrlRef.current = url;
+          setAudioUrl(url);
+        } else {
+          URL.revokeObjectURL(url);
+        }
+        return;
+      }
+
+      if (typeof audioSource === "string") {
+        if (audioSource.startsWith("blob:") || audioSource.startsWith("data:")) {
+          setAudioUrl(audioSource);
+          return;
+        }
+
+        try {
+          setSourceLoading(true);
+          const response = await fetch(audioSource, {
+            credentials: "include",
+            cache: "no-store",
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const blob = await response.blob();
+          if (cancelled) {
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          derivedUrlRef.current = url;
+          setAudioUrl(url);
+        } catch (error) {
+          console.error("Failed to resolve audio source", error);
+          if (!cancelled) {
+            setLoadError("Unable to load voice note");
+            setAudioUrl(null);
+          }
+        } finally {
+          if (!cancelled) {
+            setSourceLoading(false);
+          }
+        }
+        return;
+      }
+
+      setAudioUrl(null);
+      setLoadError("Unsupported audio source");
+    };
+
+    resolveSource();
+
+    return () => {
+      cancelled = true;
+      cleanupSource();
+    };
+  }, [audioSource, duration]);
 
   useEffect(() => {
     if (typeof duration === "number" && duration > 0) {

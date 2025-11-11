@@ -316,17 +316,17 @@ export function WhatsAppVoiceRecorder({
   return (
     <div
       className={cn(
-        "w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm transition-all dark:border-slate-700 dark:bg-slate-900/80",
+        "w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 shadow-sm transition-all dark:border-slate-700 dark:bg-slate-900/80",
         isRecording && "border-emerald-300 shadow-emerald-100 dark:border-emerald-700/60"
       )}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
           disabled={disabled || isProcessing}
           onPointerDown={handlePointerStart}
           className={cn(
-            "relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition-transform",
+            "relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition-transform sm:h-14 sm:w-14",
             disabled && "opacity-50",
             isRecording && "scale-105 bg-emerald-600 shadow-emerald-500/40",
             isCancelling && "bg-red-500",
@@ -334,16 +334,16 @@ export function WhatsAppVoiceRecorder({
           )}
           aria-label="Hold to record"
         >
-          <Mic className="h-6 w-6" />
+          <Mic className="h-7 w-7 sm:h-6 sm:w-6" />
           {isRecording && (
-            <span className="absolute -bottom-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-600/80 dark:text-emerald-300/70">
+            <span className="absolute -bottom-6 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-600/80 dark:text-emerald-300/70">
               Hold
             </span>
           )}
         </button>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex-1 min-w-0 space-y-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500 dark:text-slate-400">
             <span className="font-semibold tracking-wide">
               {isRecording ? formatTime(elapsed) : "Voice note"}
             </span>
@@ -359,17 +359,19 @@ export function WhatsAppVoiceRecorder({
                 Locked
               </span>
             )}
-            {!isRecording && (
+            {/* {!isRecording && (
               <span className="text-slate-400">
                 {disabled ? "Recording disabled" : "Hold mic to record"}
               </span>
-            )}
+            )} */}
           </div>
 
-          <div className="mt-1 rounded-2xl bg-slate-100 px-3 py-2 dark:bg-slate-800/90">
-            <div className="flex items-center gap-3">
-              {renderWaveformBars()}
-              <div className="ml-auto flex items-center gap-2">
+          <div className="rounded-2xl bg-slate-100 px-4 py-3 dark:bg-slate-800/90">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-3">
+              <div className="flex w-full items-center justify-center sm:justify-start">
+                {renderWaveformBars()}
+              </div>
+              <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
                 {isLocked ? (
                   <Button
                     type="button"
@@ -387,9 +389,7 @@ export function WhatsAppVoiceRecorder({
                       "flex items-center rounded-full border border-dashed border-slate-300 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:border-slate-600 dark:text-slate-400",
                       isRecording ? "opacity-100" : "opacity-60"
                     )}
-                  >
-                    Hold to record
-                  </div>
+                  >                  </div>
                 )}
 
                 {isRecording && (
@@ -419,7 +419,7 @@ export function WhatsAppVoiceRecorder({
           <Button
             type="button"
             size="icon"
-            className="h-12 w-12 rounded-full bg-emerald-500 text-white shadow-md hover:bg-emerald-600"
+            className="h-12 w-12 shrink-0 rounded-full bg-emerald-500 text-white shadow-md hover:bg-emerald-600"
             onClick={handleLockStop}
             disabled={isProcessing}
             aria-label="Stop recording"

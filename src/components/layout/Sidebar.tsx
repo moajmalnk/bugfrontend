@@ -23,10 +23,9 @@ import {
   Mic,
   Calendar,
 } from "lucide-react";
-import { useState, useCallback } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
-import { useSafeNavigate } from "@/hooks/useSafeNavigate";
 
 interface SidebarProps {
   className?: string;
@@ -39,7 +38,6 @@ const defaultAvatar =
 export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
   const location = useLocation();
-  const safeNavigate = useSafeNavigate();
   const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
 
@@ -58,14 +56,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     );
   };
 
-  const handleNavigation = useCallback(
-    (destination: string) => {
-      safeNavigate(destination);
-      closeSidebar?.();
-    },
-    [safeNavigate, closeSidebar]
-  );
-
   const NavLink = ({
     to,
     icon,
@@ -80,42 +70,37 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
     const destination = role ? `/${role}${to}` : to;
     const active = isActive(to);
     return (
-      <Button
-        variant="ghost"
-        className={cn(
-          "w-full justify-start h-11 px-3 py-2.5 transition-all duration-200 text-sm font-medium group relative",
-          "hover:bg-accent/80 hover:text-accent-foreground",
-          "focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-accent/20",
-          active && "bg-accent text-accent-foreground shadow-sm"
-        )}
-        onClick={() => handleNavigation(destination)}
-      >
-        <div className="flex items-center w-full min-w-0">
-          <div
-            className={cn(
-              "flex-shrink-0 transition-colors duration-200",
-              active
-                ? "text-accent-foreground"
-                : "text-muted-foreground group-hover:text-accent-foreground"
-            )}
-          >
-            {icon}
-          </div>
-          <span className="ml-3 truncate flex-1 text-left">{label}</span>
-          {badge && (
-            <span
-              className={cn(
-                "ml-auto px-2 py-0.5 text-xs font-medium rounded-full",
-                active
-                  ? "bg-accent-foreground/20 text-accent-foreground"
-                  : "bg-muted text-muted-foreground group-hover:bg-accent-foreground/20 group-hover:text-accent-foreground"
-              )}
-            >
-              {badge}
-            </span>
+      <Link to={destination} onClick={closeSidebar} className="block">
+        <Button
+          variant="ghost"
+          className={cn(
+            "w-full justify-start h-11 px-3 py-2.5 transition-all duration-200 text-sm font-medium group relative",
+            "hover:bg-accent/80 hover:text-accent-foreground",
+            "focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-accent/20",
+            active && "bg-accent text-accent-foreground shadow-sm"
           )}
-        </div>
-      </Button>
+        >
+          <div className="flex items-center w-full min-w-0">
+            <div className={cn(
+              "flex-shrink-0 transition-colors duration-200",
+              active ? "text-accent-foreground" : "text-muted-foreground group-hover:text-accent-foreground"
+            )}>
+              {icon}
+            </div>
+            <span className="ml-3 truncate flex-1 text-left">{label}</span>
+            {badge && (
+              <span className={cn(
+                "ml-auto px-2 py-0.5 text-xs font-medium rounded-full",
+                active 
+                  ? "bg-accent-foreground/20 text-accent-foreground" 
+                  : "bg-muted text-muted-foreground group-hover:bg-accent-foreground/20 group-hover:text-accent-foreground"
+              )}>
+                {badge}
+              </span>
+            )}
+          </div>
+        </Button>
+      </Link>
     );
   };
 
