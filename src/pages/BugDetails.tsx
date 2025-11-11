@@ -20,7 +20,7 @@ import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/axios";
 import { ArrowLeft, ArrowRight, Lock } from "lucide-react";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 
 interface ApiResponse<T> {
@@ -146,7 +146,14 @@ const BugDetails = () => {
   const navigatingToBugIdRef = useRef<string | null>(null);
   const previousLocationRef = useRef<string>(location.pathname);
   const exitReloadRef = useRef(false);
-  const isBugRoute = location.pathname.includes("/bugs/");
+  const isBugRoute = useMemo(() => {
+    const onBugRoute = location.pathname.includes("/bugs/");
+    console.debug("[BugDetails] isBugRoute computed", {
+      pathname: location.pathname,
+      onBugRoute,
+    });
+    return onBugRoute;
+  }, [location.pathname]);
   
   const clearNavigationState = useCallback(
     (options?: {
