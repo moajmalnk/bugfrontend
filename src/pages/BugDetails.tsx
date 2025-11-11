@@ -124,6 +124,7 @@ const AccessError = () => (
       <p className="relative text-muted-foreground max-w-md">
         You don't have permission to view this bug. You need to be a member of the project this bug belongs to.
       </p>
+      
     </section>
   </main>
 );
