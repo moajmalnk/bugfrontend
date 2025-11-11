@@ -1,7 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/((?!assets/|service-worker\\.js|manifest\\.json|version\\.json|robots\\.txt|favicon\\.ico).*)",
+      "source": "/((?!assets/|service-worker\\.js|firebase-messaging-sw\\.js|manifest\\.json|version\\.json|robots\\.txt|favicon\\.ico).*)",
       "destination": "/index.html"
     }
   ],
