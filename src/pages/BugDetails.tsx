@@ -693,6 +693,11 @@ const BugDetails = () => {
                 // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
                   if (navigatingToBugIdRef.current === prevBugId) {
+                    console.warn("[BugDetails] Navigation timeout hit for previous bug, forcing hard redirect", {
+                      targetId: prevBugId,
+                      url,
+                    });
+                    window.location.assign(url);
                     clearNavigationState({
                       reason: "timeout",
                       targetId: prevBugId,
@@ -792,6 +797,11 @@ const BugDetails = () => {
                 // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
                   if (navigatingToBugIdRef.current === nextBugId) {
+                    console.warn("[BugDetails] Navigation timeout hit for next bug, forcing hard redirect", {
+                      targetId: nextBugId,
+                      url,
+                    });
+                    window.location.assign(url);
                     clearNavigationState({
                       reason: "timeout",
                       targetId: nextBugId,
