@@ -152,8 +152,8 @@ const BugDetails = () => {
       targetId?: string;
       targetUrl?: string;
     }) => {
-      lastTargetUrlRef.current = null;
-
+      const fallbackUrl = options?.targetUrl ?? lastTargetUrlRef.current;
+      
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
         navigationTimeoutRef.current = null;
@@ -175,7 +175,6 @@ const BugDetails = () => {
           variant: "default",
         });
 
-        const fallbackUrl = options?.targetUrl ?? lastTargetUrlRef.current;
         if (fallbackUrl) {
           const pathname = fallbackUrl.split("?")[0];
           if (window.location.pathname !== pathname) {
@@ -188,9 +187,10 @@ const BugDetails = () => {
             console.warn("BugDetails: navigation timeout on same path, forcing reload");
             window.location.reload();
           }
-          lastTargetUrlRef.current = null;
         }
       }
+      
+      lastTargetUrlRef.current = null;
     },
     [toast]
   );
@@ -248,9 +248,9 @@ const BugDetails = () => {
       } else if (navigatingToBugIdRef.current && pathBugId && pathBugId !== navigatingToBugIdRef.current) {
         // Navigation was interrupted or redirected
         clearNavigationState({ reason: "cancelled" });
-        } else if (navigatingToBugIdRef.current && !pathBugId) {
-          // Navigated away from bug detail routes entirely
-          clearNavigationState({ reason: "cancelled" });
+      } else if (navigatingToBugIdRef.current && !pathBugId) {
+        // Navigated away from bug detail routes entirely
+        clearNavigationState({ reason: "cancelled" });
       }
     }
     
@@ -562,6 +562,12 @@ const BugDetails = () => {
                   return;
                 }
 
+                // Build URL
+                let url = `/${role}/bugs/${prevBugId}`;
+                if (fromProject) url += '?from=project';
+                else if (fromFixes) url += '?from=fixes';
+                lastTargetUrlRef.current = url;
+                
                 setIsNavigating(true);
                 navigatingToBugIdRef.current = prevBugId;
                 
@@ -571,16 +577,10 @@ const BugDetails = () => {
                     clearNavigationState({
                       reason: "timeout",
                       targetId: prevBugId,
-                      targetUrl: lastTargetUrlRef.current ?? url,
+                      targetUrl: url,
                     });
                   }
                 }, 2500);
-                
-                // Build URL
-                let url = `/${role}/bugs/${prevBugId}`;
-                if (fromProject) url += '?from=project';
-                else if (fromFixes) url += '?from=fixes';
-                lastTargetUrlRef.current = url;
                 
                 // Try React Router navigation first
                 try {
@@ -643,6 +643,12 @@ const BugDetails = () => {
                   return;
                 }
 
+                // Build URL
+                let url = `/${role}/bugs/${nextBugId}`;
+                if (fromProject) url += '?from=project';
+                else if (fromFixes) url += '?from=fixes';
+                lastTargetUrlRef.current = url;
+                
                 setIsNavigating(true);
                 navigatingToBugIdRef.current = nextBugId;
                 
@@ -652,16 +658,10 @@ const BugDetails = () => {
                     clearNavigationState({
                       reason: "timeout",
                       targetId: nextBugId,
-                      targetUrl: lastTargetUrlRef.current ?? url,
+                      targetUrl: url,
                     });
                   }
                 }, 2500);
-                
-                // Build URL
-                let url = `/${role}/bugs/${nextBugId}`;
-                if (fromProject) url += '?from=project';
-                else if (fromFixes) url += '?from=fixes';
-                lastTargetUrlRef.current = url;
                 
                 // Try React Router navigation first
                 try {

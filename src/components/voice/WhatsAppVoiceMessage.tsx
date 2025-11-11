@@ -59,12 +59,14 @@ export function WhatsAppVoiceMessage({
       setCurrentTime(0);
       setLoadError(null);
       setMediaDuration(duration || 0);
+      setSourceLoading(false);
 
       if (audioSource instanceof Blob) {
         const url = URL.createObjectURL(audioSource);
         if (!cancelled) {
           derivedUrlRef.current = url;
           setAudioUrl(url);
+          setSourceLoading(false);
         } else {
           URL.revokeObjectURL(url);
         }
@@ -74,6 +76,7 @@ export function WhatsAppVoiceMessage({
       if (typeof audioSource === "string") {
         if (audioSource.startsWith("blob:") || audioSource.startsWith("data:")) {
           setAudioUrl(audioSource);
+          setSourceLoading(false);
           return;
         }
 
@@ -146,16 +149,22 @@ export function WhatsAppVoiceMessage({
         setMediaDuration(audio.duration);
       }
     };
+    const handleError = () => {
+      setLoadError("Unable to play voice note");
+      setIsPlaying(false);
+    };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("loadeddata", handleLoaded);
+    audio.addEventListener("loadedmetadata", handleLoaded);
+    audio.addEventListener("error", handleError);
 
     return () => {
       audio.pause();
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
-      audio.removeEventListener("loadeddata", handleLoaded);
+      audio.removeEventListener("loadedmetadata", handleLoaded);
+      audio.removeEventListener("error", handleError);
       audioRef.current = null;
     };
   }, [audioUrl, id, onPause, speedIndex]);
@@ -167,26 +176,58 @@ export function WhatsAppVoiceMessage({
 
   useEffect(() => {
     if (autoPlay && isActive) {
-      togglePlayback(true);
+      void togglePlayback(true);
     } else if (!isActive && isPlaying) {
-      togglePlayback(false);
+      void togglePlayback(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlay, isActive]);
 
+  const ensureAudioReady = (audio: HTMLAudioElement) => {
+    if (audio.readyState >= 2) {
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const handleLoaded = () => {
+        cleanup();
+        resolve();
+      };
+
+      const handleError = () => {
+        cleanup();
+        reject(new Error("Failed to load audio metadata"));
+      };
+
+      const cleanup = () => {
+        audio.removeEventListener("loadedmetadata", handleLoaded);
+        audio.removeEventListener("error", handleError);
+      };
+
+      audio.addEventListener("loadedmetadata", handleLoaded);
+      audio.addEventListener("error", handleError);
+    });
+  };
+
   const togglePlayback = async (play?: boolean) => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || !audioUrl || sourceLoading || loadError) {
+      return;
+    }
+
     const shouldPlay = play ?? !isPlaying;
 
     if (shouldPlay) {
       try {
         setIsLoading(true);
+        await ensureAudioReady(audioRef.current);
         await audioRef.current.play();
         setIsPlaying(true);
-        setIsLoading(false);
         onPlay?.(id);
       } catch (error) {
-        console.error("Failed to play voice message", error);
+        console.error("Failed to play voice note", error);
+        setLoadError("Unable to play voice note");
+        setIsPlaying(false);
+      } finally {
         setIsLoading(false);
       }
     } else {
@@ -240,10 +281,14 @@ export function WhatsAppVoiceMessage({
     });
   }, [accent, id, progress, waveform]);
 
+  const showError = Boolean(loadError);
+  const isBusy = isLoading || sourceLoading;
+  const controlsDisabled = sourceLoading || !audioUrl || showError;
+
   return (
     <div
       className={cn(
-        "flex w-full max-w-lg items-end gap-2",
+        "flex w-full max-w-full items-end gap-2",
         accent === "sent" ? "justify-end" : "justify-start"
       )}
     >
@@ -254,7 +299,7 @@ export function WhatsAppVoiceMessage({
       )}
       <div
         className={cn(
-          "flex w-full max-w-[360px] items-center gap-3 rounded-3xl px-3 py-2 shadow-sm",
+          "flex w-full max-w-full items-center gap-3 rounded-3xl px-3 py-2 shadow-sm sm:max-w-[360px]",
           accent === "sent"
             ? "bg-emerald-500 text-white"
             : "bg-white text-slate-900 dark:bg-slate-800 dark:text-white"
@@ -264,16 +309,17 @@ export function WhatsAppVoiceMessage({
           type="button"
           size="icon"
           variant="ghost"
-          onClick={() => togglePlayback()}
-          disabled={isLoading || !audioUrl}
+          onClick={() => void togglePlayback()}
+          disabled={controlsDisabled}
           className={cn(
             "h-10 w-10 rounded-full border border-white/20 bg-white/10 text-current backdrop-blur transition hover:bg-white/20",
             accent === "received" && "border-transparent bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20",
-            isPlaying && "ring-2 ring-white/40 dark:ring-emerald-400/60"
+            isPlaying && "ring-2 ring-white/40 dark:ring-emerald-400/60",
+            controlsDisabled && "opacity-60"
           )}
           aria-label={isPlaying ? "Pause voice note" : "Play voice note"}
         >
-          {isLoading ? (
+          {isBusy ? (
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
           ) : isPlaying ? (
             <Pause className="h-4 w-4" />
@@ -290,6 +336,11 @@ export function WhatsAppVoiceMessage({
           <div className="mt-1 flex h-10 items-end gap-[2px] overflow-hidden">
             {bars}
           </div>
+          {showError && (
+            <p className="mt-2 text-[11px] font-medium text-red-500 dark:text-red-300">
+              {loadError}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col items-end gap-1">
@@ -298,9 +349,11 @@ export function WhatsAppVoiceMessage({
             size="sm"
             variant="ghost"
             onClick={cycleSpeed}
+            disabled={controlsDisabled}
             className={cn(
               "h-7 rounded-full border border-white/30 bg-white/10 px-3 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20",
-              accent === "received" && "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+              accent === "received" && "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
+              controlsDisabled && "opacity-60"
             )}
           >
             {SPEED_STEPS[speedIndex].toFixed(1).replace(".0", "")}x

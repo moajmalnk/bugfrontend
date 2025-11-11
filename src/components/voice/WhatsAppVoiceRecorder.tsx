@@ -101,10 +101,12 @@ export function WhatsAppVoiceRecorder({
     dataArrayRef.current = new Uint8Array(bufferLength);
 
     const sample = () => {
-      if (!analyserRef.current || !dataArrayRef.current) return;
-      analyserRef.current.getByteTimeDomainData(dataArrayRef.current as Uint8Array<ArrayBuffer>);
+      const analyser = analyserRef.current;
+      const buffer = dataArrayRef.current;
+      if (!analyser || !buffer) return;
+      analyser.getByteTimeDomainData(buffer as any);
       const normalized =
-        dataArrayRef.current.reduce((sum, value) => {
+        buffer.reduce((sum, value) => {
           const centered = value - 128;
           return sum + Math.abs(centered);
         }, 0) /
