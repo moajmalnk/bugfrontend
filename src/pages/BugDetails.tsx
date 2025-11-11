@@ -154,6 +154,14 @@ const BugDetails = () => {
       targetId?: string;
       targetUrl?: string;
     }) => {
+      console.groupCollapsed("[BugDetails] clearNavigationState");
+      console.log("reason", options?.reason);
+      console.log("targetId", options?.targetId);
+      console.log("targetUrl", options?.targetUrl);
+      console.log("currentPath", location.pathname);
+      console.log("isNavigating (before reset)", isNavigating);
+      console.groupEnd();
+
       const fallbackUrl = options?.targetUrl ?? lastTargetUrlRef.current;
       
       if (navigationTimeoutRef.current) {
@@ -238,6 +246,12 @@ const BugDetails = () => {
 
   // Track location changes to detect navigation completion - Clean and efficient
   useEffect(() => {
+    console.debug("[BugDetails] location change detected", {
+      pathname: location.pathname,
+      bugId,
+      isBugRoute,
+    });
+
     const currentPath = location.pathname;
     const pathChanged = previousLocationRef.current !== currentPath;
     

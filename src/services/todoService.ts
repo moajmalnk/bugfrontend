@@ -64,7 +64,7 @@ export async function listMyTasks(params: { status?: string; project_id?: string
   
   // Use appropriate endpoint based on impersonation mode
   const endpoint = useOwnTasks ? 'list_my_own_tasks.php' : 'list.php';
-  console.log('Using endpoint for tasks:', endpoint); // Debugging
+  // console.log('Using endpoint for tasks:', endpoint); // Debugging
   
   const res = await fetch(`${API}/tasks/${endpoint}${qs ? `?${qs}` : ''}`, {
     headers: authHeaders(),
@@ -101,7 +101,7 @@ export async function createTask(task: UserTask) {
   
   // Use appropriate endpoint based on impersonation mode
   const endpoint = useOwnTask ? 'create_own_task.php' : 'create.php';
-  console.log('Using endpoint for create task:', endpoint); // Debugging
+  // console.log('Using endpoint for create task:', endpoint); // Debugging
   
   const res = await fetch(`${API}/tasks/${endpoint}`, {
     method: 'POST',
@@ -160,7 +160,7 @@ export async function submitWork(payload: WorkSubmission) {
   
   // Use appropriate endpoint based on impersonation mode
   const endpoint = useOwnWork ? 'submit_own_work.php' : 'submit_work.php';
-  console.log('Using endpoint for submit:', endpoint);
+  // console.log('Using endpoint for submit:', endpoint);
   
   const res = await fetch(`${API}/tasks/${endpoint}`, {
     method: 'POST',
@@ -209,14 +209,14 @@ export async function listMySubmissions(params: { from?: string; to?: string } =
   
   // Use appropriate endpoint based on impersonation mode
   const endpoint = useOwnSubmissions ? 'my_own_submissions.php' : 'my_submissions.php';
-  console.log('Using endpoint:', endpoint);
+  // console.log('Using endpoint:', endpoint);
   
   const res = await fetch(`${API}/tasks/${endpoint}${qs ? `?${qs}` : ''}`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error('Failed to load submissions');
   const data = await res.json();
-  console.log('Submissions response:', data);
+  // console.log('Submissions response:', data);
   return data;
 }
 
