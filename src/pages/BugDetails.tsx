@@ -392,17 +392,12 @@ const BugDetails = () => {
   useEffect(() => {
     if (!isBugRoute) {
       clearNavigationState({ reason: "cancelled" });
-      if (!exitReloadRef.current) {
-        exitReloadRef.current = true;
-        setTimeout(() => {
-          if (!window.location.pathname.includes("/bugs/")) {
-            window.location.reload();
-          }
-        }, 200);
-      }
-    } else {
+      chunkLoadErrorRef.current = false;
+      chunkReloadScheduledRef.current = false;
       exitReloadRef.current = false;
+      return;
     }
+    exitReloadRef.current = false;
   }, [isBugRoute, clearNavigationState]);
 
   useEffect(() => {
