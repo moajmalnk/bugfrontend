@@ -209,7 +209,7 @@ const BugDetails = () => {
       window.removeEventListener("error", handleErrorEvent);
     };
   }, [markChunkLoadError]);
-
+  
   const clearNavigationState = useCallback(
     (options?: {
       reason?: "success" | "timeout" | "cancelled";
@@ -249,10 +249,10 @@ const BugDetails = () => {
 
         if (chunkLoadErrorRef.current && fallbackUrl) {
           console.warn("BugDetails: navigation timeout with chunk error, forcing hard reload", {
-            targetUrl: fallbackUrl,
-            currentPath: window.location.pathname,
-          });
-          window.location.assign(fallbackUrl);
+              targetUrl: fallbackUrl,
+              currentPath: window.location.pathname,
+            });
+            window.location.assign(fallbackUrl);
           chunkLoadErrorRef.current = false;
         }
       }
@@ -707,9 +707,9 @@ const BugDetails = () => {
                     return;
                   }
                   console.warn("BugDetails: chunk error fallback triggered (prev bug)", {
-                    from: window.location.pathname,
-                    to: url,
-                  });
+                      from: window.location.pathname,
+                      to: url,
+                    });
                     window.location.assign(url);
                     lastTargetUrlRef.current = null;
                   chunkLoadErrorRef.current = false;
@@ -790,9 +790,9 @@ const BugDetails = () => {
                     return;
                   }
                   console.warn("BugDetails: chunk error fallback triggered (next bug)", {
-                    from: window.location.pathname,
-                    to: url,
-                  });
+                      from: window.location.pathname,
+                      to: url,
+                    });
                     window.location.assign(url);
                     lastTargetUrlRef.current = null;
                   chunkLoadErrorRef.current = false;
