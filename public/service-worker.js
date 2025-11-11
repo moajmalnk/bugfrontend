@@ -194,7 +194,7 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-
+  
   // Special handling for JavaScript modules to prevent MIME type issues
   if (event.request.url.includes('.js') && event.request.destination === 'script') {
     event.respondWith(handleJavaScriptModule(event.request));

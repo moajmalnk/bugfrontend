@@ -145,6 +145,8 @@ const BugDetails = () => {
   const [isNavigating, setIsNavigating] = useState(false);
   const navigatingToBugIdRef = useRef<string | null>(null);
   const previousLocationRef = useRef<string>(location.pathname);
+  const exitReloadRef = useRef(false);
+  const isBugRoute = location.pathname.includes("/bugs/");
   
   const clearNavigationState = useCallback(
     (options?: {
@@ -231,6 +233,7 @@ const BugDetails = () => {
     gcTime: 10 * 60 * 1000,
     refetchOnMount: false, // Don't refetch on mount if data exists
     refetchOnWindowFocus: false, // Already set globally but be explicit
+    enabled: isBugRoute && Boolean(bugId),
   });
 
   // Track location changes to detect navigation completion - Clean and efficient
@@ -280,6 +283,22 @@ const BugDetails = () => {
       clearNavigationState({ reason: "success" });
     }
   }, [isFetching, isLoading, isNavigating, bug?.id, clearNavigationState]);
+
+  useEffect(() => {
+    if (!isBugRoute) {
+      clearNavigationState({ reason: "cancelled" });
+      if (!exitReloadRef.current) {
+        exitReloadRef.current = true;
+        setTimeout(() => {
+          if (!window.location.pathname.includes("/bugs/")) {
+            window.location.reload();
+          }
+        }, 200);
+      }
+    } else {
+      exitReloadRef.current = false;
+    }
+  }, [isBugRoute, clearNavigationState]);
 
   useEffect(() => {
     return () => {
@@ -377,6 +396,11 @@ const BugDetails = () => {
       </section>
     </main>
   );
+
+  // Early exit if we're no longer on a bug route (component should unmount)
+  if (!isBugRoute || !bugId) {
+    return null;
+  }
 
   // Now you can do your early returns
   if (shouldShowSkeleton) return renderSkeleton();
