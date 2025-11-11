@@ -38,13 +38,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {
     if (!currentUser) {
-      console.log('NotificationContext: No currentUser, skipping fetch');
+      // console.log('NotificationContext: No currentUser, skipping fetch');
       return;
     }
 
     // Prevent multiple simultaneous fetches
     if (isFetchingRef.current) {
-      console.log('NotificationContext: Fetch already in progress, skipping');
+      // console.log('NotificationContext: Fetch already in progress, skipping');
       return;
     }
 
@@ -52,19 +52,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const now = new Date();
     const timeSinceLastFetch = now.getTime() - lastFetchTimeRef.current.getTime();
     if (timeSinceLastFetch < 2000) {
-      console.log('NotificationContext: Recent fetch detected, skipping duplicate');
+      // console.log('NotificationContext: Recent fetch detected, skipping duplicate');
       return;
     }
 
     isFetchingRef.current = true;
     try {
-      console.log('NotificationContext: Fetching notifications...');
+      // console.log('NotificationContext: Fetching notifications...');
       const apiNotifications = await notificationService.getUserNotifications(50, 0);
-      console.log('NotificationContext: Received notifications:', {
-        count: apiNotifications.length,
-        sample: apiNotifications[0] || null,
-        all: apiNotifications
-      });
+      // console.log('NotificationContext: Received notifications:', {
+      //   count: apiNotifications.length,
+      //   sample: apiNotifications[0] || null,
+      //   all: apiNotifications
+      // });
       
       // Map API notifications to our Notification type
       const mappedNotifications: Notification[] = apiNotifications.map((n: any) => ({
@@ -79,21 +79,21 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         project_id: n.project_id
       }));
 
-      console.log('NotificationContext: Mapped notifications:', {
-        count: mappedNotifications.length,
-        sample: mappedNotifications[0] || null
-      });
+      // console.log('NotificationContext: Mapped notifications:', {
+      //   count: mappedNotifications.length,
+      //   sample: mappedNotifications[0] || null
+      // });
 
       setNotifications(mappedNotifications);
       
       // Get unread count
       const count = await notificationService.getUnreadCount();
-      console.log('NotificationContext: Unread count:', count);
+      // console.log('NotificationContext: Unread count:', count);
       setUnreadCount(count);
       
       lastFetchTimeRef.current = new Date();
     } catch (error) {
-      console.error('NotificationContext: Error fetching notifications:', error);
+      // console.error('NotificationContext: Error fetching notifications:', error);
     } finally {
       isFetchingRef.current = false;
     }
