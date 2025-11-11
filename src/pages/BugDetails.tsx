@@ -661,6 +661,13 @@ const BugDetails = () => {
                 isNavigating ? 'cursor-wait' : ''
               }`}
               onClick={(e) => {
+                console.info("[BugDetails] Prev button clicked", {
+                  currentBugId: bugId,
+                  targetBugId: prevBugId,
+                  isNavigating,
+                  bugListLoading,
+                  isLoading,
+                });
                 if (isNavigating || !prevBugId || bugListLoading || isLoading || prevBugId === bugId) {
                   return;
                 }
@@ -676,6 +683,10 @@ const BugDetails = () => {
                 lastTargetUrlRef.current = url;
                 
                 setIsNavigating(true);
+                console.info("[BugDetails] Starting navigation to previous bug", {
+                  targetBugId: prevBugId,
+                  url,
+                });
                 navigatingToBugIdRef.current = prevBugId;
                 chunkLoadErrorRef.current = false;
                 
@@ -704,6 +715,11 @@ const BugDetails = () => {
                 }
                 navigationFallbackRef.current = setTimeout(() => {
                   if (!chunkLoadErrorRef.current) {
+                    console.info("[BugDetails] No chunk error detected for prev navigation; skipping hard reload", {
+                      from: window.location.pathname,
+                      to: url,
+                    });
+                    navigationFallbackRef.current = null;
                     return;
                   }
                   console.warn("BugDetails: chunk error fallback triggered (prev bug)", {
@@ -744,6 +760,13 @@ const BugDetails = () => {
                 isNavigating ? 'cursor-wait' : ''
               }`}
               onClick={(e) => {
+                console.info("[BugDetails] Next button clicked", {
+                  currentBugId: bugId,
+                  targetBugId: nextBugId,
+                  isNavigating,
+                  bugListLoading,
+                  isLoading,
+                });
                 if (isNavigating || !nextBugId || bugListLoading || isLoading || nextBugId === bugId) {
                   return;
                 }
@@ -759,6 +782,10 @@ const BugDetails = () => {
                 lastTargetUrlRef.current = url;
                 
                 setIsNavigating(true);
+                console.info("[BugDetails] Starting navigation to next bug", {
+                  targetBugId: nextBugId,
+                  url,
+                });
                 navigatingToBugIdRef.current = nextBugId;
                 chunkLoadErrorRef.current = false;
                 
@@ -787,6 +814,11 @@ const BugDetails = () => {
                 }
                 navigationFallbackRef.current = setTimeout(() => {
                   if (!chunkLoadErrorRef.current) {
+                    console.info("[BugDetails] No chunk error detected for next navigation; skipping hard reload", {
+                      from: window.location.pathname,
+                      to: url,
+                    });
+                    navigationFallbackRef.current = null;
                     return;
                   }
                   console.warn("BugDetails: chunk error fallback triggered (next bug)", {

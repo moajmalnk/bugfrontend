@@ -17,8 +17,6 @@ export default defineConfig(({ mode }) => ({
     headers: {
       'Cache-Control': 'no-cache',
     },
-    // Force reload on chunk errors
-    force: true,
     // Improve chunk loading reliability
     middlewareMode: false,
     cors: true,
@@ -51,7 +49,6 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-tabs',
       '@radix-ui/react-card',
       '@radix-ui/react-toast',
-      '@radix-ui/react-slider',
       '@radix-ui/react-select',
       '@radix-ui/react-slot',
       '@radix-ui/react-separator',
