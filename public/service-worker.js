@@ -1,8 +1,9 @@
-// Dynamic cache versioning based on build time
-const BUILD_TIME = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-const CACHE_NAME = `bugricer-v${BUILD_TIME}`;
-const STATIC_CACHE = `bugricer-static-v${BUILD_TIME}`;
-const DYNAMIC_CACHE = `bugricer-dynamic-v${BUILD_TIME}`;
+// Dynamic cache versioning based on build time (include timestamp for uniqueness)
+const BUILD_TIME = new Date().toISOString(); // e.g. 2025-11-11T09:30:12.123Z
+const CACHE_SUFFIX = BUILD_TIME.replace(/[:.]/g, "-"); // Safe for cache names
+const CACHE_NAME = `bugricer-v${CACHE_SUFFIX}`;
+const STATIC_CACHE = `bugricer-static-v${CACHE_SUFFIX}`;
+const DYNAMIC_CACHE = `bugricer-dynamic-v${CACHE_SUFFIX}`;
 
 // Define cacheable resources with strategic priorities
 const CRITICAL_RESOURCES = [
@@ -166,6 +167,34 @@ self.addEventListener('fetch', event => {
     return;
   }
   
+  // Always prefer network for SPA navigations; fall back to cache when offline
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          const networkResponse = await fetch(event.request);
+          if (networkResponse && networkResponse.ok) {
+            const cache = await caches.open(DYNAMIC_CACHE);
+            cache.put(event.request, networkResponse.clone()).catch(() => {});
+            return networkResponse;
+          }
+          throw new Error(`Navigation fetch failed: ${networkResponse?.status}`);
+        } catch (error) {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          const fallback = await caches.match('/index.html');
+          if (fallback) return fallback;
+          return new Response('Offline', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' },
+          });
+        }
+      })()
+    );
+    return;
+  }
+
   // Special handling for JavaScript modules to prevent MIME type issues
   if (event.request.url.includes('.js') && event.request.destination === 'script') {
     event.respondWith(handleJavaScriptModule(event.request));
