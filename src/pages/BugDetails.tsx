@@ -148,6 +148,7 @@ const BugDetails = () => {
   const previousLocationRef = useRef<string>(location.pathname);
   const exitReloadRef = useRef(false);
   const chunkLoadErrorRef = useRef(false);
+  const chunkReloadScheduledRef = useRef(false);
   const isBugRoute = useMemo(() => {
     const onBugRoute = location.pathname.includes("/bugs/");
     console.debug("[BugDetails] isBugRoute computed", {
@@ -185,11 +186,32 @@ const BugDetails = () => {
     }
 
     const normalizedMessage = message.toLowerCase();
-    if (normalizedMessage.includes("chunkloaderror") || normalizedMessage.includes("loading chunk")) {
+    const matchesChunkError =
+      normalizedMessage.includes("chunkloaderror") ||
+      normalizedMessage.includes("loading chunk") ||
+      normalizedMessage.includes("failed to fetch dynamically imported module") ||
+      normalizedMessage.includes("error loading dynamically imported module") ||
+      normalizedMessage.includes("import()") ||
+      normalizedMessage.includes("imported module");
+
+    console.warn("[BugDetails] markChunkLoadError invoked", { message });
+
+    if (matchesChunkError) {
       chunkLoadErrorRef.current = true;
       console.warn("[BugDetails] Detected chunk load error, enabling hard reload fallback", {
         message,
       });
+
+      if (!chunkReloadScheduledRef.current) {
+        chunkReloadScheduledRef.current = true;
+        setTimeout(() => {
+          if (!window.location.pathname.includes("/bugs/")) {
+            console.warn("[BugDetails] Chunk error encountered outside bug route, forcing reload");
+            window.location.reload();
+          }
+          chunkReloadScheduledRef.current = false;
+        }, 250);
+      }
     }
   }, []);
 
