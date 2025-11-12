@@ -260,7 +260,12 @@ function AppContent() {
     // Only close context menu if clicking outside of it
     // Don't interfere with button clicks
     const target = event.target as HTMLElement;
-    
+
+    // If the click happened inside the custom context menu, do nothing and let the menu item handler run.
+    if (target.closest('[data-context-menu-root]')) {
+      return;
+    }
+
     // Check if click is on a button or interactive element
     if (target.closest('button') || 
         target.closest('[role="button"]') || 
@@ -269,7 +274,7 @@ function AppContent() {
       // Let button handlers execute first
       return;
     }
-    
+
     setContextMenu({ mouseX: null, mouseY: null });
   };
 

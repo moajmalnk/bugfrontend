@@ -227,6 +227,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
     return (
         <DropdownMenu open={isOpen} onOpenChange={onClose}>
             <DropdownMenuContent
+                data-context-menu-root
                 style={{
                     position: 'fixed',
                     top: finalY,
