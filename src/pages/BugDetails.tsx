@@ -317,11 +317,22 @@ const BugDetails = () => {
       }
       throw new Error(response.data.message || "Failed to fetch bug details");
     },
-    staleTime: 30 * 1000, // Consider data fresh for 30 seconds (was 0)
+    staleTime: 5 * 60 * 1000, // Match global config: 5 minutes
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: false, // Don't refetch on mount if data exists
+    refetchOnMount: (query) => {
+      // Only refetch if data is stale or doesn't exist
+      return !query.state.data || query.isStale();
+    },
     refetchOnWindowFocus: false, // Already set globally but be explicit
     enabled: isBugRoute && Boolean(bugId),
+    // Prevent excessive refetching
+    retry: (failureCount, error: any) => {
+      // Don't retry on auth errors
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 
   // Track location changes to detect navigation completion - Clean and efficient
@@ -357,37 +368,29 @@ const BugDetails = () => {
     }
   }, [location.pathname, bugId, clearNavigationState]);
 
+  // Consolidated navigation success detection - prevents duplicate checks
   useEffect(() => {
     if (!isNavigating) {
       return;
     }
 
     const targetId = navigatingToBugIdRef.current;
-    if (targetId && targetId === bugId) {
-      clearNavigationState({ reason: "success" });
-    }
-  }, [bugId, isNavigating, clearNavigationState]);
-
-  useEffect(() => {
-    // Only refetch if we don't have cached data or if it's stale
-    // Remove refetch from dependencies to prevent loops
-    if (!bug || isStale) {
-      refetch();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bugId]); // Only depend on bugId, React Query will handle the rest
-
-  useEffect(() => {
-    if (!isNavigating) {
+    if (!targetId) {
       return;
     }
 
-    // Only treat as successful navigation when the loaded bug matches the intended target
-    const targetId = navigatingToBugIdRef.current;
-    if (!isFetching && !isLoading && targetId && bug?.id === targetId) {
+    // Check if navigation succeeded by matching bugId or loaded bug data
+    const navigationSucceeded = 
+      (targetId === bugId) || 
+      (!isFetching && !isLoading && bug?.id === targetId);
+
+    if (navigationSucceeded) {
       clearNavigationState({ reason: "success" });
     }
-  }, [isFetching, isLoading, isNavigating, bug?.id, clearNavigationState]);
+  }, [bugId, bug?.id, isNavigating, isFetching, isLoading, clearNavigationState]);
+
+  // Remove manual refetch - React Query handles this automatically with refetchOnMount
+  // The query will refetch when bugId changes if data is stale or missing
 
   useEffect(() => {
     if (!isBugRoute) {
@@ -400,16 +403,27 @@ const BugDetails = () => {
     exitReloadRef.current = false;
   }, [isBugRoute, clearNavigationState]);
 
+  // Comprehensive cleanup on unmount
   useEffect(() => {
     return () => {
+      // Clear all timeouts
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = null;
       }
       if (navigationFallbackRef.current) {
         clearTimeout(navigationFallbackRef.current);
+        navigationFallbackRef.current = null;
       }
+      
+      // Reset all refs
       navigatingToBugIdRef.current = null;
       lastTargetUrlRef.current = null;
+      chunkLoadErrorRef.current = false;
+      chunkReloadScheduledRef.current = false;
+      exitReloadRef.current = false;
+      
+      // Reset state
       setIsNavigating(false);
     };
   }, []);
@@ -424,21 +438,28 @@ const BugDetails = () => {
     }
   }, [fromProject, bug, projectId]);
 
-  // Fetch bugs for navigation - filter by project if coming from project page
+  // Fetch bugs for navigation - optimized to prevent UI freeze
   useEffect(() => {
     let isMounted = true;
-    setBugListLoading(true);
     
-    // If coming from project page, we need to get the project ID from the current bug
-    // We'll fetch all bugs first, then filter by project if needed
-    bugService
-      .getBugs({
-        page: 1,
-        limit: 1000,
-        userId: currentUser?.id,
-      })
-      .then((res) => {
-        if (isMounted) {
+    // Debounce to prevent rapid refetches
+    const timeoutId = setTimeout(() => {
+      setBugListLoading(true);
+      
+      // Use smaller limit initially - fetch only what's needed for navigation
+      // Reduced from 1000 to 200 to prevent UI freeze in production
+      bugService
+        .getBugs({
+          page: 1,
+          limit: 200, // Reduced from 1000 to prevent UI freeze
+          userId: currentUser?.id,
+          ...(fromProject && projectId ? { projectId: projectId } : {}),
+        })
+        .then((res) => {
+          if (!isMounted) {
+            return;
+          }
+          
           let filteredBugs = res.bugs;
           
           // If coming from project page, filter by the stored project ID
@@ -448,11 +469,19 @@ const BugDetails = () => {
           
           setBugList(filteredBugs);
           setBugListLoading(false);
-        }
-      })
-      .catch(() => setBugListLoading(false));
+        })
+        .catch((error) => {
+          if (!isMounted) {
+            return;
+          }
+          console.error("[BugDetails] Error fetching bug list:", error);
+          setBugListLoading(false);
+        });
+    }, 150); // Small debounce to prevent rapid refetches
+
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
     };
   }, [fromProject, projectId, currentUser?.id]);
 
