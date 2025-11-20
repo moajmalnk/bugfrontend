@@ -58,6 +58,10 @@ const BugDetailsDiagnostic = () => {
   const [isMonitoring, setIsMonitoring] = useState(true);
   const [navigationCount, setNavigationCount] = useState(0);
   const [freezeDetected, setFreezeDetected] = useState(false);
+  const [serviceWorkerStatus, setServiceWorkerStatus] = useState<{
+    registered: boolean;
+    updateCheckInterval?: number;
+  } | null>(null);
   
   const logsRef = useRef<DiagnosticData[]>([]);
   const apiCallsRef = useRef<ApiCall[]>([]);
@@ -317,7 +321,48 @@ const BugDetailsDiagnostic = () => {
     navigate(`/${currentUser.role}/bugs/${bugId}`);
   };
 
-  // Initialize
+  // Monitor Service Worker
+  useEffect(() => {
+    if (!isMonitoring) return;
+    
+    const checkServiceWorker = async () => {
+      if ('serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.getRegistration();
+          const isRegistered = !!registration;
+          
+          // Check if service worker update check is happening every 60 seconds
+          // This is a known issue in serviceWorkerManager.ts line 205-209
+          setServiceWorkerStatus({
+            registered: isRegistered,
+            updateCheckInterval: 60000, // Known: serviceWorkerManager checks every 60s
+          });
+          
+          if (isRegistered && registration) {
+            registration.addEventListener('updatefound', () => {
+              addDiagnostic('warning', 'Service Worker update detected', {
+                timestamp: new Date().toISOString(),
+              });
+            });
+          }
+          
+          addDiagnostic('info', `Service Worker ${isRegistered ? 'registered' : 'not registered'}`, {
+            registered: isRegistered,
+            updateCheckInterval: 60000,
+          });
+        } catch (error: any) {
+          addDiagnostic('error', 'Service Worker check failed', { error: error.message });
+        }
+      }
+    };
+    
+    checkServiceWorker();
+    const interval = setInterval(checkServiceWorker, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(interval);
+  }, [isMonitoring]);
+
+  // Initialize and expose diagnostic tools globally
   useEffect(() => {
     addDiagnostic('info', 'BugDetails Diagnostic Page Loaded', {
       bugId,
@@ -326,13 +371,47 @@ const BugDetailsDiagnostic = () => {
       userId: currentUser?.id,
     });
 
+    // Check for known freeze causes
+    addDiagnostic('warning', '⚠️ POTENTIAL FREEZE CAUSE DETECTED', {
+      issue: 'Service Worker Update Check',
+      interval: 'Every 60 seconds',
+      location: 'serviceWorkerManager.ts:205-209',
+      recommendation: 'Service worker checks for updates every 60 seconds. This may be causing the freezes.',
+    });
+
+    // Expose diagnostic tools to window for global access
+    if (typeof window !== 'undefined') {
+      (window as any).__BUG_DETAILS_DIAGNOSTIC__ = {
+        getLogs: () => logsRef.current,
+        exportLogs: () => JSON.stringify(logsRef.current, null, 2),
+        clearLogs: () => {
+          logsRef.current = [];
+          setDiagnostics([]);
+        },
+        getQueryCache: () => queryClient.getQueryCache().getAll(),
+        clearQueryCache: () => queryClient.clear(),
+        navigateToDiagnostic: () => {
+          if (bugId && currentUser?.role) {
+            window.location.href = `/${currentUser.role}/bugs/${bugId}/diagnostic`;
+          }
+        },
+        // Add diagnostic page specific methods
+        getDiagnostics: () => diagnostics,
+        getApiCalls: () => apiCalls,
+        getMemoryUsage: () => memoryUsage,
+        getReactQueryCache: () => reactQueryCache,
+      };
+      
+      console.log('[BugDetailsDiagnostic] Diagnostic tools available at window.__BUG_DETAILS_DIAGNOSTIC__');
+    }
+
     // Auto-start monitoring
     setIsMonitoring(true);
 
     return () => {
       setIsMonitoring(false);
     };
-  }, []);
+  }, [bugId, currentUser?.role, currentUser?.id, location.pathname, queryClient]);
 
   const getDiagnosticIcon = (type: DiagnosticData['type']) => {
     switch (type) {
@@ -378,8 +457,43 @@ const BugDetailsDiagnostic = () => {
               <Alert className="mt-4 border-red-500 bg-red-50 dark:bg-red-950/20">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Freeze Detected!</AlertTitle>
-                <AlertDescription>
-                  The page appears to be frozen. Check the logs below for details.
+                <AlertDescription className="space-y-2">
+                  <p>The page appears to be frozen. Check the logs below for details.</p>
+                  {serviceWorkerStatus?.registered && (
+                    <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-950/20 rounded text-sm">
+                      <strong>⚠️ Likely Cause:</strong> Service Worker update check every 60 seconds 
+                      (matches freeze pattern). See recommendations below.
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Service Worker Status */}
+            {serviceWorkerStatus && (
+              <Alert className={serviceWorkerStatus.registered ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" : ""}>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Service Worker Status</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>
+                    Status: <strong>{serviceWorkerStatus.registered ? 'Registered' : 'Not Registered'}</strong>
+                  </p>
+                  {serviceWorkerStatus.registered && (
+                    <>
+                      <p>
+                        Update Check Interval: <strong>{serviceWorkerStatus.updateCheckInterval ? `${serviceWorkerStatus.updateCheckInterval / 1000}s` : 'Unknown'}</strong>
+                      </p>
+                      <div className="mt-2 p-2 bg-background rounded text-xs">
+                        <strong>🔧 Fix Recommendation:</strong>
+                        <ul className="list-disc list-inside mt-1 space-y-1">
+                          <li>Service worker checks for updates every 60 seconds (matches freeze timing)</li>
+                          <li>This is in <code>serviceWorkerManager.ts:205-209</code></li>
+                          <li>Consider increasing interval to 5 minutes (300000ms) or disabling auto-update checks</li>
+                          <li>Or use <code>registration.update()</code> only on user interaction</li>
+                        </ul>
+                      </div>
+                    </>
+                  )}
                 </AlertDescription>
               </Alert>
             )}

@@ -16,7 +16,7 @@ export function UserNav() {
   const { currentUser, logout } = useAuth();
   const role = currentUser?.role;
 
-  const defaultAvatar = "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png";
+  const defaultAvatar = "/logo.png";
 
   return (
     <DropdownMenu>

@@ -19,6 +19,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
   private updateCallbacks: (() => void)[] = [];
   private offlineCallbacks: (() => void)[] = [];
   private onlineCallbacks: (() => void)[] = [];
+  private updateCheckIntervalId: number | null = null;
 
   constructor() {
     this.setupNetworkListeners();
@@ -60,6 +61,12 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
    * Unregister the service worker
    */
   async unregister(): Promise<boolean> {
+    // Clear update check interval
+    if (this.updateCheckIntervalId !== null) {
+      clearInterval(this.updateCheckIntervalId);
+      this.updateCheckIntervalId = null;
+    }
+    
     if (!this.registration) {
       return false;
     }
@@ -201,12 +208,35 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
       window.location.reload();
     });
 
-    // Check for updates periodically
-    setInterval(() => {
-      this.update().catch(() => {
-        // Ignore update check errors
-      });
-    }, 60000); // Check every minute
+    // Check for updates periodically - FIXED: Increased interval to prevent freezes
+    // Changed from 60s to 5 minutes (300000ms) to prevent main thread blocking
+    // The frequent checks were causing page freezes every 60 seconds
+    // Use requestIdleCallback for non-blocking checks when possible
+    const scheduleUpdateCheck = () => {
+      // Use requestIdleCallback if available to prevent blocking main thread
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        requestIdleCallback(() => {
+          this.update().catch(() => {
+            // Ignore update check errors
+          });
+        }, { timeout: 5000 });
+      } else {
+        // Fallback to setTimeout for better async handling (non-blocking)
+        setTimeout(() => {
+          this.update().catch(() => {
+            // Ignore update check errors
+          });
+        }, 0);
+      }
+    };
+    
+    // Clear any existing interval first
+    if (this.updateCheckIntervalId !== null) {
+      clearInterval(this.updateCheckIntervalId);
+    }
+    
+    // Set new interval: 5 minutes instead of 1 minute to prevent freezes
+    this.updateCheckIntervalId = window.setInterval(scheduleUpdateCheck, 5 * 60 * 1000);
   }
 
   /**

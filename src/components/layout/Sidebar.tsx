@@ -32,8 +32,7 @@ interface SidebarProps {
   closeSidebar?: () => void;
 }
 
-const defaultAvatar =
-  "https://codoacademy.com/uploads/system/e7c3fb5390c74909db1bb3559b24007a.png";
+const defaultAvatar = "/logo.png";
 
 export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
