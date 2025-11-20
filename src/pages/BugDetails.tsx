@@ -129,6 +129,40 @@ const AccessError = () => (
   </main>
 );
 
+// Enhanced logging for production debugging
+const createDiagnosticLogger = (componentName: string) => {
+  const logs: Array<{ time: number; message: string; data?: any }> = [];
+  const MAX_LOGS = 50;
+
+  return {
+    log: (message: string, data?: any) => {
+      const timestamp = Date.now();
+      const logEntry = { time: timestamp, message, data };
+      logs.push(logEntry);
+      
+      // Keep only last MAX_LOGS entries
+      if (logs.length > MAX_LOGS) {
+        logs.shift();
+      }
+      
+      // Always log to console in production for debugging
+      console.log(`[${componentName}]`, message, data || '');
+      
+      // Store in window for global access
+      if (typeof window !== 'undefined') {
+        (window as any).__BUG_DETAILS_LOGS__ = logs;
+      }
+    },
+    getLogs: () => logs,
+    clearLogs: () => logs.length = 0,
+    exportLogs: () => {
+      return JSON.stringify(logs, null, 2);
+    }
+  };
+};
+
+const diagnosticLogger = createDiagnosticLogger('BugDetails');
+
 const BugDetails = () => {
   // All hooks at the top!
   const { bugId } = useParams();
@@ -149,6 +183,114 @@ const BugDetails = () => {
   const exitReloadRef = useRef(false);
   const chunkLoadErrorRef = useRef(false);
   const chunkReloadScheduledRef = useRef(false);
+  const renderCountRef = useRef(0);
+  const lastRenderTimeRef = useRef(Date.now());
+  
+  // Track render performance
+  renderCountRef.current += 1;
+  const now = Date.now();
+  const timeSinceLastRender = now - lastRenderTimeRef.current;
+  lastRenderTimeRef.current = now;
+  
+  // Log slow renders (potential freeze indicator)
+  if (timeSinceLastRender > 1000 && renderCountRef.current > 1) {
+    diagnosticLogger.log('Slow render detected', {
+      timeSinceLastRender,
+      renderCount: renderCountRef.current,
+      bugId,
+      pathname: location.pathname
+    });
+  }
+  
+  // Initial mount logging
+  useEffect(() => {
+    diagnosticLogger.log('Component mounted', {
+      bugId,
+      pathname: location.pathname,
+      userId: currentUser?.id,
+      userRole: currentUser?.role,
+      renderCount: renderCountRef.current
+    });
+    
+    // Expose diagnostic tools to window
+    if (typeof window !== 'undefined') {
+      (window as any).__BUG_DETAILS_DIAGNOSTIC__ = {
+        getLogs: () => diagnosticLogger.getLogs(),
+        exportLogs: () => diagnosticLogger.exportLogs(),
+        clearLogs: () => diagnosticLogger.clearLogs(),
+        getQueryCache: () => queryClient.getQueryCache().getAll(),
+        clearQueryCache: () => queryClient.clear(),
+        navigateToDiagnostic: () => {
+          if (bugId && currentUser?.role) {
+            window.location.href = `/${currentUser.role}/bugs/${bugId}/diagnostic`;
+          }
+        }
+      };
+      
+      console.log('[BugDetails] Diagnostic tools available at window.__BUG_DETAILS_DIAGNOSTIC__');
+    }
+    
+    return () => {
+      diagnosticLogger.log('Component unmounting', {
+        bugId,
+        renderCount: renderCountRef.current
+      });
+    };
+  }, []); // Only run on mount/unmount
+  const renderCountRef = useRef(0);
+  const lastRenderTimeRef = useRef(Date.now());
+  
+  // Track render performance
+  renderCountRef.current += 1;
+  const now = Date.now();
+  const timeSinceLastRender = now - lastRenderTimeRef.current;
+  lastRenderTimeRef.current = now;
+  
+  // Log slow renders (potential freeze indicator)
+  if (timeSinceLastRender > 1000 && renderCountRef.current > 1) {
+    diagnosticLogger.log('Slow render detected', {
+      timeSinceLastRender,
+      renderCount: renderCountRef.current,
+      bugId,
+      pathname: location.pathname
+    });
+  }
+  
+  // Initial mount logging
+  useEffect(() => {
+    diagnosticLogger.log('Component mounted', {
+      bugId,
+      pathname: location.pathname,
+      userId: currentUser?.id,
+      userRole: currentUser?.role,
+      renderCount: renderCountRef.current
+    });
+    
+    // Expose diagnostic tools to window
+    if (typeof window !== 'undefined') {
+      (window as any).__BUG_DETAILS_DIAGNOSTIC__ = {
+        getLogs: () => diagnosticLogger.getLogs(),
+        exportLogs: () => diagnosticLogger.exportLogs(),
+        clearLogs: () => diagnosticLogger.clearLogs(),
+        getQueryCache: () => queryClient.getQueryCache().getAll(),
+        clearQueryCache: () => queryClient.clear(),
+        navigateToDiagnostic: () => {
+          if (bugId && currentUser?.role) {
+            window.location.href = `/${currentUser.role}/bugs/${bugId}/diagnostic`;
+          }
+        }
+      };
+      
+      console.log('[BugDetails] Diagnostic tools available at window.__BUG_DETAILS_DIAGNOSTIC__');
+    }
+    
+    return () => {
+      diagnosticLogger.log('Component unmounting', {
+        bugId,
+        renderCount: renderCountRef.current
+      });
+    };
+  }, []); // Only run on mount/unmount
   const isBugRoute = useMemo(() => {
     const onBugRoute = location.pathname.includes("/bugs/");
     console.debug("[BugDetails] isBugRoute computed", {
@@ -298,24 +440,49 @@ const BugDetails = () => {
   } = useQuery({
     queryKey: ["bug", bugId],
     queryFn: async () => {
-      // apiClient handles token and impersonation automatically
-      const response = await apiClient.get<ApiResponse<Bug>>(
-        `/bugs/get.php?id=${bugId}`
-      );
-      if (response.data.success) {
-        console.log('🔍 BugDetails: Fetched bug data:', {
-          bugId,
-          hasAttachments: !!response.data.data?.attachments,
-          attachmentsCount: response.data.data?.attachments?.length || 0,
-          attachments: response.data.data?.attachments,
-          screenshots: response.data.data?.screenshots,
-          files: response.data.data?.files,
-          fullResponse: response.data.data
-        });
+      const fetchStartTime = performance.now();
+      diagnosticLogger.log('Bug fetch started', { bugId });
+      
+      try {
+        // apiClient handles token and impersonation automatically
+        const response = await apiClient.get<ApiResponse<Bug>>(
+          `/bugs/get.php?id=${bugId}`
+        );
         
-        return response.data.data;
+        const fetchDuration = performance.now() - fetchStartTime;
+        
+        if (response.data.success) {
+          diagnosticLogger.log('Bug fetch successful', {
+            bugId,
+            duration: fetchDuration,
+            hasAttachments: !!response.data.data?.attachments,
+            attachmentsCount: response.data.data?.attachments?.length || 0,
+          });
+          
+          // Log slow fetches
+          if (fetchDuration > 3000) {
+            diagnosticLogger.log('WARNING: Slow bug fetch', {
+              duration: fetchDuration,
+              bugId
+            });
+          }
+          
+          return response.data.data;
+        }
+        
+        const errorMsg = response.data.message || "Failed to fetch bug details";
+        diagnosticLogger.log('Bug fetch failed (no data)', { bugId, error: errorMsg });
+        throw new Error(errorMsg);
+      } catch (err: any) {
+        const fetchDuration = performance.now() - fetchStartTime;
+        diagnosticLogger.log('Bug fetch error', {
+          bugId,
+          duration: fetchDuration,
+          error: err.message || 'Unknown error',
+          errorType: err.name,
+        });
+        throw err;
       }
-      throw new Error(response.data.message || "Failed to fetch bug details");
     },
     staleTime: 5 * 60 * 1000, // Match global config: 5 minutes
     gcTime: 10 * 60 * 1000,
@@ -442,9 +609,17 @@ const BugDetails = () => {
   useEffect(() => {
     let isMounted = true;
     
+    diagnosticLogger.log('Bug list fetch effect triggered', {
+      fromProject,
+      projectId,
+      userId: currentUser?.id
+    });
+    
     // Debounce to prevent rapid refetches
     const timeoutId = setTimeout(() => {
+      const fetchStartTime = performance.now();
       setBugListLoading(true);
+      diagnosticLogger.log('Bug list fetch started', { fromProject, projectId });
       
       // Use smaller limit initially - fetch only what's needed for navigation
       // Reduced from 1000 to 200 to prevent UI freeze in production
@@ -456,7 +631,10 @@ const BugDetails = () => {
           ...(fromProject && projectId ? { projectId: projectId } : {}),
         })
         .then((res) => {
+          const fetchDuration = performance.now() - fetchStartTime;
+          
           if (!isMounted) {
+            diagnosticLogger.log('Bug list fetch cancelled (unmounted)', { duration: fetchDuration });
             return;
           }
           
@@ -467,13 +645,37 @@ const BugDetails = () => {
             filteredBugs = res.bugs.filter(b => b.project_id === projectId);
           }
           
+          diagnosticLogger.log('Bug list fetch completed', {
+            duration: fetchDuration,
+            totalBugs: res.bugs.length,
+            filteredBugs: filteredBugs.length,
+            fromProject,
+            projectId
+          });
+          
+          // Warn about slow fetches
+          if (fetchDuration > 5000) {
+            diagnosticLogger.log('WARNING: Slow bug list fetch', {
+              duration: fetchDuration,
+              bugCount: filteredBugs.length
+            });
+          }
+          
           setBugList(filteredBugs);
           setBugListLoading(false);
         })
         .catch((error) => {
+          const fetchDuration = performance.now() - fetchStartTime;
+          
           if (!isMounted) {
             return;
           }
+          
+          diagnosticLogger.log('Bug list fetch error', {
+            duration: fetchDuration,
+            error: error.message || 'Unknown error'
+          });
+          
           console.error("[BugDetails] Error fetching bug list:", error);
           setBugListLoading(false);
         });
@@ -482,8 +684,9 @@ const BugDetails = () => {
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
+      diagnosticLogger.log('Bug list fetch effect cleanup', { bugId });
     };
-  }, [fromProject, projectId, currentUser?.id]);
+  }, [fromProject, projectId, currentUser?.id, bugId]);
 
   // Check if this is an access error
   const isAccessError =

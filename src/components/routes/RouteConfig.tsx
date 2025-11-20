@@ -63,6 +63,7 @@ const Projects = lazy(() => import("@/pages/Projects"));
 const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
 const Bugs = lazy(() => import("@/pages/Bugs"));
 const BugDetails = lazy(() => import("@/pages/BugDetails"));
+const BugDetailsDiagnostic = lazy(() => import("@/pages/BugDetailsDiagnostic"));
 const NewBug = lazy(() => import("@/pages/NewBug"));
 const Activity = lazy(() => import("@/pages/Activity"));
 const Users = lazy(() => import("@/pages/Users"));
@@ -236,6 +237,7 @@ const RouteConfig = () => {
           <Route path="projects/:projectId" element={<ProjectDetails />} />
           <Route path="bugs" element={<Bugs />} />
           <Route path="bugs/:bugId" element={<BugDetails />} />
+          <Route path="bugs/:bugId/diagnostic" element={<BugDetailsDiagnostic />} />
           <Route path="bugs/new" element={<NewBug />} />
           <Route path="activity" element={<Activity />} />
           <Route path="users" element={<Users />} />
