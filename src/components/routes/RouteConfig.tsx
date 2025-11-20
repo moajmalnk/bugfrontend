@@ -1,5 +1,7 @@
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
@@ -63,7 +65,44 @@ const Projects = lazy(() => import("@/pages/Projects"));
 const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
 const Bugs = lazy(() => import("@/pages/Bugs"));
 const BugDetails = lazy(() => import("@/pages/BugDetails"));
-const BugDetailsDiagnostic = lazy(() => import("@/pages/BugDetailsDiagnostic"));
+const BugDetailsDiagnostic = lazy(() => 
+  import("@/pages/BugDetailsDiagnostic").catch((error) => {
+    console.error('Failed to load BugDetailsDiagnostic component:', error);
+    // Return a fallback component
+    return {
+      default: () => (
+        <div className="min-h-screen flex items-center justify-center bg-background p-6">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle>Diagnostic Page Loading Error</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
+                Failed to load diagnostic component. This usually happens due to network issues or cached files.
+              </p>
+              <Button onClick={() => window.location.reload()} className="w-full">
+                Reload Page
+              </Button>
+              <Button 
+                onClick={async () => {
+                  if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                  }
+                  window.location.reload();
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                Clear Cache & Reload
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    };
+  })
+);
 const NewBug = lazy(() => import("@/pages/NewBug"));
 const Activity = lazy(() => import("@/pages/Activity"));
 const Users = lazy(() => import("@/pages/Users"));
@@ -236,8 +275,8 @@ const RouteConfig = () => {
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:projectId" element={<ProjectDetails />} />
           <Route path="bugs" element={<Bugs />} />
-          <Route path="bugs/:bugId" element={<BugDetails />} />
           <Route path="bugs/:bugId/diagnostic" element={<BugDetailsDiagnostic />} />
+          <Route path="bugs/:bugId" element={<BugDetails />} />
           <Route path="bugs/new" element={<NewBug />} />
           <Route path="activity" element={<Activity />} />
           <Route path="users" element={<Users />} />
