@@ -202,7 +202,7 @@ const BugDetails = () => {
     });
   }
   
-  // Initial mount logging
+  // Initial mount logging - expose diagnostic tools
   useEffect(() => {
     diagnosticLogger.log('Component mounted', {
       bugId,
@@ -236,61 +236,7 @@ const BugDetails = () => {
         renderCount: renderCountRef.current
       });
     };
-  }, []); // Only run on mount/unmount
-  const renderCountRef = useRef(0);
-  const lastRenderTimeRef = useRef(Date.now());
-  
-  // Track render performance
-  renderCountRef.current += 1;
-  const now = Date.now();
-  const timeSinceLastRender = now - lastRenderTimeRef.current;
-  lastRenderTimeRef.current = now;
-  
-  // Log slow renders (potential freeze indicator)
-  if (timeSinceLastRender > 1000 && renderCountRef.current > 1) {
-    diagnosticLogger.log('Slow render detected', {
-      timeSinceLastRender,
-      renderCount: renderCountRef.current,
-      bugId,
-      pathname: location.pathname
-    });
-  }
-  
-  // Initial mount logging
-  useEffect(() => {
-    diagnosticLogger.log('Component mounted', {
-      bugId,
-      pathname: location.pathname,
-      userId: currentUser?.id,
-      userRole: currentUser?.role,
-      renderCount: renderCountRef.current
-    });
-    
-    // Expose diagnostic tools to window
-    if (typeof window !== 'undefined') {
-      (window as any).__BUG_DETAILS_DIAGNOSTIC__ = {
-        getLogs: () => diagnosticLogger.getLogs(),
-        exportLogs: () => diagnosticLogger.exportLogs(),
-        clearLogs: () => diagnosticLogger.clearLogs(),
-        getQueryCache: () => queryClient.getQueryCache().getAll(),
-        clearQueryCache: () => queryClient.clear(),
-        navigateToDiagnostic: () => {
-          if (bugId && currentUser?.role) {
-            window.location.href = `/${currentUser.role}/bugs/${bugId}/diagnostic`;
-          }
-        }
-      };
-      
-      console.log('[BugDetails] Diagnostic tools available at window.__BUG_DETAILS_DIAGNOSTIC__');
-    }
-    
-    return () => {
-      diagnosticLogger.log('Component unmounting', {
-        bugId,
-        renderCount: renderCountRef.current
-      });
-    };
-  }, []); // Only run on mount/unmount
+  }, [bugId, currentUser?.id, currentUser?.role, queryClient]); // Include dependencies for diagnostic tools
   const isBugRoute = useMemo(() => {
     const onBugRoute = location.pathname.includes("/bugs/");
     console.debug("[BugDetails] isBugRoute computed", {

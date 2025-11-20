@@ -164,7 +164,7 @@ const BugDetailsDiagnostic = () => {
           dataUpdatedAt: q.state.dataUpdatedAt,
           dataExists: !!q.state.data,
           isStale: q.isStale(),
-          isFetching: q.isFetching,
+          isFetching: (q as any).isFetching,
         })),
       };
       
@@ -266,7 +266,7 @@ const BugDetailsDiagnostic = () => {
       
       addDiagnostic('success', `Bug fetch successful in ${duration.toFixed(0)}ms`, {
         duration,
-        hasData: !!response.data?.data,
+        hasData: !!(response.data as any)?.data,
         bugId,
       });
     } catch (error: any) {
@@ -285,7 +285,7 @@ const BugDetailsDiagnostic = () => {
       
       addDiagnostic('success', `Bug list fetch successful in ${duration.toFixed(0)}ms`, {
         duration,
-        bugCount: response.data?.data?.bugs?.length || 0,
+        bugCount: (response.data as any)?.data?.bugs?.length || 0,
       });
       
       if (duration > 3000) {
