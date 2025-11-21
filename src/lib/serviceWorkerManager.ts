@@ -33,6 +33,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
       // console.warn('[SW Manager] Service workers not supported');
       return null;
     }
+    
 
     try {
       this.registration = await navigator.serviceWorker.register('/service-worker.js', {
