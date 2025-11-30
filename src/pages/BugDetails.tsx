@@ -186,33 +186,46 @@ const BugDetails = () => {
   const renderCountRef = useRef(0);
   const lastRenderTimeRef = useRef(Date.now());
   
-  // Track render performance
+  // Track render performance - only in development or when explicitly enabled 
   renderCountRef.current += 1;
-  const now = Date.now();
-  const timeSinceLastRender = now - lastRenderTimeRef.current;
-  lastRenderTimeRef.current = now;
+  const isDevelopment = import.meta.env.DEV;
+  const enableDiagnostics = (window as any).__ENABLE_BUG_DETAILS_DIAGNOSTICS__ === true;
   
-  // Log slow renders (potential freeze indicator)
-  if (timeSinceLastRender > 1000 && renderCountRef.current > 1) {
-    diagnosticLogger.log('Slow render detected', {
-      timeSinceLastRender,
-      renderCount: renderCountRef.current,
-      bugId,
-      pathname: location.pathname
-    });
+  if (isDevelopment || enableDiagnostics) {
+    const now = Date.now();
+    const timeSinceLastRender = now - lastRenderTimeRef.current;
+    lastRenderTimeRef.current = now;
+    
+    // Log slow renders (potential freeze indicator) - throttled
+    if (timeSinceLastRender > 1000 && renderCountRef.current > 1) {
+      diagnosticLogger.log('Slow render detected', {
+        timeSinceLastRender,
+        renderCount: renderCountRef.current,
+        bugId,
+        pathname: location.pathname
+      });
+    }
+  } else {
+    // Still update ref but don't log in production
+    lastRenderTimeRef.current = Date.now();
   }
   
-  // Initial mount logging - expose diagnostic tools
+  // Initial mount logging - expose diagnostic tools (only in dev or when enabled)
   useEffect(() => {
-    diagnosticLogger.log('Component mounted', {
-      bugId,
-      pathname: location.pathname,
-      userId: currentUser?.id,
-      userRole: currentUser?.role,
-      renderCount: renderCountRef.current
-    });
+    const isDevelopment = import.meta.env.DEV;
+    const enableDiagnostics = (window as any).__ENABLE_BUG_DETAILS_DIAGNOSTICS__ === true;
     
-    // Expose diagnostic tools to window
+    if (isDevelopment || enableDiagnostics) {
+      diagnosticLogger.log('Component mounted', {
+        bugId,
+        pathname: location.pathname,
+        userId: currentUser?.id,
+        userRole: currentUser?.role,
+        renderCount: renderCountRef.current
+      });
+    }
+    
+    // Expose diagnostic tools to window (always available, but logging is conditional)
     if (typeof window !== 'undefined') {
       (window as any).__BUG_DETAILS_DIAGNOSTIC__ = {
         getLogs: () => diagnosticLogger.getLogs(),
@@ -220,6 +233,14 @@ const BugDetails = () => {
         clearLogs: () => diagnosticLogger.clearLogs(),
         getQueryCache: () => queryClient.getQueryCache().getAll(),
         clearQueryCache: () => queryClient.clear(),
+        enableDiagnostics: () => {
+          (window as any).__ENABLE_BUG_DETAILS_DIAGNOSTICS__ = true;
+          console.log('[BugDetails] Diagnostics enabled. Reload page to activate.');
+        },
+        disableDiagnostics: () => {
+          (window as any).__ENABLE_BUG_DETAILS_DIAGNOSTICS__ = false;
+          console.log('[BugDetails] Diagnostics disabled. Reload page to deactivate.');
+        },
         navigateToDiagnostic: () => {
           if (bugId && currentUser?.role) {
             window.location.href = `/${currentUser.role}/bugs/${bugId}/diagnostic`;
@@ -227,14 +248,18 @@ const BugDetails = () => {
         }
       };
       
-      console.log('[BugDetails] Diagnostic tools available at window.__BUG_DETAILS_DIAGNOSTIC__');
+      if (isDevelopment || enableDiagnostics) {
+        console.log('[BugDetails] Diagnostic tools available at window.__BUG_DETAILS_DIAGNOSTIC__');
+      }
     }
     
     return () => {
-      diagnosticLogger.log('Component unmounting', {
-        bugId,
-        renderCount: renderCountRef.current
-      });
+      if (isDevelopment || enableDiagnostics) {
+        diagnosticLogger.log('Component unmounting', {
+          bugId,
+          renderCount: renderCountRef.current
+        });
+      }
     };
   }, [bugId, currentUser?.id, currentUser?.role, queryClient]); // Include dependencies for diagnostic tools
   const isBugRoute = useMemo(() => {
@@ -387,7 +412,12 @@ const BugDetails = () => {
     queryKey: ["bug", bugId],
     queryFn: async () => {
       const fetchStartTime = performance.now();
-      diagnosticLogger.log('Bug fetch started', { bugId });
+      const isDevelopment = import.meta.env.DEV;
+      const enableDiagnostics = (window as any).__ENABLE_BUG_DETAILS_DIAGNOSTICS__ === true;
+      
+      if (isDevelopment || enableDiagnostics) {
+        diagnosticLogger.log('Bug fetch started', { bugId });
+      }
       
       try {
         // apiClient handles token and impersonation automatically
@@ -398,35 +428,41 @@ const BugDetails = () => {
         const fetchDuration = performance.now() - fetchStartTime;
         
         if (response.data.success) {
-          diagnosticLogger.log('Bug fetch successful', {
-            bugId,
-            duration: fetchDuration,
-            hasAttachments: !!response.data.data?.attachments,
-            attachmentsCount: response.data.data?.attachments?.length || 0,
-          });
-          
-          // Log slow fetches
-          if (fetchDuration > 3000) {
-            diagnosticLogger.log('WARNING: Slow bug fetch', {
+          if (isDevelopment || enableDiagnostics) {
+            diagnosticLogger.log('Bug fetch successful', {
+              bugId,
               duration: fetchDuration,
-              bugId
+              hasAttachments: !!response.data.data?.attachments,
+              attachmentsCount: response.data.data?.attachments?.length || 0,
             });
+            
+            // Log slow fetches
+            if (fetchDuration > 3000) {
+              diagnosticLogger.log('WARNING: Slow bug fetch', {
+                duration: fetchDuration,
+                bugId
+              });
+            }
           }
           
           return response.data.data;
         }
         
         const errorMsg = response.data.message || "Failed to fetch bug details";
-        diagnosticLogger.log('Bug fetch failed (no data)', { bugId, error: errorMsg });
+        if (isDevelopment || enableDiagnostics) {
+          diagnosticLogger.log('Bug fetch failed (no data)', { bugId, error: errorMsg });
+        }
         throw new Error(errorMsg);
       } catch (err: any) {
         const fetchDuration = performance.now() - fetchStartTime;
-        diagnosticLogger.log('Bug fetch error', {
-          bugId,
-          duration: fetchDuration,
-          error: err.message || 'Unknown error',
-          errorType: err.name,
-        });
+        if (isDevelopment || enableDiagnostics) {
+          diagnosticLogger.log('Bug fetch error', {
+            bugId,
+            duration: fetchDuration,
+            error: err.message || 'Unknown error',
+            errorType: err.name,
+          });
+        }
         throw err;
       }
     },
@@ -554,83 +590,120 @@ const BugDetails = () => {
   // Fetch bugs for navigation - optimized to prevent UI freeze
   useEffect(() => {
     let isMounted = true;
+    let abortController: AbortController | null = null;
     
-    diagnosticLogger.log('Bug list fetch effect triggered', {
-      fromProject,
-      projectId,
-      userId: currentUser?.id
-    });
+    const isDevelopment = import.meta.env.DEV;
+    const enableDiagnostics = (window as any).__ENABLE_BUG_DETAILS_DIAGNOSTICS__ === true;
+    
+    if (isDevelopment || enableDiagnostics) {
+      diagnosticLogger.log('Bug list fetch effect triggered', {
+        fromProject,
+        projectId,
+        userId: currentUser?.id
+      });
+    }
     
     // Debounce to prevent rapid refetches
     const timeoutId = setTimeout(() => {
       const fetchStartTime = performance.now();
       setBugListLoading(true);
-      diagnosticLogger.log('Bug list fetch started', { fromProject, projectId });
       
-      // Use smaller limit initially - fetch only what's needed for navigation
-      // Reduced from 1000 to 200 to prevent UI freeze in production
-      bugService
-        .getBugs({
-          page: 1,
-          limit: 200, // Reduced from 1000 to prevent UI freeze
-          userId: currentUser?.id,
-          ...(fromProject && projectId ? { projectId: projectId } : {}),
-        })
-        .then((res) => {
-          const fetchDuration = performance.now() - fetchStartTime;
-          
-          if (!isMounted) {
-            diagnosticLogger.log('Bug list fetch cancelled (unmounted)', { duration: fetchDuration });
-            return;
-          }
-          
-          let filteredBugs = res.bugs;
-          
-          // If coming from project page, filter by the stored project ID
-          if (fromProject && projectId) {
-            filteredBugs = res.bugs.filter(b => b.project_id === projectId);
-          }
-          
-          diagnosticLogger.log('Bug list fetch completed', {
-            duration: fetchDuration,
-            totalBugs: res.bugs.length,
-            filteredBugs: filteredBugs.length,
-            fromProject,
-            projectId
+      if (isDevelopment || enableDiagnostics) {
+        diagnosticLogger.log('Bug list fetch started', { fromProject, projectId });
+      }
+      
+      // Use requestAnimationFrame to ensure fetch doesn't block UI
+      requestAnimationFrame(() => {
+        if (!isMounted) return;
+        
+        // Use smaller limit initially - fetch only what's needed for navigation
+        // Reduced from 1000 to 100 to prevent UI freeze in production
+        bugService
+          .getBugs({
+            page: 1,
+            limit: 100, // Further reduced from 200 to prevent UI freeze
+            userId: currentUser?.id,
+            ...(fromProject && projectId ? { projectId: projectId } : {}),
+          })
+          .then((res) => {
+            const fetchDuration = performance.now() - fetchStartTime;
+            
+            if (!isMounted) {
+              if (isDevelopment || enableDiagnostics) {
+                diagnosticLogger.log('Bug list fetch cancelled (unmounted)', { duration: fetchDuration });
+              }
+              return;
+            }
+            
+            // Use requestIdleCallback or setTimeout to defer state update if available
+            const updateState = () => {
+              if (!isMounted) return;
+              
+              let filteredBugs = res.bugs;
+              
+              // If coming from project page, filter by the stored project ID
+              if (fromProject && projectId) {
+                filteredBugs = res.bugs.filter(b => b.project_id === projectId);
+              }
+              
+              if (isDevelopment || enableDiagnostics) {
+                diagnosticLogger.log('Bug list fetch completed', {
+                  duration: fetchDuration,
+                  totalBugs: res.bugs.length,
+                  filteredBugs: filteredBugs.length,
+                  fromProject,
+                  projectId
+                });
+                
+                // Warn about slow fetches
+                if (fetchDuration > 5000) {
+                  diagnosticLogger.log('WARNING: Slow bug list fetch', {
+                    duration: fetchDuration,
+                    bugCount: filteredBugs.length
+                  });
+                }
+              }
+              
+              setBugList(filteredBugs);
+              setBugListLoading(false);
+            };
+            
+            // Defer state update to next frame to prevent blocking
+            if ('requestIdleCallback' in window) {
+              requestIdleCallback(updateState, { timeout: 100 });
+            } else {
+              setTimeout(updateState, 0);
+            }
+          })
+          .catch((error) => {
+            const fetchDuration = performance.now() - fetchStartTime;
+            
+            if (!isMounted) {
+              return;
+            }
+            
+            if (isDevelopment || enableDiagnostics) {
+              diagnosticLogger.log('Bug list fetch error', {
+                duration: fetchDuration,
+                error: error.message || 'Unknown error'
+              });
+            }
+            
+            console.error("[BugDetails] Error fetching bug list:", error);
+            setBugListLoading(false);
           });
-          
-          // Warn about slow fetches
-          if (fetchDuration > 5000) {
-            diagnosticLogger.log('WARNING: Slow bug list fetch', {
-              duration: fetchDuration,
-              bugCount: filteredBugs.length
-            });
-          }
-          
-          setBugList(filteredBugs);
-          setBugListLoading(false);
-        })
-        .catch((error) => {
-          const fetchDuration = performance.now() - fetchStartTime;
-          
-          if (!isMounted) {
-            return;
-          }
-          
-          diagnosticLogger.log('Bug list fetch error', {
-            duration: fetchDuration,
-            error: error.message || 'Unknown error'
-          });
-          
-          console.error("[BugDetails] Error fetching bug list:", error);
-          setBugListLoading(false);
-        });
+      });
     }, 150); // Small debounce to prevent rapid refetches
 
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
-      diagnosticLogger.log('Bug list fetch effect cleanup', { bugId });
+      if (abortController) {
+        abortController.abort();
+      }
+      if (isDevelopment || enableDiagnostics) {
+        diagnosticLogger.log('Bug list fetch effect cleanup', { bugId });
+      }
     };
   }, [fromProject, projectId, currentUser?.id, bugId]);
 
@@ -786,24 +859,31 @@ const BugDetails = () => {
   // Check if user came from fixes page via URL parameter
   const fromFixes = searchParams.get("from") === "fixes";
   
-  const filteredBugList = bugList.filter(
-    (b) => {
+  // Memoize filtered bug list to prevent recalculation on every render
+  const filteredBugList = useMemo(() => {
+    return bugList.filter((b) => {
       // If coming from fixes page, show only fixed bugs
       if (fromFixes) {
         return b.status === "fixed" || b.id === bugId; // Always include the current bug
       }
       // Otherwise, show non-fixed bugs (original behavior)
       return ["pending", "in_progress", "declined", "rejected"].includes(b.status) || b.id === bugId;
-    }
-  );
-  const currentIndex = filteredBugList.findIndex((b) => b.id === bugId);
-  const prevBugId =
-    currentIndex > 0 ? filteredBugList[currentIndex - 1]?.id : null;
-  const nextBugId =
-    currentIndex >= 0 && currentIndex < filteredBugList.length - 1
+    });
+  }, [bugList, fromFixes, bugId]);
+  
+  // Memoize navigation values to prevent recalculation
+  const navigationValues = useMemo(() => {
+    const currentIndex = filteredBugList.findIndex((b) => b.id === bugId);
+    const prevBugId = currentIndex > 0 ? filteredBugList[currentIndex - 1]?.id : null;
+    const nextBugId = currentIndex >= 0 && currentIndex < filteredBugList.length - 1
       ? filteredBugList[currentIndex + 1]?.id
       : null;
-  const totalBugs = filteredBugList.length;
+    const totalBugs = filteredBugList.length;
+    
+    return { currentIndex, prevBugId, nextBugId, totalBugs };
+  }, [filteredBugList, bugId]);
+  
+  const { currentIndex, prevBugId, nextBugId, totalBugs } = navigationValues;
 
   const role = currentUser?.role || "admin";
 
