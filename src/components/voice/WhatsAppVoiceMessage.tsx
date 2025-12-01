@@ -90,17 +90,47 @@ export function WhatsAppVoiceMessage({
             credentials: "omit",
           });
           if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            const errorText = await response.text().catch(() => 'Unknown error');
+            console.error(`Failed to fetch audio: HTTP ${response.status}`, {
+              url: audioSource,
+              status: response.status,
+              statusText: response.statusText,
+              error: errorText
+            });
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
+          
+          // Check if response is actually an audio file
+          const contentType = response.headers.get('content-type') || '';
+          if (!contentType.startsWith('audio/') && contentType !== 'application/octet-stream') {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            console.error('Response is not an audio file', {
+              url: audioSource,
+              contentType,
+              responsePreview: errorText.substring(0, 200)
+            });
+            throw new Error(`Invalid content type: ${contentType}`);
+          }
+          
           const blob = await response.blob();
           if (cancelled) {
             return;
           }
+          
+          // Verify blob is not empty
+          if (blob.size === 0) {
+            console.error('Audio blob is empty', { url: audioSource });
+            throw new Error('Audio file is empty');
+          }
+          
           const url = URL.createObjectURL(blob);
           derivedUrlRef.current = url;
           setAudioUrl(url);
         } catch (error) {
-          console.error("Failed to resolve audio source", error);
+          console.error("Failed to resolve audio source", {
+            url: audioSource,
+            error: error instanceof Error ? error.message : String(error)
+          });
           if (!cancelled) {
             setLoadError("Unable to load voice note");
             setAudioUrl(null);
