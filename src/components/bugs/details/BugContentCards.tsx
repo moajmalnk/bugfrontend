@@ -50,7 +50,8 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
     if (/^https?:\/\//i.test(path)) {
       return path;
     }
-    const url = `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(path)}&bug_id=${encodeURIComponent(bug.id)}`;
+    // Use audio.php endpoint for audio files (same as EditBugDialog)
+    const url = `${apiBaseUrl}/audio.php?path=${encodeURIComponent(path)}`;
     console.log('🎵 Building audio URL:', { path, apiBaseUrl, url });
     return url;
   };
@@ -82,7 +83,7 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
             attachment.file_name?.match(/\.(wav|mp3|m4a|ogg|webm)$/i)
           ) {
             try {
-              // Use get_attachment.php endpoint for proper CORS and content-type handling
+              // Use audio.php endpoint for proper CORS and content-type handling
               const audioUrl = buildAudioUrl(attachment.file_path);
 
               const audio = new Audio();

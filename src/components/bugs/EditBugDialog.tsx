@@ -803,12 +803,6 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                 <div className="space-y-3">
                   <WhatsAppVoiceRecorder
                     onComplete={handleVoiceRecorderComplete}
-                    onCancel={() =>
-                      toast({
-                        title: "Recording cancelled",
-                        description: "Hold the mic icon to capture a new voice note.",
-                      })
-                    }
                     disabled={isSubmitting}
                     maxDuration={300}
                   />
