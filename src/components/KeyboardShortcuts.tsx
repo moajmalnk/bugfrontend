@@ -8,30 +8,41 @@ export function KeyboardShortcuts() {
   const { setTheme, theme } = useTheme();
   const { currentUser } = useAuth();
 
+  // Production-safe navigation helper
+  const safeNavigate = (path: string) => {
+    // In production, use window.location for reliable navigation from BugDetails
+    if (import.meta.env.PROD && window.location.pathname.includes('/bugs/')) {
+      console.log('[KeyboardShortcuts] Using window.location for production navigation', { path });
+      window.location.href = path;
+    } else {
+      navigate(path, { state: { from: window.location.pathname } });
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // // console.log('Key pressed:', e.key, 'Code:', e.code, 'Shift:', e.shiftKey, 'Ctrl:', e.ctrlKey);
       if (e.ctrlKey && !e.shiftKey && (e.key === "b" || e.key === "B")) {
         e.preventDefault();
-        navigate(`/${currentUser?.role}/bugs/new`, { state: { from: window.location.pathname } });
+        safeNavigate(`/${currentUser?.role}/bugs/new`);
       }
       if (e.ctrlKey && e.shiftKey && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
-        navigate(`/${currentUser?.role}/bugs`, { state: { from: window.location.pathname } });
+        safeNavigate(`/${currentUser?.role}/bugs`);
       }
       if (e.ctrlKey && e.shiftKey && (e.key === "f" || e.key === "F")) {
         e.preventDefault();
-        navigate(`/${currentUser?.role}/fixes`, { state: { from: window.location.pathname } });
+        safeNavigate(`/${currentUser?.role}/fixes`);
       }
       // Shortcut for New Update: Ctrl + U
       if (e.ctrlKey && !e.shiftKey && (e.key === 'u' || e.key === 'U')) {
         e.preventDefault();
-        navigate(`/${currentUser?.role}/new-update`, { state: { from: window.location.pathname } });
+        safeNavigate(`/${currentUser?.role}/new-update`);
       }
       // Shortcut for Updates page: Ctrl + Shift + U
       if (e.ctrlKey && e.shiftKey && (e.key === 'u' || e.key === 'U')) {
         e.preventDefault();
-        navigate(`/${currentUser?.role}/updates`, { state: { from: window.location.pathname } });
+        safeNavigate(`/${currentUser?.role}/updates`);
       }
       if (e.shiftKey && e.code === "Space") {
         e.preventDefault();
@@ -43,12 +54,12 @@ export function KeyboardShortcuts() {
       // Shortcut for Settings: Ctrl + Shift + S
       if (e.ctrlKey && e.shiftKey && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
-        navigate(`/${currentUser?.role}/settings`, { state: { from: window.location.pathname } });
+        safeNavigate(`/${currentUser?.role}/settings`);
       }
       // Shortcut for Profile: Ctrl + Shift + P
       if (e.ctrlKey && e.shiftKey && (e.key === "p" || e.key === "P")) {
         e.preventDefault();
-        navigate(`/${currentUser?.role}/profile`, { state: { from: window.location.pathname } });
+        safeNavigate(`/${currentUser?.role}/profile`);
       }
     };
     window.addEventListener("keydown", handleKeyDown);

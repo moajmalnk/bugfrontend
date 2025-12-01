@@ -136,44 +136,56 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
     };
 
     // Define menu items based on user role
+    // Production-safe navigation helper
+    const safeNavigate = (path: string) => {
+        // In production, use window.location for reliable navigation from BugDetails
+        if (import.meta.env.PROD && window.location.pathname.includes('/bugs/')) {
+            console.log('[ContextMenu] Using window.location for production navigation', { path });
+            window.location.href = path;
+        } else {
+            navigate(path);
+        }
+        onClose();
+    };
+
     const getMenuItems = (role: User['role'] | undefined): ContextMenuItem[] => {
         const commonItems: ContextMenuItem[] = [
             { label: 'Copy', action: copyAction, icon: <ClipboardCopy className="h-4 w-4" />, shortcut: 'Ctrl+C', disabled: !canCopy() },
             { label: 'Cut', action: cutAction, icon: <Scissors className="h-4 w-4" />, shortcut: 'Ctrl+X', disabled: !canCut() },
             { label: 'Paste', action: pasteAction, icon: <ClipboardPaste className="h-4 w-4" />, shortcut: 'Ctrl+V', disabled: !canPaste() },
             { label: 'Privacy Mode', action: () => { /* TODO: Implement privacy mode toggle */ onClose(); }, shortcut: 'Ctrl+Space', icon: <Lock className="h-4 w-4" /> },
-            { label: 'Profile', action: () => { navigate(`/${role}/profile`); onClose(); }, icon: <UserIcon className="h-4 w-4" />, shortcut: 'Ctrl+Shift+P' },
+            { label: 'Profile', action: () => safeNavigate(`/${role}/profile`), icon: <UserIcon className="h-4 w-4" />, shortcut: 'Ctrl+Shift+P' },
             { label: 'Refresh', action: () => { window.location.reload(); onClose(); }, icon: <RefreshCw className="h-4 w-4" />, shortcut: 'Ctrl+R' },
             { label: 'Dark or Light', action: () => { toggleTheme(); onClose(); }, shortcut: 'Shift+Space', icon: theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" /> },
         ];
 
         if (role === 'admin') {
             return [
-                { label: 'New Bug', action: () => { navigate(`/${role}/bugs/new`); onClose(); }, shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
-                { label: 'Fix Bugs', action: () => { navigate(`/${role}/bugs`); onClose(); }, shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
-                { label: 'New Update', action: () => { navigate(`/${role}/new-update`); onClose(); }, shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
-                { label: 'Projects', action: () => { navigate(`/${role}/projects`); onClose(); }, icon: <Folder className="h-4 w-4" /> },
-                { label: 'Bugs', action: () => { navigate(`/${role}/bugs`); onClose(); }, icon: <Bug className="h-4 w-4" />, shortcut: 'Ctrl+Shift+B' },
-                { label: 'Fixes', action: () => { navigate(`/${role}/fixes`); onClose(); }, shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
-                { label: 'Updates', action: () => { navigate(`/${role}/updates`); onClose(); }, shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
-                { label: 'Users', action: () => { navigate(`/${role}/users`); onClose(); }, icon: <Users className="h-4 w-4" /> },
-                { label: 'Settings', action: () => { navigate(`/${role}/settings`); onClose(); }, icon: <Settings className="h-4 w-4" />, shortcut: 'Ctrl+Shift+S' },
+                { label: 'New Bug', action: () => safeNavigate(`/${role}/bugs/new`), shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
+                { label: 'Fix Bugs', action: () => safeNavigate(`/${role}/bugs`), shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'New Update', action: () => safeNavigate(`/${role}/new-update`), shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
+                { label: 'Projects', action: () => safeNavigate(`/${role}/projects`), icon: <Folder className="h-4 w-4" /> },
+                { label: 'Bugs', action: () => safeNavigate(`/${role}/bugs`), icon: <Bug className="h-4 w-4" />, shortcut: 'Ctrl+Shift+B' },
+                { label: 'Fixes', action: () => safeNavigate(`/${role}/fixes`), shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'Updates', action: () => safeNavigate(`/${role}/updates`), shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
+                { label: 'Users', action: () => safeNavigate(`/${role}/users`), icon: <Users className="h-4 w-4" /> },
+                { label: 'Settings', action: () => safeNavigate(`/${role}/settings`), icon: <Settings className="h-4 w-4" />, shortcut: 'Ctrl+Shift+S' },
                 ...commonItems,
             ];
         } else if (role === 'developer') {
             return [
-                { label: 'Fixes', action: () => { navigate(`/${role}/fixes`); onClose(); }, icon: <CheckSquare className="h-4 w-4" /> },
-                { label: 'Fix Bugs', action: () => { navigate(`/${role}/bugs`); onClose(); }, shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
-                { label: 'New Update', action: () => { navigate(`/${role}/new-update`); onClose(); }, shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
-                { label: 'Updates', action: () => { navigate(`/${role}/updates`); onClose(); }, shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
+                { label: 'Fixes', action: () => safeNavigate(`/${role}/fixes`), icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'Fix Bugs', action: () => safeNavigate(`/${role}/bugs`), shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
+                { label: 'New Update', action: () => safeNavigate(`/${role}/new-update`), shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
+                { label: 'Updates', action: () => safeNavigate(`/${role}/updates`), shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
                 ...commonItems,
             ];
         } else if (role === 'tester') {
             return [
-                { label: 'Bugs', action: () => { navigate(`/${role}/bugs`); onClose(); }, icon: <Bug className="h-4 w-4" />, shortcut: 'Ctrl+Shift+B' },
-                { label: 'New Bug', action: () => { navigate(`/${role}/bugs/new`); onClose(); }, shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
-                { label: 'New Update', action: () => { navigate(`/${role}/new-update`); onClose(); }, shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
-                { label: 'Updates', action: () => { navigate(`/${role}/updates`); onClose(); }, shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
+                { label: 'Bugs', action: () => safeNavigate(`/${role}/bugs`), icon: <Bug className="h-4 w-4" />, shortcut: 'Ctrl+Shift+B' },
+                { label: 'New Bug', action: () => safeNavigate(`/${role}/bugs/new`), shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
+                { label: 'New Update', action: () => safeNavigate(`/${role}/new-update`), shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
+                { label: 'Updates', action: () => safeNavigate(`/${role}/updates`), shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
                 ...commonItems,
             ];
         }

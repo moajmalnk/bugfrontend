@@ -68,8 +68,24 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   }) => {
     const destination = role ? `/${role}${to}` : to;
     const active = isActive(to);
+    
+    // Production-safe navigation handler
+    const handleClick = (e: React.MouseEvent) => {
+      closeSidebar?.();
+      
+      // In production, use window.location for reliable navigation from BugDetails
+      if (import.meta.env.PROD && window.location.pathname.includes('/bugs/')) {
+        e.preventDefault();
+        console.log('[Sidebar] Using window.location for production navigation', { destination });
+        window.location.href = destination;
+        return;
+      }
+      
+      // In development, let React Router handle it
+    };
+    
     return (
-      <Link to={destination} onClick={closeSidebar} className="block">
+      <Link to={destination} onClick={handleClick} className="block">
         <Button
           variant="ghost"
           className={cn(
