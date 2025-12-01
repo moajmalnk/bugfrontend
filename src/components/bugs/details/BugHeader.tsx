@@ -373,7 +373,7 @@ export const BugHeader = ({
               </Button>
             )}
 
-            {(currentUser?.role === "admin" || currentUser?.role === "developer") &&
+              {(currentUser?.role === "admin" || currentUser?.role === "developer") &&
               bug.status !== "fixed" && (
                 <Button
                   variant="default"
@@ -383,7 +383,10 @@ export const BugHeader = ({
                     // Preserve the from parameter when navigating to fix page
                     const fixUrl = `/${authUser?.role || "tester"}/bugs/${bug.id}/fix`;
                     const redirectUrl = isFromProject ? `${fixUrl}?from=project` : fixUrl;
-                    navigate(redirectUrl);
+                    
+                    // Use React Router navigate - BugDetails will unmount when route changes
+                    // The route order fix ensures /fix route matches before /bugs/:id
+                    navigate(redirectUrl, { replace: false });
                   }}
                 >
                   <CheckSquare className="mr-0 h-4 w-4" />

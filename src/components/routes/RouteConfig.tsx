@@ -275,9 +275,11 @@ const RouteConfig = () => {
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:projectId" element={<ProjectDetails />} />
           <Route path="bugs" element={<Bugs />} />
-          <Route path="bugs/:bugId/diagnostic" element={<BugDetailsDiagnostic />} />
-          <Route path="bugs/:bugId" element={<BugDetails />} />
           <Route path="bugs/new" element={<NewBug />} />
+          {/* More specific routes must come BEFORE the general bugs/:bugId route */}
+          <Route path="bugs/:bugId/diagnostic" element={<BugDetailsDiagnostic />} />
+          <Route path="bugs/:bugId/fix" element={<FixBug />} />
+          <Route path="bugs/:bugId" element={<BugDetails />} />
           <Route path="activity" element={<Activity />} />
           <Route path="users" element={<Users />} />
           <Route path="users/:userId/permissions" element={<UserPermissions />} />
@@ -286,7 +288,6 @@ const RouteConfig = () => {
           <Route path="profile" element={<Profile />} />
           <Route path="reports" element={<Reports />} />
           <Route path="messages" element={<Messages />} />
-          <Route path="bugs/:bugId/fix" element={<FixBug />} />
           <Route path="new-update" element={<NewUpdate />} />
           <Route path="updates" element={<Updates />} />
           <Route path="updates/:updateId" element={<UpdateDetails />} />

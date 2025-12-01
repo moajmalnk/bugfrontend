@@ -263,9 +263,14 @@ const BugDetails = () => {
     };
   }, [bugId, currentUser?.id, currentUser?.role, queryClient]); // Include dependencies for diagnostic tools
   const isBugRoute = useMemo(() => {
-    const onBugRoute = location.pathname.includes("/bugs/");
+    const pathname = location.pathname;
+    // More specific check: only match exact bug details route, not child routes like /fix, /edit, /diagnostic
+    // Pattern: /role/bugs/:bugId (but not /role/bugs/:bugId/fix, /role/bugs/:bugId/edit, etc.)
+    const bugDetailsPattern = /\/[^/]+\/bugs\/[^/]+$/; // Matches /role/bugs/:bugId but not /role/bugs/:bugId/fix
+    const onBugRoute = bugDetailsPattern.test(pathname);
+    
     console.debug("[BugDetails] isBugRoute computed", {
-      pathname: location.pathname,
+      pathname,
       onBugRoute,
     });
     return onBugRoute;
@@ -473,7 +478,7 @@ const BugDetails = () => {
       return !query.state.data || query.isStale();
     },
     refetchOnWindowFocus: false, // Already set globally but be explicit
-    enabled: isBugRoute && Boolean(bugId),
+    enabled: isBugRoute && Boolean(bugId) && !location.pathname.includes('/fix') && !location.pathname.includes('/edit') && !location.pathname.includes('/diagnostic'),
     // Prevent excessive refetching
     retry: (failureCount, error: any) => {
       // Don't retry on auth errors
@@ -542,7 +547,12 @@ const BugDetails = () => {
   // The query will refetch when bugId changes if data is stale or missing
 
   useEffect(() => {
-    if (!isBugRoute) {
+    // Check if we're on a child route (fix, edit, diagnostic)
+    const isChildRoute = location.pathname.includes('/fix') || 
+                         location.pathname.includes('/edit') || 
+                         location.pathname.includes('/diagnostic');
+    
+    if (!isBugRoute || isChildRoute) {
       clearNavigationState({ reason: "cancelled" });
       chunkLoadErrorRef.current = false;
       chunkReloadScheduledRef.current = false;
@@ -550,7 +560,7 @@ const BugDetails = () => {
       return;
     }
     exitReloadRef.current = false;
-  }, [isBugRoute, clearNavigationState]);
+  }, [isBugRoute, location.pathname, clearNavigationState]);
 
   // Comprehensive cleanup on unmount
   useEffect(() => {
@@ -780,7 +790,19 @@ const BugDetails = () => {
   );
 
   // Early exit if we're no longer on a bug route (component should unmount)
+  // Also exit if we're on a child route like /fix, /edit, or /diagnostic
+  // This is critical for production - prevents component from blocking navigation
+  const isChildRoute = location.pathname.includes('/fix') || 
+                       location.pathname.includes('/edit') || 
+                       location.pathname.includes('/diagnostic');
+  
+  // CRITICAL: Return null immediately for child routes to allow React Router to mount the correct component
+  if (isChildRoute) {
+    return null;
+  }
+  
   if (!isBugRoute || !bugId) {
+    // Force unmount by returning null immediately
     return null;
   }
 
