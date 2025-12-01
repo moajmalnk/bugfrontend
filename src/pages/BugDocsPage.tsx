@@ -245,7 +245,7 @@ const BugDocsPage = () => {
         // Load user's own documents
         docs = await googleDocsService.listGeneralDocuments();
       } else if (activeTab === "all-docs" && isAdmin) {
-        // Load all documents grouped by project (for admin)
+        // Load all documents from all users (admins, developers, testers, and others) grouped by project
         const result = await googleDocsService.getAllDocuments();
         setAllDocumentsGrouped(result.documents);
         // Flatten for display
