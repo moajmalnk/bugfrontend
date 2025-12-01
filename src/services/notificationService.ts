@@ -211,9 +211,16 @@ class NotificationService {
   // API methods for fetching and managing notifications
   async getUserNotifications(limit: number = 50, offset: number = 0): Promise<any[]> {
     try {
+      // Skip API calls when offline to avoid noisy network errors
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return [];
+      }
+
       const { token, headers } = this.getTokenAndImpersonationHeaders();
       if (!token) {
-        console.warn('NotificationService: No token found');
+        if (import.meta.env.DEV) {
+          console.warn('NotificationService: No token found');
+        }
         return [];
       }
 
@@ -253,12 +260,14 @@ class NotificationService {
           console.error('NotificationService: API Error Text:', errorText);
         }
         
-        console.error('NotificationService: Request failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          url: url,
-          message: errorMessage
-        });
+        if (import.meta.env.DEV) {
+          console.error('NotificationService: Request failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: url,
+            message: errorMessage
+          });
+        }
         
         throw new Error(errorMessage);
       }
@@ -276,17 +285,24 @@ class NotificationService {
       
       return data.success ? (data.data?.notifications || []) : [];
     } catch (error: any) {
-      console.error('NotificationService: Error fetching notifications:', {
-        error: error.message,
-        stack: error.stack,
-        name: error.name
-      });
+      if (import.meta.env.DEV) {
+        console.error('NotificationService: Error fetching notifications:', {
+          error: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
       return [];
     }
   }
 
   async getUnreadCount(): Promise<number> {
     try {
+      // Skip API calls when offline
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return 0;
+      }
+
       const { token, headers } = this.getTokenAndImpersonationHeaders();
       if (!token) {
         return 0;
@@ -313,7 +329,9 @@ class NotificationService {
       const data = await response.json();
       return data.success ? data.data.unread_count : 0;
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching unread count:', error);
+      }
       return 0;
     }
   }
@@ -355,7 +373,9 @@ class NotificationService {
       const data = await response.json();
       return data.success;
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error marking notification as read:', error);
+      }
       return false;
     }
   }
@@ -393,7 +413,9 @@ class NotificationService {
       const data = await response.json();
       return data.success;
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error marking all notifications as read:', error);
+      }
       return false;
     }
   }
@@ -431,7 +453,9 @@ class NotificationService {
       const data = await response.json();
       return data.success;
     } catch (error) {
-      console.error('Error deleting all notifications:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error deleting all notifications:', error);
+      }
       return false;
     }
   }

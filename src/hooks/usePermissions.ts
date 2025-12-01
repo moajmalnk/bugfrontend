@@ -41,6 +41,12 @@ export function usePermissions(projectId: string | null = null) {
 
       // Fetch from API
       const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+      // Skip permissions fetch when offline to prevent noisy network errors
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setIsLoading(false);
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/permissions/user_permissions.php?userId=${currentUser.id}`,
         {
@@ -65,7 +71,9 @@ export function usePermissions(projectId: string | null = null) {
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
       }
     } catch (error) {
-      console.error("Failed to load permissions:", error);
+      if (import.meta.env.DEV) {
+        console.error("Failed to load permissions:", error);
+      }
       setPermissions([]);
     } finally {
       setIsLoading(false);

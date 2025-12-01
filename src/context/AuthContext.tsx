@@ -128,6 +128,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const sendHeartbeat = async () => {
       try {
+        // Avoid unnecessary network errors when the browser is offline
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          return;
+        }
+
         const token = sessionStorage.getItem("token") || localStorage.getItem("token");
         if (!token) return;
 
@@ -139,8 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
       } catch (error) {
-        // Silently handle errors - don't disrupt user experience
-        console.error('Heartbeat failed:', error);
+        // Silently handle errors - don't disrupt user experience in production
+        if (import.meta.env.DEV) {
+          console.error('Heartbeat failed:', error);
+        }
       }
     };
 

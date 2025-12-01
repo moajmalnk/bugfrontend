@@ -70,6 +70,11 @@ class BroadcastNotificationService {
   // Check for new notifications since last check
   private async checkForNotifications(): Promise<void> {
     try {
+      // Avoid polling when the browser is offline
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return;
+      }
+
       const settings = notificationService.getSettings();
       
       // Skip if browser notifications are disabled
