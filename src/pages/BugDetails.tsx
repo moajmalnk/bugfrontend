@@ -707,6 +707,37 @@ const BugDetails = () => {
     };
   }, [fromProject, projectId, currentUser?.id, bugId]);
 
+  // Check if user came from fixes page via URL parameter
+  const fromFixes = searchParams.get("from") === "fixes";
+  
+  // Memoize filtered bug list to prevent recalculation on every render
+  // MUST be before any early returns to follow Rules of Hooks
+  const filteredBugList = useMemo(() => {
+    return bugList.filter((b) => {
+      // If coming from fixes page, show only fixed bugs
+      if (fromFixes) {
+        return b.status === "fixed" || b.id === bugId; // Always include the current bug
+      }
+      // Otherwise, show non-fixed bugs (original behavior)
+      return ["pending", "in_progress", "declined", "rejected"].includes(b.status) || b.id === bugId;
+    });
+  }, [bugList, fromFixes, bugId]);
+  
+  // Memoize navigation values to prevent recalculation
+  // MUST be before any early returns to follow Rules of Hooks
+  const navigationValues = useMemo(() => {
+    const currentIndex = filteredBugList.findIndex((b) => b.id === bugId);
+    const prevBugId = currentIndex > 0 ? filteredBugList[currentIndex - 1]?.id : null;
+    const nextBugId = currentIndex >= 0 && currentIndex < filteredBugList.length - 1
+      ? filteredBugList[currentIndex + 1]?.id
+      : null;
+    const totalBugs = filteredBugList.length;
+    
+    return { currentIndex, prevBugId, nextBugId, totalBugs };
+  }, [filteredBugList, bugId]);
+  
+  const { currentIndex, prevBugId, nextBugId, totalBugs } = navigationValues;
+
   // Check if this is an access error
   const isAccessError =
     error &&
@@ -854,36 +885,6 @@ const BugDetails = () => {
       });
     }
   };
-
-  // Find current bug index
-  // Check if user came from fixes page via URL parameter
-  const fromFixes = searchParams.get("from") === "fixes";
-  
-  // Memoize filtered bug list to prevent recalculation on every render
-  const filteredBugList = useMemo(() => {
-    return bugList.filter((b) => {
-      // If coming from fixes page, show only fixed bugs
-      if (fromFixes) {
-        return b.status === "fixed" || b.id === bugId; // Always include the current bug
-      }
-      // Otherwise, show non-fixed bugs (original behavior)
-      return ["pending", "in_progress", "declined", "rejected"].includes(b.status) || b.id === bugId;
-    });
-  }, [bugList, fromFixes, bugId]);
-  
-  // Memoize navigation values to prevent recalculation
-  const navigationValues = useMemo(() => {
-    const currentIndex = filteredBugList.findIndex((b) => b.id === bugId);
-    const prevBugId = currentIndex > 0 ? filteredBugList[currentIndex - 1]?.id : null;
-    const nextBugId = currentIndex >= 0 && currentIndex < filteredBugList.length - 1
-      ? filteredBugList[currentIndex + 1]?.id
-      : null;
-    const totalBugs = filteredBugList.length;
-    
-    return { currentIndex, prevBugId, nextBugId, totalBugs };
-  }, [filteredBugList, bugId]);
-  
-  const { currentIndex, prevBugId, nextBugId, totalBugs } = navigationValues;
 
   const role = currentUser?.role || "admin";
 
