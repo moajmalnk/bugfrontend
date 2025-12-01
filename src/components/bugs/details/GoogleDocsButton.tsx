@@ -20,43 +20,30 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
   }, []);
 
   const checkConnection = async () => {
-    console.log('🔄 [GoogleDocsButton] Checking connection...');
     setIsLoading(true);
     try {
       const connected = await googleDocsService.checkConnection();
-      console.log('✅ [GoogleDocsButton] Connection check result:', connected);
       setIsConnected(connected.connected || false);
     } catch (error) {
-      console.error('❌ [GoogleDocsButton] Failed to check connection:', error);
+      // Silently handle connection check errors
     } finally {
       setIsLoading(false);
-      console.log('🏁 [GoogleDocsButton] Connection check completed');
     }
   };
 
   const handleConnectGoogleDocs = () => {
-    console.group('🟢 [GoogleDocsButton] Connect Button Clicked');
-    console.log('Bug ID:', bugId);
-    
     try {
       // Store current bug ID in session storage so we can return to it
       sessionStorage.setItem('bugdocs_return_bug_id', bugId);
-      console.log('✅ [GoogleDocsButton] Stored bug ID in sessionStorage');
       
       // Get JWT token to pass as state parameter
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      console.log('Token found:', !!token);
       
       // Navigate to Google OAuth with JWT token as state
       const authUrl = googleDocsService.getAuthUrl(token);
-      console.log('🔄 [GoogleDocsButton] Redirecting to:', authUrl);
-      
       window.location.href = authUrl;
-      console.log('✅ [GoogleDocsButton] Redirect initiated');
     } catch (error) {
-      console.error('❌ [GoogleDocsButton] Connect error:', error);
-    } finally {
-      console.groupEnd();
+      // Silently handle connection errors
     }
   };
 
@@ -74,15 +61,10 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
     }
     
     setIsCreating(true);
-    console.log('✅ [GoogleDocsButton] Set isCreating to true');
     
     try {
-      console.log('⏳ [GoogleDocsButton] Calling createBugDocument...');
       const result = await googleDocsService.createBugDocument(bugId);
       const elapsed = Date.now() - startTime;
-      
-      console.log('✅ [GoogleDocsButton] Document created successfully in', elapsed, 'ms');
-      console.log('Result:', result);
       
       toast({
         title: "Success!",
@@ -90,17 +72,8 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
       });
 
       // Open the document in a new tab
-      console.log('🔄 [GoogleDocsButton] Opening document:', result.document_url);
       googleDocsService.openDocument(result.document_url);
-      console.log('✅ [GoogleDocsButton] Document opened');
     } catch (error: any) {
-      const elapsed = Date.now() - startTime;
-      console.error('❌ [GoogleDocsButton] Error after', elapsed, 'ms:', {
-        error,
-        errorMessage: error?.message,
-        errorStack: error?.stack,
-        errorResponse: error?.response
-      });
       
       toast({
         title: "Error",

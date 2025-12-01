@@ -84,22 +84,10 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
             try {
               // Use get_attachment.php endpoint for proper CORS and content-type handling
               const audioUrl = buildAudioUrl(attachment.file_path);
-              console.log(
-                "🔍 Loading duration for:",
-                attachment.file_name,
-                "URL:",
-                audioUrl
-              );
 
               const audio = new Audio();
 
               audio.addEventListener("loadedmetadata", () => {
-                console.log(
-                  "✅ Duration loaded for:",
-                  attachment.file_name,
-                  "Duration:",
-                  audio.duration
-                );
                 durations[attachment.id] = audio.duration;
                 setVoiceNoteDurations((prev) => ({
                   ...prev,

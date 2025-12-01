@@ -317,21 +317,14 @@ function AppContent() {
   const networkError = false; // Replace with actual network error logic
 
   useEffect(() => {
-    // Monitor all button clicks globally
+    // Monitor all button clicks globally (development only)
     const handleGlobalClick = (e: MouseEvent) => {
+      if (!import.meta.env.DEV) return;
+      
       const target = e.target as HTMLElement;
       const button = target.closest('button');
       
       if (button) {
-        console.log('🔘 [Global] Button clicked:', {
-          text: button.textContent?.trim(),
-          disabled: button.disabled,
-          ariaLabel: button.getAttribute('aria-label'),
-          className: button.className,
-          id: button.id,
-          timestamp: new Date().toISOString()
-        });
-        
         // Check if button becomes stuck after 3 seconds
         setTimeout(() => {
           if (button.disabled && button.textContent?.includes('Loading') || button.textContent?.includes('Creating')) {

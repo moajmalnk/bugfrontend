@@ -59,7 +59,6 @@ class GoogleDocsService {
    */
   async checkConnection(): Promise<GoogleDocsConnectionStatus> {
     try {
-      console.log('🔍 Checking Google Docs connection...');
       const response = await apiClient.get<{
         success: boolean;
         data: GoogleDocsConnectionStatus;
@@ -69,8 +68,6 @@ class GoogleDocsService {
         connected: response.data.data?.connected || false,
         email: response.data.data?.email || null
       };
-      console.log('🔗 Connection check result:', result);
-      console.log('🔍 Debug info:', response.data);
       return result;
     } catch (error) {
       console.error('❌ Failed to check Google Docs connection:', error);

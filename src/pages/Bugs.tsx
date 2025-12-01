@@ -149,11 +149,13 @@ const Bugs = () => {
   const fetchProjects = async () => {
     try {
       const projectsData = await projectService.getProjects();
-      console.log(
-        "Fetched projects for user:",
-        currentUser?.role,
-        projectsData
-      );
+      if (import.meta.env.DEV) {
+        console.log(
+          "Fetched projects for user:",
+          currentUser?.role,
+          projectsData
+        );
+      }
       setProjects(projectsData);
     } catch (error: any) {
       console.error("Error fetching projects:", error);

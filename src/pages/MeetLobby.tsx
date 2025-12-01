@@ -239,7 +239,6 @@ export default function MeetLobby() {
     setRunningMeets(prev => [optimisticMeeting, ...prev]);
     
     try {
-      console.log("🔄 Creating new meeting...");
       // Call the Google Meet API endpoint (apiClient handles token and impersonation automatically)
       const response = await apiClient.post(
         `/meet/create-space.php`,
@@ -249,11 +248,9 @@ export default function MeetLobby() {
       );
 
       const data = response.data as GoogleMeetResponse;
-      console.log("📊 Create meeting response:", data);
       
       if (data?.success && data?.meetingUri) {
         toast.success("Google Meet created successfully!");
-        console.log("✅ Meeting created successfully, refreshing meetings list...");
         
         // Clear the title input and close modal
         setTitle("");
@@ -323,7 +320,6 @@ export default function MeetLobby() {
   const fetchRunningMeets = useCallback(async (forceRefresh = false) => {
     // Don't fetch if we already have a Google connection error
     if (error && error.includes("Please connect your Google account")) {
-      console.log("🚫 Skipping fetch due to Google connection error");
       return;
     }
 
@@ -333,7 +329,6 @@ export default function MeetLobby() {
     const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
     if (!forceRefresh && cache.data && cacheAge < CACHE_DURATION) {
-      console.log("🚀 Using cached data");
       setRunningMeets(cache.data.runningMeetings || []);
       setCompletedMeets(cache.data.completedMeetings || []);
       setIsInitialLoad(false);
@@ -342,37 +337,31 @@ export default function MeetLobby() {
 
     // Prevent multiple simultaneous requests
     if (pendingRequest && !forceRefresh) {
-      console.log("⏳ Waiting for existing request...");
       try {
         await pendingRequest;
         return;
       } catch (error) {
-        console.log("❌ Pending request failed, proceeding with new request");
+        // Continue with new request if pending request failed
       }
     }
 
     if (loadingMeets && !forceRefresh) {
-      console.log("Already loading meets, skipping duplicate request");
       return;
     }
 
     setLoadingMeets(true);
     const requestPromise = (async () => {
     try {
-        console.log("🔄 Fetching running meets...");
       // apiClient handles token and impersonation automatically
       const response = await apiClient.get(
         `/meet/get-running-meets.php`
       );
 
       const data = response.data as RunningMeetsResponse;
-        console.log("📊 API Response:", data);
         
       if (data?.success) {
           const runningMeetings = data.runningMeetings || [];
           const completedMeetings = data.completedMeetings || [];
-          
-          console.log(`✅ Loaded ${runningMeetings.length} running meetings and ${completedMeetings.length} completed meetings`);
           
           // Update cache
           setCache({ data, timestamp: now });
@@ -426,14 +415,12 @@ export default function MeetLobby() {
   const fetchMeetingDetails = async (meetingId: string) => {
     setLoadingDetails(true);
     try {
-      console.log("🔄 Fetching meeting details for ID:", meetingId);
       // apiClient handles token and impersonation automatically
       const response = await apiClient.get(
         `/meet/get-meeting-details.php?meeting_id=${meetingId}`
       );
 
       const data = response.data as MeetingDetailsResponse;
-      console.log("📊 Meeting details response:", data);
       
       if (data?.success && data?.meetingDetails) {
         setMeetingDetails(data.meetingDetails);
@@ -490,14 +477,12 @@ export default function MeetLobby() {
   const performActualDelete = async (meetingId: string) => {
     setDeletingMeetingId(meetingId);
     try {
-      console.log("🔄 Actually deleting meeting with ID:", meetingId);
       // apiClient handles token and impersonation automatically
       const response = await apiClient.delete(
         `/meet/delete-meeting.php?meeting_id=${meetingId}`
       );
 
       const data = response.data as DeleteMeetingResponse;
-      console.log("📊 Delete meeting response:", data);
       
       if (data?.success) {
         toast.success("Meeting permanently deleted");
@@ -633,8 +618,6 @@ export default function MeetLobby() {
     const runningCount = runningMeets?.length || 0;
     const completedCount = completedMeets?.length || 0;
     
-    console.log(`📊 Tab counts - Running: ${runningCount}, Completed: ${completedCount}`);
-    
     switch (tabType) {
       case "my-meets":
         return runningCount;
@@ -645,24 +628,24 @@ export default function MeetLobby() {
     }
   };
 
-  // Debug function to log current state
+  // Debug function to log current state (development only)
   const debugState = () => {
-    console.log("🔍 Current Meeting State:", {
-      runningMeets: runningMeets.length,
-      completedMeets: completedMeets.length,
-      loadingMeets,
-      error,
-      activeTab
-    });
+    if (import.meta.env.DEV) {
+      console.log("🔍 Current Meeting State:", {
+        runningMeets: runningMeets.length,
+        completedMeets: completedMeets.length,
+        loadingMeets,
+        error,
+        activeTab
+      });
+    }
   };
 
   // Check Google connection status
   const checkConnection = async () => {
     setIsCheckingConnection(true);
     try {
-      console.log('Checking Google connection for Meet...');
       const result = await googleDocsService.checkConnection();
-      console.log('Connection status:', result);
       setIsConnected(result.connected);
       setConnectedEmail(result.email || null);
       
@@ -748,7 +731,6 @@ export default function MeetLobby() {
       const googleError = urlParams.get('google_error');
       
       if (googleConnected === 'true') {
-        console.log("✅ Google account connected successfully! Refreshing meetings...");
         toast.success("Google account connected successfully! You can now create and manage meetings.");
         // Clear the URL parameters
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -758,7 +740,6 @@ export default function MeetLobby() {
         checkConnection();
         // Refresh meetings after a short delay to ensure token is saved
         setTimeout(() => {
-          console.log("🔄 Refreshing meetings after Google connection...");
           fetchRunningMeets(true); // Force refresh
         }, 1500); // Increased delay to ensure backend has saved tokens
         return true; // Indicate we handled the connection
@@ -789,8 +770,6 @@ export default function MeetLobby() {
 
   // Fetch running meets on component mount with progressive loading
   useEffect(() => {
-    console.log("🚀 Component mounted, fetching initial meetings...");
-    
     // Only fetch if we don't have an error about Google connection
     if (!error || !error.includes("Please connect your Google account")) {
       fetchRunningMeets();
@@ -798,7 +777,6 @@ export default function MeetLobby() {
     
     // Background refresh every 30 seconds (reduced frequency for better performance)
     const interval = setInterval(() => {
-      console.log("🔄 Background refresh...");
       // Only refresh if we don't have a Google connection error
       if (!error || !error.includes("Please connect your Google account")) {
         fetchRunningMeets();
@@ -806,7 +784,6 @@ export default function MeetLobby() {
     }, 60000); // Increased to 1 minute for better performance
     
     return () => {
-      console.log("🧹 Cleaning up meeting refresh interval");
       clearInterval(interval);
     };
   }, []); // Remove fetchRunningMeets from dependencies to prevent infinite loop
@@ -815,8 +792,6 @@ export default function MeetLobby() {
   const fetchTeamMembers = useCallback(async () => {
     setLoadingUsers(true);
     try {
-      console.log("🔄 Fetching team members...");
-      
       // Fetch all three types of users in parallel (apiClient handles token and impersonation automatically)
       const [adminsResponse, developersResponse, testersResponse] = await Promise.all([
         apiClient.get(`/get_all_admins.php`),
@@ -828,8 +803,6 @@ export default function MeetLobby() {
       const developersData = developersResponse.data as TeamMembersResponse;
       const testersData = testersResponse.data as TeamMembersResponse;
 
-      console.log("📊 Team members response:", { adminsData, developersData, testersData });
-
       // Combine all team members with their roles
       const allTeamMembers: TeamMember[] = [
         ...(adminsData.emails || []).map(email => ({ email, role: 'admin' as const })),
@@ -838,7 +811,6 @@ export default function MeetLobby() {
       ];
 
       setTeamMembers(allTeamMembers);
-      console.log(`✅ Loaded ${allTeamMembers.length} team members (${adminsData.emails?.length || 0} admins, ${developersData.emails?.length || 0} developers, ${testersData.emails?.length || 0} testers)`);
     } catch (err: any) {
       console.error("❌ Error fetching team members:", err?.message);
       // Fallback to empty array on error
@@ -857,7 +829,6 @@ export default function MeetLobby() {
 
   // Add a manual refresh function that can be called from the UI
   const handleRefresh = () => {
-    console.log("🔄 Manual refresh triggered");
     // Clear any existing Google connection errors before refreshing
     if (error && error.includes("Please connect your Google account")) {
       setError(null);
@@ -962,7 +933,6 @@ export default function MeetLobby() {
       // Debounce focus events to prevent multiple rapid refreshes
       clearTimeout(focusTimeout);
       focusTimeout = setTimeout(() => {
-        console.log("👁️ Window focused, refreshing meetings...");
         // Only refresh if we don't have a Google connection error
         if (!error || !error.includes("Please connect your Google account")) {
           fetchRunningMeets(true);

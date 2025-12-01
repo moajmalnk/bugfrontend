@@ -47,11 +47,9 @@ export async function listMyTasks(params: { status?: string; project_id?: string
   if (token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      console.log('Token payload for tasks:', payload); // Debugging
       
       // If this is a dashboard access token with admin_id, we're impersonating
       if (payload.purpose === 'dashboard_access' && payload.admin_id && payload.user_id) {
-        console.log('Impersonation detected, using list_tasks.php'); // Debugging
         useOwnTasks = false; // Use regular tasks endpoint to respect impersonation
       } else {
         console.log('Normal mode, using list_my_own_tasks.php'); // Debugging
