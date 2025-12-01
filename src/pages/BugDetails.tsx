@@ -798,10 +798,21 @@ const BugDetails = () => {
   
   // CRITICAL: Return null immediately for child routes to allow React Router to mount the correct component
   if (isChildRoute) {
+    console.log('[BugDetails] Detected child route, unmounting component', {
+      pathname: location.pathname,
+      isChildRoute: true,
+      timestamp: Date.now()
+    });
     return null;
   }
   
   if (!isBugRoute || !bugId) {
+    console.log('[BugDetails] Not on bug route or no bugId, unmounting', {
+      isBugRoute,
+      bugId,
+      pathname: location.pathname,
+      timestamp: Date.now()
+    });
     // Force unmount by returning null immediately
     return null;
   }

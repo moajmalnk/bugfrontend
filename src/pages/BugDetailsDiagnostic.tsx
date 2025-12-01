@@ -318,8 +318,75 @@ const BugDetailsDiagnostic = () => {
   const goToBugDetails = () => {
     if (!bugId || !currentUser?.role) return;
     setNavigationCount(prev => prev + 1);
-    addDiagnostic('info', `Navigating to BugDetails (attempt ${navigationCount + 1})`);
-    navigate(`/${currentUser.role}/bugs/${bugId}`);
+    const targetUrl = `/${currentUser.role}/bugs/${bugId}`;
+    addDiagnostic('info', `Navigating to BugDetails (attempt ${navigationCount + 1})`, { targetUrl });
+    
+    console.log('[BugDetailsDiagnostic] Navigation test', {
+      from: window.location.pathname,
+      to: targetUrl,
+      method: 'navigate',
+      timestamp: Date.now()
+    });
+    
+    // In production, use window.location for reliable navigation
+    if (import.meta.env.PROD) {
+      console.warn('[BugDetailsDiagnostic] Using window.location for production navigation');
+      window.location.href = targetUrl;
+    } else {
+      navigate(targetUrl);
+    }
+  };
+
+  // Test navigation to fix page
+  const testFixPageNavigation = () => {
+    if (!bugId || !currentUser?.role) return;
+    const targetUrl = `/${currentUser?.role}/bugs/${bugId}/fix`;
+    addDiagnostic('info', `Testing navigation to Fix page`, { targetUrl });
+    
+    console.log('[BugDetailsDiagnostic] Fix page navigation test', {
+      from: window.location.pathname,
+      to: targetUrl,
+      method: import.meta.env.PROD ? 'window.location' : 'navigate',
+      timestamp: Date.now()
+    });
+    
+    // Always use window.location for fix page navigation in production
+    if (import.meta.env.PROD) {
+      window.location.href = targetUrl;
+    } else {
+      navigate(targetUrl);
+    }
+  };
+
+  // Test React Router navigation
+  const testReactRouterNavigation = (path: string) => {
+    addDiagnostic('info', `Testing React Router navigation`, { path });
+    console.log('[BugDetailsDiagnostic] React Router navigation test', {
+      from: window.location.pathname,
+      to: path,
+      timestamp: Date.now()
+    });
+    
+    try {
+      navigate(path);
+      setTimeout(() => {
+        const actualPath = window.location.pathname;
+        if (actualPath !== path) {
+          addDiagnostic('error', `Navigation failed! Expected ${path}, got ${actualPath}`, {
+            expected: path,
+            actual: actualPath
+          });
+          console.error('[BugDetailsDiagnostic] Navigation failed', {
+            expected: path,
+            actual: actualPath
+          });
+        } else {
+          addDiagnostic('success', `Navigation successful to ${path}`);
+        }
+      }, 500);
+    } catch (error: any) {
+      addDiagnostic('error', `Navigation error: ${error.message}`, error);
+    }
   };
 
   // Monitor Service Worker
@@ -370,6 +437,52 @@ const BugDetailsDiagnostic = () => {
     return () => clearInterval(interval);
   }, [isMonitoring]);
 
+  // Monitor navigation attempts
+  useEffect(() => {
+    if (!isMonitoring) return;
+
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+
+    // Monitor pushState (React Router uses this)
+    history.pushState = function(...args) {
+      const [state, title, url] = args;
+      addDiagnostic('info', `Navigation attempt: pushState`, {
+        url: url?.toString(),
+        currentPath: window.location.pathname,
+        timestamp: Date.now()
+      });
+      console.log('[Diagnostic] pushState called', { url, currentPath: window.location.pathname });
+      return originalPushState.apply(history, args);
+    };
+
+    // Monitor replaceState
+    history.replaceState = function(...args) {
+      const [state, title, url] = args;
+      addDiagnostic('info', `Navigation attempt: replaceState`, {
+        url: url?.toString(),
+        currentPath: window.location.pathname,
+        timestamp: Date.now()
+      });
+      return originalReplaceState.apply(history, args);
+    };
+
+    // Monitor popstate (back/forward)
+    const handlePopState = (event: PopStateEvent) => {
+      addDiagnostic('info', `Navigation: popstate`, {
+        pathname: window.location.pathname,
+        timestamp: Date.now()
+      });
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isMonitoring]);
+
   // Initialize and expose diagnostic tools globally
   useEffect(() => {
     addDiagnostic('info', 'BugDetails Diagnostic Page Loaded', {
@@ -377,6 +490,7 @@ const BugDetailsDiagnostic = () => {
       pathname: location.pathname,
       userRole: currentUser?.role,
       userId: currentUser?.id,
+      isProduction: import.meta.env.PROD,
     });
 
     // Check for known freeze causes
@@ -385,6 +499,14 @@ const BugDetailsDiagnostic = () => {
       interval: 'Every 60 seconds',
       location: 'serviceWorkerManager.ts:205-209',
       recommendation: 'Service worker checks for updates every 60 seconds. This may be causing the freezes.',
+    });
+
+    // Check React Router version and configuration
+    addDiagnostic('info', 'React Router Configuration', {
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+      state: location.state,
     });
 
     // Expose diagnostic tools to window for global access
@@ -408,6 +530,22 @@ const BugDetailsDiagnostic = () => {
         getApiCalls: () => apiCalls,
         getMemoryUsage: () => memoryUsage,
         getReactQueryCache: () => reactQueryCache,
+        // Navigation testing methods
+        testNavigation: (path: string) => {
+          console.log('[Diagnostic] Testing navigation to:', path);
+          testReactRouterNavigation(path);
+        },
+        testFixPage: () => {
+          if (bugId && currentUser?.role) {
+            testFixPageNavigation();
+          } else {
+            console.error('[Diagnostic] Cannot test fix page: missing bugId or role');
+          }
+        },
+        forceNavigation: (path: string) => {
+          console.warn('[Diagnostic] Force navigation using window.location:', path);
+          window.location.href = path;
+        },
       };
       
       console.log('[BugDetailsDiagnostic] Diagnostic tools available at window.__BUG_DETAILS_DIAGNOSTIC__');
@@ -521,6 +659,9 @@ const BugDetailsDiagnostic = () => {
               </Button>
               <Button onClick={testBugListFetch}>
                 Test Bug List Fetch
+              </Button>
+              <Button onClick={testFixPageNavigation} disabled={!bugId} variant="default">
+                Test Fix Page Navigation
               </Button>
               <Button onClick={clearCache} variant="outline">
                 Clear React Query Cache
