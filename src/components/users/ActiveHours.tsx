@@ -62,9 +62,24 @@ export function ActiveHours({ userId, userName }: ActiveHoursProps) {
   });
 
   const formatHours = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes}m`;
+    }
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
+    if (mins === 0) {
+      return `${hours}h`;
+    }
     return `${hours}h ${mins}m`;
+  };
+  
+  const formatHoursDecimal = (hours: number) => {
+    if (hours < 1) {
+      const minutes = Math.round(hours * 60);
+      return `${minutes}m`;
+    }
+    // Round to 1 decimal place for hours
+    return `${hours.toFixed(1)}h`;
   };
 
   const formatDate = (dateString: string) => {
@@ -145,7 +160,7 @@ export function ActiveHours({ userId, userName }: ActiveHoursProps) {
               <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4 text-center">
                 <Clock className="h-6 w-6 text-blue-500 mx-auto mb-2" />
                 <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                  {activeHoursData.summary.total_hours.toFixed(1)}h
+                  {formatHoursDecimal(activeHoursData.summary.total_hours)}
                 </p>
                 <p className="text-sm text-blue-600 dark:text-blue-400">Total Hours</p>
               </div>
@@ -153,7 +168,7 @@ export function ActiveHours({ userId, userName }: ActiveHoursProps) {
               <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4 text-center">
                 <TrendingUp className="h-6 w-6 text-green-500 mx-auto mb-2" />
                 <p className="text-2xl font-bold text-green-700 dark:text-green-300">
-                  {activeHoursData.summary.average_hours_per_day.toFixed(1)}h
+                  {formatHoursDecimal(activeHoursData.summary.average_hours_per_day)}
                 </p>
                 <p className="text-sm text-green-600 dark:text-green-400">Avg/Day</p>
               </div>

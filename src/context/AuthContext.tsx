@@ -15,8 +15,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (identifier: string, password: string) => Promise<boolean>;
-  loginWithToken: (user: User, token: string) => void;
-  logout: () => void;
+  loginWithToken: (user: User, token: string) => Promise<void>;
+  logout: () => Promise<void>;
   register: (data: RegisterData) => Promise<boolean>;
   updateCurrentUser: (user: User) => void;
   storeIntendedDestination: (path: string) => void;
@@ -185,6 +185,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const user = data.user;
         setCurrentUser(user);
 
+        // Start activity session tracking on login
+        try {
+          await fetch(`${ENV.API_URL}/users/start_session_on_login.php`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${data.token}`,
+              "Content-Type": "application/json",
+            },
+          });
+        } catch (error) {
+          // Don't fail login if session tracking fails
+          if (import.meta.env.DEV) {
+            console.error("Failed to start session tracking:", error);
+          }
+        }
+
         // Get the intended destination or default to the user's role-specific projects page
         const intendedDestination =
           localStorage.getItem("intendedDestination") ||
@@ -254,7 +270,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // End activity session tracking on logout
+    const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+    if (token && currentUser) {
+      try {
+        await fetch(`${ENV.API_URL}/users/end_session_on_logout.php`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ user_id: currentUser.id }),
+        });
+      } catch (error) {
+        // Don't fail logout if session tracking fails
+        if (import.meta.env.DEV) {
+          console.error("Failed to end session tracking:", error);
+        }
+      }
+    }
+    
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
     localStorage.removeItem("intendedDestination");
@@ -263,9 +299,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate("/login", { replace: true });
   };
 
-  const loginWithToken = (user: User, token: string) => {
+  const loginWithToken = async (user: User, token: string) => {
     localStorage.setItem("token", token);
     setCurrentUser(user);
+
+    // Start activity session tracking on login
+    try {
+      await fetch(`${ENV.API_URL}/users/start_session_on_login.php`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (error) {
+      // Don't fail login if session tracking fails
+      if (import.meta.env.DEV) {
+        console.error("Failed to start session tracking:", error);
+      }
+    }
 
     // Get the intended destination or default to the user's role-specific projects page
     const intendedDestination =
