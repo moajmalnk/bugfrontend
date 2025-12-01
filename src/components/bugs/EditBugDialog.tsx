@@ -716,20 +716,32 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                 multiple
               />
 
-              {/* Simple three-card grid: screenshots, files, voice recorder */}
+              {/* Three-card grid: screenshots, files, voice recorder - matching UI/UX */}
               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-                {/* Screenshots section */}
-                  {/* Screenshots section */}
+                {/* Screenshots section - matching Voice Note design */}
                 <div className="space-y-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-20 w-full flex flex-col items-center justify-center border-2 border-dashed"
+                  <div
+                    className="w-full h-28 sm:h-28 rounded-xl border-2 border-dashed border-gray-300 bg-slate-900/60 px-4 py-3 shadow-sm transition-all dark:border-gray-600 hover:border-blue-400 hover:shadow-[0_0_0_1px_rgba(59,130,246,0.4)] cursor-pointer"
                     onClick={handleScreenshotClick}
                   >
-                    <ImagePlus className="h-5 w-5 mb-1" />
-                    <span className="text-sm">Add Screenshots</span>
-                  </Button>
+                    <div className="flex h-full w-full items-center justify-center gap-4">
+                      <Button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleScreenshotClick();
+                        }}
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg transition-all disabled:opacity-50"
+                        aria-label="Add Screenshots"
+                      >
+                        <ImagePlus className="h-5 w-5" />
+                      </Button>
+                      <span className="text-sm font-semibold text-gray-100">
+                        Add Screenshots
+                      </span>
+                    </div>
+                  </div>
                   {screenshots.length > 0 && (
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-blue-700 dark:text-blue-400">
@@ -759,17 +771,30 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                   )}
                 </div>
 
-                {/* Files section */}
+                {/* Files section - matching Voice Note design */}
                 <div className="space-y-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-20 w-full flex flex-col items-center justify-center border-2 border-dashed"
+                  <div
+                    className="w-full h-28 sm:h-28 rounded-xl border-2 border-dashed border-gray-300 bg-slate-900/60 px-4 py-3 shadow-sm transition-all dark:border-gray-600 hover:border-purple-400 hover:shadow-[0_0_0_1px_rgba(168,85,247,0.4)] cursor-pointer"
                     onClick={handleFileClick}
                   >
-                    <Paperclip className="h-5 w-5 mb-1" />
-                    <span className="text-sm">Attach Files</span>
-                  </Button>
+                    <div className="flex h-full w-full items-center justify-center gap-4">
+                      <Button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFileClick();
+                        }}
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-purple-500 hover:bg-purple-600 text-white shadow-lg transition-all disabled:opacity-50"
+                        aria-label="Attach Files"
+                      >
+                        <Paperclip className="h-5 w-5" />
+                      </Button>
+                      <span className="text-sm font-semibold text-gray-100">
+                        Attach Files
+                      </span>
+                    </div>
+                  </div>
                   {files.length > 0 && (
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-green-700 dark:text-green-400">

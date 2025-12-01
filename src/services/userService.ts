@@ -15,6 +15,7 @@ interface UpdateUserData {
   email?: string;
   phone?: string;
   role?: UserRole;
+  role_id?: number;
 }
 
 // Define the structure for user statistics
@@ -110,7 +111,30 @@ class UserService {
     if (!result.success) {
       throw new Error(result.message || "Failed to update user");
     }
-    return { ...result.data, phone: result.data?.phone };
+    
+    // Backend now returns the updated user in result.data
+    if (result.data) {
+      const updatedUser = result.data;
+      // Ensure all required User fields are present
+      return {
+        id: updatedUser.id || userId,
+        username: updatedUser.username || '',
+        email: updatedUser.email || '',
+        phone: updatedUser.phone || '',
+        role: updatedUser.role || userData.role || 'user',
+        role_id: updatedUser.role_id || null,
+        name: updatedUser.name || updatedUser.username || '',
+        avatar: this.generateAvatar(
+          updatedUser.name || updatedUser.username || '',
+          (updatedUser.role || userData.role || 'user') as UserRole
+        ),
+        created_at: updatedUser.created_at,
+        last_active_at: updatedUser.last_active_at || null,
+      };
+    }
+    
+    // Fallback if backend doesn't return data (shouldn't happen with new implementation)
+    throw new Error("Backend did not return updated user data");
   }
 
   async getUserStats(userId: string): Promise<UserStats> {

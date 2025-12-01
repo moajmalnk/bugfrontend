@@ -28,7 +28,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { userService } from "@/services/userService";
 import { permissionService } from "@/services/permissionService";
-import { User } from "@/types";
+import { User, UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pencil, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
@@ -44,9 +44,7 @@ const userFormSchema = z.object({
       message: "Username can only contain letters, numbers, and underscores",
     }),
   email: z.string().email({ message: "Invalid email address" }),
-  role: z.string().min(1, {
-    required_error: "Please select a role",
-  }),
+  role: z.string().min(1, { message: "Please select a role" }),
   phone: z.string().optional(),
 });
 
@@ -121,40 +119,43 @@ export function EditUserDialog({
         (r) => r.role_name.toLowerCase() === data.role.toLowerCase()
       );
 
-      // Call the update service
-      await userService.updateUser(user.id, {
+      // Call the update service and get the updated user from backend
+      const updatedUser = await userService.updateUser(user.id, {
         username: data.username,
         email: data.email,
-        role: data.role,
+        role: data.role as UserRole,
         role_id: selectedRole?.id,
         phone: data.phone ? "+91" + data.phone : "",
       });
 
-      // Manually create updated user object from form data
-      const locallyUpdatedUser = {
-        ...user, // Start with current user data
-        username: data.username, // Apply updated values
-        email: data.email,
-        role: data.role,
-        phone: data.phone ? "+91" + data.phone : "",
-        // Note: The 'name' property is often derived from 'username' or handled server-side.
-        // Ensure your backend returns the updated 'name' in the response if necessary,
-        // or handle its derivation client-side if possible.
-        // For now, we assume username update is sufficient for avatar.
+      // Use the updated user from backend response, ensuring all fields are properly set
+      const updatedRole = (updatedUser.role || data.role) as UserRole;
+      const finalUpdatedUser: User = {
+        ...user, // Start with current user data to preserve any fields not returned
+        ...updatedUser, // Override with backend response (includes role, role_id, etc.)
+        username: updatedUser.username || data.username,
+        email: updatedUser.email || data.email,
+        role: updatedRole,
+        phone: updatedUser.phone || (data.phone ? "+91" + data.phone : ""),
+        name: updatedUser.name || updatedUser.username || data.username,
+        // Generate avatar based on updated role
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-          data.username || data.email
-        )}&background=3b82f6&color=fff&size=128`,
+          updatedUser.name || updatedUser.username || data.username
+        )}&background=${
+          updatedRole === 'admin' ? '3b82f6' :
+          updatedRole === 'developer' ? '10b981' :
+          updatedRole === 'tester' ? 'f59e0b' : '6b7280'
+        }&color=fff&size=128`,
       };
 
-      // Call the onUserUpdate callback with the locally constructed updated user object
-      onUserUpdate(locallyUpdatedUser);
+      // Call the onUserUpdate callback with the updated user from backend
+      onUserUpdate(finalUpdatedUser);
 
       toast({
         title: "Success",
         description: "User has been updated successfully.",
       });
       setOpen(false);
-      // window.location.reload(); // Commented out to prevent reload
     } catch (error: any) {
       // console.error("Error updating user:", error);
       let errorMessage = "Failed to update the user. Please try again.";
