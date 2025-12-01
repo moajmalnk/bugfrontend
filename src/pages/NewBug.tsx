@@ -731,7 +731,6 @@ const NewBug = () => {
                         <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"></div>
                         Attachments
                       </Label>
-                      
                     </div>
 
                     {/* Hidden file inputs */}
@@ -752,223 +751,222 @@ const NewBug = () => {
                       multiple
                     />
 
-                    <div className="grid gap-6 md:grid-cols-3">
-                      {/* Screenshots section */}
-                      <div
-                        className="space-y-4"
-                        tabIndex={0}
-                        onPaste={handlePasteScreenshot}
-                      >
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-300 rounded-xl group"
-                          onClick={handleScreenshotClick}
+                    {/* Simple three-card grid: screenshots, files, voice recorder */}
+                    <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+                        {/* Screenshots section */}
+                        <div
+                          className="space-y-4"
+                          tabIndex={0}
+                          onPaste={handlePasteScreenshot}
                         >
-                          <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
-                            <ImagePlus className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <span className="font-semibold text-gray-700 dark:text-gray-300">Add Screenshots</span>
-                          {/* <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            (Paste or Upload)
-                          </span> */}
-                        </Button>
-
-                        {/* Preview of screenshots */}
-                        {screenshots.length > 0 && (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                Screenshots ({screenshots.length})
-                              </Label>
-                              <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={clearAllScreenshots}
-                                className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
-                              >
-                                Clear All
-                              </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-300 rounded-xl group"
+                            onClick={handleScreenshotClick}
+                          >
+                            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
+                              <ImagePlus className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              {screenshots.map((file, index) => (
-                                <div
-                                  key={index}
-                                  className="relative rounded-xl border border-gray-200 dark:border-gray-700 p-2 group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">
+                              Add Screenshots
+                            </span>
+                          </Button>
+
+                          {/* Preview of screenshots */}
+                          {screenshots.length > 0 && (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                  Screenshots ({screenshots.length})
+                                </Label>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={clearAllScreenshots}
+                                  className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
                                 >
-                                  {file.preview ? (
-                                    <img
-                                      src={file.preview}
-                                      alt={`Screenshot ${index + 1}`}
-                                      className="h-24 w-full object-cover rounded-lg"
-                                    />
-                                  ) : (
-                                    <div className="h-24 w-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
-                                      <FileImage className="h-8 w-8 text-gray-400" />
-                                    </div>
-                                  )}
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="icon"
-                                    className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg"
-                                    onClick={() => removeScreenshot(index)}
+                                  Clear All
+                                </Button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                {screenshots.map((file, index) => (
+                                  <div
+                                    key={index}
+                                    className="relative rounded-xl border border-gray-200 dark:border-gray-700 p-2 group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
                                   >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                  <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">
-                                    {file.name}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                </div>
-
-                      {/* Files section */}
-                      <div className="space-y-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400 dark:hover:border-green-500 hover:bg-green-50/50 dark:hover:bg-green-950/20 transition-all duration-300 rounded-xl group"
-                          onClick={handleFileClick}
-                        >
-                          <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full mb-3 group-hover:bg-green-200 dark:group-hover:bg-green-800/40 transition-colors">
-                            <Paperclip className="h-6 w-6 text-green-600 dark:text-green-400" />
-                          </div>
-                          <span className="font-semibold text-gray-700 dark:text-gray-300">Attach Files</span>
-                          {/* <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            (Documents, logs, etc.)
-                          </span> */}
-                        </Button>
-
-                        {/* Preview of files */}
-                        {files.length > 0 && (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                Files ({files.length})
-                              </Label>
-                              <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={clearAllFiles}
-                                className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
-                              >
-                                Clear All
-                              </Button>
-                            </div>
-                            <div className="space-y-2">
-                              {files.map((file, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
-                                >
-                                  <div className="flex items-center space-x-3 overflow-hidden">
                                     {file.preview ? (
                                       <img
                                         src={file.preview}
-                                        alt={`File preview ${index + 1}`}
-                                        className="h-10 w-10 object-cover rounded-lg"
+                                        alt={`Screenshot ${index + 1}`}
+                                        className="h-24 w-full object-cover rounded-lg"
                                       />
                                     ) : (
-                                      <div className="h-10 w-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
-                                        <File className="h-5 w-5 text-gray-400" />
+                                      <div className="h-24 w-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                        <FileImage className="h-8 w-8 text-gray-400" />
                                       </div>
                                     )}
-                                    <div className="min-w-0 flex-1">
-                                      <div className="truncate font-medium text-gray-700 dark:text-gray-300">
-                                        {file.name}
-                                      </div>
-                                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        {(file.size / 1024).toFixed(1)} KB
-                                      </div>
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="icon"
+                                      className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg"
+                                      onClick={() => removeScreenshot(index)}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                    <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">
+                                      {file.name}
                                     </div>
                                   </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
-                                    onClick={() => removeFile(index)}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
 
-                      {/* Voice Notes section */}
-                      <div className="space-y-4">
-                        <WhatsAppVoiceRecorder
-                          onComplete={handleVoiceRecorderComplete}
-                          onCancel={() =>
-                            toast({
-                              title: "Recording cancelled",
-                              description: "Hold the mic to record a new voice note.",
-                            })
-                          }
-                          disabled={isSubmitting}
-                          maxDuration={300}
-                        />
-
-                        {/* Preview of voice notes */}
-                        {voiceNotes.length > 0 && (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                Voice Notes ({voiceNotes.length})
-                              </Label>
-                              <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={clearAllVoiceNotes}
-                                className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
-                              >
-                                Clear All
-                              </Button>
+                        {/* Files section */}
+                        <div className="space-y-4">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400 dark:hover:border-green-500 hover:bg-green-50/50 dark:hover:bg-green-950/20 transition-all duration-300 rounded-xl group"
+                            onClick={handleFileClick}
+                          >
+                            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full mb-3 group-hover:bg-green-200 dark:group-hover:bg-green-800/40 transition-colors">
+                              <Paperclip className="h-6 w-6 text-green-600 dark:text-green-400" />
                             </div>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">
+                              Attach Files
+                            </span>
+                          </Button>
+
+                        {/* Preview of files */}
+                          {files.length > 0 && (
                             <div className="space-y-3">
-                              {voiceNotes.map((voiceNote, index) => {
-                                const voiceId = voiceNote.id;
-                                return (
-                                  <WhatsAppVoiceMessage
-                                    key={voiceId}
-                                    id={voiceId}
-                                    audioSource={voiceNote.blob}
-                                    duration={voiceNote.duration}
-                                    waveform={voiceNote.waveform}
-                                    accent="sent"
-                                    autoPlay
-                                    isActive={activeVoiceNoteId === voiceId}
-                                    onPlay={(id) => setActiveVoiceNoteId(id)}
-                                    onPause={(id) => {
-                                      if (id === activeVoiceNoteId) {
-                                        setActiveVoiceNoteId(null);
-                                      }
-                                    }}
-                                    onRemove={() => {
-                                      if (activeVoiceNoteId === voiceId) {
-                                        setActiveVoiceNoteId(null);
-                                      }
-                                      removeVoiceNote(index);
-                                    }}
-                                  />
-                                );
-                              })}
+                              <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                  Files ({files.length})
+                                </Label>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={clearAllFiles}
+                                  className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                                >
+                                  Clear All
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                {files.map((file, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                                  >
+                                    <div className="flex items-center space-x-3 overflow-hidden">
+                                      {file.preview ? (
+                                        <img
+                                          src={file.preview}
+                                          alt={`File preview ${index + 1}`}
+                                          className="h-10 w-10 object-cover rounded-lg"
+                                        />
+                                      ) : (
+                                        <div className="h-10 w-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                          <File className="h-5 w-5 text-gray-400" />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <div className="truncate font-medium text-gray-700 dark:text-gray-300">
+                                          {file.name}
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                          {(file.size / 1024).toFixed(1)} KB
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
+                                      onClick={() => removeFile(index)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
+
+                        {/* Voice Notes section - recorder only */}
+                        <div className="space-y-4">
+                          <WhatsAppVoiceRecorder
+                            onComplete={handleVoiceRecorderComplete}
+                            onCancel={() =>
+                              toast({
+                                title: "Recording cancelled",
+                                description: "Hold the mic to record a new voice note.",
+                              })
+                            }
+                            disabled={isSubmitting}
+                            maxDuration={300}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
+
+                  {/* Compact WhatsApp-style voice notes list below attachments */}
+                  {voiceNotes.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Voice Notes ({voiceNotes.length})
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearAllVoiceNotes}
+                          className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                        >
+                          Clear All
+                        </Button>
+                      </div>
+                      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                        {voiceNotes.map((voiceNote, index) => {
+                          const voiceId = voiceNote.id;
+                          return (
+                            <WhatsAppVoiceMessage
+                              key={voiceId}
+                              id={voiceId}
+                              audioSource={voiceNote.blob}
+                              duration={voiceNote.duration}
+                              waveform={voiceNote.waveform}
+                              accent="sent"
+                              autoPlay
+                              isActive={activeVoiceNoteId === voiceId}
+                              onPlay={(id) => setActiveVoiceNoteId(id)}
+                              onPause={(id) => {
+                                if (id === activeVoiceNoteId) {
+                                  setActiveVoiceNoteId(null);
+                                }
+                              }}
+                              onRemove={() => {
+                                if (activeVoiceNoteId === voiceId) {
+                                  setActiveVoiceNoteId(null);
+                                }
+                                removeVoiceNote(index);
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
                 <CardFooter className="p-6 sm:p-8 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
                   <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">

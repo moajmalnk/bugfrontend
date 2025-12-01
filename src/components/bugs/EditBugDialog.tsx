@@ -716,8 +716,10 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                 multiple
               />
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {/* Simple three-card grid: screenshots, files, voice recorder */}
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                 {/* Screenshots section */}
+                  {/* Screenshots section */}
                 <div className="space-y-3">
                   <Button
                     type="button"
@@ -730,11 +732,17 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                   </Button>
                   {screenshots.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium text-blue-700 dark:text-blue-400">New Screenshots ({screenshots.length})</Label>
+                      <Label className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                        New Screenshots ({screenshots.length})
+                      </Label>
                       {screenshots.map((file, index) => (
                         <div key={index} className="relative rounded border p-2 group">
                           {file.preview && (
-                            <img src={file.preview} alt={`Screenshot ${index + 1}`} className="h-16 w-full object-cover rounded" />
+                            <img
+                              src={file.preview}
+                              alt={`Screenshot ${index + 1}`}
+                              className="h-16 w-full object-cover rounded"
+                            />
                           )}
                           <Button
                             type="button"
@@ -764,9 +772,14 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                   </Button>
                   {files.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium text-green-700 dark:text-green-400">New Files ({files.length})</Label>
+                      <Label className="text-sm font-medium text-green-700 dark:text-green-400">
+                        New Files ({files.length})
+                      </Label>
                       {files.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between rounded border p-2 text-sm">
+                        <div
+                          key={index}
+                          className="flex items-center justify-between rounded border p-2 text-sm"
+                        >
                           <div className="flex items-center gap-2 overflow-hidden">
                             <File className="h-4 w-4 flex-shrink-0" />
                             <span className="truncate text-xs">{file.name}</span>
@@ -786,7 +799,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                   )}
                 </div>
 
-                {/* Voice Notes section */}
+                {/* Voice Notes section - recorder only */}
                 <div className="space-y-3">
                   <WhatsAppVoiceRecorder
                     onComplete={handleVoiceRecorderComplete}
@@ -799,40 +812,46 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                     disabled={isSubmitting}
                     maxDuration={300}
                   />
-                  {voiceNotes.length > 0 && (
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium text-purple-700 dark:text-purple-400">New Voice Notes ({voiceNotes.length})</Label>
-                      {voiceNotes.map((voiceNote, index) => {
-                        const voiceId = voiceNote.id;
-                        return (
-                          <WhatsAppVoiceMessage
-                            key={voiceId}
-                            id={voiceId}
-                            audioSource={voiceNote.blob}
-                            duration={voiceNote.duration}
-                            waveform={voiceNote.waveform}
-                            accent="sent"
-                            autoPlay
-                            isActive={activeVoiceId === voiceId}
-                            onPlay={(id) => setActiveVoiceId(id)}
-                            onPause={(id) => {
-                              if (id === activeVoiceId) {
-                                setActiveVoiceId(null);
-                              }
-                            }}
-                            onRemove={() => {
-                              if (activeVoiceId === voiceId) {
-                                setActiveVoiceId(null);
-                              }
-                              removeVoiceNote(index);
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               </div>
+
+              {/* Compact voice-notes list below attachments */}
+              {voiceNotes.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <Label className="text-sm font-medium text-purple-700 dark:text-purple-400">
+                    New Voice Notes ({voiceNotes.length})
+                  </Label>
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    {voiceNotes.map((voiceNote, index) => {
+                      const voiceId = voiceNote.id;
+                      return (
+                        <WhatsAppVoiceMessage
+                          key={voiceId}
+                          id={voiceId}
+                          audioSource={voiceNote.blob}
+                          duration={voiceNote.duration}
+                          waveform={voiceNote.waveform}
+                          accent="sent"
+                          autoPlay
+                          isActive={activeVoiceId === voiceId}
+                          onPlay={(id) => setActiveVoiceId(id)}
+                          onPause={(id) => {
+                            if (id === activeVoiceId) {
+                              setActiveVoiceId(null);
+                            }
+                          }}
+                          onRemove={() => {
+                            if (activeVoiceId === voiceId) {
+                              setActiveVoiceId(null);
+                            }
+                            removeVoiceNote(index);
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Existing Attachments - Separated by Type */}
               {existingAttachments.length > 0 && (() => {
