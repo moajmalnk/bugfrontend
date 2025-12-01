@@ -510,7 +510,18 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="
+          w-full
+          max-w-[95vw]
+          sm:max-w-[720px]
+          lg:max-w-[900px]
+          max-h-[90vh]
+          overflow-y-auto
+          px-4
+          sm:px-6
+        "
+      >
         <DialogHeader>
           <DialogTitle>Edit Bug</DialogTitle>
           <DialogDescription>
@@ -705,7 +716,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                 multiple
               />
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {/* Screenshots section */}
                 <div className="space-y-3">
                   <Button

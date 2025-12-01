@@ -82,9 +82,12 @@ export function WhatsAppVoiceMessage({
 
         try {
           setSourceLoading(true);
+          // Audio files are served with permissive CORS (Access-Control-Allow-Origin: *)
+          // and don't require cookies or auth headers, so we explicitly avoid sending
+          // credentials here to prevent CORS errors in production.
           const response = await fetch(audioSource, {
-            credentials: "include",
             cache: "no-store",
+            credentials: "omit",
           });
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
