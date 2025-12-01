@@ -76,7 +76,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
       // In production, use window.location for reliable navigation from BugDetails
       if (import.meta.env.PROD && window.location.pathname.includes('/bugs/')) {
         e.preventDefault();
-        console.log('[Sidebar] Using window.location for production navigation', { destination });
         window.location.href = destination;
         return;
       }
@@ -299,7 +298,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
           to={role ? `/${role}/profile` : "/profile"}
           className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition-all duration-200 group relative z-10 pointer-events-auto"
           onClick={(e) => {
-            console.log('Profile button clicked', { role, currentUser });
             closeSidebar?.();
           }}
         >

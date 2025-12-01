@@ -12,7 +12,6 @@ export function KeyboardShortcuts() {
   const safeNavigate = (path: string) => {
     // In production, use window.location for reliable navigation from BugDetails
     if (import.meta.env.PROD && window.location.pathname.includes('/bugs/')) {
-      console.log('[KeyboardShortcuts] Using window.location for production navigation', { path });
       window.location.href = path;
     } else {
       navigate(path, { state: { from: window.location.pathname } });

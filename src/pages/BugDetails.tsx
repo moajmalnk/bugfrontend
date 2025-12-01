@@ -356,13 +356,6 @@ const BugDetails = () => {
       targetId?: string;
       targetUrl?: string;
     }) => {
-      console.groupCollapsed("[BugDetails] clearNavigationState");
-      console.log("reason", options?.reason);
-      console.log("targetId", options?.targetId);
-      console.log("targetUrl", options?.targetUrl);
-      console.log("currentPath", location.pathname);
-      console.log("isNavigating (before reset)", isNavigating);
-      console.groupEnd();
 
       const fallbackUrl = options?.targetUrl ?? lastTargetUrlRef.current ?? undefined;
       
@@ -798,21 +791,10 @@ const BugDetails = () => {
   
   // CRITICAL: Return null immediately for child routes to allow React Router to mount the correct component
   if (isChildRoute) {
-    console.log('[BugDetails] Detected child route, unmounting component', {
-      pathname: location.pathname,
-      isChildRoute: true,
-      timestamp: Date.now()
-    });
     return null;
   }
   
   if (!isBugRoute || !bugId) {
-    console.log('[BugDetails] Not on bug route or no bugId, unmounting', {
-      isBugRoute,
-      bugId,
-      pathname: location.pathname,
-      timestamp: Date.now()
-    });
     // Force unmount by returning null immediately
     return null;
   }
@@ -970,13 +952,6 @@ const BugDetails = () => {
                 isNavigating ? 'cursor-wait' : ''
               }`}
               onClick={(e) => {
-                console.info("[BugDetails] Prev button clicked", {
-                  currentBugId: bugId,
-                  targetBugId: prevBugId,
-                  isNavigating,
-                  bugListLoading,
-                  isLoading,
-                });
                 if (isNavigating || !prevBugId || bugListLoading || isLoading || prevBugId === bugId) {
                   return;
                 }
@@ -992,20 +967,12 @@ const BugDetails = () => {
                 lastTargetUrlRef.current = url;
                 
                 setIsNavigating(true);
-                console.info("[BugDetails] Starting navigation to previous bug", {
-                  targetBugId: prevBugId,
-                  url,
-                });
                 navigatingToBugIdRef.current = prevBugId;
                 chunkLoadErrorRef.current = false;
                 
                 // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
                   if (navigatingToBugIdRef.current === prevBugId) {
-                    console.warn("[BugDetails] Navigation timeout hit for previous bug, forcing hard redirect", {
-                      targetId: prevBugId,
-                      url,
-                    });
                     window.location.assign(url);
                     clearNavigationState({
                       reason: "timeout",
@@ -1029,18 +996,10 @@ const BugDetails = () => {
                 }
                 navigationFallbackRef.current = setTimeout(() => {
                   if (!chunkLoadErrorRef.current) {
-                    console.info("[BugDetails] No chunk error detected for prev navigation; skipping hard reload", {
-                      from: window.location.pathname,
-                      to: url,
-                    });
                     navigationFallbackRef.current = null;
                     return;
                   }
-                  console.warn("BugDetails: chunk error fallback triggered (prev bug)", {
-                      from: window.location.pathname,
-                      to: url,
-                    });
-                    window.location.assign(url);
+                  window.location.assign(url);
                     lastTargetUrlRef.current = null;
                   chunkLoadErrorRef.current = false;
                   navigationFallbackRef.current = null;
@@ -1074,13 +1033,6 @@ const BugDetails = () => {
                 isNavigating ? 'cursor-wait' : ''
               }`}
               onClick={(e) => {
-                console.info("[BugDetails] Next button clicked", {
-                  currentBugId: bugId,
-                  targetBugId: nextBugId,
-                  isNavigating,
-                  bugListLoading,
-                  isLoading,
-                });
                 if (isNavigating || !nextBugId || bugListLoading || isLoading || nextBugId === bugId) {
                   return;
                 }
@@ -1096,20 +1048,12 @@ const BugDetails = () => {
                 lastTargetUrlRef.current = url;
                 
                 setIsNavigating(true);
-                console.info("[BugDetails] Starting navigation to next bug", {
-                  targetBugId: nextBugId,
-                  url,
-                });
                 navigatingToBugIdRef.current = nextBugId;
                 chunkLoadErrorRef.current = false;
                 
                 // Backup timeout - clear after 2.5 seconds to avoid long disabled state
                 navigationTimeoutRef.current = setTimeout(() => {
                   if (navigatingToBugIdRef.current === nextBugId) {
-                    console.warn("[BugDetails] Navigation timeout hit for next bug, forcing hard redirect", {
-                      targetId: nextBugId,
-                      url,
-                    });
                     window.location.assign(url);
                     clearNavigationState({
                       reason: "timeout",
@@ -1133,18 +1077,10 @@ const BugDetails = () => {
                 }
                 navigationFallbackRef.current = setTimeout(() => {
                   if (!chunkLoadErrorRef.current) {
-                    console.info("[BugDetails] No chunk error detected for next navigation; skipping hard reload", {
-                      from: window.location.pathname,
-                      to: url,
-                    });
                     navigationFallbackRef.current = null;
                     return;
                   }
-                  console.warn("BugDetails: chunk error fallback triggered (next bug)", {
-                      from: window.location.pathname,
-                      to: url,
-                    });
-                    window.location.assign(url);
+                  window.location.assign(url);
                     lastTargetUrlRef.current = null;
                   chunkLoadErrorRef.current = false;
                   navigationFallbackRef.current = null;

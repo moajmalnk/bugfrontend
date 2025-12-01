@@ -384,25 +384,15 @@ export const BugHeader = ({
                     const fixUrl = `/${authUser?.role || "tester"}/bugs/${bug.id}/fix`;
                     const redirectUrl = isFromProject ? `${fixUrl}?from=project` : fixUrl;
                     
-                    console.log('[BugHeader] Fix button clicked', {
-                      currentPath: window.location.pathname,
-                      targetPath: redirectUrl,
-                      isProduction: import.meta.env.PROD,
-                      timestamp: Date.now()
-                    });
-                    
                     // In production, React Router navigation may fail due to code splitting
                     // Use window.location as reliable fallback for production
                     if (import.meta.env.PROD) {
-                      console.warn('[BugHeader] Using window.location for production navigation');
                       window.location.href = redirectUrl;
                     } else {
                       // Try React Router navigation in development
                       try {
                         navigate(redirectUrl, { replace: false });
-                        console.log('[BugHeader] React Router navigation called');
                       } catch (error) {
-                        console.error('[BugHeader] React Router navigation failed, using window.location', error);
                         window.location.href = redirectUrl;
                       }
                     }
