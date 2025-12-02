@@ -61,6 +61,7 @@ import {
   Calendar,
   Clock,
   Code,
+  Copy,
   FileText,
   Filter,
   ListChecks,
@@ -68,6 +69,7 @@ import {
   Loader2,
   Plus,
   Search,
+  Share2,
   Shield,
   TestTube,
   User,
@@ -242,7 +244,17 @@ const MemberCard = ({
   );
 };
 
-const TaskCard = ({ task, onView }: { task: SharedTask; onView: (task: SharedTask) => void }) => {
+const TaskCard = ({ 
+  task, 
+  onView, 
+  onShare, 
+  onCopyUrl 
+}: { 
+  task: SharedTask; 
+  onView: (task: SharedTask) => void;
+  onShare?: (task: SharedTask) => void;
+  onCopyUrl?: (task: SharedTask) => void;
+}) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "approved":
@@ -296,7 +308,7 @@ const TaskCard = ({ task, onView }: { task: SharedTask; onView: (task: SharedTas
             <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
               <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               <span className="truncate">
-                {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}
+                {task.due_date ? new Date(task.due_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'No due date'}
               </span>
             </div>
           </div>
@@ -371,7 +383,7 @@ const TaskCard = ({ task, onView }: { task: SharedTask; onView: (task: SharedTas
                   <div className="flex items-center gap-1" title="Created Date">
                     <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
                     <span className="text-xs sm:text-sm">
-                      {new Date(task.created_at).toLocaleDateString()}
+                      {new Date(task.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                     </span>
                   </div>
                 </div>
@@ -382,13 +394,39 @@ const TaskCard = ({ task, onView }: { task: SharedTask; onView: (task: SharedTas
 
         {/* Card Actions */}
         <div className="pt-2 mt-auto p-4 sm:p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {onShare && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onShare(task)}
+                className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                title="Share task"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Share</span>
+              </Button>
+            )}
+            {onCopyUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onCopyUrl(task)}
+                className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200 border-purple-200 text-purple-600 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                title="Copy task URL"
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Copy URL</span>
+              </Button>
+            )}
           <Button
             variant="default"
-            className="w-full h-11 bg-gradient-to-r from-orange-600 to-yellow-600 hover:from-orange-700 hover:to-yellow-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+              className={`w-full h-11 bg-gradient-to-r from-orange-600 to-yellow-600 hover:from-orange-700 hover:to-yellow-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 ${onShare && onCopyUrl ? 'sm:col-span-1' : onShare || onCopyUrl ? 'sm:col-span-2' : ''}`}
             onClick={() => onView(task)} 
           >
             View
           </Button>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -4232,6 +4270,76 @@ const ProjectDetails = () => {
   };
 
   // Function to open edit task dialog
+  // Generate shareable URL for a shared task
+  const getTaskShareUrl = (task: SharedTask) => {
+    const baseUrl = window.location.origin;
+    const currentPath = window.location.pathname;
+    // Create URL with task ID parameter
+    return `${baseUrl}${currentPath}?task=${task.id}`;
+  };
+
+  // Handle share task
+  const handleShareTask = async (task: SharedTask) => {
+    const shareUrl = getTaskShareUrl(task);
+    const shareData = {
+      title: task.title,
+      text: task.description || `Check out this task: ${task.title}`,
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        toast({
+          title: "Task shared",
+          description: "Task link has been shared successfully.",
+        });
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(shareUrl);
+        toast({
+          title: "Link copied",
+          description: "Task link has been copied to clipboard.",
+        });
+      }
+    } catch (error: any) {
+      // User cancelled or error occurred, try copy as fallback
+      if (error.name !== 'AbortError') {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          toast({
+            title: "Link copied",
+            description: "Task link has been copied to clipboard.",
+          });
+        } catch (copyError) {
+          toast({
+            title: "Error",
+            description: "Failed to share or copy link.",
+            variant: "destructive",
+          });
+        }
+      }
+    }
+  };
+
+  // Handle copy task URL
+  const handleCopyTaskUrl = async (task: SharedTask) => {
+    const shareUrl = getTaskShareUrl(task);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: "Link copied",
+        description: "Task link has been copied to clipboard.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to copy link to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const openEditShared = (task: SharedTask) => {
     setEditingShared({ ...task });
     // Set existing assigned users if any
@@ -4334,7 +4442,7 @@ const ProjectDetails = () => {
                 {projectOwner && (
                   <span>Owner: <span className="text-foreground">{projectOwner.username}</span></span>
                 )}
-                <span>Created: <span className="text-foreground">{new Date(project.created_at).toLocaleDateString()}</span></span>
+                <span>Created: <span className="text-foreground">{new Date(project.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></span>
                 <span>Status: <span className="capitalize inline-flex items-center px-1.5 py-0.5 rounded-full border bg-muted/40">{project.status}</span></span>
               </div>
               <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full"></div>
@@ -4847,7 +4955,7 @@ const ProjectDetails = () => {
               ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {getFilteredTasks().map((task) => (
-                          <TaskCard key={task.id} task={task} onView={openTaskDetails} />
+                          <TaskCard key={task.id} task={task} onView={openTaskDetails} onShare={handleShareTask} onCopyUrl={handleCopyTaskUrl} />
                         ))}
                         </div>
                     )}
@@ -4891,7 +4999,7 @@ const ProjectDetails = () => {
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {getFilteredTasks().filter(task => task.assigned_to === currentUser?.id).map((task) => (
-                          <TaskCard key={task.id} task={task} onView={openTaskDetails} />
+                          <TaskCard key={task.id} task={task} onView={openTaskDetails} onShare={handleShareTask} onCopyUrl={handleCopyTaskUrl} />
                         ))}
                       </div>
                     )}
@@ -5557,7 +5665,7 @@ const ProjectDetails = () => {
                           </div>
                           <span className="text-gray-600 dark:text-gray-400">Created:</span>
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {new Date(selectedTask.created_at || '').toLocaleDateString()}
+                            {new Date(selectedTask.created_at || '').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                           </span>
                         </div>
 
@@ -5567,7 +5675,7 @@ const ProjectDetails = () => {
                           </div>
                           <span className="text-gray-600 dark:text-gray-400">Due Date:</span>
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleDateString() : 'No due date'}
+                            {selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'No due date'}
                           </span>
                         </div>
 

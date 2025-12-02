@@ -269,9 +269,10 @@ export class MessagingService {
       return `${Math.floor(diffInHours)}h ago`;
     } else {
       // Use local time formatting
-      return date.toLocaleDateString('en-US', {
+      return date.toLocaleDateString('en-IN', {
         year: 'numeric',
         month: 'short',
+        timeZone: 'Asia/Kolkata',
         day: 'numeric',
       });
     }

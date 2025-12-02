@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions } from '@/services/todoService';
+import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn } from '@/services/todoService';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, ArrowLeft, Plus, Bell } from 'lucide-react';
+import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, ArrowLeft, Plus, Bell, FolderKanban } from 'lucide-react';
+import { projectService, Project } from '@/services/projectService';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DatePicker } from '@/components/ui/DatePicker';
-import { TimePicker } from '@/components/ui/TimePicker';
 import { HourPicker } from '@/components/ui/HourPicker';
 import { useAuth } from '@/context/AuthContext';
 
@@ -36,7 +38,6 @@ export default function DailyWorkUpdate() {
   
   const [form, setForm] = useState<WorkSubmission>({
     submission_date: todayYMD(),
-    start_time: isEditing ? '10:00' : getCurrentTime(),
     hours_today: 4,
     overtime_hours: 0,
     completed_tasks: '',
@@ -54,6 +55,12 @@ export default function DailyWorkUpdate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<string>('');
+  const [isCheckInDialogOpen, setIsCheckInDialogOpen] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [plannedWork, setPlannedWork] = useState<string>('');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   
   // Calculate overtime automatically
   const overtimeHours = useMemo(() => {
@@ -68,7 +75,6 @@ export default function DailyWorkUpdate() {
 
   const canSubmit = useMemo(() => {
     const hasDate = !!form.submission_date;
-    const hasStart = !!(form.start_time && String(form.start_time).trim());
     const hrs = Number(form.hours_today);
     const hasHours = hrs >= 1 && hrs <= 24;
     
@@ -78,7 +84,7 @@ export default function DailyWorkUpdate() {
                      countItems(form.ongoing_tasks) > 0 || 
                      countItems(form.notes) > 0;
     
-    return hasDate && hasStart && hasHours && hasTasks;
+    return hasDate && hasHours && hasTasks;
   }, [form]);
 
   function countItems(text?: string) {
@@ -93,7 +99,7 @@ export default function DailyWorkUpdate() {
     if (!t) return '----';
     try {
       const d = new Date(`1970-01-01T${t}`);
-      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
     } catch {
       return t;
     }
@@ -122,9 +128,6 @@ export default function DailyWorkUpdate() {
       if (!form.submission_date) {
         throw new Error('Date is required');
       }
-      if (!form.start_time || String(form.start_time).trim() === '') {
-        throw new Error('Start Time is required');
-      }
       const hoursNum = Number(form.hours_today);
       if (!(hoursNum >= 1 && hoursNum <= 24)) {
         throw new Error("Today's Hours must be between 1 and 24");
@@ -138,7 +141,13 @@ export default function DailyWorkUpdate() {
       if (!hasTasks) {
         throw new Error('Please enter at least one task in Completed, Pending, Ongoing, or Upcoming fields');
       }
-      const payload = { ...form };
+      // Get planned projects and work from check-in data if available
+      // Check if we have check-in data stored in the form or need to fetch from the database
+      const payload: any = { 
+        ...form,
+        planned_projects: selectedProjects.length > 0 ? selectedProjects : undefined,
+        planned_work: plannedWork.trim() || undefined
+      };
       const res = await submitWork(payload);
       if ((res as any)?.success === false) throw new Error((res as any)?.message || 'Failed');
       toast({ title: isEditing ? 'Daily submission updated' : 'Daily submission saved' });
@@ -165,12 +174,69 @@ export default function DailyWorkUpdate() {
     }
   }
 
+  async function handleCheckIn() {
+    try {
+      setIsCheckingIn(true);
+      const result = await checkIn(form.submission_date, selectedProjects, plannedWork);
+      
+      // Update form with check-in time
+      setForm((prev) => ({
+        ...prev,
+        check_in_time: result.check_in_time,
+      }));
+      
+      const checkInDate = new Date(result.check_in_time);
+      const formattedTime = checkInDate.toLocaleTimeString('en-IN', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        timeZone: 'Asia/Kolkata'
+      });
+      
+      toast({ 
+        title: 'Checked in successfully', 
+        description: `Check-in time: ${formattedTime}` 
+      });
+      
+      // Reset form
+      setSelectedProjects([]);
+      setPlannedWork('');
+      setIsCheckInDialogOpen(false);
+    } catch (e: any) {
+      toast({ 
+        title: 'Failed to check in', 
+        description: e?.message || 'An error occurred',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsCheckingIn(false);
+    }
+  }
+
+  function handleProjectToggle(projectId: string) {
+    setSelectedProjects(prev => 
+      prev.includes(projectId) 
+        ? prev.filter(id => id !== projectId)
+        : [...prev, projectId]
+    );
+  }
+
   // Live local preview (does not require backend)
   useEffect(() => {
-    const weekday = new Date(form.submission_date).toLocaleDateString(undefined, { weekday: 'long' });
+    const weekday = new Date(form.submission_date).toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' });
     const d = new Date(form.submission_date);
     const dateText = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${weekday}`;
-    const startText = form.start_time ? new Date(`1970-01-01T${form.start_time}`).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '----';
+    
+    // Format check-in time if available, otherwise show placeholder
+    let checkInText = '----';
+    if (form.check_in_time) {
+      try {
+        const checkInDate = new Date(form.check_in_time);
+        checkInText = checkInDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+      } catch {
+        checkInText = '----';
+      }
+    }
+    
     const cCount = countItems(form.completed_tasks);
     const pCount = countItems(form.pending_tasks);
     const oCount = countItems(form.ongoing_tasks);
@@ -178,7 +244,7 @@ export default function DailyWorkUpdate() {
 
     let header = `🧾 CODO Daily Work Update — User\n` +
       `📅 Date: ${dateText}\n` +
-      `🕘 Start Time: ${startText}\n` +
+      `🕘 Check-in Time: ${checkInText}\n` +
       `⏱ Today's Working Hours: ${Number(form.hours_today || 0)} Hours`;
     
     // Add overtime breakdown if applicable
@@ -189,11 +255,31 @@ export default function DailyWorkUpdate() {
 
     // Compute totals for current CODO period up to selected date
     const since = getCodoPeriodStart(form.submission_date);
-    const sinceLabel = new Date(since).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+    const sinceLabel = new Date(since).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
     header += `\n📊 Total Working Days (Since ${sinceLabel}): 0 Days`;
     header += `\n🧮 Total Hours Completed : 0 hours`;
 
     const sec: string[] = [];
+    
+    // Add planned projects and work if available
+    if (selectedProjects.length > 0 || plannedWork.trim()) {
+      let plannedSection = `📋 *Planning Details:*\n\n`;
+      
+      if (selectedProjects.length > 0) {
+        const projectNames = projects
+          .filter(p => selectedProjects.includes(p.id))
+          .map(p => p.name)
+          .join(', ');
+        plannedSection += `📁 *Projects:* ${projectNames}\n`;
+      }
+      
+      if (plannedWork.trim()) {
+        plannedSection += `\n📝 *Planned Work:*\n${plannedWork.trim()}\n`;
+      }
+      
+      sec.push(plannedSection);
+    }
+    
     const cTxt = (form.completed_tasks || '').trim();
     const pTxt = (form.pending_tasks || '').trim();
     const oTxt = (form.ongoing_tasks || '').trim();
@@ -205,7 +291,36 @@ export default function DailyWorkUpdate() {
 
     const text = sec.length ? header + `\n\n` + sec.join(`\n\n`) : header;
     setTemplate(text);
-  }, [form.submission_date, form.start_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes]);
+  }, [form.submission_date, form.check_in_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes, selectedProjects, plannedWork, projects]);
+
+  // Load projects when check-in dialog opens
+  useEffect(() => {
+    if (isCheckInDialogOpen) {
+      (async () => {
+        try {
+          setLoadingProjects(true);
+          const projectsData = await projectService.getProjects();
+          // Filter to show only active projects
+          const activeProjects = projectsData.filter(p => p.status === 'active' || !p.status);
+          setProjects(activeProjects);
+          console.log('Loaded projects:', activeProjects.length, 'out of', projectsData.length);
+        } catch (error: any) {
+          console.error('Failed to load projects:', error);
+          toast({
+            title: 'Error',
+            description: error?.message || 'Failed to load projects. Please try again.',
+            variant: 'destructive'
+          });
+          setProjects([]);
+        } finally {
+          setLoadingProjects(false);
+        }
+      })();
+    } else {
+      // Reset projects when dialog closes to ensure fresh load next time
+      setProjects([]);
+    }
+  }, [isCheckInDialogOpen]);
 
   useEffect(() => {
     (async () => {
@@ -232,7 +347,7 @@ export default function DailyWorkUpdate() {
           if (existingSubmission) {
             setForm({
               submission_date: existingSubmission.submission_date,
-              start_time: existingSubmission.start_time || '10:00',
+              check_in_time: existingSubmission.check_in_time || undefined,
               hours_today: existingSubmission.hours_today || 8,
               overtime_hours: existingSubmission.overtime_hours || 0,
               completed_tasks: existingSubmission.completed_tasks || '',
@@ -240,6 +355,24 @@ export default function DailyWorkUpdate() {
               ongoing_tasks: existingSubmission.ongoing_tasks || '',
               notes: existingSubmission.notes || '',
             });
+            
+            // Load planned projects and work if available
+            if (existingSubmission.planned_projects) {
+              try {
+                const plannedProjectsArray = typeof existingSubmission.planned_projects === 'string' 
+                  ? JSON.parse(existingSubmission.planned_projects) 
+                  : existingSubmission.planned_projects;
+                if (Array.isArray(plannedProjectsArray)) {
+                  setSelectedProjects(plannedProjectsArray);
+                }
+              } catch (e) {
+                console.error('Failed to parse planned_projects:', e);
+              }
+            }
+            
+            if (existingSubmission.planned_work) {
+              setPlannedWork(existingSubmission.planned_work);
+            }
           }
         }
       } catch (e) {
@@ -318,6 +451,23 @@ export default function DailyWorkUpdate() {
               
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 <Button 
+                  onClick={() => setIsCheckInDialogOpen(true)}
+                  disabled={isCheckingIn}
+                  className="h-12 px-6 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                >
+                  {isCheckingIn ? (
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Checking in...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <Clock className="h-5 w-5" />
+                      <span>Check-in</span>
+                    </div>
+                  )}
+                </Button>
+                <Button 
                   disabled={!canSubmit || loading} 
                   onClick={onSubmit} 
                   className="h-12 px-6 bg-gradient-to-r from-blue-600 to-emerald-700 hover:from-blue-700 hover:to-emerald-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
@@ -373,7 +523,7 @@ export default function DailyWorkUpdate() {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
                     <div className="space-y-3">
                       <Label htmlFor="work-date" className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-blue-600" />
@@ -384,19 +534,6 @@ export default function DailyWorkUpdate() {
                           value={form.submission_date} 
                           onChange={(v)=>setForm((p)=>({...p, submission_date:v}))} 
                           allowOnlyTodayAndYesterday 
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label htmlFor="start-time" className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-emerald-600" />
-                        Start Time <span className="text-red-500">*</span>
-                      </Label>
-                      <div id="start-time">
-                        <TimePicker 
-                          value={form.start_time || ''} 
-                          onChange={(v)=>setForm((p)=>({...p, start_time:v}))} 
                         />
                       </div>
                     </div>
@@ -448,7 +585,7 @@ export default function DailyWorkUpdate() {
                           <FileText className="h-4 w-4 text-white" />
                         </div>
                         <p className="text-sm font-medium text-red-700 dark:text-red-300">
-                          Please complete all required fields: Date, Start Time, Hours (1–24), and at least one task field.
+                          Please complete all required fields: Date, Hours (1–24), and at least one task field.
                         </p>
                       </div>
                     </div>
@@ -622,6 +759,142 @@ Example:
 
         </div>
       </section>
+
+      {/* Check-in Confirmation Dialog */}
+      <Dialog open={isCheckInDialogOpen} onOpenChange={(open) => {
+        setIsCheckInDialogOpen(open);
+        if (!open) {
+          // Reset form when dialog closes
+          setSelectedProjects([]);
+          setPlannedWork('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-green-600" />
+              Check-in
+            </DialogTitle>
+            <DialogDescription>
+              Select projects you plan to work on and describe your planned work for today.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-6">
+            {/* Date and Time Display */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Date:</span>
+                <span className="text-sm text-gray-900 dark:text-white">
+                  {new Date(form.submission_date).toLocaleDateString('en-IN', { 
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    timeZone: 'Asia/Kolkata'
+                  })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Time:</span>
+                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {new Date().toLocaleTimeString('en-IN', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZone: 'Asia/Kolkata'
+                  })}
+                </span>
+              </div>
+            </div>
+
+            {/* Project Selection */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                <FolderKanban className="h-4 w-4 text-blue-600" />
+                Select Projects to Work On
+              </Label>
+              <div className="border-2 border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-48 overflow-y-auto bg-gray-50 dark:bg-gray-800/50">
+                {loadingProjects ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading projects...</span>
+                  </div>
+                ) : projects.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No projects available</p>
+                ) : (
+                  <div className="space-y-2">
+                    {projects.map((project) => (
+                      <div
+                        key={project.id}
+                        className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                        onClick={() => handleProjectToggle(project.id)}
+                      >
+                        <Checkbox
+                          id={`project-${project.id}`}
+                          checked={selectedProjects.includes(project.id)}
+                          onCheckedChange={() => handleProjectToggle(project.id)}
+                        />
+                        <label
+                          htmlFor={`project-${project.id}`}
+                          className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer flex-1"
+                        >
+                          {project.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {selectedProjects.length > 0 && (
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {selectedProjects.length} project{selectedProjects.length !== 1 ? 's' : ''} selected
+                </p>
+              )}
+            </div>
+
+            {/* Planned Work */}
+            <div className="space-y-3">
+              <Label htmlFor="planned-work" className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-emerald-600" />
+                Planned Work for Today
+              </Label>
+              <Textarea
+                id="planned-work"
+                placeholder="Describe what you plan to work on today...&#10;&#10;Example:&#10;• Fix authentication bug in login module&#10;• Review PR #123 for new feature&#10;• Update API documentation&#10;• Write unit tests for user service"
+                value={plannedWork}
+                onChange={(e) => setPlannedWork(e.target.value)}
+                className="min-h-[120px] border-2 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-400 rounded-xl text-sm leading-relaxed resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCheckInDialogOpen(false);
+                setSelectedProjects([]);
+                setPlannedWork('');
+              }}
+              disabled={isCheckingIn}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCheckIn}
+              disabled={isCheckingIn || (selectedProjects.length === 0 && !plannedWork.trim())}
+              className="bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 disabled:opacity-50"
+            >
+              {isCheckingIn ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Checking in...</span>
+                </div>
+              ) : (
+                'Confirm Check-in'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

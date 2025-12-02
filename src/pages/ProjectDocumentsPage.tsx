@@ -37,6 +37,7 @@ import {
   ChevronRight,
   User,
   Edit,
+  Copy,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -211,6 +212,22 @@ const ProjectDocumentsPage = () => {
 
   const handleViewDocument = (doc: UserDocument) => {
     googleDocsService.openDocument(doc.google_doc_url);
+  };
+
+  const handleCopyDocumentUrl = async (doc: UserDocument) => {
+    try {
+      await navigator.clipboard.writeText(doc.google_doc_url);
+      toast({
+        title: "Link copied",
+        description: "Document URL has been copied to clipboard.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to copy link to clipboard.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getDocTypeIcon = (docType: string) => {
@@ -508,6 +525,15 @@ const ProjectDocumentsPage = () => {
                         >
                           <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
                           <span className="sm:inline">Edit</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCopyDocumentUrl(doc)}
+                          className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 dark:hover:border-purple-600 text-purple-700 dark:text-purple-300 hover:text-purple-700 dark:hover:text-purple-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
+                        >
+                          <Copy className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                          <span className="sm:inline">Copy URL</span>
                         </Button>
                         <Button
                           variant="destructive"

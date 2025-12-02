@@ -18,6 +18,7 @@ import { Bug, BugStatus, Project } from "@/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { GoogleDocsButton } from "./GoogleDocsButton";
+import { BugFixCelebration } from "@/components/celebration/BugFixCelebration";
 
 interface BugDetailsCardProps {
   bug: Bug;
@@ -38,6 +39,7 @@ export const BugDetailsCard = ({
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
   const [bugState, setBugState] = useState(bug);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const handleUpdate = async (field: "status" | "priority", value: string) => {
     if (!currentUser) {
@@ -72,6 +74,9 @@ export const BugDetailsCard = ({
 
       // Send notification when status is changed to "fixed"
       if (field === "status" && value === "fixed") {
+        // Show celebration animation
+        setShowCelebration(true);
+
         const notificationResult = await sendBugStatusUpdateNotification(
           updatedBug
         );
@@ -239,6 +244,13 @@ export const BugDetailsCard = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Celebration Animation */}
+      <BugFixCelebration
+        bug={bugState}
+        isVisible={showCelebration}
+        onClose={() => setShowCelebration(false)}
+      />
     </div>
   );
 };

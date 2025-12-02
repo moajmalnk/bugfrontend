@@ -2015,7 +2015,7 @@ export default function MeetRoom() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-blue-400">{message.user}</span>
                         <span className="text-xs text-gray-500">
-                          {message.timestamp.toLocaleTimeString()}
+                          {message.timestamp.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}
                         </span>
                       </div>
                       <p className="text-gray-200 text-sm bg-gray-700/50 rounded-lg p-2">

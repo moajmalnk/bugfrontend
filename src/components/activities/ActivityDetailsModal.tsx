@@ -351,7 +351,7 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Created:</span>
                   <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {new Date(activity.created_at).toLocaleString()}
+                    {new Date(activity.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">

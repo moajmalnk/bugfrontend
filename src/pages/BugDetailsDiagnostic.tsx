@@ -806,7 +806,7 @@ const BugDetailsDiagnostic = () => {
                             <div className="flex items-center gap-2">
                               <span className="font-semibold">{log.type.toUpperCase()}</span>
                               <span className="text-muted-foreground">
-                                {new Date(log.timestamp).toLocaleTimeString()}
+                                {new Date(log.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}
                               </span>
                             </div>
                             <div className="mt-1">{log.message}</div>

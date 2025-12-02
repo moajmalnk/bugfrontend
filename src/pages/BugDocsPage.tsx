@@ -47,6 +47,7 @@ import {
   User,
   X,
   Edit,
+  Copy,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -63,6 +64,10 @@ const BugDocsPage = () => {
     project_name: string;
     documents: UserDocument[];
   }>>([]);
+  // Separate counts for each tab to fix tab count display
+  const [myDocsCount, setMyDocsCount] = useState<number>(0);
+  const [allDocsCount, setAllDocsCount] = useState<number>(0);
+  const [sharedDocsCount, setSharedDocsCount] = useState<number>(0);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [projects, setProjects] = useState<ProjectWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -166,6 +171,9 @@ const BugDocsPage = () => {
       // Load documents and templates if connected
       if (connected) {
         console.log('📄 Loading documents and templates...');
+        // Preload all tab counts first for accurate badge numbers
+        await preloadAllTabCounts();
+        // Then load documents for the active tab
         await Promise.all([loadDocuments(), loadTemplates()]);
         console.log('✅ Documents and templates loaded');
       } else {
@@ -237,6 +245,32 @@ const BugDocsPage = () => {
     window.location.href = authUrl;
   };
 
+  // Preload all tab counts for accurate tab badge numbers
+  const preloadAllTabCounts = async () => {
+    try {
+      // Load My Docs count
+      const myDocs = await googleDocsService.listGeneralDocuments();
+      setMyDocsCount(myDocs.length);
+      
+      // Load All Docs count (admin only)
+      if (isAdmin) {
+        const allDocsResult = await googleDocsService.getAllDocuments();
+        const allDocs = allDocsResult.documents.flatMap(group => group.documents);
+        setAllDocsCount(allDocs.length);
+        setAllDocumentsGrouped(allDocsResult.documents);
+      }
+      
+      // Load Shared Docs count (developer/tester only)
+      if (isDevOrTester) {
+        const sharedDocs = await googleDocsService.getSharedDocuments();
+        setSharedDocsCount(sharedDocs.length);
+      }
+    } catch (error: any) {
+      console.error("Error preloading tab counts:", error);
+      // Don't show toast for preload errors, just log them
+    }
+  };
+
   const loadDocuments = async () => {
     try {
       let docs: UserDocument[] = [];
@@ -244,15 +278,18 @@ const BugDocsPage = () => {
       if (activeTab === "my-docs") {
         // Load user's own documents
         docs = await googleDocsService.listGeneralDocuments();
+        setMyDocsCount(docs.length);
       } else if (activeTab === "all-docs" && isAdmin) {
         // Load all documents from all users (admins, developers, testers, and others) grouped by project
         const result = await googleDocsService.getAllDocuments();
         setAllDocumentsGrouped(result.documents);
         // Flatten for display
         docs = result.documents.flatMap(group => group.documents);
+        setAllDocsCount(docs.length);
       } else if (activeTab === "shared-docs" && isDevOrTester) {
         // Load shared documents (from projects user is member of)
         docs = await googleDocsService.getSharedDocuments();
+        setSharedDocsCount(docs.length);
       }
       
       setDocuments(docs);
@@ -283,6 +320,8 @@ const BugDocsPage = () => {
   const refreshDocuments = async () => {
     console.log('🔄 Refreshing documents, isConnected:', isConnected);
     if (isConnected) {
+      // Refresh all tab counts and then load current tab
+      await preloadAllTabCounts();
       await loadDocuments();
     } else {
       console.log('❌ Not connected, cannot refresh documents');
@@ -453,6 +492,22 @@ const BugDocsPage = () => {
     googleDocsService.openDocument(doc.google_doc_url);
   };
 
+  const handleCopyDocumentUrl = async (doc: UserDocument) => {
+    try {
+      await navigator.clipboard.writeText(doc.google_doc_url);
+      toast({
+        title: "Link copied",
+        description: "Document URL has been copied to clipboard.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to copy link to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getDocTypeIcon = (docType: string) => {
     switch (docType) {
       case "meeting":
@@ -537,15 +592,15 @@ const BugDocsPage = () => {
   }, [documents, activeTab, searchTerm, dateFilter, projectFilter]);
 
 
-  // Get tab counts
+  // Get tab counts - use separate state variables for accurate counts
   const getTabCount = (tabType: string) => {
     switch (tabType) {
       case "all-docs":
-        return isAdmin ? documents?.length || 0 : 0;
+        return isAdmin ? allDocsCount : 0;
       case "shared-docs":
-        return isDevOrTester ? documents?.length || 0 : 0;
+        return isDevOrTester ? sharedDocsCount : 0;
       case "my-docs":
-        return documents?.length || 0;
+        return myDocsCount;
       default:
         return 0;
     }
@@ -553,11 +608,8 @@ const BugDocsPage = () => {
 
   // Check if should show project cards
   const shouldShowProjectCards = () => {
-    if (!isConnected) return false;
-    if (isAdmin && activeTab === "all-docs") {
-      // Show project cards in admin "All Docs" tab
-      return true;
-    }
+    // Disabled: Show document list instead of project cards for better visibility
+    // Admins can see all documents directly in the "All Docs" tab
     return false;
   };
 
@@ -599,6 +651,29 @@ const BugDocsPage = () => {
               </div>
               
               <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 sm:gap-4">
+                {/* Google Connection Status Indicator */}
+                <div className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border transition-all duration-300"
+                  style={{
+                    backgroundColor: isConnected ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                    borderColor: isConnected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                  }}
+                >
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className={`text-sm font-semibold ${isConnected ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                    {isConnected ? 'Google Connected' : 'Not Connected'}
+                  </span>
+                  {!isConnected && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={() => navigate(`/${userRole}/profile`)}
+                      className="h-auto p-0 text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline ml-1"
+                    >
+                      Connect
+                    </Button>
+                  )}
+                </div>
+
                 {isConnected && (
                   <>
                     <Button 
@@ -632,81 +707,6 @@ const BugDocsPage = () => {
         </div>
 
 
-        {/* Connection Status */}
-        {!isCheckingConnection && (
-          <>
-            {!isConnected ? (
-          <div className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-yellow-50/30 to-red-50/50 dark:from-orange-950/20 dark:via-yellow-950/10 dark:to-red-950/20 rounded-2xl"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-                <LinkIcon className="h-10 w-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Google Docs Not Connected</h3>
-              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                Connect your account to create, manage, and collaborate on documents directly from BugRicer.
-              </p>
-              <Button
-                onClick={handleConnectGoogleDocs}
-                className="h-12 px-8 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
-                <LinkIcon className="h-5 w-5 mr-2" />
-                Connect Account
-                <ExternalLink className="h-4 w-4 ml-2" />
-              </Button>
-            </div>
-          </div>
-            ) : (
-              <div className="relative overflow-hidden mb-6">
-                <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-emerald-50/30 to-teal-50/50 dark:from-green-950/20 dark:via-emerald-950/10 dark:to-teal-950/20 rounded-2xl"></div>
-                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                      <div className="flex-shrink-0">
-                        <div className="p-2 sm:p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
-                          <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-1 sm:mb-0">
-                          Google Account Connected
-                        </h3>
-                        {connectedEmail && (
-                          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                            {connectedEmail}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex-shrink-0 flex gap-3">
-                      <Button
-                        onClick={handleConnectGoogleDocs}
-                        variant="outline"
-                        className="w-full sm:w-auto border-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Reconnect
-                      </Button>
-                      <Button
-                        onClick={() => setShowDisconnectDialog(true)}
-                        variant="destructive"
-                        className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Disconnect
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
 
         {/* Disconnect Confirmation Dialog */}
         <Dialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
@@ -752,7 +752,7 @@ const BugDocsPage = () => {
         </Dialog>
 
         {/* Documents Tabs */}
-        {isConnected && (
+        {!isCheckingConnection && (
           <Tabs 
             value={activeTab} 
             onValueChange={(val) => {
@@ -949,20 +949,32 @@ const BugDocsPage = () => {
                         <FileText className="h-10 w-10 text-white" />
                       </div>
                       <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                        {activeTab === "all-docs" ? "No documents found" : "No documents found"}
+                        {!isConnected ? "Google Account Not Connected" : activeTab === "all-docs" ? "No documents found" : "No documents found"}
                       </h3>
                       <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                        {activeTab === "all-docs"
+                        {!isConnected
+                          ? "Please connect your Google account first to view and manage documents."
+                          : activeTab === "all-docs"
                           ? "No documents available. Create your first document to get started."
                           : "No documents available. Create your first document to get started."}
                       </p>
-                      <Button 
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                      >
-                        <Plus className="h-5 w-5 mr-2" />
-                        Create Document
-                      </Button>
+                      {!isConnected ? (
+                        <Button 
+                          onClick={() => navigate(`/${userRole}/profile`)}
+                          className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                        >
+                          <LinkIcon className="h-5 w-5 mr-2" />
+                          Connect Google Account
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={() => setIsCreateModalOpen(true)}
+                          className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                        >
+                          <Plus className="h-5 w-5 mr-2" />
+                          Create Document
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1019,7 +1031,6 @@ const BugDocsPage = () => {
                                 onClick={() => handleViewDocument(doc)}
                                 className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
                               >
-                                <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
                                 <span className="sm:inline">View</span>
                               </Button>
                               <Button
@@ -1028,8 +1039,15 @@ const BugDocsPage = () => {
                                 onClick={() => handleEditClick(doc)}
                                 className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
                               >
-                                <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
                                 <span className="sm:inline">Edit</span>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCopyDocumentUrl(doc)}
+                                className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 dark:hover:border-purple-600 text-purple-700 dark:text-purple-300 hover:text-purple-700 dark:hover:text-purple-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
+                              >
+                                <span className="sm:inline">Copy</span>
                               </Button>
                               <Button
                                 variant="destructive"
@@ -1045,7 +1063,6 @@ const BugDocsPage = () => {
                                   </>
                                 ) : (
                                   <>
-                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
                                     <span className="sm:inline">Delete</span>
                                   </>
                                 )}

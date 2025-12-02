@@ -725,8 +725,8 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                     onClick={handleScreenshotClick}
                   >
                     <div className="flex h-full w-full items-center justify-center gap-4">
-                      <Button
-                        type="button"
+                  <Button
+                    type="button"
                         disabled={isSubmitting}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -734,9 +734,9 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                         }}
                         className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg transition-all disabled:opacity-50"
                         aria-label="Add Screenshots"
-                      >
+                  >
                         <ImagePlus className="h-5 w-5" />
-                      </Button>
+                  </Button>
                       <span className="text-sm font-semibold text-gray-100">
                         Add Screenshots
                       </span>
@@ -778,8 +778,8 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                     onClick={handleFileClick}
                   >
                     <div className="flex h-full w-full items-center justify-center gap-4">
-                      <Button
-                        type="button"
+                  <Button
+                    type="button"
                         disabled={isSubmitting}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -787,9 +787,9 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                         }}
                         className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-purple-500 hover:bg-purple-600 text-white shadow-lg transition-all disabled:opacity-50"
                         aria-label="Attach Files"
-                      >
+                  >
                         <Paperclip className="h-5 w-5" />
-                      </Button>
+                  </Button>
                       <span className="text-sm font-semibold text-gray-100">
                         Attach Files
                       </span>

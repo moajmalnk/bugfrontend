@@ -27,13 +27,24 @@ const API_URL = `${ENV.API_URL}/projects`;
 class ProjectService {
   async getProjects(): Promise<Project[]> {
     try {
-      const response = await apiClient.get<{ success: boolean; data: Project[] }>('/projects/getAll.php');
+      const response = await apiClient.get<{ success: boolean; data: Project[]; message?: string }>('/projects/getAll.php');
+      console.log('Projects API response:', response.data);
+      
       if (response.data.success) {
-        return response.data.data || [];
+        const projects = response.data.data || [];
+        console.log('Projects loaded:', projects.length);
+        return projects;
       }
+      
+      console.warn('Projects API returned success=false:', response.data.message);
       return [];
-    } catch (error) {
-    //console.error('Error fetching projects:', error);
+    } catch (error: any) {
+      console.error('Error fetching projects:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
       throw error;
     }
   }

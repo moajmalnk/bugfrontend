@@ -35,10 +35,11 @@ export const formatLocalDate = (
 
     switch (format) {
       case 'date':
-        return calcuttaTime.toLocaleDateString('en-US', {
+        return calcuttaTime.toLocaleDateString('en-IN', {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
+          timeZone: 'Asia/Kolkata',
         });
 
       case 'time':
@@ -76,17 +77,19 @@ export const formatLocalDate = (
         if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
         if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
         
-        return calcuttaTime.toLocaleDateString('en-US', {
+        return calcuttaTime.toLocaleDateString('en-IN', {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
+          timeZone: 'Asia/Kolkata',
         });
 
       default:
-        return calcuttaTime.toLocaleDateString('en-US', {
+        return calcuttaTime.toLocaleDateString('en-IN', {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
+          timeZone: 'Asia/Kolkata',
         });
     }
   } catch (error) {
@@ -105,11 +108,12 @@ export const getCurrentLocalTime = (): string => {
   const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
   const calcuttaTime = new Date(utcTime + (5.5 * 60 * 60000));
   
-  return calcuttaTime.toLocaleTimeString('en-US', {
+  return calcuttaTime.toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: true,
+    timeZone: 'Asia/Kolkata',
   });
 };
 
@@ -123,10 +127,11 @@ export const getCurrentLocalDate = (): string => {
   const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
   const calcuttaTime = new Date(utcTime + (5.5 * 60 * 60000));
   
-  return calcuttaTime.toLocaleDateString('en-US', {
+  return calcuttaTime.toLocaleDateString('en-IN', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: 'Asia/Kolkata',
   });
 };
 

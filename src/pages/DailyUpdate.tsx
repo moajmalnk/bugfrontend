@@ -57,7 +57,7 @@ export default function DailyUpdate() {
     if (!t) return '----';
     try {
       const d = new Date(`1970-01-01T${t}`);
-      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
     } catch {
       return t;
     }
@@ -182,7 +182,7 @@ export default function DailyUpdate() {
   // Format date for display (e.g., "October 6" or "November 5")
   function formatDateForDisplay(dateStr: string) {
     const d = new Date(dateStr + 'T00:00:00');
-    const monthName = d.toLocaleDateString(undefined, { month: 'long' });
+    const monthName = d.toLocaleDateString('en-IN', { month: 'long', timeZone: 'Asia/Kolkata' });
     const day = d.getDate();
     return `${monthName} ${day}`;
   }
@@ -205,7 +205,7 @@ export default function DailyUpdate() {
 
   function formatSubmissionText(s: any) {
     const d = new Date(s.submission_date);
-    const weekday = d.toLocaleDateString(undefined, { weekday: 'long' });
+    const weekday = d.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' });
     const dateText = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${weekday}`;
     const startText = formatTime12h(s.start_time);
     const c = (s.completed_tasks || '').trim();
@@ -234,7 +234,7 @@ export default function DailyUpdate() {
     const since = getCodoPeriodStart(s.submission_date);
     const to = s.submission_date;
     const { days, hours } = computeTotalsInRange(submissions, since, to);
-    const sinceLabel = new Date(since).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+    const sinceLabel = new Date(since).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
     body += `\n📊 Total Working Days (Since ${sinceLabel}): ${days} ${days===1?'Day':'Days'}`;
     body += `\n🧮 Total Hours Completed : ${hours} hours`;
 

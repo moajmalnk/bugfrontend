@@ -3,12 +3,18 @@ import { toast } from "@/components/ui/use-toast";
 import { googleDocsService } from "@/services/googleDocsService";
 import { FileText, ExternalLink, Link as LinkIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { getEffectiveRole } from "@/lib/utils";
 
 interface GoogleDocsButtonProps {
   bugId: string;
 }
 
 export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const userRole = currentUser ? getEffectiveRole(currentUser) : 'user';
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -100,63 +106,44 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
 
   if (!isConnected) {
     return (
-      <div className="space-y-3">
+      <div className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl border transition-all duration-300"
+        style={{
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          borderColor: 'rgba(239, 68, 68, 0.3)',
+        }}
+      >
+        <div className="w-2 h-2 rounded-full bg-red-500" />
+        <span className="text-sm font-semibold text-red-700 dark:text-red-300">
+          Not Connected
+        </span>
         <Button
-          variant="outline"
-          size="lg"
-          onClick={handleConnectGoogleDocs}
-          disabled={isLoading}
-          className="
-            w-full h-12 px-6 py-3 rounded-xl font-semibold text-sm
-            bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900
-            hover:from-slate-100 hover:to-slate-200 dark:hover:from-slate-700 dark:hover:to-slate-800
-            text-slate-700 dark:text-slate-300 border-2 border-slate-300 dark:border-slate-600
-            shadow-lg hover:shadow-xl
-            transition-all duration-300 ease-in-out
-            transform hover:scale-[1.02] active:scale-[0.98]
-            disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none
-            disabled:shadow-md
-            relative overflow-hidden
-          "
+          variant="link"
+          size="sm"
+          onClick={() => navigate(`/${userRole}/profile`)}
+          className="h-auto p-0 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline ml-1"
         >
-          {/* Animated background gradient */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-200/20 dark:via-slate-600/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-          
-          <div className="relative flex items-center justify-center space-x-3">
-            {isLoading ? (
-              <>
-                <div className="relative">
-                  <LinkIcon className="h-5 w-5 animate-pulse" />
-                  <div className="absolute inset-0 h-5 w-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
-                </div>
-                <span className="font-semibold tracking-wide">Connecting...</span>
-              </>
-            ) : (
-              <>
-                <div className="relative group/icon">
-                  <LinkIcon className="h-5 w-5 transition-all duration-200 group-hover/icon:scale-110 group-hover/icon:rotate-12" />
-                  <div className="absolute -top-1 -right-1 h-3 w-3 bg-orange-400 rounded-full border-2 border-white animate-pulse shadow-sm"></div>
-                </div>
-                <span className="font-semibold tracking-wide">Connect Google</span>
-                <ExternalLink className="h-4 w-4 transition-all duration-200 hover:translate-x-0.5 hover:-translate-y-0.5 hover:scale-110" />
-              </>
-            )}
-          </div>
+          Connect
         </Button>
-        
-        {/* Professional status indicator */}
-        <div className="flex items-center justify-center space-x-2 text-xs">
-          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
-            <div className="h-2 w-2 bg-orange-500 rounded-full shadow-sm"></div>
-            <span className="text-orange-700 dark:text-orange-400 font-medium">Connect to BugDocs</span>
-          </div>
-        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
+      {/* Google Connection Status Indicator */}
+      <div className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl border transition-all duration-300"
+        style={{
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          borderColor: 'rgba(34, 197, 94, 0.3)',
+        }}
+      >
+        <div className="w-2 h-2 rounded-full bg-green-500" />
+        <span className="text-sm font-semibold text-green-700 dark:text-green-300">
+          Google Connected
+        </span>
+      </div>
+
+      {/* Create BugDoc Button */}
       <Button
         variant="default"
         size="lg"
@@ -198,14 +185,6 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
           )}
         </div>
       </Button>
-      
-      {/* Professional status indicator */}
-      <div className="flex items-center justify-center space-x-2 text-xs">
-        <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-          <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse shadow-sm"></div>
-          <span className="text-green-700 dark:text-green-400 font-medium">Google Docs Connected</span>
-        </div>
-      </div>
     </div>
   );
 };

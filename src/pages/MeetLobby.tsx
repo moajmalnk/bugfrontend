@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/dialog";
 import { createMeeting, getMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2, RefreshCw } from "lucide-react";
+import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2, RefreshCw, Link as LinkIcon } from "lucide-react";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { TimePicker } from "@/components/ui/TimePicker";
 import { googleDocsService } from "@/services/googleDocsService";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -157,6 +159,19 @@ export default function MeetLobby() {
   const { currentUser } = useAuth();
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
+  // Initialize with current date and time
+  const getDefaultDate = () => {
+    const now = new Date();
+    return now.toISOString().split('T')[0]; // YYYY-MM-DD
+  };
+  const getDefaultTime = () => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}:00`; // HH:mm:ss
+  };
+  const [meetingDate, setMeetingDate] = useState(getDefaultDate());
+  const [meetingTime, setMeetingTime] = useState(getDefaultTime());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -239,11 +254,36 @@ export default function MeetLobby() {
     setRunningMeets(prev => [optimisticMeeting, ...prev]);
     
     try {
+      // Prepare participant emails from selected users
+      const participantEmails = selectedUsers.length > 0 
+        ? selectedUsers // selectedUsers already contains email addresses
+        : [];
+      
+      // Prepare meeting time (combine date and time)
+      // meetingDate is in YYYY-MM-DD format
+      // meetingTime is in HH:mm:ss format
+      let meetingStartTime: string | undefined;
+      let meetingEndTime: string | undefined;
+      
+      if (meetingDate && meetingTime) {
+        // Extract hours and minutes from time (HH:mm:ss format)
+        const [hours, minutes] = meetingTime.split(':').map(Number);
+        // Combine date and time, then convert to ISO format
+        const startDateTime = new Date(`${meetingDate}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+        meetingStartTime = startDateTime.toISOString();
+        // End time is 1 hour after start time
+        const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000);
+        meetingEndTime = endDateTime.toISOString();
+      }
+      
       // Call the Google Meet API endpoint (apiClient handles token and impersonation automatically)
       const response = await apiClient.post(
         `/meet/create-space.php`,
         {
-          meeting_title: title || "BugMeet Session"
+          meeting_title: title || "BugMeet Session",
+          participant_emails: participantEmails,
+          start_time: meetingStartTime,
+          end_time: meetingEndTime
         }
       );
 
@@ -252,8 +292,10 @@ export default function MeetLobby() {
       if (data?.success && data?.meetingUri) {
         toast.success("Google Meet created successfully!");
         
-        // Clear the title input and close modal
+        // Clear the form inputs and close modal
         setTitle("");
+        setMeetingDate("");
+        setMeetingTime("");
         setIsModalOpen(false);
         
         // Open the Google Meet link in a new tab
@@ -512,15 +554,17 @@ export default function MeetLobby() {
     const end = new Date(endTime);
     const now = new Date();
     
-    const startStr = start.toLocaleTimeString('en-US', { 
+    const startStr = start.toLocaleTimeString('en-IN', { 
       hour: '2-digit', 
       minute: '2-digit',
-      hour12: true 
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
     });
-    const endStr = end.toLocaleTimeString('en-US', { 
+    const endStr = end.toLocaleTimeString('en-IN', { 
       hour: '2-digit', 
       minute: '2-digit',
-      hour12: true 
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
     });
     
     if (now >= start && now <= end) {
@@ -841,6 +885,9 @@ export default function MeetLobby() {
     setModalType("create");
     setIsModalOpen(true);
     setError(null);
+    // Set default date and time to current when opening modal
+    setMeetingDate(getDefaultDate());
+    setMeetingTime(getDefaultTime());
   };
 
   const openJoinModal = () => {
@@ -853,6 +900,8 @@ export default function MeetLobby() {
     setIsModalOpen(false);
     setTitle("");
     setCode("");
+    setMeetingDate("");
+    setMeetingTime("");
     setSelectedUsers([]);
     setActiveRoleTab("all");
     setError(null);
@@ -980,140 +1029,59 @@ export default function MeetLobby() {
               </div>
               
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <Button
-                  onClick={openCreateModal}
-                  className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                {/* Google Connection Status Indicator */}
+                <div className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border transition-all duration-300"
+                  style={{
+                    backgroundColor: isConnected ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                    borderColor: isConnected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                  }}
                 >
-                  <Plus className="h-5 w-5 mr-2" />
-                  New Meet
-                </Button>
-                
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
-                    <div className="p-1.5 bg-blue-500 rounded-lg">
-                      <Video className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                        {runningMeets.length + completedMeets.length}
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className={`text-sm font-semibold ${isConnected ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                    {isConnected ? 'Google Connected' : 'Not Connected'}
+                  </span>
+                  {!isConnected && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={() => navigate(`/${currentUser?.role || 'user'}/profile`)}
+                      className="h-auto p-0 text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline ml-1"
+                    >
+                      Connect
+                    </Button>
+                  )}
+                </div>
+
+                {isConnected && (
+                  <>
+                    <Button
+                      onClick={openCreateModal}
+                      className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      New Meet
+                    </Button>
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
+                        <div className="p-1.5 bg-blue-500 rounded-lg">
+                          <Video className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                            {runningMeets.length + completedMeets.length}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {error && (
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-red-50/50 to-orange-50/50 dark:from-red-950/20 dark:to-orange-950/20 rounded-2xl"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-red-200/50 dark:border-red-700/50 rounded-2xl p-6">
-              <Alert className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-                <AlertDescription className="text-red-800 dark:text-red-300">
-                  {error}
-                </AlertDescription>
-              </Alert>
-            </div>
-          </div>
-        )}
 
-        {/* Google Connected Status */}
-        {!isCheckingConnection && isConnected && !error && (
-          <div className="relative overflow-hidden mb-6">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-emerald-50/30 to-teal-50/50 dark:from-green-950/20 dark:via-emerald-950/10 dark:to-teal-950/20 rounded-2xl"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="p-2 sm:p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-1 sm:mb-0">
-                      Google Account Connected
-                    </h3>
-                    {connectedEmail && (
-                      <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                        {connectedEmail}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex-shrink-0 flex gap-3">
-                  <Button
-                    onClick={handleConnect}
-                    variant="outline"
-                    className="w-full sm:w-auto border-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Reconnect
-                  </Button>
-                  <Button
-                    onClick={() => setShowDisconnectDialog(true)}
-                    variant="destructive"
-                    className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Disconnect
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Google Connection Status */}
-        {error && (error.includes("Please connect your Google account") || 
-                  error.includes("re-authorize your Google account") ||
-                  error.includes("Failed to obtain access token") ||
-                  error.includes("reconnect Google account") ||
-                  error.includes("not connected Google")) && (
-          <div className="relative overflow-hidden mb-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-2xl"></div>
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-blue-200/50 dark:border-blue-700/50 rounded-2xl p-4 sm:p-6 lg:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="p-2 sm:p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-1 sm:mb-0">
-                      {error.includes("re-authorize") || error.includes("reconnect") || error.includes("Failed to obtain access token") ? "Google Account Re-authorization Required" : "Google Account Required"}
-                    </h3>
-                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
-                      {error.includes("re-authorize") || error.includes("reconnect") || error.includes("Failed to obtain access token")
-                        ? "Re-authorize your Google account to access calendar features for meeting management"
-                        : "Connect your Google account to create and manage meetings"
-                      }
-                    </p>
-                  </div>
-                </div>
-                <div className="flex-shrink-0">
-                  <Button
-                    onClick={handleConnect}
-                    className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3"
-                  >
-                    {error.includes("re-authorize") || error.includes("reconnect") || error.includes("Failed to obtain access token") ? "Re-authorize Google" : "Connect Google"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Meetings Tabs */}
         <Tabs 
@@ -1275,14 +1243,24 @@ export default function MeetLobby() {
                       <Video className="h-10 w-10 text-white" />
                     </div>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                      {activeTab === "my-meets" ? "No meetings found" : "No shared meetings"}
+                      {!isConnected ? "Google Account Not Connected" : activeTab === "my-meets" ? "No meetings found" : "No shared meetings"}
                     </h3>
                     <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                      {activeTab === "my-meets"
+                      {!isConnected
+                        ? "Please connect your Google account first to view and manage meetings."
+                        : activeTab === "my-meets"
                         ? "You don't have any meetings yet. Create your first meeting to get started."
                         : "There are no shared meetings available right now."}
                     </p>
-                    {activeTab === "my-meets" && (
+                    {!isConnected ? (
+                      <Button 
+                        onClick={() => navigate(`/${currentUser?.role || 'user'}/profile`)}
+                        className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                      >
+                        <LinkIcon className="h-5 w-5 mr-2" />
+                        Connect Google Account
+                      </Button>
+                    ) : activeTab === "my-meets" && (
                       <div className="flex flex-col sm:flex-row gap-3 justify-center">
                         <Button
                           onClick={openCreateModal}
@@ -1510,14 +1488,6 @@ export default function MeetLobby() {
             </DialogHeader>
             
             <div className="space-y-6">
-              {error && (
-                <Alert className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-                  <AlertDescription className="text-red-800 dark:text-red-300">
-                    {error}
-                  </AlertDescription>
-                </Alert>
-              )}
-              
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1536,6 +1506,34 @@ export default function MeetLobby() {
                     className="w-full h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-mono text-center text-lg tracking-wider"
                   />
                 </div>
+
+                {/* Meet Time - Only for Create Modal */}
+                {modalType === "create" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Meeting Date
+                      </label>
+                      <DatePicker
+                        value={meetingDate}
+                        onChange={setMeetingDate}
+                        placeholder="Select meeting date"
+                        className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Meeting Time
+                      </label>
+                      <TimePicker
+                        value={meetingTime}
+                        onChange={setMeetingTime}
+                        placeholder="Select meeting time"
+                        className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Team Member Selection - Only for Create Modal */}
                 {modalType === "create" && (
@@ -1804,13 +1802,13 @@ export default function MeetLobby() {
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-blue-600 flex-shrink-0" />
                       <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
-                        <strong>Start:</strong> {new Date(meetingDetails.startTime).toLocaleString()}
+                        <strong>Start:</strong> {new Date(meetingDetails.startTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-blue-600 flex-shrink-0" />
                       <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
-                        <strong>End:</strong> {new Date(meetingDetails.endTime).toLocaleString()}
+                        <strong>End:</strong> {new Date(meetingDetails.endTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-1">
@@ -1904,13 +1902,13 @@ export default function MeetLobby() {
                           <div className="flex items-center gap-2">
                             <Timer className="h-4 w-4 text-green-600 flex-shrink-0" />
                             <span className="text-gray-600 dark:text-gray-400 break-words">
-                              <strong>Joined:</strong> {new Date(session.joinTime).toLocaleString()}
+                              <strong>Joined:</strong> {new Date(session.joinTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Timer className="h-4 w-4 text-red-600 flex-shrink-0" />
                             <span className="text-gray-600 dark:text-gray-400 break-words">
-                              <strong>Left:</strong> {new Date(session.leaveTime).toLocaleString()}
+                              <strong>Left:</strong> {new Date(session.leaveTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                             </span>
                           </div>
                           <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-1">

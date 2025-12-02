@@ -17,6 +17,7 @@ export type UserTask = {
 export type WorkSubmission = {
   submission_date: string; // YYYY-MM-DD
   start_time?: string; // HH:mm:ss
+  check_in_time?: string; // YYYY-MM-DD HH:mm:ss
   hours_today: number;
   overtime_hours?: number;
   total_working_days?: number | null;
@@ -226,6 +227,50 @@ export async function deleteSubmission(arg: { id?: number; submission_date?: str
   });
   if (!res.ok) throw new Error('Failed to delete submission');
   return res.json();
+}
+
+export async function checkIn(
+  submissionDate?: string, 
+  plannedProjects?: string[], 
+  plannedWork?: string
+): Promise<{ success: boolean; check_in_time: string; submission_date: string; message?: string }> {
+  const res = await fetch(`${API}/tasks/check_in.php`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      submission_date: submissionDate || new Date().toISOString().split('T')[0],
+      planned_projects: plannedProjects || [],
+      planned_work: plannedWork || ''
+    }),
+  });
+  
+  // Get response text first to handle empty responses
+  const responseText = await res.text();
+  
+  if (!responseText) {
+    throw new Error('Empty response from server');
+  }
+  
+  let responseData;
+  try {
+    responseData = JSON.parse(responseText);
+  } catch (e) {
+    console.error('Failed to parse JSON response:', responseText);
+    throw new Error('Invalid JSON response from server: ' + responseText.substring(0, 100));
+  }
+  
+  if (!res.ok || !responseData.success) {
+    throw new Error(responseData.message || 'Failed to check in');
+  }
+  
+  // Extract data from response (responseData.data contains the actual data)
+  const data = responseData.data || responseData;
+  return {
+    success: responseData.success,
+    check_in_time: data.check_in_time || responseData.check_in_time,
+    submission_date: data.submission_date || responseData.submission_date,
+    message: responseData.message
+  };
 }
 
 

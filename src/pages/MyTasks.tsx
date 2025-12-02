@@ -9,7 +9,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2, Undo2, X } from 'lucide-react';
+import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2, Undo2, X, Share2, Copy } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { useAuth } from '@/context/AuthContext';
@@ -298,6 +298,35 @@ export default function MyTasks() {
     if (urlTab !== activeTab) setActiveTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Auto-open task detail modal when task parameter is in URL
+  useEffect(() => {
+    const taskId = searchParams.get("task");
+    if (taskId && !sharedLoading && sharedTasks.length > 0) {
+      const task = sharedTasks.find(t => t.id === Number(taskId));
+      if (task) {
+        // Only open if modal is closed or if a different task is selected
+        const shouldOpen = !sharedDetailOpen || selectedShared?.id !== task.id;
+        if (shouldOpen) {
+          // Switch to shared-tasks tab if not already there
+          if (activeTab !== 'shared-tasks') {
+            setActiveTab('shared-tasks');
+            setSearchParams({ tab: 'shared-tasks', task: taskId }, { replace: true });
+          }
+          // Open the detail modal
+          setSelectedShared(task);
+          setShowAllAssignees(false);
+          setActiveDetailTab('details');
+          setSharedDetailOpen(true);
+        }
+      }
+    } else if (!taskId && sharedDetailOpen && searchParams.get("tab") === 'shared-tasks') {
+      // If task parameter is removed from URL, close the modal
+      // But only if we're on the shared-tasks tab to avoid closing when switching tabs
+      setSharedDetailOpen(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, sharedTasks, sharedLoading]);
 
   // Auto-refresh for My Tasks
   useEffect(() => {
@@ -816,6 +845,76 @@ export default function MyTasks() {
     }
   }
 
+  // Generate shareable URL for a shared task
+  const getTaskShareUrl = (task: SharedTask) => {
+    const baseUrl = window.location.origin;
+    const currentPath = window.location.pathname;
+    // Create URL with tab and task ID parameters
+    return `${baseUrl}${currentPath}?tab=shared-tasks&task=${task.id}`;
+  };
+
+  // Handle share task
+  const handleShareTask = async (task: SharedTask) => {
+    const shareUrl = getTaskShareUrl(task);
+    const shareData = {
+      title: task.title,
+      text: task.description || `Check out this task: ${task.title}`,
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        toast({
+          title: "Task shared",
+          description: "Task link has been shared successfully.",
+        });
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(shareUrl);
+        toast({
+          title: "Link copied",
+          description: "Task link has been copied to clipboard.",
+        });
+      }
+    } catch (error: any) {
+      // User cancelled or error occurred, try copy as fallback
+      if (error.name !== 'AbortError') {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          toast({
+            title: "Link copied",
+            description: "Task link has been copied to clipboard.",
+          });
+        } catch (copyError) {
+          toast({
+            title: "Error",
+            description: "Failed to share or copy link.",
+            variant: "destructive",
+          });
+        }
+      }
+    }
+  };
+
+  // Handle copy task URL
+  const handleCopyTaskUrl = async (task: SharedTask) => {
+    const shareUrl = getTaskShareUrl(task);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: "Link copied",
+        description: "Task link has been copied to clipboard.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to copy link to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
@@ -1054,7 +1153,7 @@ export default function MyTasks() {
                     <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
                       <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                       <span className="truncate">
-                        {t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No due date'}
+                        {t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'No due date'}
                       </span>
                     </div>
                   </div>
@@ -1342,7 +1441,7 @@ export default function MyTasks() {
                       <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
                         <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                         <span className="truncate">
-                          {t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No due date'}
+                          {t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'No due date'}
                         </span>
                         </div>
                       </div>
@@ -1460,10 +1559,10 @@ export default function MyTasks() {
                             </div>
                             <div className="flex flex-col items-end">
                               <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
-                                {t.created_at ? new Date(t.created_at).toLocaleDateString() : 'N/A'}
+                                {t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'}
                               </span>
                               <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                {t.created_at ? new Date(t.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                {t.created_at ? new Date(t.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) : 'N/A'}
                               </span>
                             </div>
                           </div>
@@ -1485,6 +1584,34 @@ export default function MyTasks() {
                                                     t.completed_assignee_ids?.includes(currentUser.id);
 
                       const buttons = [];
+
+                      // Share and Copy URL buttons (always visible)
+                      buttons.push({
+                        component: (
+                          <Button 
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleShareTask(t)}
+                            className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                            title="Share task"
+                          >
+                            Share
+                          </Button>
+                        )
+                      });
+                      buttons.push({
+                        component: (
+                          <Button 
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopyTaskUrl(t)}
+                            className="w-full h-11 font-semibold shadow-sm hover:shadow-md transition-all duration-200 border-purple-200 text-purple-600 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                            title="Copy task"
+                          >
+                            Copy
+                          </Button>
+                        )
+                      });
 
                       // Always show View button
                       buttons.push({
@@ -1622,41 +1749,13 @@ export default function MyTasks() {
                       const getGridClasses = () => {
                         if (buttonCount === 1) return "grid grid-cols-1 gap-3";
                         if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
-                        if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
+                        if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-3 gap-3";
                         if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
-                        if (buttonCount === 5) return "grid grid-cols-1 sm:grid-cols-3 gap-3";
-                        return "grid grid-cols-1 sm:grid-cols-2 gap-3";
+                        if (buttonCount === 5) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
+                        if (buttonCount === 6) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
+                        if (buttonCount === 7) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
+                        return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
                       };
-
-                      // Custom layout for 5 buttons: View + Incomplete in first row, Approve spans full width in second row, Edit + Delete in third row
-                      if (buttonCount === 5) {
-                        return (
-                          <div className="space-y-3">
-                            {/* First row: View, Incomplete */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {buttons.slice(0, 2).map((button, index) => (
-                                <div key={index}>
-                                  {button.component}
-                                </div>
-                              ))}
-                            </div>
-                            {/* Second row: Approve (spans full width) */}
-                            <div className="grid grid-cols-1 gap-3">
-                              <div key={2}>
-                                {buttons[2].component}
-                              </div>
-                            </div>
-                            {/* Third row: Edit, Delete */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {buttons.slice(3, 5).map((button, index) => (
-                                <div key={index + 3}>
-                                  {button.component}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      }
 
                       return (
                         <div className={getGridClasses()}>
@@ -1950,7 +2049,7 @@ export default function MyTasks() {
                         </div>
                         <span className="text-gray-600 dark:text-gray-400">Created:</span>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          {new Date(selected.created_at || '').toLocaleDateString()}
+                          {new Date(selected.created_at || '').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                         </span>
                     </div>
 
@@ -1960,7 +2059,7 @@ export default function MyTasks() {
                         </div>
                         <span className="text-gray-600 dark:text-gray-400">Due Date:</span>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          {selected.due_date ? new Date(selected.due_date).toLocaleDateString() : 'No due date'}
+                          {selected.due_date ? new Date(selected.due_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'No due date'}
                         </span>
                       </div>
                     </div>
@@ -2452,7 +2551,14 @@ export default function MyTasks() {
         </Dialog>
 
         {/* Professional Shared Task Detail Modal */}
-        <Dialog open={sharedDetailOpen} onOpenChange={setSharedDetailOpen}>
+        <Dialog open={sharedDetailOpen} onOpenChange={(open) => {
+          setSharedDetailOpen(open);
+          if (!open) {
+            // Remove task parameter from URL when modal is closed
+            const currentTab = searchParams.get("tab") || "my-tasks";
+            setSearchParams({ tab: currentTab }, { replace: true });
+          }
+        }}>
           <DialogContent 
             className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-xl hide-scrollbar"
             aria-describedby="shared-task-detail-description"
@@ -2585,7 +2691,7 @@ export default function MyTasks() {
                         </div>
                         <span className="text-gray-600 dark:text-gray-400">Created:</span>
                         <span className="font-medium text-gray-900 dark:text-white break-words">
-                          {new Date(selectedShared.created_at || '').toLocaleDateString()}
+                          {new Date(selectedShared.created_at || '').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                         </span>
                     </div>
 
@@ -2595,7 +2701,7 @@ export default function MyTasks() {
                         </div>
                         <span className="text-gray-600 dark:text-gray-400">Due Date:</span>
                         <span className="font-medium text-gray-900 dark:text-white break-words">
-                          {selectedShared.due_date ? new Date(selectedShared.due_date).toLocaleDateString() : 'No due date'}
+                          {selectedShared.due_date ? new Date(selectedShared.due_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'No due date'}
                         </span>
                       </div>
 
@@ -2754,11 +2860,11 @@ export default function MyTasks() {
                                       </Badge>
                                       {completedAt && (
                                         <span className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                                          <span className="hidden sm:inline">{new Date(completedAt).toLocaleDateString()}</span>
-                                          <span className="sm:hidden">{new Date(completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                          <span className="hidden sm:inline">{new Date(completedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
+                                          <span className="sm:hidden">{new Date(completedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' })}</span>
                                           <br className="hidden sm:block" />
                                           <span className="text-[10px] sm:text-xs">
-                                            {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {new Date(completedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                                           </span>
                                         </span>
                                       )}

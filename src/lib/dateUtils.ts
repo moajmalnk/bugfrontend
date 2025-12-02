@@ -95,23 +95,31 @@ export function formatAbsoluteDate(dateString: string | Date): string {
   
   const days = Math.abs(differenceInDays(now, date));
   
+  // Get IST time string for the date
+  const istTimeStr = date.toLocaleTimeString('en-IN', { 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    hour12: true, 
+    timeZone: 'Asia/Kolkata' 
+  });
+  
   // Today: "Today at 2:30 PM"
   if (days === 0) {
-    return `Today at ${format(date, 'h:mm a')}`;
+    return `Today at ${istTimeStr}`;
   }
   
   // Yesterday: "Yesterday at 2:30 PM"
   if (days === 1) {
-    return `Yesterday at ${format(date, 'h:mm a')}`;
+    return `Yesterday at ${istTimeStr}`;
   }
   
   // This year: "Mar 15 at 2:30 PM"
   if (date.getFullYear() === now.getFullYear()) {
-    return format(date, 'MMM d \'at\' h:mm a');
+    return `${format(date, 'MMM d')} at ${istTimeStr}`;
   }
   
   // Previous years: "Mar 15, 2023 at 2:30 PM"
-  return format(date, 'MMM d, yyyy \'at\' h:mm a');
+  return `${format(date, 'MMM d, yyyy')} at ${istTimeStr}`;
 }
 
 /**
@@ -155,7 +163,21 @@ export function formatBugDate(dateString: string | Date): string {
  */
 export function formatFullTimestamp(dateString: string | Date): string {
   const date = safeParseDate(dateString);
-  return format(date, 'EEEE, MMMM do, yyyy \'at\' h:mm:ss a');
+  const datePart = date.toLocaleDateString('en-IN', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    timeZone: 'Asia/Kolkata'
+  });
+  const timePart = date.toLocaleTimeString('en-IN', { 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata' 
+  });
+  return `${datePart} at ${timePart}`;
 }
 
 /**

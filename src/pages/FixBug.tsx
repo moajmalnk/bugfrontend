@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { BugFixCelebration } from "@/components/celebration/BugFixCelebration";
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -64,6 +65,8 @@ const FixBug = () => {
   const [bug, setBug] = useState<Bug | null>(null); // State to hold bug details
   const [fixDescription, setFixDescription] = useState(""); // Added field for fix description
   const [status, setStatus] = useState<Bug["status"]>("fixed"); // Status defaults to 'fixed'
+  const [showCelebration, setShowCelebration] = useState(false); // State for celebration animation
+  const [celebrationBug, setCelebrationBug] = useState<Bug | null>(null); // Bug data for celebration
   
   // Check if user came from project page
   const fromProject = searchParams.get("from") === "project";
@@ -176,14 +179,24 @@ const FixBug = () => {
       const data = response.data as ApiResponse<Bug>;
 
       if (data.success) {
+        // Update bug state with the updated bug data
+        const updatedBug = { ...bug, ...data.data, status };
+
+        // Update bug state first for celebration component
+        setBug(updatedBug);
+
         // Send notification if status is fixed
         if (status === "fixed") {
           await sendBugStatusUpdateNotification({
-            ...bug,
-            id: bug.id,
+            ...updatedBug,
+            id: updatedBug.id,
             status: "fixed",
             updated_by_name: currentUser?.name || "BugRicer",
           });
+
+          // Store updated bug for celebration and show animation
+          setCelebrationBug(updatedBug);
+          setShowCelebration(true);
         }
 
         // Broadcast notification for status change
@@ -204,15 +217,15 @@ const FixBug = () => {
         // Invalidate the bug details query to force refetch on the details page
         queryClient.invalidateQueries({ queryKey: ["bug", bugId] });
 
-        // Redirect back to the bug details page, preserving the navigation context
-        const bugDetailsUrl = currentUser?.role
-          ? `/${currentUser.role}/bugs/${bugId}`
-          : `/bugs/${bugId}`;
-        
-        // Add the from parameter if user came from project page
-        const redirectUrl = fromProject ? `${bugDetailsUrl}?from=project` : bugDetailsUrl;
-        
-        navigate(redirectUrl);
+        // If not fixed, redirect immediately. If fixed, wait for celebration
+        if (status !== "fixed") {
+          const bugDetailsUrl = currentUser?.role
+            ? `/${currentUser.role}/bugs/${bugId}`
+            : `/bugs/${bugId}`;
+          
+          const redirectUrl = fromProject ? `${bugDetailsUrl}?from=project` : bugDetailsUrl;
+          navigate(redirectUrl);
+        }
       } else {
         throw new Error(data.message || "Failed to update bug status");
       }
@@ -694,6 +707,23 @@ const FixBug = () => {
           </div>
         </div>
       </section>
+
+      {/* Celebration Animation */}
+      <BugFixCelebration
+        bug={celebrationBug}
+        isVisible={showCelebration}
+        onClose={() => {
+          setShowCelebration(false);
+          setCelebrationBug(null);
+          // Redirect after celebration closes
+          const bugDetailsUrl = currentUser?.role
+            ? `/${currentUser.role}/bugs/${bugId}`
+            : `/bugs/${bugId}`;
+          
+          const redirectUrl = fromProject ? `${bugDetailsUrl}?from=project` : bugDetailsUrl;
+          navigate(redirectUrl);
+        }}
+      />
     </main>
   );
 };

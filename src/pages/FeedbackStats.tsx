@@ -467,7 +467,7 @@ export default function FeedbackStats() {
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                            {new Date(feedback.submitted_at).toLocaleDateString()}
+                            {new Date(feedback.submitted_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                           </div>
                           <Button
                             variant="outline"
