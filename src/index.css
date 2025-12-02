@@ -172,42 +172,58 @@
   display: none !important;
 }
 
-/* Custom scrollbar for BugRicer theme - for individual elements */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #64748b; /* slate-500 */
-  border-radius: 6px;
-  border: 1px solid transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #475569; /* slate-600 */
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+/* Global custom scrollbar for BugRicer theme */
+html,
+body,
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #64748b transparent;
 }
 
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #64748b; /* slate-500 */
+  border-radius: 9999px;
+  border: 2px solid transparent;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #475569; /* slate-600 */
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* Dark mode scrollbar */
+.dark html,
+.dark body,
+.dark .custom-scrollbar {
+  scrollbar-color: #475569 transparent;
+}
+
+.dark html::-webkit-scrollbar-thumb,
+.dark body::-webkit-scrollbar-thumb,
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #475569; /* slate-600 */
 }
 
+.dark html::-webkit-scrollbar-thumb:hover,
+.dark body::-webkit-scrollbar-thumb:hover,
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #334155; /* slate-700 */
-}
-
-.dark .custom-scrollbar {
-  scrollbar-color: #475569 transparent;
 }
 
 /* Hide scrollbars for all browsers */
