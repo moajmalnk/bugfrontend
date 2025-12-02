@@ -63,7 +63,7 @@ export function WhatsAppStatsWidget({ className }: WhatsAppStatsWidgetProps) {
         averageResponseTime: 2.3,
         topRecipients: [
           { phone: "+918848676627", name: "John Doe", messageCount: 45 },
-          { phone: "+919876543210", name: "Jane Smith", messageCount: 32 },
+          { phone: "+919497792540", name: "Jane Smith", messageCount: 32 },
           { phone: "+919876543211", name: "Mike Johnson", messageCount: 28 },
         ],
         recentActivity: [
