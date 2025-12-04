@@ -349,7 +349,6 @@ function AppContent() {
     <>
       <SEOHead />
       <SkipToContent />
-      <RefreshKeyboardShortcuts />
       <OfflineBanner show={isOffline} />
       <div style={{ paddingTop: isOffline ? '3rem' : '0' }}>
         <RouteConfig />
@@ -384,6 +383,72 @@ function AppContent() {
   );
 }
 
+type GlobalErrorFallbackProps = {
+  error: Error;
+  resetError: () => void;
+  retry: () => void;
+};
+
+function GlobalErrorFallback({ resetError, retry }: GlobalErrorFallbackProps) {
+  const handleHardRefresh = () => {
+    // Force a full reload to pull the latest version
+    window.location.reload();
+  };
+
+  return (
+    <>
+      {/* Enable refresh keyboard shortcut only while this screen is visible */}
+      <RefreshKeyboardShortcuts />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-4">
+        <div className="max-w-md w-full bg-slate-950/80 border border-slate-800/80 rounded-2xl shadow-2xl shadow-black/60 p-6 sm:p-8 backdrop-blur-xl">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-400/30 shadow-inner shadow-emerald-500/40">
+              <span className="text-2xl">🚀</span>
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-semibold text-slate-50 tracking-tight">
+                New Version of BugRicer Available
+              </h1>
+              <p className="mt-2 text-sm sm:text-base text-slate-300/80 leading-relaxed">
+                We detected an issue loading the current version. This usually means a fresh
+                update is ready. Refresh to continue with the latest, most stable experience.
+              </p>
+            </div>
+
+            <div className="w-full space-y-2 mt-4">
+              <ProfessionalRefreshButton
+                onHardRefresh={handleHardRefresh}
+                showDropdown={false}
+                label="Refresh & Update"
+                variant="default"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white border-0 shadow-lg shadow-emerald-500/30"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Tip: You can also press <span className="font-semibold text-slate-200">Ctrl + Shift + R</span> to refresh.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 mt-4 w-full justify-center">
+              <button
+                onClick={retry}
+                className="flex-1 text-xs sm:text-sm px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-900/80 transition-colors"
+              >
+                Try Again Without Refresh
+              </button>
+              <button
+                onClick={resetError}
+                className="flex-1 text-xs sm:text-sm px-3 py-2 rounded-md border border-slate-800 text-slate-400 hover:bg-slate-900/60 transition-colors"
+              >
+                Reset Session
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 
 function App() {
 
@@ -405,32 +470,7 @@ function App() {
                     <NotificationProvider>
                       <NotificationSettingsProvider>
                         <ModernErrorBoundary
-                          fallbackRender={({ error, resetError, retry }) => (
-                            <div className="min-h-screen flex items-center justify-center bg-background p-4">
-                              <div className="max-w-md w-full bg-card rounded-lg shadow-lg p-6 text-center">
-                                <h1 className="text-xl font-semibold text-foreground mb-2">
-                                  Application Error
-                                </h1>
-                                <p className="text-muted-foreground mb-4">
-                                  Something went wrong. Please try again.
-                                </p>
-                                <div className="space-y-2">
-                                  <button
-                                    onClick={retry}
-                                    className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-                                  >
-                                    Try Again
-                                  </button>
-                                  <button
-                                    onClick={resetError}
-                                    className="w-full bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors"
-                                  >
-                                    Reset
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                          fallbackRender={(props) => <GlobalErrorFallback {...props} />}
                         >
                           <ErrorBoundaryProvider>
                             <AppContent />
