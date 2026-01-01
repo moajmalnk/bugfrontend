@@ -39,6 +39,7 @@ export interface UserDocument {
   project_name: string | null;
   creator_user_id?: string;
   creator_name?: string | null;
+  role?: string;
 }
 
 export interface Template {
@@ -63,7 +64,7 @@ class GoogleDocsService {
         success: boolean;
         data: GoogleDocsConnectionStatus;
       }>('/docs/check-connection.php');
-      
+
       const result = {
         connected: response.data.data?.connected || false,
         email: response.data.data?.email || null
@@ -85,11 +86,11 @@ class GoogleDocsService {
         success: boolean;
         message: string;
       }>('/oauth/disconnect.php');
-      
+
       if (!response.data.success) {
         throw new Error(response.data.message || 'Failed to disconnect');
       }
-      
+
       console.log('✅ Google account disconnected successfully');
       return response.data;
     } catch (error: any) {
@@ -131,7 +132,7 @@ class GoogleDocsService {
         message: string;
         data?: { email: string; google_user_id: string };
       }>('/oauth/link-account.php', {});
-      
+
       return {
         success: response.data.success,
         email: response.data.data?.email,
@@ -154,11 +155,11 @@ class GoogleDocsService {
       }>('/docs/create.php', {
         bug_id: bugId,
       });
-      
+
       if (!response.data.success) {
         throw new Error(response.data.message || 'Failed to create document');
       }
-      
+
       return response.data.data;
     } catch (error: any) {
       console.error('Failed to create bug document:', error);
@@ -176,11 +177,11 @@ class GoogleDocsService {
         message: string;
         data: BugDocument[];
       }>(`/docs/list.php?bug_id=${bugId}`);
-      
+
       if (!response.data.success) {
         throw new Error(response.data.message || 'Failed to fetch documents');
       }
-      
+
       return response.data.data || [];
     } catch (error: any) {
       console.error('Failed to fetch bug documents:', error);
@@ -206,7 +207,8 @@ class GoogleDocsService {
     docTitle: string,
     templateId?: number,
     docType: string = 'general',
-    projectId?: string | null
+    projectId?: string | null,
+    role?: string
   ): Promise<{ success: boolean; id: number; document_url: string; document_title: string }> {
     try {
       const response = await apiClient.post<{
@@ -220,6 +222,7 @@ class GoogleDocsService {
         template_id: templateId,
         doc_type: docType,
         project_id: projectId || null,
+        role: role || 'all',
       });
 
       if (!response.data.success) {
@@ -392,10 +395,11 @@ class GoogleDocsService {
    * Update a document title, project, and template
    */
   async updateDocument(
-    documentId: number, 
-    newTitle: string, 
-    projectId?: string | null, 
-    templateId?: number | null
+    documentId: number,
+    newTitle: string,
+    projectId?: string | null,
+    templateId?: number | null,
+    role?: string
   ): Promise<{ success: boolean; message: string; data?: { id: number; doc_title: string } }> {
     try {
       const response = await apiClient.post<{
@@ -407,6 +411,7 @@ class GoogleDocsService {
         doc_title: newTitle,
         project_id: projectId || null,
         template_id: templateId || null,
+        role: role || 'all',
       });
 
       if (!response.data.success) {
@@ -446,10 +451,10 @@ class GoogleDocsService {
    */
   async listTemplates(category?: string): Promise<Template[]> {
     try {
-      const url = category 
+      const url = category
         ? `/docs/list-templates.php?category=${encodeURIComponent(category)}`
         : '/docs/list-templates.php';
-      
+
       const response = await apiClient.get<{
         success: boolean;
         templates: Template[];

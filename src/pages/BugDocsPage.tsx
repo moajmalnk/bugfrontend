@@ -57,7 +57,7 @@ const BugDocsPage = () => {
   const userRole = currentUser ? getEffectiveRole(currentUser) : 'user';
   const isAdmin = userRole === 'admin';
   const isDevOrTester = userRole === 'developer' || userRole === 'tester';
-  
+
   const [documents, setDocuments] = useState<UserDocument[]>([]);
   const [allDocumentsGrouped, setAllDocumentsGrouped] = useState<Array<{
     project_id: string | null;
@@ -78,19 +78,20 @@ const BugDocsPage = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
-  
+
   // Delete confirmation state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<UserDocument | null>(null);
-  
+
   // Edit document state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [documentToEdit, setDocumentToEdit] = useState<UserDocument | null>(null);
   const [editDocTitle, setEditDocTitle] = useState("");
   const [editSelectedProjectId, setEditSelectedProjectId] = useState<string>("");
   const [editSelectedTemplateId, setEditSelectedTemplateId] = useState<string>("0");
+  const [editSelectedRole, setEditSelectedRole] = useState<string>("all");
   const [isUpdating, setIsUpdating] = useState(false);
-  
+
   // Disconnect confirmation state
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -99,6 +100,7 @@ const BugDocsPage = () => {
   const [docTitle, setDocTitle] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("0");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedRole, setSelectedRole] = useState<string>("all");
 
   // Tab and filter state
   const [searchParams, setSearchParams] = useSearchParams();
@@ -164,7 +166,7 @@ const BugDocsPage = () => {
     try {
       // Load projects (always load, doesn't require Google connection)
       await loadProjects();
-      
+
       // Check connection first
       const connected = await checkConnection();
       console.log('🔗 Connection result:', connected);
@@ -232,13 +234,13 @@ const BugDocsPage = () => {
   const handleConnectGoogleDocs = () => {
     // Get JWT token to pass as state parameter (check sessionStorage first for impersonation tokens)
     const token = sessionStorage.getItem('token') || localStorage.getItem('token');
-    
+
     // Build return URL based on current environment
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const returnUrl = isLocal 
+    const returnUrl = isLocal
       ? `http://localhost:8080${window.location.pathname}`
       : `https://bugs.bugricer.com${window.location.pathname}`;
-    
+
     // Navigate to Google OAuth with JWT token and return URL as state
     // In impersonation mode, the token's user_id is the impersonated user's ID
     const authUrl = googleDocsService.getAuthUrl(token, returnUrl);
@@ -251,7 +253,7 @@ const BugDocsPage = () => {
       // Load My Docs count
       const myDocs = await googleDocsService.listGeneralDocuments();
       setMyDocsCount(myDocs.length);
-      
+
       // Load All Docs count (admin only)
       if (isAdmin) {
         const allDocsResult = await googleDocsService.getAllDocuments();
@@ -259,7 +261,7 @@ const BugDocsPage = () => {
         setAllDocsCount(allDocs.length);
         setAllDocumentsGrouped(allDocsResult.documents);
       }
-      
+
       // Load Shared Docs count (developer/tester only)
       if (isDevOrTester) {
         const sharedDocs = await googleDocsService.getSharedDocuments();
@@ -274,7 +276,7 @@ const BugDocsPage = () => {
   const loadDocuments = async () => {
     try {
       let docs: UserDocument[] = [];
-      
+
       if (activeTab === "my-docs") {
         // Load user's own documents
         docs = await googleDocsService.listGeneralDocuments();
@@ -291,7 +293,7 @@ const BugDocsPage = () => {
         docs = await googleDocsService.getSharedDocuments();
         setSharedDocsCount(docs.length);
       }
-      
+
       setDocuments(docs);
       console.log(`Loaded ${docs.length} documents for tab: ${activeTab}`);
     } catch (error: any) {
@@ -341,20 +343,21 @@ const BugDocsPage = () => {
     setIsCreating(true);
     try {
       // Convert selectedTemplateId to number, treat "0" as undefined (no template)
-      const templateId = selectedTemplateId && selectedTemplateId !== "0" 
-        ? parseInt(selectedTemplateId) 
+      const templateId = selectedTemplateId && selectedTemplateId !== "0"
+        ? parseInt(selectedTemplateId)
         : undefined;
-      
+
       // Convert selectedProjectId - treat empty string as null (no project)
-      const projectId = selectedProjectId && selectedProjectId !== "" 
-        ? selectedProjectId 
+      const projectId = selectedProjectId && selectedProjectId !== ""
+        ? selectedProjectId
         : null;
-      
+
       const result = await googleDocsService.createGeneralDocument(
         docTitle.trim(),
         templateId,
         'general',
-        projectId
+        projectId,
+        selectedRole
       );
 
       toast({
@@ -372,6 +375,7 @@ const BugDocsPage = () => {
       setDocTitle("");
       setSelectedTemplateId("0");
       setSelectedProjectId("");
+      setSelectedRole("all");
       setIsCreateModalOpen(false);
     } catch (error: any) {
       toast({
@@ -395,6 +399,8 @@ const BugDocsPage = () => {
     setEditSelectedProjectId(doc.project_id || "none");
     // template_id might not be in the interface but exists in database
     setEditSelectedTemplateId((doc as any).template_id ? (doc as any).template_id.toString() : "0");
+    // role might not be in the interface but exists in database
+    setEditSelectedRole((doc as any).role || "all");
     setIsEditDialogOpen(true);
   };
 
@@ -404,6 +410,7 @@ const BugDocsPage = () => {
     setEditDocTitle("");
     setEditSelectedProjectId("");
     setEditSelectedTemplateId("0");
+    setEditSelectedRole("all");
   };
 
   const handleEditConfirm = async () => {
@@ -421,12 +428,13 @@ const BugDocsPage = () => {
       // Convert selected values
       const projectId = editSelectedProjectId && editSelectedProjectId !== "none" ? editSelectedProjectId : null;
       const templateId = editSelectedTemplateId && editSelectedTemplateId !== "0" ? parseInt(editSelectedTemplateId) : null;
-      
+
       await googleDocsService.updateDocument(
-        documentToEdit.id, 
+        documentToEdit.id,
         editDocTitle.trim(),
         projectId,
-        templateId
+        templateId,
+        editSelectedRole
       );
 
       toast({
@@ -443,6 +451,7 @@ const BugDocsPage = () => {
       setEditDocTitle("");
       setEditSelectedProjectId("");
       setEditSelectedTemplateId("0");
+      setEditSelectedRole("all");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -468,7 +477,7 @@ const BugDocsPage = () => {
 
       // Reload documents list
       await refreshDocuments();
-      
+
       // Close dialog
       setIsDeleteDialogOpen(false);
       setDocumentToDelete(null);
@@ -520,10 +529,38 @@ const BugDocsPage = () => {
     }
   };
 
+  const getRoleBadge = (role: string | undefined) => {
+    const roleValue = role || "all";
+
+    switch (roleValue) {
+      case "admins":
+        return {
+          label: "Admins Only",
+          className: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800"
+        };
+      case "developers":
+        return {
+          label: "Developers Only",
+          className: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+        };
+      case "testers":
+        return {
+          label: "Testers Only",
+          className: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+        };
+      case "all":
+      default:
+        return {
+          label: "All Users",
+          className: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+        };
+    }
+  };
+
   // Filtered documents with useMemo - sorted by latest first
   const filteredDocuments = useMemo(() => {
     let filtered = [...documents];
-    
+
     // Filter by tab
     if (activeTab === "my-docs") {
       // For now, show all documents in both tabs
@@ -532,11 +569,11 @@ const BugDocsPage = () => {
     } else if (activeTab === "all-docs") {
       filtered = documents;
     }
-    
+
     // Apply search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(doc => 
+      filtered = filtered.filter(doc =>
         doc.doc_title.toLowerCase().includes(searchLower) ||
         doc.template_name?.toLowerCase().includes(searchLower) ||
         doc.doc_type.toLowerCase().includes(searchLower) ||
@@ -544,7 +581,7 @@ const BugDocsPage = () => {
         doc.project_name?.toLowerCase().includes(searchLower)
       );
     }
-    
+
     // Apply date filter
     if (dateFilter !== "all") {
       const now = new Date();
@@ -555,7 +592,7 @@ const BugDocsPage = () => {
       thisWeek.setDate(thisWeek.getDate() - 7);
       const thisMonth = new Date(today);
       thisMonth.setMonth(thisMonth.getMonth() - 1);
-      
+
       filtered = filtered.filter(doc => {
         const docDate = new Date(doc.created_at);
         switch (dateFilter) {
@@ -572,7 +609,7 @@ const BugDocsPage = () => {
         }
       });
     }
-    
+
     // Apply project filter
     if (projectFilter !== "all") {
       filtered = filtered.filter(doc => {
@@ -582,7 +619,7 @@ const BugDocsPage = () => {
         return doc.project_id === projectFilter;
       });
     }
-    
+
     // Sort by latest first (newest documents at the top)
     return filtered.sort((a, b) => {
       const dateA = new Date(a.created_at);
@@ -649,7 +686,7 @@ const BugDocsPage = () => {
                   Manage your Documents and templates
                 </p>
               </div>
-              
+
               <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 sm:gap-4">
                 {/* Google Connection Status Indicator */}
                 <div className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border transition-all duration-300"
@@ -676,8 +713,8 @@ const BugDocsPage = () => {
 
                 {isConnected && (
                   <>
-                    <Button 
-                      onClick={() => setIsCreateModalOpen(true)} 
+                    <Button
+                      onClick={() => setIsCreateModalOpen(true)}
                       size="lg"
                       className="w-full xs:w-auto h-11 sm:h-12 px-4 sm:px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
                     >
@@ -686,7 +723,7 @@ const BugDocsPage = () => {
                     </Button>
                   </>
                 )}
-                
+
                 {isConnected && (
                   <div className="flex items-center justify-center xs:justify-start gap-4">
                     <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
@@ -753,8 +790,8 @@ const BugDocsPage = () => {
 
         {/* Documents Tabs */}
         {!isCheckingConnection && (
-          <Tabs 
-            value={activeTab} 
+          <Tabs
+            value={activeTab}
             onValueChange={(val) => {
               setActiveTab(val);
               setSearchParams((prev) => {
@@ -762,7 +799,7 @@ const BugDocsPage = () => {
                 p.set("tab", val);
                 return p as any;
               });
-            }} 
+            }}
             className="w-full"
           >
             <div className="relative">
@@ -823,7 +860,7 @@ const BugDocsPage = () => {
                 </TabsList>
               </div>
             </div>
-            
+
             <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
               {/* Project Cards View (Admin - All Docs) */}
               {shouldShowProjectCards() && (
@@ -833,8 +870,8 @@ const BugDocsPage = () => {
                       Projects
                     </h2>
                   </div>
-                  <ProjectCardsGrid 
-                    projects={projectsWithDocuments} 
+                  <ProjectCardsGrid
+                    projects={projectsWithDocuments}
                     isLoading={isLoadingProjects}
                     onProjectClick={(projectId) => {
                       navigate(`/${userRole}/bugdocs/project/${projectId}`);
@@ -845,360 +882,423 @@ const BugDocsPage = () => {
 
               {/* Search and Filter Controls - only show when not showing project cards */}
               {!shouldShowProjectCards() && (
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
-                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="p-1.5 bg-orange-500 rounded-lg">
-                        <Search className="h-4 w-4 text-white" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-                    </div>
-                    
-                    <div className="flex flex-col md:flex-row gap-4">
-                      {/* Search Bar */}
-                      <div className="flex-1 relative group">
-                        <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
-                        <input
-                          type="text"
-                          placeholder="Search documents..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                        />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
+                  <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="p-1.5 bg-orange-500 rounded-lg">
+                          <Search className="h-4 w-4 text-white" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
                       </div>
 
-                      {/* Filter Controls */}
-                      <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                        {/* Date Filter */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
-                            <Calendar className="h-4 w-4 text-white" />
-                          </div>
-                          <Select value={dateFilter} onValueChange={setDateFilter}>
-                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                              <SelectValue placeholder="Date" />
-                            </SelectTrigger>
-                            <SelectContent position="popper" className="z-[60]">
-                              <SelectItem value="all">All Dates</SelectItem>
-                              <SelectItem value="today">Today</SelectItem>
-                              <SelectItem value="yesterday">Yesterday</SelectItem>
-                              <SelectItem value="this-week">This Week</SelectItem>
-                              <SelectItem value="this-month">This Month</SelectItem>
-                            </SelectContent>
-                          </Select>
+                      <div className="flex flex-col md:flex-row gap-4">
+                        {/* Search Bar */}
+                        <div className="flex-1 relative group">
+                          <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                          <input
+                            type="text"
+                            placeholder="Search documents..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                          />
                         </div>
-                        
-                        {/* Project Filter */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
-                            <FolderOpen className="h-4 w-4 text-white" />
+
+                        {/* Filter Controls */}
+                        <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                          {/* Date Filter */}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                              <Calendar className="h-4 w-4 text-white" />
+                            </div>
+                            <Select value={dateFilter} onValueChange={setDateFilter}>
+                              <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                                <SelectValue placeholder="Date" />
+                              </SelectTrigger>
+                              <SelectContent position="popper" className="z-[60]">
+                                <SelectItem value="all">All Dates</SelectItem>
+                                <SelectItem value="today">Today</SelectItem>
+                                <SelectItem value="yesterday">Yesterday</SelectItem>
+                                <SelectItem value="this-week">This Week</SelectItem>
+                                <SelectItem value="this-month">This Month</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <Select value={projectFilter} onValueChange={setProjectFilter}>
-                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                              <SelectValue placeholder="Project" />
-                            </SelectTrigger>
-                            <SelectContent position="popper" className="z-[60]">
-                              <SelectItem value="all">All Projects</SelectItem>
-                              <SelectItem value="none">No Project</SelectItem>
-                              {projects.map((project) => (
-                                <SelectItem key={project.id} value={project.id}>
-                                  {project.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+
+                          {/* Project Filter */}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                              <FolderOpen className="h-4 w-4 text-white" />
+                            </div>
+                            <Select value={projectFilter} onValueChange={setProjectFilter}>
+                              <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                                <SelectValue placeholder="Project" />
+                              </SelectTrigger>
+                              <SelectContent position="popper" className="z-[60]">
+                                <SelectItem value="all">All Projects</SelectItem>
+                                <SelectItem value="none">No Project</SelectItem>
+                                {projects.map((project) => (
+                                  <SelectItem key={project.id} value={project.id}>
+                                    {project.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Clear Filters Button */}
+                          {(searchTerm || dateFilter !== "all" || projectFilter !== "all") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSearchTerm("");
+                                setDateFilter("all");
+                                setProjectFilter("all");
+                              }}
+                              className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                            >
+                              Clear
+                            </Button>
+                          )}
                         </div>
-                        
-                        {/* Clear Filters Button */}
-                        {(searchTerm || dateFilter !== "all" || projectFilter !== "all") && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSearchTerm("");
-                              setDateFilter("all");
-                              setProjectFilter("all");
-                            }}
-                            className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                          >
-                            Clear
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
               )}
 
               {/* Documents Content - only show when not showing project cards */}
               {!shouldShowProjectCards() && (
-              <div className="space-y-4">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-muted-foreground">Loading documents...</span>
-                  </div>
-                ) : filteredDocuments.length === 0 ? (
-                  <div className="relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
-                    <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-                      <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-                        <FileText className="h-10 w-10 text-white" />
-                      </div>
-                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                        {!isConnected ? "Google Account Not Connected" : activeTab === "all-docs" ? "No documents found" : "No documents found"}
-                      </h3>
-                      <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                        {!isConnected
-                          ? "Please connect your Google account first to view and manage documents."
-                          : activeTab === "all-docs"
-                          ? "No documents available. Create your first document to get started."
-                          : "No documents available. Create your first document to get started."}
-                      </p>
-                      {!isConnected ? (
-                        <Button 
-                          onClick={() => navigate(`/${userRole}/profile`)}
-                          className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                        >
-                          <LinkIcon className="h-5 w-5 mr-2" />
-                          Connect Google Account
-                        </Button>
-                      ) : (
-                        <Button 
-                          onClick={() => setIsCreateModalOpen(true)}
-                          className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                        >
-                          <Plus className="h-5 w-5 mr-2" />
-                          Create Document
-                        </Button>
-                      )}
+                <div className="space-y-4">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-muted-foreground">Loading documents...</span>
                     </div>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 mt-4 grid-cols-1" style={{ minHeight: 200 }} aria-label="Document list">
-                    {filteredDocuments.map((doc) => (
-                      <div
-                        key={doc.id}
-                        className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-1"
-                      >
-                        {/* Gradient overlay */}
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-red-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-red-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        
-                        {/* Status indicator */}
-                        <div className="absolute top-4 right-4 w-3 h-3 bg-orange-500 rounded-full shadow-lg"></div>
-                        
-                        <div className="relative p-4 sm:p-5 md:p-6">
-                          <div className="flex flex-col gap-3 sm:gap-4">
-                            <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
-                              <div className="text-xl sm:text-2xl md:text-3xl flex-shrink-0">{getDocTypeIcon(doc.doc_type)}</div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-700 dark:group-hover:text-orange-300 transition-colors break-words">
-                                  {doc.doc_title}
-                                </h3>
-                                <div className="flex flex-col gap-2 sm:gap-3 mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                                  {doc.project_name && (
-                                    <span className="flex items-center min-w-0">
-                                      <FolderOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 flex-shrink-0" />
-                                      <span className="truncate">{doc.project_name}</span>
-                                    </span>
-                                  )}
-                                  {doc.template_name && (
-                                    <span className="flex items-center min-w-0">
-                                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 flex-shrink-0" />
-                                      <span className="truncate">{doc.template_name}</span>
-                                    </span>
-                                  )}
-                                  {doc.creator_name && activeTab !== "my-docs" && (
-                                    <span className="flex items-center min-w-0">
-                                      <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 flex-shrink-0" />
-                                      <span className="truncate">By {doc.creator_name}</span>
-                                    </span>
-                                  )}
-                                  <span className="flex items-center min-w-0">
-                                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 flex-shrink-0" />
-                                    <span className="truncate">Created {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}</span>
+                  ) : filteredDocuments.length === 0 ? (
+                    <div className="relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                      <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
+                        <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                          <FileText className="h-10 w-10 text-white" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                          {!isConnected ? "Google Account Not Connected" : activeTab === "all-docs" ? "No documents found" : "No documents found"}
+                        </h3>
+                        <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                          {!isConnected
+                            ? "Please connect your Google account first to view and manage documents."
+                            : activeTab === "all-docs"
+                              ? "No documents available. Create your first document to get started."
+                              : "No documents available. Create your first document to get started."}
+                        </p>
+                        {!isConnected ? (
+                          <Button
+                            onClick={() => navigate(`/${userRole}/profile`)}
+                            className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                          >
+                            <LinkIcon className="h-5 w-5 mr-2" />
+                            Connect Google Account
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                          >
+                            <Plus className="h-5 w-5 mr-2" />
+                            Create Document
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 lg:grid-cols-2" style={{ minHeight: 200 }} aria-label="Document list">
+                      {filteredDocuments.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-2xl hover:border-orange-300 dark:hover:border-orange-600 transition-all duration-300"
+                        >
+                          {/* Top accent bar */}
+                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-600"></div>
+
+                          <div className="p-5 sm:p-6">
+                            {/* Header with title and role badge */}
+                            <div className="flex items-start justify-between gap-3 mb-4">
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                <div className="text-2xl sm:text-3xl flex-shrink-0 mt-1">
+                                  {getDocTypeIcon(doc.doc_type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors break-words line-clamp-2">
+                                    {doc.doc_title}
+                                  </h3>
+                                </div>
+                              </div>
+
+                              {/* Role Badge - Top Right */}
+                              {(() => {
+                                const roleBadge = getRoleBadge((doc as any).role);
+                                return (
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border shadow-sm flex-shrink-0 ${roleBadge.className}`}>
+                                    <User className="h-3 w-3 mr-1" />
+                                    <span className="hidden sm:inline">{roleBadge.label}</span>
+                                    <span className="sm:hidden">{roleBadge.label.split(' ')[0]}</span>
                                   </span>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Document Details Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
+                              {/* Project */}
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex-shrink-0">
+                                  <FolderOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs text-gray-500 dark:text-gray-500 font-medium">Project</div>
+                                  <div className="font-semibold text-gray-900 dark:text-white truncate">
+                                    {doc.project_name || <span className="italic text-gray-400">No Project</span>}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Creator */}
+                              {doc.creator_name && activeTab !== "my-docs" && (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/20 flex-shrink-0">
+                                    <User className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs text-gray-500 dark:text-gray-500 font-medium">Creator</div>
+                                    <div className="font-semibold text-gray-900 dark:text-white truncate">{doc.creator_name}</div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Template */}
+                              {doc.template_name && (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/20 flex-shrink-0">
+                                    <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs text-gray-500 dark:text-gray-500 font-medium">Template</div>
+                                    <div className="font-semibold text-gray-900 dark:text-white truncate">{doc.template_name}</div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Created Time */}
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex-shrink-0">
+                                  <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs text-gray-500 dark:text-gray-500 font-medium">Created</div>
+                                  <div className="font-semibold text-gray-900 dark:text-white truncate">
+                                    {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 justify-end sm:justify-start">
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleViewDocument(doc)}
-                                className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
+                                className="flex-1 h-9 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-800 hover:from-orange-100 hover:to-red-100 dark:hover:from-orange-900/30 dark:hover:to-red-900/30 text-orange-700 dark:text-orange-300 font-semibold"
                               >
-                                <span className="sm:inline">View</span>
+                                <ExternalLink className="h-4 w-4 mr-1.5" />
+                                <span className="hidden sm:inline">View</span>
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditClick(doc)}
-                                className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
+                                className="flex-1 h-9 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold"
                               >
-                                <span className="sm:inline">Edit</span>
+                                <Edit className="h-4 w-4 mr-1.5" />
+                                <span className="hidden sm:inline">Edit</span>
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleCopyDocumentUrl(doc)}
-                                className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 dark:hover:border-purple-600 text-purple-700 dark:text-purple-300 hover:text-purple-700 dark:hover:text-purple-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
+                                className="h-9 px-3 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
                               >
-                                <span className="sm:inline">Copy</span>
+                                <Copy className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="destructive"
                                 size="sm"
                                 onClick={() => handleDeleteClick(doc)}
                                 disabled={isDeleting === doc.id}
-                                className="flex-1 sm:flex-initial h-9 sm:h-10 w-auto px-3 sm:px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                                className="h-9 px-3"
                               >
                                 {isDeleting === doc.id ? (
-                                  <>
-                                    <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin sm:mr-1" />
-                                    <span className="hidden sm:inline">Delete</span>
-                                  </>
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
                                 ) : (
-                                  <>
-                                    <span className="sm:inline">Delete</span>
-                                  </>
+                                  <Trash2 className="h-4 w-4" />
                                 )}
                               </Button>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </TabsContent>
           </Tabs>
         )}
 
-      {/* Create Document Modal */}
-      {isConnected && (
-        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Create New Document</DialogTitle>
-            <DialogDescription className="text-sm sm:text-base">
-              Create a new Google Doc from a template or start from scratch
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="doc-title" className="text-sm font-medium">Document Title *</Label>
-              <Input
-                id="doc-title"
-                placeholder="Enter document title..."
-                value={docTitle}
-                onChange={(e) => setDocTitle(e.target.value)}
-                disabled={isCreating}
-                className="w-full"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="template" className="text-sm font-medium">Template (Optional)</Label>
-              <Select
-                value={selectedTemplateId}
-                onValueChange={setSelectedTemplateId}
-                disabled={isCreating}
-              >
-                <SelectTrigger id="template" className="w-full">
-                  <SelectValue placeholder="Blank document (no template)" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px] overflow-y-auto">
-                  <SelectItem value="0">Blank document (no template)</SelectItem>
-                  {templates.map((template) => (
-                    <SelectItem key={template.id} value={template.id.toString()}>
-                      <div className="flex flex-col items-start">
-                        <span>{template.template_name}</span>
-                        {!template.is_configured && (
-                          <span className="text-orange-500 text-xs">
-                            (not configured)
-                          </span>
-                        )}
-                        {template.is_configured && template.description && (
-                          <span className="text-muted-foreground text-xs">
-                            ({template.category})
-                          </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">
-                  Templates provide pre-formatted structures for your documents
-                </p>
-                {templates.some(t => !t.is_configured) && (
-                  <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                    <span>⚠️</span>
-                    <span>Templates marked "not configured" will create blank documents</span>
+        {/* Create Document Modal */}
+        {isConnected && (
+          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-lg sm:text-xl">Create New Document</DialogTitle>
+                <DialogDescription className="text-sm sm:text-base">
+                  Create a new Google Doc from a template or start from scratch
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="doc-title" className="text-sm font-medium">Document Title *</Label>
+                  <Input
+                    id="doc-title"
+                    placeholder="Enter document title..."
+                    value={docTitle}
+                    onChange={(e) => setDocTitle(e.target.value)}
+                    disabled={isCreating}
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="template" className="text-sm font-medium">Template (Optional)</Label>
+                  <Select
+                    value={selectedTemplateId}
+                    onValueChange={setSelectedTemplateId}
+                    disabled={isCreating}
+                  >
+                    <SelectTrigger id="template" className="w-full">
+                      <SelectValue placeholder="Blank document (no template)" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                      <SelectItem value="0">Blank document (no template)</SelectItem>
+                      {templates.map((template) => (
+                        <SelectItem key={template.id} value={template.id.toString()}>
+                          <div className="flex flex-col items-start">
+                            <span>{template.template_name}</span>
+                            {!template.is_configured && (
+                              <span className="text-orange-500 text-xs">
+                                (not configured)
+                              </span>
+                            )}
+                            {template.is_configured && template.description && (
+                              <span className="text-muted-foreground text-xs">
+                                ({template.category})
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Templates provide pre-formatted structures for your documents
+                    </p>
+                    {templates.some(t => !t.is_configured) && (
+                      <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                        <span>⚠️</span>
+                        <span>Templates marked "not configured" will create blank documents</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="project" className="text-sm font-medium">Project (Optional)</Label>
+                  <Select
+                    value={selectedProjectId || "none"}
+                    onValueChange={(value) => setSelectedProjectId(value === "none" ? "" : value)}
+                    disabled={isCreating}
+                  >
+                    <SelectTrigger id="project" className="w-full">
+                      <SelectValue placeholder="No project (general document)" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                      <SelectItem value="none">No project (general document)</SelectItem>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Associate this document with a project for better organization
                   </p>
-                )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role" className="text-sm font-medium">Accessible to Roles *</Label>
+                  <Select
+                    value={selectedRole}
+                    onValueChange={setSelectedRole}
+                    disabled={isCreating}
+                  >
+                    <SelectTrigger id="role" className="w-full">
+                      <SelectValue placeholder="Select roles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Users</SelectItem>
+                      <SelectItem value="admins">Admins Only</SelectItem>
+                      <SelectItem value="developers">Developers Only</SelectItem>
+                      <SelectItem value="testers">Testers Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Specify which user roles can access this document
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project" className="text-sm font-medium">Project (Optional)</Label>
-              <Select
-                value={selectedProjectId || "none"}
-                onValueChange={(value) => setSelectedProjectId(value === "none" ? "" : value)}
-                disabled={isCreating}
-              >
-                <SelectTrigger id="project" className="w-full">
-                  <SelectValue placeholder="No project (general document)" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px] overflow-y-auto">
-                  <SelectItem value="none">No project (general document)</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Associate this document with a project for better organization
-              </p>
-            </div>
-          </div>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setIsCreateModalOpen(false)}
-              disabled={isCreating}
-              className="w-full sm:w-auto order-2 sm:order-1"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateDocument} 
-              disabled={isCreating}
-              className="w-full sm:w-auto order-1 sm:order-2"
-            >
-              {isCreating ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Document
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      )}
+              <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  disabled={isCreating}
+                  className="w-full sm:w-auto order-2 sm:order-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateDocument}
+                  disabled={isCreating}
+                  className="w-full sm:w-auto order-1 sm:order-2"
+                >
+                  {isCreating ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Document
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
 
         {/* Edit Document Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -1278,6 +1378,27 @@ const BugDocsPage = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-role" className="text-sm font-medium">Accessible to Roles *</Label>
+                <Select
+                  value={editSelectedRole}
+                  onValueChange={setEditSelectedRole}
+                  disabled={isUpdating}
+                >
+                  <SelectTrigger id="edit-role" className="w-full">
+                    <SelectValue placeholder="Select roles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Users</SelectItem>
+                    <SelectItem value="admins">Admins Only</SelectItem>
+                    <SelectItem value="developers">Developers Only</SelectItem>
+                    <SelectItem value="testers">Testers Only</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Specify which user roles can access this document
+                </p>
+              </div>
             </div>
             <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
               <Button
@@ -1327,7 +1448,7 @@ const BugDocsPage = () => {
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-sm mb-1">Warning</h4>
                     <p className="text-sm text-muted-foreground">
-                      This will permanently delete the document from both BugRicer and Google Drive. 
+                      This will permanently delete the document from both BugRicer and Google Drive.
                       This action cannot be undone.
                     </p>
                   </div>
