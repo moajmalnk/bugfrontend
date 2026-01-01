@@ -251,6 +251,12 @@ const NewBug = () => {
         console.log(`Added voice note ${index + 1}: ${fileName}, Size: ${voiceNote.blob.size}, Type: ${voiceNote.blob.type}`);
       });
 
+      // Show optimistic success toast immediately for better UX
+      toast({
+        title: "Submitting...",
+        description: "Your bug report is being submitted",
+      });
+
       const response = await apiClient.post('/bugs/create.php', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -260,58 +266,42 @@ const NewBug = () => {
       const data = response.data as ApiResponse<any>;
 
       if (data.success) {
+        // Show success toast immediately
         toast({
           title: "Success",
           description: "Bug report submitted successfully",
         });
 
-        // Handle redirection immediately after successful submission and toast
-        if (preSelectedProjectId) {
-          navigate(
-            currentUser?.role
-              ? `/${currentUser.role}/projects/${preSelectedProjectId}`
-              : `/projects/${preSelectedProjectId}`
-          );
-        } else {
-          navigate(currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs");
-        }
+        // Navigate immediately after successful submission (notifications handled by backend)
+        // Small delay to show success message before navigation
+        setTimeout(() => {
+          if (preSelectedProjectId) {
+            navigate(
+              currentUser?.role
+                ? `/${currentUser.role}/projects/${preSelectedProjectId}`
+                : `/projects/${preSelectedProjectId}`
+            );
+          } else {
+            navigate(currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs");
+          }
+        }, 500);
 
-        // Send email notification asynchronously without blocking navigation
+        // Send frontend notifications asynchronously (non-blocking)
+        // Backend already handles email and WhatsApp, but we still need to handle:
+        // - Browser broadcast notifications
+        // - WhatsApp share (if enabled in user settings)
         setTimeout(async () => {
           try {
-            // console.log("Sending notification for bug:", name);
-
-            const uploadedAttachments = (data as any).uploadedAttachments || [];
-            // console.log("Uploaded attachment paths from backend:", uploadedAttachments);
-
             const bugId =
               data.data?.bug?.id || (data as any).bugId || data.data?.id || (data as any).id;
-            const bugData = {
-              title: name,
-              description: description,
-              expected_result: expectedResult,
-              actual_result: actualResult,
-              priority: priority,
-              status: "pending",
-              reported_by_name: currentUser?.name || "BugRicer",
-              attachments: uploadedAttachments,
-              id: bugId,
-              project_id: projectId,
-            };
-
-            // Send email notification
-            const emailResponse = await sendNewBugNotification(bugData);
-            // console.log("Email notification sent:", emailResponse);
 
             // Broadcast browser notification to all users
-            if ((data as any).id) {
-              const bugId = String((data as any).id);
+            if (bugId) {
               await broadcastNotificationService.broadcastNewBug(
                 name,
-                bugId,
+                String(bugId),
                 currentUser?.name || "BugRicer"
               );
-              // console.log("Broadcast notification sent for new bug");
 
               // Check if WhatsApp notifications are enabled and share
               const notificationSettings = notificationService.getSettings();
@@ -326,7 +316,7 @@ const NewBug = () => {
 
                 whatsappService.shareNewBug({
                   bugTitle: name,
-                  bugId: bugId,
+                  bugId: String(bugId),
                   priority: priority,
                   description: description,
                   expectedResult: expectedResult,
@@ -334,11 +324,11 @@ const NewBug = () => {
                   reportedBy: currentUser?.name || "BugRicer",
                   projectName: selectedProject?.name || "BugRicer Project",
                 });
-                // console.log("WhatsApp share opened for new bug");
               }
             }
-          } catch (emailError) {
-            // console.error("Failed to send email notification:", emailError);
+          } catch (error) {
+            // Silently fail - notifications are handled by backend
+            console.error("Failed to send frontend notifications:", error);
           }
         }, 100);
       } else {

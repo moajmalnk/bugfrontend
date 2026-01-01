@@ -38,6 +38,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
 // Import troubleshooting tool (makes it available globally in console)
 import '@/utils/googleOAuthTroubleshoot';
+import { setupGoogleOAuthErrorHandler } from '@/utils/googleOAuthErrorHandler';
 import { ProfessionalRefreshButton } from '@/components/ui/ProfessionalRefreshButton';
 import { RefreshKeyboardShortcuts } from '@/components/ui/RefreshKeyboardShortcuts';
 
@@ -200,6 +201,9 @@ function AppContent() {
     // Initialize development utilities
     initDevUtils();
     
+    // Set up Google OAuth error handler
+    const oauthCleanup = setupGoogleOAuthErrorHandler();
+    
     // Initialize service worker
     initializeServiceWorker().catch(error => {
       // //.error('[App] Service worker initialization failed:', error);
@@ -221,7 +225,10 @@ function AppContent() {
     // Initialize offline detector as fallback
     const cleanup = initOfflineDetector();
     
-    return cleanup;
+    return () => {
+      cleanup();
+      oauthCleanup();
+    };
   }, []);
 
   useEffect(() => {
@@ -428,7 +435,7 @@ function GlobalErrorFallback({ resetError, retry }: GlobalErrorFallbackProps) {
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 mt-4 w-full justify-center">
+            {/* <div className="flex flex-col sm:flex-row gap-2 mt-4 w-full justify-center">
               <button
                 onClick={retry}
                 className="flex-1 text-xs sm:text-sm px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-900/80 transition-colors"
@@ -441,7 +448,7 @@ function GlobalErrorFallback({ resetError, retry }: GlobalErrorFallbackProps) {
               >
                 Reset Session
               </button>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

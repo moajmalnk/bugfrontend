@@ -30,8 +30,8 @@ import { projectService } from "@/services/projectService";
 import { updateService } from "@/services/updateService";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { AlertCircle, Bell, Filter, Lock, Plus, Search, User, X } from "lucide-react";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { AlertCircle, Bell, Filter, Lock, Plus, Search, User, X, FolderOpen } from "lucide-react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 
@@ -115,19 +115,43 @@ const Updates = () => {
   // Use persisted filters hook
   const [filters, setFilter, clearFilters] = usePersistedFilters("updates", {
     searchTerm: "",
-    typeFilter: "all",
+    projectFilter: "all",
     createdByFilter: "all",
   });
   const searchTerm = filters.searchTerm || "";
-  const typeFilter = filters.typeFilter || "all";
+  const projectFilter = filters.projectFilter || "all";
   const createdByFilter = filters.createdByFilter || "all";
   
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
-  const setTypeFilter = (value: string) => setFilter("typeFilter", value);
+  const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const setCreatedByFilter = (value: string) => setFilter("createdByFilter", value);
-  const [typeOpen, setTypeOpen] = useState(false);
+  const [projectOpen, setProjectOpen] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Local state for search input to prevent re-render issues
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
+  
+  // Sync local state with persisted filter
+  useEffect(() => {
+    setLocalSearchTerm(searchTerm);
+  }, [searchTerm]);
+  
+  // Debounced update to persisted filter (prevents excessive localStorage writes)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearchTerm !== searchTerm) {
+        setFilter("searchTerm", localSearchTerm);
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [localSearchTerm, searchTerm, setFilter]);
+  
+  // Memoized onChange handler
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalSearchTerm(e.target.value);
+  }, []);
 
   // Fetch updates from backend
   const {
@@ -142,7 +166,7 @@ const Updates = () => {
   // Reset current page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, updates.length, searchTerm, typeFilter, createdByFilter]);
+  }, [activeTab, updates.length, localSearchTerm, projectFilter, createdByFilter]);
 
   // Fetch projects to determine if user can create new update
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
@@ -186,19 +210,28 @@ const Updates = () => {
           .toLowerCase()
           .includes(searchTerm.toLowerCase());
 
-      const matchesType = typeFilter === "all" || update.type === typeFilter;
+      // Project filter: match by project_id, with fallback to project_name if project_id is missing
+      let matchesProject = true;
+      if (projectFilter !== "all") {
+        const updateProjectId = update.project_id || 
+          (update.project_name ? projects.find(p => p.name === update.project_name)?.id : null);
+        matchesProject = updateProjectId ? String(updateProjectId) === String(projectFilter) : false;
+      }
+      
       const matchesCreatedBy =
         createdByFilter === "all" || update.created_by === createdByFilter;
 
-      return matchesSearch && matchesType && matchesCreatedBy;
+      return matchesSearch && matchesProject && matchesCreatedBy;
     });
   }, [
     updates,
     activeTab,
     currentUser?.username,
-    searchTerm,
-    typeFilter,
+    currentUser?.id,
+    localSearchTerm,
+    projectFilter,
     createdByFilter,
+    projects,
   ]);
 
   // Pagination calculations
@@ -235,6 +268,60 @@ const Updates = () => {
       .filter((creator, index, arr) => arr.indexOf(creator) === index);
     return creators.sort();
   }, [updates]);
+
+  // Get unique projects for filter - role-aware
+  const uniqueProjects = useMemo(() => {
+    // For admins: show all unique projects from updates
+    if (currentUser?.role === "admin") {
+      const projectMap = new Map();
+      updates.forEach((update) => {
+        // Try to get project_id from update, fallback to finding by name
+        const projectId = update.project_id || 
+          (update.project_name ? projects.find(p => p.name === update.project_name)?.id : null);
+        const projectName = update.project_name;
+        
+        if (projectId && projectName) {
+          if (!projectMap.has(projectId)) {
+            projectMap.set(projectId, {
+              id: projectId,
+              name: projectName,
+            });
+          }
+        }
+      });
+      return Array.from(projectMap.values()).sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
+    }
+    
+    // For non-admins: show only their assigned projects that appear in updates
+    const assignedProjectIds = new Set(
+      projects.map((p) => String(p.id))
+    );
+    
+    const projectMap = new Map();
+    updates.forEach((update) => {
+      // Try to get project_id from update, fallback to finding by name
+      const projectId = update.project_id || 
+        (update.project_name ? projects.find(p => p.name === update.project_name)?.id : null);
+      const projectName = update.project_name;
+      
+      if (projectId && projectName) {
+        // Only include if user is assigned to this project
+        if (assignedProjectIds.has(String(projectId))) {
+          if (!projectMap.has(projectId)) {
+            projectMap.set(projectId, {
+              id: projectId,
+              name: projectName,
+            });
+          }
+        }
+      }
+    });
+    return Array.from(projectMap.values()).sort((a, b) => 
+      a.name.localeCompare(b.name)
+    );
+  }, [updates, projects, currentUser?.role]);
 
   // Keep tab in sync with URL changes (back/forward navigation)
   useEffect(() => {
@@ -338,17 +425,8 @@ const Updates = () => {
                 ref={searchInputRef}
                 type="text"
                 placeholder="Search updates, projects, or creators..."
-                value={searchTerm}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  setSearchTerm(newValue);
-                  // Maintain focus after state update
-                  requestAnimationFrame(() => {
-                    if (searchInputRef.current && document.activeElement !== searchInputRef.current) {
-                      searchInputRef.current.focus();
-                    }
-                  });
-                }}
+                value={localSearchTerm}
+                onChange={handleSearchChange}
                 className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                 autoComplete="off"
               />
@@ -356,28 +434,30 @@ const Updates = () => {
 
             {/* Filter Controls */}
             <div className="flex flex-col sm:flex-row gap-3">
-              {/* Type Filter */}
+              {/* Project Filter */}
               <div className="flex items-center gap-2 min-w-0">
                 <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
-                  <Filter className="h-4 w-4 text-white" />
+                  <FolderOpen className="h-4 w-4 text-white" />
                 </div>
                 <Select
-                  open={typeOpen}
-                  onOpenChange={setTypeOpen}
-                  value={typeFilter}
+                  open={projectOpen}
+                  onOpenChange={setProjectOpen}
+                  value={projectFilter}
                   onValueChange={(v) => {
-                    setTypeFilter(v);
-                    setTypeOpen(false);
+                    setProjectFilter(v);
+                    setProjectOpen(false);
                   }}
                 >
                   <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                    <SelectValue placeholder="Type" />
+                    <SelectValue placeholder="Project" />
                   </SelectTrigger>
                   <SelectContent position="popper" className="z-[60]">
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="feature">Feature</SelectItem>
-                    <SelectItem value="updation">Updation</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {uniqueProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -411,11 +491,12 @@ const Updates = () => {
               </div>
 
               {/* Clear Filters Button */}
-              {(searchTerm || typeFilter !== "all" || createdByFilter !== "all") && (
+              {(localSearchTerm || projectFilter !== "all" || createdByFilter !== "all") && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
+                    setLocalSearchTerm("");
                     clearFilters();
                   }}
                   className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"

@@ -12,11 +12,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { updateService } from "@/services/updateService";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, Undo2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, Undo2, CheckCircle2, ImagePlus, Paperclip, File, Clock, CalendarDays, Play } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
+import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import { formatDetailedDate } from "@/lib/dateUtils";
@@ -142,9 +143,11 @@ const UpdateDetails = () => {
 
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [updateList, setUpdateList] = useState<any[]>([]);
   const [updateListLoading, setUpdateListLoading] = useState(true);
   const [isDeletingUpdate, setIsDeletingUpdate] = useState(false);
+  const [activeVoiceNoteId, setActiveVoiceNoteId] = useState<string | null>(null);
 
   // Undo delete hook
   const undoDelete = useUndoDelete({
@@ -208,6 +211,7 @@ const UpdateDetails = () => {
       queryClient.invalidateQueries({ queryKey: ["update", updateId] });
       setShowApproveDialog(false);
       setShowDeclineDialog(false);
+      setShowCompleteDialog(false);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -221,6 +225,11 @@ const UpdateDetails = () => {
 
   const declineMutation = useMutation({
     mutationFn: () => updateService.declineUpdate(updateId),
+    ...mutationOptions,
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: () => updateService.markAsCompleted(updateId),
     ...mutationOptions,
   });
 
@@ -270,10 +279,11 @@ const UpdateDetails = () => {
   
   const getStatusBadgeStyle = (status: string) => {
      switch (status) {
-      case "approved": return "bg-green-100 text-green-800 border-green-200";
-      case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "declined": return "bg-red-100 text-red-800 border-red-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+      case "approved": return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700";
+      case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700";
+      case "declined": return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700";
+      case "completed": return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700";
+      default: return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700";
     }
   };
 
@@ -419,6 +429,108 @@ const UpdateDetails = () => {
               </CardContent>
             </Card>
             
+            {/* Attachments Card - Moved here to be more prominent */}
+            {((update.attachments_count && update.attachments_count > 0) || 
+              (update.screenshots && update.screenshots.length > 0) || 
+              (update.files && update.files.length > 0) || 
+              (update.voice_notes && update.voice_notes.length > 0)) && (
+              <Card>
+                <CardHeader><CardTitle>Attachments</CardTitle></CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Screenshots */}
+                  {update.screenshots && update.screenshots.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        <ImagePlus className="h-4 w-4" />
+                        Screenshots ({update.screenshots.length})
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {update.screenshots.map((screenshot: any) => (
+                          <div key={screenshot.id} className="relative rounded-xl border border-gray-200 dark:border-gray-700 p-2 group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800">
+                            <a href={screenshot.full_url || `${import.meta.env.VITE_API_URL.replace('/api', '')}/${screenshot.file_path}`} target="_blank" rel="noopener noreferrer" className="block">
+                              <img 
+                                src={screenshot.full_url || `${import.meta.env.VITE_API_URL.replace('/api', '')}/${screenshot.file_path}`} 
+                                alt={screenshot.file_name} 
+                                className="h-32 w-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity" 
+                                onError={(e) => {
+                                  // Fallback if image fails to load
+                                  (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" fill="%23999"%3EImage%3C/text%3E%3C/svg%3E';
+                                }}
+                              />
+                            </a>
+                            <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">{screenshot.file_name}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Files */}
+                  {update.files && update.files.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        <Paperclip className="h-4 w-4" />
+                        Files ({update.files.length})
+                      </div>
+                      <div className="space-y-2">
+                        {update.files.map((file: any) => (
+                          <a 
+                            key={file.id} 
+                            href={file.full_url || `${import.meta.env.VITE_API_URL.replace('/api', '')}/${file.file_path}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                          >
+                            <div className="flex items-center space-x-3 overflow-hidden">
+                              {file.full_url && file.file_type?.startsWith('image/') ? (
+                                <img src={file.full_url} alt={file.file_name} className="h-10 w-10 object-cover rounded-lg" />
+                              ) : (
+                                <div className="h-10 w-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                  <File className="h-5 w-5 text-gray-400" />
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-medium text-gray-700 dark:text-gray-300">{file.file_name}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{file.file_size ? `${(file.file_size / 1024).toFixed(1)} KB` : ''}</div>
+                              </div>
+                            </div>
+                            <File className="h-4 w-4 text-gray-400" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Voice Notes */}
+                  {update.voice_notes && update.voice_notes.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        <Play className="h-4 w-4" />
+                        Voice Notes ({update.voice_notes.length})
+                      </div>
+                      <div className="space-y-2">
+                        {update.voice_notes.map((voiceNote: any) => (
+                          <div key={voiceNote.id} className="relative">
+                            <WhatsAppVoiceMessage
+                              id={voiceNote.id}
+                              audioSource={voiceNote.full_url || `${import.meta.env.VITE_API_URL.replace('/api', '')}/${voiceNote.file_path}`}
+                              duration={voiceNote.duration || 0}
+                              waveform={[]}
+                              onRemove={() => {}}
+                              isActive={activeVoiceNoteId === voiceNote.id}
+                              onPlay={(id) => setActiveVoiceNoteId(id)}
+                              onPause={(id) => setActiveVoiceNoteId(null)}
+                              onEnded={() => setActiveVoiceNoteId(null)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+            
             {currentUser?.role === "admin" && update?.status === "pending" && (
               <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
                 <CardHeader className="flex-row items-center justify-between">
@@ -433,6 +545,25 @@ const UpdateDetails = () => {
                   </Button>
                   <Button variant="destructive" onClick={() => setShowDeclineDialog(true)}>
                     <X className="mr-2 h-4 w-4"/>Decline
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {update?.status === "approved" && canPerformActions && (
+              <Card className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
+                <CardHeader className="flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-blue-900 dark:text-blue-100">Update Approved</CardTitle>
+                    <CardDescription className="text-blue-700 dark:text-blue-400">This update has been approved and is ready to be marked as completed.</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex gap-4">
+                  <Button 
+                    onClick={() => setShowCompleteDialog(true)} 
+                    className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm hover:shadow-md"
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />Mark as Completed
                   </Button>
                 </CardContent>
               </Card>
@@ -469,6 +600,20 @@ const UpdateDetails = () => {
                   <span className="text-muted-foreground">Created on:</span>
                   <span className="font-medium">{formattedCreatedDate}</span>
                 </div>
+                {update.expected_date && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Expected date:</span>
+                    <span className="font-medium">{format(new Date(update.expected_date), 'MMM dd, yyyy')}</span>
+                  </div>
+                )}
+                {update.expected_time && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Expected time:</span>
+                    <span className="font-medium">{update.expected_time}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </section>
@@ -524,6 +669,7 @@ const UpdateDetails = () => {
       {/* Confirmation Dialogs */}
       <ConfirmationDialog open={showApproveDialog} onOpenChange={setShowApproveDialog} onConfirm={() => approveMutation.mutate()} title="Approve Update" description="Are you sure you want to approve this update?" confirmText="Approve" isLoading={approveMutation.isPending} />
       <ConfirmationDialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog} onConfirm={() => declineMutation.mutate()} title="Decline Update" description="Are you sure you want to decline this update? This cannot be undone." confirmText="Decline" isLoading={declineMutation.isPending} variant="destructive" />
+      <ConfirmationDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog} onConfirm={() => completeMutation.mutate()} title="Mark as Completed" description="Are you sure you want to mark this update as completed? This indicates the update has been fully implemented." confirmText="Mark as Completed" isLoading={completeMutation.isPending} />
     </main>
   );
 };

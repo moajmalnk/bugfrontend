@@ -111,11 +111,26 @@ Important:
    */
   logRejectionError: () => {
     const setup = googleOAuthDiagnostic.getSetupInstructionsForRejection();
+    const originInfo = googleOAuthDiagnostic.getCurrentOriginInfo();
     
-    console.error('%cGoogle OAuth Rejection', 'color: red; font-weight: bold;');
-    console.warn(setup.instructions);
-    console.log('Current origin:', setup.currentOrigin);
-    console.log('Google Cloud Console:', 'https://console.cloud.google.com/apis/credentials');
+    // Create a formatted console message
+    console.group('%c🚨 Google OAuth Configuration Error', 'color: #ff4444; font-weight: bold; font-size: 14px;');
+    console.error('%cThe origin is not authorized for this Google OAuth Client ID', 'color: #ff6666; font-size: 12px;');
+    console.log('%cCurrent Origin:', 'color: #4CAF50; font-weight: bold;', originInfo.origin);
+    console.log('%cClient ID:', 'color: #2196F3; font-weight: bold;', googleOAuthDiagnostic.clientId);
+    console.group('%c📋 How to Fix:', 'color: #FF9800; font-weight: bold;');
+    console.log('%c1. Open Google Cloud Console:', 'color: #2196F3;', 'https://console.cloud.google.com/apis/credentials');
+    console.log('%c2. Find and click on OAuth 2.0 Client ID:', 'color: #2196F3;', googleOAuthDiagnostic.clientId);
+    console.log('%c3. In "Authorized JavaScript origins", click "ADD URI" and enter:', 'color: #2196F3;');
+    console.log('   %c' + originInfo.origin, 'color: #4CAF50; font-family: monospace; background: #f5f5f5; padding: 2px 6px; border-radius: 3px;');
+    console.log('%c4. In "Authorized redirect URIs", click "ADD URI" and enter:', 'color: #2196F3;');
+    console.log('   %c' + originInfo.origin + '/login', 'color: #4CAF50; font-family: monospace; background: #f5f5f5; padding: 2px 6px; border-radius: 3px;');
+    console.log('%c5. Click "SAVE"', 'color: #2196F3;');
+    console.log('%c6. Wait 2-5 minutes for changes to propagate', 'color: #FF9800;');
+    console.log('%c7. Refresh this page and try again', 'color: #2196F3;');
+    console.groupEnd();
+    console.log('%c💡 Quick Link:', 'color: #9C27B0; font-weight: bold;', 'https://console.cloud.google.com/apis/credentials');
+    console.groupEnd();
     
     return setup;
   }

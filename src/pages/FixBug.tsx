@@ -22,7 +22,6 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
-import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { Bug } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -160,7 +159,12 @@ const FixBug = () => {
       return;
     }
 
+    // Show optimistic UI immediately
     setIsSubmitting(true);
+    toast({
+      title: "Updating...",
+      description: "Updating bug status...",
+    });
 
     try {
       const formData = new FormData();
@@ -169,7 +173,7 @@ const FixBug = () => {
       formData.append("fix_description", fixDescription); // Include fix description
       formData.append("fixed_by", currentUser.id); // Record who fixed it
 
-      // Assuming an update endpoint exists
+      // Send update request
       const response = await apiClient.post('/bugs/update.php', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -185,52 +189,50 @@ const FixBug = () => {
         // Update bug state first for celebration component
         setBug(updatedBug);
 
-        // Send notification if status is fixed
-        if (status === "fixed") {
-          await sendBugStatusUpdateNotification({
-            ...updatedBug,
-            id: updatedBug.id,
-            status: "fixed",
-            updated_by_name: currentUser?.name || "BugRicer",
-          });
-
-          // Store updated bug for celebration and show animation
-          setCelebrationBug(updatedBug);
-          setShowCelebration(true);
-        }
-
-        // Broadcast notification for status change
-        if (status && bug) {
-          await broadcastNotificationService.broadcastStatusChange(
-            bug.title,
-            bug.id,
-            status,
-            currentUser?.name || "BugRicer"
-          );
-        }
-
+        // Show success toast
         toast({
           title: "Success",
           description: "Bug status updated successfully",
         });
+
+        // Store updated bug for celebration and show animation if status is fixed
+        if (status === "fixed") {
+          setCelebrationBug(updatedBug);
+          setShowCelebration(true);
+        }
+
+        // Send broadcast notification asynchronously (non-blocking)
+        if (status && bug) {
+          setTimeout(() => {
+            broadcastNotificationService.broadcastStatusChange(
+              bug.title,
+              bug.id,
+              status,
+              currentUser?.name || "BugRicer"
+            ).catch(err => {
+              console.error("Failed to send broadcast notification:", err);
+            });
+          }, 0);
+        }
 
         // Invalidate the bug details query to force refetch on the details page
         queryClient.invalidateQueries({ queryKey: ["bug", bugId] });
 
         // If not fixed, redirect immediately. If fixed, wait for celebration
         if (status !== "fixed") {
-          const bugDetailsUrl = currentUser?.role
-            ? `/${currentUser.role}/bugs/${bugId}`
-            : `/bugs/${bugId}`;
-          
-          const redirectUrl = fromProject ? `${bugDetailsUrl}?from=project` : bugDetailsUrl;
-          navigate(redirectUrl);
+          setTimeout(() => {
+            const bugDetailsUrl = currentUser?.role
+              ? `/${currentUser.role}/bugs/${bugId}`
+              : `/bugs/${bugId}`;
+            
+            const redirectUrl = fromProject ? `${bugDetailsUrl}?from=project` : bugDetailsUrl;
+            navigate(redirectUrl);
+          }, 500);
         }
       } else {
         throw new Error(data.message || "Failed to update bug status");
       }
     } catch (error) {
-      // // console.error("Error updating bug:", error);
       toast({
         title: "Error",
         description:

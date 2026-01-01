@@ -14,6 +14,8 @@ export type UserTask = {
   updated_at?: string;
 };
 
+export type StatusOption = 'not_started' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
+
 export type WorkSubmission = {
   submission_date: string; // YYYY-MM-DD
   start_time?: string; // HH:mm:ss
@@ -26,6 +28,8 @@ export type WorkSubmission = {
   pending_tasks?: string;
   ongoing_tasks?: string;
   notes?: string;
+  planned_work_status?: StatusOption;
+  planned_work_notes?: string;
 };
 
 import { ENV } from '@/lib/env';
@@ -39,16 +43,16 @@ function authHeaders() {
 
 export async function listMyTasks(params: { status?: string; project_id?: string } = {}) {
   const qs = new URLSearchParams(params as any).toString();
-  
+
   // Check if we're in impersonation mode by looking at the token
   // Prioritize sessionStorage first (where impersonation tokens are stored)
   const token = sessionStorage.getItem('token') || localStorage.getItem('token') || localStorage.getItem('auth_token');
   let useOwnTasks = true; // Default to own tasks
-  
+
   if (token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      
+
       // If this is a dashboard access token with admin_id, we're impersonating
       if (payload.purpose === 'dashboard_access' && payload.admin_id && payload.user_id) {
         useOwnTasks = false; // Use regular tasks endpoint to respect impersonation
@@ -60,11 +64,11 @@ export async function listMyTasks(params: { status?: string; project_id?: string
       console.log('Token parsing error:', e);
     }
   }
-  
+
   // Use appropriate endpoint based on impersonation mode
   const endpoint = useOwnTasks ? 'list_my_own_tasks.php' : 'list.php';
   // console.log('Using endpoint for tasks:', endpoint); // Debugging
-  
+
   const res = await fetch(`${API}/tasks/${endpoint}${qs ? `?${qs}` : ''}`, {
     headers: authHeaders(),
   });
@@ -79,12 +83,12 @@ export async function createTask(task: UserTask) {
   // Prioritize sessionStorage first (where impersonation tokens are stored)
   const token = sessionStorage.getItem('token') || localStorage.getItem('token') || localStorage.getItem('auth_token');
   let useOwnTask = true; // Default to own task creation
-  
+
   if (token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       console.log('Token payload for create task:', payload); // Debugging
-      
+
       // If this is a dashboard access token with admin_id, we're impersonating
       if (payload.purpose === 'dashboard_access' && payload.admin_id && payload.user_id) {
         console.log('Impersonation detected, using create_task.php'); // Debugging
@@ -97,11 +101,11 @@ export async function createTask(task: UserTask) {
       console.log('Token parsing error:', e);
     }
   }
-  
+
   // Use appropriate endpoint based on impersonation mode
   const endpoint = useOwnTask ? 'create_own_task.php' : 'create.php';
   // console.log('Using endpoint for create task:', endpoint); // Debugging
-  
+
   const res = await fetch(`${API}/tasks/${endpoint}`, {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -138,12 +142,12 @@ export async function submitWork(payload: WorkSubmission) {
   // Prioritize sessionStorage first (where impersonation tokens are stored)
   const token = sessionStorage.getItem('token') || localStorage.getItem('token') || localStorage.getItem('auth_token');
   let useOwnWork = true; // Default to own work submission
-  
+
   if (token) {
     try {
       const tokenPayload = JSON.parse(atob(token.split('.')[1]));
       console.log('Token payload for submit work:', tokenPayload);
-      
+
       // If this is a dashboard access token with admin_id, we're impersonating
       if (tokenPayload.purpose === 'dashboard_access' && tokenPayload.admin_id && tokenPayload.user_id) {
         console.log('Impersonation detected, using submit_work.php');
@@ -156,11 +160,11 @@ export async function submitWork(payload: WorkSubmission) {
       console.log('Token parsing error:', e);
     }
   }
-  
+
   // Use appropriate endpoint based on impersonation mode
   const endpoint = useOwnWork ? 'submit_own_work.php' : 'submit_work.php';
   // console.log('Using endpoint for submit:', endpoint);
-  
+
   const res = await fetch(`${API}/tasks/${endpoint}`, {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -181,18 +185,18 @@ export async function getTemplate(date: string, since?: string) {
 
 export async function listMySubmissions(params: { from?: string; to?: string } = {}) {
   // Add cache-busting parameter to ensure fresh data
-  const qs = new URLSearchParams({...params, _t: Date.now().toString()});
-  
+  const qs = new URLSearchParams({ ...params, _t: Date.now().toString() });
+
   // Check if we're in impersonation mode by looking at the token
   // Prioritize sessionStorage first (where impersonation tokens are stored)
   const token = sessionStorage.getItem('token') || localStorage.getItem('token') || localStorage.getItem('auth_token');
   let useOwnSubmissions = true; // Default to own submissions
-  
+
   if (token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       console.log('Token payload for submissions:', payload);
-      
+
       // If this is a dashboard access token with admin_id, we're impersonating
       if (payload.purpose === 'dashboard_access' && payload.admin_id && payload.user_id) {
         console.log('Impersonation detected, using my_submissions.php');
@@ -205,11 +209,11 @@ export async function listMySubmissions(params: { from?: string; to?: string } =
       console.log('Token parsing error:', e);
     }
   }
-  
+
   // Use appropriate endpoint based on impersonation mode
   const endpoint = useOwnSubmissions ? 'my_own_submissions.php' : 'my_submissions.php';
   // console.log('Using endpoint:', endpoint);
-  
+
   const res = await fetch(`${API}/tasks/${endpoint}${qs ? `?${qs}` : ''}`, {
     headers: authHeaders(),
   });
@@ -230,27 +234,29 @@ export async function deleteSubmission(arg: { id?: number; submission_date?: str
 }
 
 export async function checkIn(
-  submissionDate?: string, 
-  plannedProjects?: string[], 
-  plannedWork?: string
+  submissionDate?: string,
+  plannedProjects?: string[],
+  plannedWork?: string,
+  plannedWorkStatus?: StatusOption
 ): Promise<{ success: boolean; check_in_time: string; submission_date: string; message?: string }> {
   const res = await fetch(`${API}/tasks/check_in.php`, {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
+    body: JSON.stringify({
       submission_date: submissionDate || new Date().toISOString().split('T')[0],
       planned_projects: plannedProjects || [],
-      planned_work: plannedWork || ''
+      planned_work: plannedWork || '',
+      planned_work_status: plannedWorkStatus || 'not_started'
     }),
   });
-  
+
   // Get response text first to handle empty responses
   const responseText = await res.text();
-  
+
   if (!responseText) {
     throw new Error('Empty response from server');
   }
-  
+
   let responseData;
   try {
     responseData = JSON.parse(responseText);
@@ -258,11 +264,11 @@ export async function checkIn(
     console.error('Failed to parse JSON response:', responseText);
     throw new Error('Invalid JSON response from server: ' + responseText.substring(0, 100));
   }
-  
+
   if (!res.ok || !responseData.success) {
     throw new Error(responseData.message || 'Failed to check in');
   }
-  
+
   // Extract data from response (responseData.data contains the actual data)
   const data = responseData.data || responseData;
   return {

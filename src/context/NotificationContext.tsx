@@ -13,15 +13,22 @@ export interface Notification {
   entity_type?: string;
   entity_id?: string;
   project_id?: string;
+  project_name?: string;
+  bug_id?: string;
+  bug_title?: string;
+  status?: string;
+  created_by?: string;
 }
 
 interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
+  isLoading: boolean;
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
+  refreshNotifications: () => void;
 }
 
 export const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -29,42 +36,42 @@ export const NotificationContext = createContext<NotificationContextType | undef
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const { currentUser } = useAuth();
   const settings = notificationService.getSettings();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastFetchTimeRef = useRef<Date>(new Date());
+  const lastFetchTimeRef = useRef<Date>(new Date(0)); // Initialize to 0 to allow immediate first fetch
   const isFetchingRef = useRef<boolean>(false);
 
   // Fetch notifications from API
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (showLoading = false) => {
     if (!currentUser) {
-      // console.log('NotificationContext: No currentUser, skipping fetch');
       return;
     }
 
     // Prevent multiple simultaneous fetches
     if (isFetchingRef.current) {
-      // console.log('NotificationContext: Fetch already in progress, skipping');
       return;
     }
 
-    // Check if we fetched recently (within last 2 seconds)
+    // Check if we fetched recently (within last 500ms) - reduced from 2000ms for faster updates
     const now = new Date();
     const timeSinceLastFetch = now.getTime() - lastFetchTimeRef.current.getTime();
-    if (timeSinceLastFetch < 2000) {
-      // console.log('NotificationContext: Recent fetch detected, skipping duplicate');
+    if (timeSinceLastFetch < 500) {
       return;
     }
 
     isFetchingRef.current = true;
+    if (showLoading) {
+      setIsLoading(true);
+    }
+    
     try {
-      // console.log('NotificationContext: Fetching notifications...');
-      const apiNotifications = await notificationService.getUserNotifications(50, 0);
-      // console.log('NotificationContext: Received notifications:', {
-      //   count: apiNotifications.length,
-      //   sample: apiNotifications[0] || null,
-      //   all: apiNotifications
-      // });
+      // Fetch notifications and unread count in parallel for better performance
+      const [apiNotifications, count] = await Promise.all([
+        notificationService.getUserNotifications(50, 0),
+        notificationService.getUnreadCount()
+      ]);
       
       // Map API notifications to our Notification type
       const mappedNotifications: Notification[] = apiNotifications.map((n: any) => ({
@@ -76,51 +83,46 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         createdAt: n.createdAt || n.created_at || new Date().toISOString(),
         entity_type: n.entity_type,
         entity_id: n.entity_id,
-        project_id: n.project_id
+        project_id: n.project_id,
+        project_name: n.project_name,
+        bug_id: n.bug_id,
+        bug_title: n.bug_title,
+        status: n.status,
+        created_by: n.created_by
       }));
 
-      // console.log('NotificationContext: Mapped notifications:', {
-      //   count: mappedNotifications.length,
-      //   sample: mappedNotifications[0] || null
-      // });
-
       setNotifications(mappedNotifications);
-      
-      // Get unread count
-      const count = await notificationService.getUnreadCount();
-      // console.log('NotificationContext: Unread count:', count);
       setUnreadCount(count);
-      
       lastFetchTimeRef.current = new Date();
     } catch (error) {
       // console.error('NotificationContext: Error fetching notifications:', error);
     } finally {
       isFetchingRef.current = false;
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   }, [currentUser]);
 
-  // Initial fetch and setup polling
+  // Initial fetch and setup polling - removed delay for immediate load
   useEffect(() => {
     if (currentUser) {
-      // Add a small delay to prevent multiple simultaneous fetches
-      const timeoutId = setTimeout(() => {
+      // Fetch immediately without delay
+      fetchNotifications(true);
+      
+      // Poll every 15 seconds for new notifications (reduced from 30s for faster updates)
+      pollingIntervalRef.current = setInterval(() => {
         fetchNotifications();
-        
-        // Poll every 30 seconds for new notifications
-        pollingIntervalRef.current = setInterval(() => {
-          fetchNotifications();
-        }, 30000);
-      }, 100);
+      }, 15000);
       
       return () => {
-        clearTimeout(timeoutId);
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
       };
     }
-  }, [currentUser?.id]); // Only depend on user ID, not the whole user object
+  }, [currentUser?.id, fetchNotifications]);
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
     const newNotification: Notification = {
@@ -159,12 +161,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     );
     setUnreadCount(prev => Math.max(0, prev - 1));
     
-    // Update on server
-    await notificationService.markAsRead(notificationId);
+    // Update on server (fire and forget for faster UX)
+    notificationService.markAsRead(notificationId).catch(() => {
+      // Silently handle errors, optimistic update already applied
+    });
     
-    // Refresh to get accurate count
-    const count = await notificationService.getUnreadCount();
-    setUnreadCount(count);
+    // Refresh count in background without blocking
+    notificationService.getUnreadCount().then(count => {
+      setUnreadCount(count);
+    }).catch(() => {
+      // Silently handle errors
+    });
   }, []);
 
   const markAllAsRead = useCallback(async () => {
@@ -177,12 +184,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     // Update on server
     const success = await notificationService.markAllAsRead();
     
+    // Refresh immediately for accurate state (no delay)
     if (success) {
-      // Refresh to get accurate count and state
-      await fetchNotifications();
+      fetchNotifications();
     } else {
-      // Revert optimistic update on failure
-      await fetchNotifications();
+      fetchNotifications();
     }
   }, [fetchNotifications]);
 
@@ -194,8 +200,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     // Delete on server
     await notificationService.deleteAll();
     
-    // Refresh to get accurate state
-    await fetchNotifications();
+    // Refresh immediately for accurate state (no delay)
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  // Expose refresh function for manual refresh
+  const refreshNotifications = useCallback(() => {
+    fetchNotifications(true);
   }, [fetchNotifications]);
 
   return (
@@ -203,10 +214,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       value={{
         notifications,
         unreadCount,
+        isLoading,
         addNotification,
         markAsRead,
         markAllAsRead,
         clearNotifications,
+        refreshNotifications,
       }}
     >
       {children}

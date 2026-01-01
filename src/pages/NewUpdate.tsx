@@ -25,19 +25,40 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send } from "lucide-react";
+import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send, ImagePlus, Paperclip, File, X, Calendar, Clock, FileImage } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { useState } from "react";
+import { useState, useRef, useEffect, ChangeEvent } from "react";
 import * as z from "zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { sendNewUpdateNotification } from "@/services/emailService";
 import { Skeleton } from '@/components/ui/skeleton';
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { apiClient } from "@/lib/axios";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { TimePicker } from "@/components/ui/TimePicker";
+import {
+  RecordedVoiceNote,
+  WhatsAppVoiceRecorder,
+} from "@/components/voice/WhatsAppVoiceRecorder";
+import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
+
+interface FileWithPreview extends File {
+  preview?: string;
+}
+
+interface VoiceNote {
+  id: string;
+  blob: Blob;
+  duration: number;
+  name: string;
+  isPlaying: boolean;
+  audioUrl?: string;
+  waveform?: number[];
+}
 
 const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
@@ -47,6 +68,8 @@ const formSchema = z.object({
     required_error: "Please select an update type",
   }),
   description: z.string().min(1, "Description is required"),
+  expected_date: z.string().optional(),
+  expected_time: z.string().optional(),
 });
 
 const LoadingSpinner = () => (
@@ -110,6 +133,16 @@ const NewUpdate = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
 
+  // File uploads
+  const [screenshots, setScreenshots] = useState<FileWithPreview[]>([]);
+  const [files, setFiles] = useState<FileWithPreview[]>([]);
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
+  const [activeVoiceNoteId, setActiveVoiceNoteId] = useState<string | null>(null);
+
+  // Refs for file inputs
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Fetch projects the user is a member of
   const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
@@ -151,33 +184,231 @@ const NewUpdate = () => {
       type: undefined,
       description: "",
       project_id: "",
+      expected_date: "",
+      expected_time: "",
     },
   });
 
+  // Cleanup effect for blob URLs
+  useEffect(() => {
+    return () => {
+      screenshots.forEach((file) => {
+        if (file.preview) URL.revokeObjectURL(file.preview);
+      });
+      files.forEach((file) => {
+        if (file.preview) URL.revokeObjectURL(file.preview);
+      });
+      voiceNotes.forEach((voiceNote) => {
+        if (voiceNote.audioUrl && voiceNote.audioUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(voiceNote.audioUrl);
+        }
+      });
+    };
+  }, [screenshots, files, voiceNotes]);
+
+  // File upload handlers
+  const handleScreenshotClick = () => {
+    screenshotInputRef.current?.click();
+  };
+
+  const handleScreenshotChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles) return;
+
+    const newFiles = Array.from(selectedFiles).map((file) =>
+      Object.assign(file, {
+        preview: URL.createObjectURL(file),
+      })
+    );
+    setScreenshots((prev) => [...prev, ...newFiles]);
+    e.target.value = "";
+  };
+
+  const removeScreenshot = (index: number) => {
+    const newScreenshots = [...screenshots];
+    if (newScreenshots[index].preview) {
+      URL.revokeObjectURL(newScreenshots[index].preview!);
+    }
+    newScreenshots.splice(index, 1);
+    setScreenshots(newScreenshots);
+  };
+
+  const clearAllScreenshots = () => {
+    screenshots.forEach((file) => {
+      if (file.preview) URL.revokeObjectURL(file.preview);
+    });
+    setScreenshots([]);
+  };
+
+  const handleFileClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles) return;
+
+    const newFiles = Array.from(selectedFiles).map((file) =>
+      Object.assign(file, {
+        preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+      })
+    );
+    setFiles((prev) => [...prev, ...newFiles]);
+    e.target.value = "";
+  };
+
+  const removeFile = (index: number) => {
+    const newFiles = [...files];
+    if (newFiles[index].preview) {
+      URL.revokeObjectURL(newFiles[index].preview!);
+    }
+    newFiles.splice(index, 1);
+    setFiles(newFiles);
+  };
+
+  const clearAllFiles = () => {
+    files.forEach((file) => {
+      if (file.preview) URL.revokeObjectURL(file.preview);
+    });
+    setFiles([]);
+  };
+
+  const handleVoiceRecorderComplete = ({
+    blob,
+    duration,
+    waveform,
+  }: RecordedVoiceNote) => {
+    const voiceNote: VoiceNote = {
+      id: `vn_${Date.now()}_${Math.random()}`,
+      blob,
+      duration,
+      name: `Voice Note ${voiceNotes.length + 1}`,
+      isPlaying: false,
+      audioUrl: URL.createObjectURL(blob),
+      waveform,
+    };
+    setVoiceNotes((prev) => [...prev, voiceNote]);
+  };
+
+  const removeVoiceNote = (index: number) => {
+    const voiceNote = voiceNotes[index];
+    if (voiceNote.audioUrl) {
+      URL.revokeObjectURL(voiceNote.audioUrl);
+    }
+    setActiveVoiceNoteId((prev) => (prev === voiceNote.id ? null : prev));
+    setVoiceNotes((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllVoiceNotes = () => {
+    voiceNotes.forEach((vn) => {
+      if (vn.audioUrl) URL.revokeObjectURL(vn.audioUrl);
+    });
+    setVoiceNotes([]);
+    setActiveVoiceNoteId(null);
+  };
+
+  const handlePasteScreenshot = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf("image") !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          const fileWithPreview = Object.assign(file, {
+            preview: URL.createObjectURL(file),
+          });
+          setScreenshots((prev) => [...prev, fileWithPreview]);
+        }
+      }
+    }
+  };
+
   const mutation = useMutation<unknown, unknown, z.infer<typeof formSchema> & { project_id: string }>({
     mutationFn: async (values) => {
-      const response = await apiClient.post('/updates/create.php', values);
-      return response.data;
+      // Show optimistic loading toast
+      toast({ 
+        title: "Creating...", 
+        description: "Your update is being created" 
+      });
+      
+      // Create FormData for file uploads
+      const formData = new FormData();
+      formData.append("title", values.title);
+      formData.append("type", values.type);
+      formData.append("description", values.description);
+      formData.append("project_id", values.project_id);
+      if (values.expected_date) formData.append("expected_date", values.expected_date);
+      if (values.expected_time) formData.append("expected_time", values.expected_time);
+
+      // Add screenshots
+      screenshots.forEach((file) => {
+        formData.append("screenshots[]", file);
+      });
+
+      // Add files
+      files.forEach((file) => {
+        formData.append("files[]", file);
+      });
+
+      // Add voice notes
+      voiceNotes.forEach((voiceNote, index) => {
+        const fileExtension = voiceNote.blob.type.includes("webm")
+          ? "webm"
+          : voiceNote.blob.type.includes("mp4")
+          ? "mp4"
+          : "ogg";
+        const fileName = `${voiceNote.name || `voice_note_${index + 1}`}.${fileExtension}`;
+        formData.append("voice_notes[]", voiceNote.blob, fileName);
+        formData.append(`voice_note_duration_${index}`, voiceNote.duration.toString());
+      });
+      
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/updates/create.php`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      
+      const data = await response.json();
+      return data;
     },
     onSuccess: async (data: any, values) => {
       if (data.success) {
-        toast({ title: "Success", description: "Update created successfully" });
+        // Show success toast immediately
+        toast({ 
+          title: "Success", 
+          description: "Update created successfully" 
+        });
+        
+        // Invalidate queries for fresh data
         queryClient.invalidateQueries({ queryKey: ["updates"] });
-        sendNewUpdateNotification({
-          ...values,
-          id: data.data?.id,
-          created_at: new Date().toISOString(),
-          created_by: currentUser?.username || "BugRicer"
-        });
-        await broadcastNotificationService.broadcastNotification({
-          type: "new_update",
-          title: "New Update Posted",
-          message: `A new update has been posted: ${values.title}`,
-          bugId: data.data?.id || "0",
-          bugTitle: values.title,
-          createdBy: currentUser?.name || "BugRicer"
-        });
-        navigate(currentUser?.role ? `/${currentUser.role}/updates` : "/updates");
+        
+        // Navigate immediately (notifications handled by backend)
+        // Small delay to show success message before navigation
+        setTimeout(() => {
+          navigate(currentUser?.role ? `/${currentUser.role}/updates` : "/updates");
+        }, 500);
+
+        // Send frontend notifications asynchronously (non-blocking)
+        // Backend already handles email and WhatsApp, but we still need to handle:
+        // - Browser broadcast notifications
+        setTimeout(async () => {
+          try {
+            await broadcastNotificationService.broadcastNotification({
+              type: "new_update",
+              title: "New Update Posted",
+              message: `A new update has been posted: ${values.title}`,
+              bugId: data.data?.id || "0",
+              bugTitle: values.title,
+              createdBy: currentUser?.name || "BugRicer"
+            });
+          } catch (error) {
+            // Silently fail - notifications are handled by backend
+            console.error("Failed to send frontend notifications:", error);
+          }
+        }, 100);
       } else {
         let errorMsg = data.message || "Failed to create update";
         if (data.message && (data.message.includes("Unauthorized") || data.message.includes("not a member"))) {
@@ -432,6 +663,304 @@ const NewUpdate = () => {
                           </FormItem>
                         )}
                       />
+
+                      {/* Expected Date and Time */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="expected_date"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                                <div className="p-1 bg-indigo-500 rounded-lg">
+                                  <Calendar className="h-3 w-3 text-white" />
+                                </div>
+                                Expected Date
+                              </FormLabel>
+                              <FormControl>
+                                <DatePicker
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  placeholder="Select expected date"
+                                  className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl"
+                                />
+                              </FormControl>
+                              <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
+                                When is this update expected to be completed?
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="expected_time"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                                <div className="p-1 bg-purple-500 rounded-lg">
+                                  <Clock className="h-3 w-3 text-white" />
+                                </div>
+                                Expected Time
+                              </FormLabel>
+                              <FormControl>
+                                <TimePicker
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  placeholder="Select expected time"
+                                  className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl"
+                                />
+                              </FormControl>
+                              <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
+                                What time is this update expected?
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Attachments Section */}
+                    <div className="space-y-6 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                          <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"></div>
+                          Attachments
+                        </Label>
+                      </div>
+
+                      {/* Hidden file inputs */}
+                      <input
+                        type="file"
+                        ref={screenshotInputRef}
+                        onChange={handleScreenshotChange}
+                        accept="image/*"
+                        className="hidden"
+                        multiple
+                      />
+
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        className="hidden"
+                        multiple
+                      />
+
+                      {/* Three-card grid: screenshots, files, voice recorder */}
+                      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+                        {/* Screenshots section */}
+                        <div
+                          className="space-y-4"
+                          tabIndex={0}
+                          onPaste={handlePasteScreenshot}
+                        >
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-300 rounded-xl group"
+                            onClick={handleScreenshotClick}
+                            disabled={isSubmitting}
+                          >
+                            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
+                              <ImagePlus className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">
+                              Add Screenshots
+                            </span>
+                          </Button>
+
+                          {screenshots.length > 0 && (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                  Screenshots ({screenshots.length})
+                                </Label>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={clearAllScreenshots}
+                                  className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                                  disabled={isSubmitting}
+                                >
+                                  Clear All
+                                </Button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                {screenshots.map((file, index) => (
+                                  <div
+                                    key={index}
+                                    className="relative rounded-xl border border-gray-200 dark:border-gray-700 p-2 group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                                  >
+                                    {file.preview ? (
+                                      <img
+                                        src={file.preview}
+                                        alt={`Screenshot ${index + 1}`}
+                                        className="h-24 w-full object-cover rounded-lg"
+                                      />
+                                    ) : (
+                                      <div className="h-24 w-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                        <FileImage className="h-8 w-8 text-gray-400" />
+                                      </div>
+                                    )}
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="icon"
+                                      className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg"
+                                      onClick={() => removeScreenshot(index)}
+                                      disabled={isSubmitting}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                    <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">
+                                      {file.name}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Files section */}
+                        <div className="space-y-4">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400 dark:hover:border-green-500 hover:bg-green-50/50 dark:hover:bg-green-950/20 transition-all duration-300 rounded-xl group"
+                            onClick={handleFileClick}
+                            disabled={isSubmitting}
+                          >
+                            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full mb-3 group-hover:bg-green-200 dark:group-hover:bg-green-800/40 transition-colors">
+                              <Paperclip className="h-6 w-6 text-green-600 dark:text-green-400" />
+                            </div>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">
+                              Attach Files
+                            </span>
+                          </Button>
+
+                          {files.length > 0 && (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                  Files ({files.length})
+                                </Label>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={clearAllFiles}
+                                  className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                                  disabled={isSubmitting}
+                                >
+                                  Clear All
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                {files.map((file, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                                  >
+                                    <div className="flex items-center space-x-3 overflow-hidden">
+                                      {file.preview ? (
+                                        <img
+                                          src={file.preview}
+                                          alt={`File preview ${index + 1}`}
+                                          className="h-10 w-10 object-cover rounded-lg"
+                                        />
+                                      ) : (
+                                        <div className="h-10 w-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                          <File className="h-5 w-5 text-gray-400" />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <div className="truncate font-medium text-gray-700 dark:text-gray-300">
+                                          {file.name}
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                          {(file.size / 1024).toFixed(1)} KB
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
+                                      onClick={() => removeFile(index)}
+                                      disabled={isSubmitting}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Voice Notes section */}
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            {/* <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center block">
+                              Voice Notes
+                            </Label> */}
+                            <WhatsAppVoiceRecorder
+                              onComplete={handleVoiceRecorderComplete}
+                              onCancel={() => {}}
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Voice Notes List */}
+                      {voiceNotes.length > 0 && (
+                        <div className="space-y-3 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                              Voice Notes ({voiceNotes.length})
+                            </Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={clearAllVoiceNotes}
+                              className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                              disabled={isSubmitting}
+                            >
+                              Clear All
+                            </Button>
+                          </div>
+                          <div className="space-y-2">
+                            {voiceNotes.map((voiceNote, index) => {
+                              const voiceId = voiceNote.id;
+                              return (
+                                <WhatsAppVoiceMessage
+                                  key={voiceId}
+                                  id={voiceId}
+                                  audioSource={voiceNote.blob}
+                                  duration={voiceNote.duration}
+                                  waveform={voiceNote.waveform}
+                                  onRemove={() => removeVoiceNote(index)}
+                                  isActive={activeVoiceNoteId === voiceId}
+                                  onPlay={(id) => setActiveVoiceNoteId(id)}
+                                  onPause={(id) => {
+                                    if (id === activeVoiceNoteId) {
+                                      setActiveVoiceNoteId(null);
+                                    }
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-end pt-6 border-t border-gray-200/50 dark:border-gray-700/50">

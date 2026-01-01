@@ -48,7 +48,6 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-tooltip',
       '@radix-ui/react-checkbox',
       '@radix-ui/react-tabs',
-      '@radix-ui/react-card',
       '@radix-ui/react-toast',
       '@radix-ui/react-select',
       '@radix-ui/react-slot',
@@ -74,37 +73,37 @@ export default defineConfig(({ mode }) => ({
     // Optimized chunking strategy for production
     rollupOptions: mode === 'development'
       ? {
-      output: {
-        manualChunks: undefined,
-        // Better chunk naming for development
-        chunkFileNames: 'assets/[name].js',
-        entryFileNames: 'assets/[name].js',
-      },
-        }
-      : {
-      output: {
-            // Let Rollup perform automatic code-splitting to avoid oversized bundles that can fail to parse when truncated
-            manualChunks: undefined,
-        chunkFileNames: 'assets/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: (assetInfo) => {
-          if (!assetInfo.name) return 'assets/[name]-[hash].[ext]';
-          const info = assetInfo.name.split('.');
-          const ext = info[info.length - 1];
-          if (/\.(png|jpe?g|gif|svg|webp|avif)$/.test(assetInfo.name)) {
-            return `assets/images/[name]-[hash].${ext}`;
-          }
-          if (/\.(woff2?|eot|ttf|otf)$/.test(assetInfo.name)) {
-            return `assets/fonts/[name]-[hash].${ext}`;
-          }
-          return `assets/[name]-[hash].${ext}`;
+        output: {
+          manualChunks: undefined,
+          // Better chunk naming for development
+          chunkFileNames: 'assets/[name].js',
+          entryFileNames: 'assets/[name].js',
         },
-        // Ensure proper module format
-        format: 'es',
-        // Add proper module type
-        banner: mode === 'production' ? '/* BugRicer Meeting Room - Production Build */' : undefined,
+      }
+      : {
+        output: {
+          // Let Rollup perform automatic code-splitting to avoid oversized bundles that can fail to parse when truncated
+          manualChunks: undefined,
+          chunkFileNames: 'assets/[name]-[hash].js',
+          entryFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: (assetInfo) => {
+            if (!assetInfo.name) return 'assets/[name]-[hash].[ext]';
+            const info = assetInfo.name.split('.');
+            const ext = info[info.length - 1];
+            if (/\.(png|jpe?g|gif|svg|webp|avif)$/.test(assetInfo.name)) {
+              return `assets/images/[name]-[hash].${ext}`;
+            }
+            if (/\.(woff2?|eot|ttf|otf)$/.test(assetInfo.name)) {
+              return `assets/fonts/[name]-[hash].${ext}`;
+            }
+            return `assets/[name]-[hash].${ext}`;
+          },
+          // Ensure proper module format
+          format: 'es',
+          // Add proper module type
+          banner: mode === 'production' ? '/* BugRicer Meeting Room - Production Build */' : undefined,
+        },
       },
-    },
     chunkSizeWarningLimit: 3000,
     target: 'esnext',
     cssCodeSplit: true,

@@ -4042,6 +4042,8 @@ const ProjectDetails = () => {
     try {
       setIsAdding(true);
       const token = localStorage.getItem("token");
+      
+      // Optimize: Process all member additions in parallel for faster response
       const addRequests = selectedUsers.map(async (userId) => {
         const selectedMember = availableMembers.find((u) => u.id === userId);
         const role = selectedMember?.role;
@@ -4053,45 +4055,64 @@ const ProjectDetails = () => {
             message: "Missing role",
           };
         }
-        const response = await fetch(`${ENV.API_URL}/projects/add_member.php`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            project_id: projectId,
-            user_id: userId,
-            role,
-          }),
-        });
-        const data = await response.json();
-        if (data.success) {
-          if (selectedMember && projectId) {
-            await logMemberActivity(
-              projectId,
-              selectedMember.username,
-              "added",
-              role
-            );
+        
+        try {
+          const response = await fetch(`${ENV.API_URL}/projects/add_member.php`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              project_id: projectId,
+              user_id: userId,
+              role,
+            }),
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            // Log activity asynchronously (non-blocking) for better UX
+            if (selectedMember && projectId) {
+              logMemberActivity(
+                projectId,
+                selectedMember.username,
+                "added",
+                role
+              ).catch(err => console.error('Activity logging error:', err));
+            }
+            return { userId, ok: true, username: selectedMember?.username };
           }
-          return { userId, ok: true, username: selectedMember?.username };
+          return {
+            userId,
+            ok: false,
+            username: selectedMember?.username,
+            message: data.message,
+          };
+        } catch (error: any) {
+          return {
+            userId,
+            ok: false,
+            username: selectedMember?.username,
+            message: error.message || "Network error",
+          };
         }
-        return {
-          userId,
-          ok: false,
-          username: selectedMember?.username,
-          message: data.message,
-        };
       });
 
+      // Wait for all requests to complete
       const results = await Promise.all(addRequests);
       const successes = results.filter((r) => r.ok);
       const failures = results.filter((r) => !r.ok);
 
+      // Clear selection immediately for better UX
       setSelectedUsers([]);
-      await Promise.all([fetchAvailableMembers(), fetchMembers()]);
+      
+      // Refresh data in background (non-blocking) - don't wait for it
+      // This allows the UI to update immediately while data refreshes in background
+      fetchAvailableMembers().catch(err => console.error('Error refreshing available members:', err));
+      fetchMembers().catch(err => console.error('Error refreshing members:', err));
 
+      // Show success message immediately
       if (successes.length > 0) {
         toast({
           title: "Members added",

@@ -1,17 +1,36 @@
 import { apiClient } from '@/lib/axios';
 
+export interface Attachment {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size?: number;
+  duration?: number;
+  uploaded_by: string;
+  created_at: string;
+  full_url?: string;
+}
+
 export interface Update {
   id: string;
   title: string;
   description: string;
   type: 'feature' | 'updation' | 'maintenance';
-  status: 'pending' | 'approved' | 'declined';
+  status: 'pending' | 'approved' | 'declined' | 'completed';
   project_name: string;
   project_id: string;
   created_by: string;
   created_by_name?: string;
   created_at: string;
   updated_at?: string;
+  expected_date?: string;
+  expected_time?: string;
+  attachments?: Attachment[];
+  screenshots?: Attachment[];
+  files?: Attachment[];
+  voice_notes?: Attachment[];
+  attachments_count?: number;
 }
 
 class UpdateService {
@@ -76,6 +95,19 @@ class UpdateService {
       throw new Error(response.data.message || 'Failed to decline update.');
     } catch (error) {
       // console.error('Error declining update:', error);
+      throw error;
+    }
+  }
+
+  async markAsCompleted(updateId: string): Promise<string> {
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string }>(`/updates/complete.php?id=${updateId}`);
+      if (response.data.success) {
+        return response.data.message || 'Update marked as completed successfully.';
+      }
+      throw new Error(response.data.message || 'Failed to mark update as completed.');
+    } catch (error) {
+      // console.error('Error marking update as completed:', error);
       throw error;
     }
   }

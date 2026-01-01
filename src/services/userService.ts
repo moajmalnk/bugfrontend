@@ -154,6 +154,14 @@ class UserService {
     return response.data;
   }
 
+  async getPeriodDetails(userId: string, periodStart: string, periodEnd: string): Promise<any> {
+    const response = await this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?id=${userId}&period_start=${periodStart}&period_end=${periodEnd}`);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch period details');
+    }
+    return response.data;
+  }
+
   async deleteUser(userId: string, force = false): Promise<boolean> {
     const token = localStorage.getItem('token');
     const url = `${this.baseUrl}/delete.php?id=${userId}${force ? '&force=true' : ''}`;

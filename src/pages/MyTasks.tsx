@@ -849,17 +849,24 @@ export default function MyTasks() {
   const getTaskShareUrl = (task: SharedTask) => {
     const baseUrl = window.location.origin;
     const currentPath = window.location.pathname;
+    // Ensure task.id is properly converted to string and trimmed
+    const taskId = String(task.id || '').trim();
     // Create URL with tab and task ID parameters
-    return `${baseUrl}${currentPath}?tab=shared-tasks&task=${task.id}`;
+    return `${baseUrl}${currentPath}?tab=shared-tasks&task=${taskId}`;
   };
 
   // Handle share task
   const handleShareTask = async (task: SharedTask) => {
+    // Generate URL using the same function as copy
     const shareUrl = getTaskShareUrl(task);
+    
+    // Ensure URL is properly formatted (no extra characters)
+    const cleanUrl = shareUrl.trim();
+    
     const shareData = {
       title: task.title,
       text: task.description || `Check out this task: ${task.title}`,
-      url: shareUrl,
+      url: cleanUrl,
     };
 
     try {
@@ -871,7 +878,7 @@ export default function MyTasks() {
         });
       } else {
         // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(shareUrl);
+        await navigator.clipboard.writeText(cleanUrl);
         toast({
           title: "Link copied",
           description: "Task link has been copied to clipboard.",
@@ -881,7 +888,7 @@ export default function MyTasks() {
       // User cancelled or error occurred, try copy as fallback
       if (error.name !== 'AbortError') {
         try {
-          await navigator.clipboard.writeText(shareUrl);
+          await navigator.clipboard.writeText(cleanUrl);
           toast({
             title: "Link copied",
             description: "Task link has been copied to clipboard.",
@@ -1743,28 +1750,85 @@ export default function MyTasks() {
                         }
                       }
 
-                      const buttonCount = buttons.length;
+                      // Always 2 rows layout with specific grid distribution
+                      // Row 1: Share, Copy, View, Complete/Incomplete/Approve (distribute evenly)
+                      // Row 2: Edit (8 cols) + Delete (4 cols) = 12 cols total
                       
-                      // Professional responsive grid layout based on button count
-                      const getGridClasses = () => {
-                        if (buttonCount === 1) return "grid grid-cols-1 gap-3";
-                        if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
-                        if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-3 gap-3";
-                        if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3";
-                        if (buttonCount === 5) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
-                        if (buttonCount === 6) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
-                        if (buttonCount === 7) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
-                        return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
-                      };
+                      // Separate buttons into rows by identifying their types
+                      const row1Buttons = [];
+                      const row2Buttons = [];
+                      
+                      buttons.forEach((button) => {
+                        const buttonProps = button.component?.props || {};
+                        const buttonText = typeof buttonProps.children === 'string' ? buttonProps.children : '';
+                        const onClickStr = buttonProps.onClick?.toString() || '';
+                        
+                        // Identify Edit button (calls openEditShared)
+                        const isEdit = onClickStr.includes('openEditShared');
+                        // Identify Delete button (destructive variant or calls onDeleteShared)
+                        const isDelete = buttonProps.variant === 'destructive' || onClickStr.includes('onDeleteShared');
+                        
+                        if (isEdit || isDelete) {
+                          // Edit and Delete always go to row 2
+                          row2Buttons.push({ ...button, isEdit, isDelete });
+                        } else {
+                          // All other buttons (Share, Copy, View, Complete, Incomplete, Approve) go to row 1
+                          row1Buttons.push(button);
+                        }
+                      });
 
                       return (
-                        <div className={getGridClasses()}>
-                          {buttons.map((button, index) => (
-                            <div key={index}>
-                              {button.component}
-                      </div>
-                          ))}
-                    </div>
+                        <div className="space-y-3">
+                          {/* Row 1: Share, Copy, View, Complete/Incomplete/Approve (distribute evenly) */}
+                          {row1Buttons.length > 0 && (
+                            <div className="grid grid-cols-12 gap-3">
+                              {row1Buttons.map((button, index) => {
+                                // Distribute evenly: 3 buttons = 4 cols each, 2 buttons = 6 cols each, 1 button = 12 cols
+                                const colSpan = row1Buttons.length === 3 ? "col-span-4" : 
+                                              row1Buttons.length === 2 ? "col-span-6" : 
+                                              row1Buttons.length === 4 ? "col-span-3" :
+                                              "col-span-12";
+                                return (
+                                  <div key={`row1-${index}`} className={colSpan}>
+                                    {button.component}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          
+                          {/* Row 2: Edit (8 cols) + Delete (4 cols) */}
+                          {row2Buttons.length > 0 && (
+                            <div className="grid grid-cols-12 gap-3">
+                              {row2Buttons.map((button, index) => {
+                                // Edit gets 8 cols, Delete gets 4 cols
+                                let colSpan = "col-span-12";
+                                if (button.isEdit) {
+                                  colSpan = "col-span-8";
+                                } else if (button.isDelete) {
+                                  colSpan = "col-span-4";
+                                } else {
+                                  // Fallback for any other buttons in row 2
+                                  const hasEdit = row2Buttons.some(b => b.isEdit);
+                                  const hasDelete = row2Buttons.some(b => b.isDelete);
+                                  if (hasEdit && hasDelete) {
+                                    colSpan = "col-span-12"; // Takes full width if Edit and Delete already present
+                                  } else if (hasEdit) {
+                                    colSpan = "col-span-4"; // Shares remaining 4 cols with Edit's 8
+                                  } else if (hasDelete) {
+                                    colSpan = "col-span-8"; // Shares remaining 8 cols with Delete's 4
+                                  }
+                                }
+                                
+                                return (
+                                  <div key={`row2-${index}`} className={colSpan}>
+                                    {button.component}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       );
                     })()}
                   </div>
@@ -2947,24 +3011,84 @@ export default function MyTasks() {
                       }] : [])
                     ];
 
-                    const buttonCount = buttons.length;
+                    // Always 2 rows layout with specific grid distribution
+                    // Row 1: Close button (12 cols) or other buttons
+                    // Row 2: Edit (8 cols) + Delete (4 cols) = 12 cols total
                     
-                    // Professional responsive grid layout based on button count
-                    const getGridClasses = () => {
-                      if (buttonCount === 1) return "grid grid-cols-1 gap-3 sm:gap-4";
-                      if (buttonCount === 2) return "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4";
-                      if (buttonCount === 3) return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4";
-                      if (buttonCount === 4) return "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4";
-                      return "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4";
-                    };
+                    // Separate buttons into rows
+                    const row1Buttons = [];
+                    const row2Buttons = [];
+                    
+                    buttons.forEach((button) => {
+                      const buttonProps = button.component?.props || {};
+                      const onClickStr = buttonProps.onClick?.toString() || '';
+                      
+                      // Identify Edit button (calls openEditShared)
+                      const isEdit = onClickStr.includes('openEditShared');
+                      // Identify Delete button (destructive variant or calls onDeleteShared)
+                      const isDelete = buttonProps.variant === 'destructive' || 
+                                      onClickStr.includes('onDeleteShared') ||
+                                      (buttonProps.className && buttonProps.className.includes('border-red-200'));
+                      
+                      if (isEdit || isDelete) {
+                        // Edit and Delete always go to row 2
+                        row2Buttons.push({ ...button, isEdit, isDelete });
+                      } else {
+                        // All other buttons (Close, etc.) go to row 1
+                        row1Buttons.push(button);
+                      }
+                    });
 
                     return (
-                      <div className={getGridClasses()}>
-                        {buttons.map((button, index) => (
-                          <div key={index} className="flex">
-                            {button.component}
-                  </div>
-                        ))}
+                      <div className="space-y-3 sm:space-y-4">
+                        {/* Row 1: Close and other buttons (distribute evenly) */}
+                        {row1Buttons.length > 0 && (
+                          <div className="grid grid-cols-12 gap-3 sm:gap-4">
+                            {row1Buttons.map((button, index) => {
+                              // Distribute evenly
+                              const colSpan = row1Buttons.length === 1 ? "col-span-12" : 
+                                            row1Buttons.length === 2 ? "col-span-6" : 
+                                            "col-span-4";
+                              return (
+                                <div key={`row1-${index}`} className={colSpan}>
+                                  {button.component}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        
+                        {/* Row 2: Edit (8 cols) + Delete (4 cols) */}
+                        {row2Buttons.length > 0 && (
+                          <div className="grid grid-cols-12 gap-3 sm:gap-4">
+                            {row2Buttons.map((button, index) => {
+                              // Edit gets 8 cols, Delete gets 4 cols
+                              let colSpan = "col-span-12";
+                              if (button.isEdit) {
+                                colSpan = "col-span-8";
+                              } else if (button.isDelete) {
+                                colSpan = "col-span-4";
+                              } else {
+                                // Fallback for any other buttons in row 2
+                                const hasEdit = row2Buttons.some(b => b.isEdit);
+                                const hasDelete = row2Buttons.some(b => b.isDelete);
+                                if (hasEdit && hasDelete) {
+                                  colSpan = "col-span-12";
+                                } else if (hasEdit) {
+                                  colSpan = "col-span-4";
+                                } else if (hasDelete) {
+                                  colSpan = "col-span-8";
+                                }
+                              }
+                              
+                              return (
+                                <div key={`row2-${index}`} className={colSpan}>
+                                  {button.component}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}

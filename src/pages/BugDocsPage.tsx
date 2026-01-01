@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -48,6 +50,11 @@ import {
   X,
   Edit,
   Copy,
+  Shield,
+  Code,
+  TestTube,
+  Users,
+  CheckCircle2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -87,9 +94,9 @@ const BugDocsPage = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [documentToEdit, setDocumentToEdit] = useState<UserDocument | null>(null);
   const [editDocTitle, setEditDocTitle] = useState("");
-  const [editSelectedProjectId, setEditSelectedProjectId] = useState<string>("");
+  const [editSelectedProjectIds, setEditSelectedProjectIds] = useState<string[]>([]);
   const [editSelectedTemplateId, setEditSelectedTemplateId] = useState<string>("0");
-  const [editSelectedRole, setEditSelectedRole] = useState<string>("all");
+  const [editSelectedRoles, setEditSelectedRoles] = useState<string[]>(["all"]);
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Disconnect confirmation state
@@ -99,8 +106,10 @@ const BugDocsPage = () => {
   // Form state
   const [docTitle, setDocTitle] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("0");
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
-  const [selectedRole, setSelectedRole] = useState<string>("all");
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(["all"]);
+  const [projectSearchTerm, setProjectSearchTerm] = useState("");
+  const [editProjectSearchTerm, setEditProjectSearchTerm] = useState("");
 
   // Tab and filter state
   const [searchParams, setSearchParams] = useSearchParams();
@@ -113,8 +122,25 @@ const BugDocsPage = () => {
   const initialTab = searchParams.get("tab") || getDefaultTab();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
+  const [localSearchTerm, setLocalSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  
+  // Sync local search term with persisted search term
+  useEffect(() => {
+    setLocalSearchTerm(searchTerm);
+  }, [searchTerm]);
+  
+  // Debounced update to search term (prevents excessive re-renders)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearchTerm !== searchTerm) {
+        setSearchTerm(localSearchTerm);
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [localSearchTerm, searchTerm]);
 
   useEffect(() => {
     loadData();
@@ -340,6 +366,15 @@ const BugDocsPage = () => {
       return;
     }
 
+    if (selectedRoles.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select at least one role",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsCreating(true);
     try {
       // Convert selectedTemplateId to number, treat "0" as undefined (no template)
@@ -347,17 +382,22 @@ const BugDocsPage = () => {
         ? parseInt(selectedTemplateId)
         : undefined;
 
-      // Convert selectedProjectId - treat empty string as null (no project)
-      const projectId = selectedProjectId && selectedProjectId !== ""
-        ? selectedProjectId
+      // Convert selectedProjectIds array to comma-separated string (or null if empty)
+      const projectIdValue = selectedProjectIds.length > 0
+        ? selectedProjectIds.join(',')
         : null;
+
+      // Convert roles array to comma-separated string (or 'all' if only 'all' is selected)
+      const roleValue = selectedRoles.length === 1 && selectedRoles[0] === 'all' 
+        ? 'all' 
+        : selectedRoles.filter(r => r !== 'all').join(',');
 
       const result = await googleDocsService.createGeneralDocument(
         docTitle.trim(),
         templateId,
         'general',
-        projectId,
-        selectedRole
+        projectIdValue,
+        roleValue
       );
 
       toast({
@@ -374,8 +414,9 @@ const BugDocsPage = () => {
       // Reset form and close modal
       setDocTitle("");
       setSelectedTemplateId("0");
-      setSelectedProjectId("");
-      setSelectedRole("all");
+      setSelectedProjectIds([]);
+      setSelectedRoles(["all"]);
+      setProjectSearchTerm("");
       setIsCreateModalOpen(false);
     } catch (error: any) {
       toast({
@@ -396,11 +437,26 @@ const BugDocsPage = () => {
   const handleEditClick = (doc: UserDocument) => {
     setDocumentToEdit(doc);
     setEditDocTitle(doc.doc_title);
-    setEditSelectedProjectId(doc.project_id || "none");
+    // Parse comma-separated project IDs into array, or empty array if null/empty
+    const projectIdValue = doc.project_id || "";
+    const projectIdsArray = projectIdValue ? projectIdValue.split(",").map((p: string) => p.trim()) : [];
+    setEditSelectedProjectIds(projectIdsArray);
     // template_id might not be in the interface but exists in database
     setEditSelectedTemplateId((doc as any).template_id ? (doc as any).template_id.toString() : "0");
-    // role might not be in the interface but exists in database
-    setEditSelectedRole((doc as any).role || "all");
+    // Parse comma-separated roles into array, or default to ['all']
+    const roleValue = (doc as any).role || "all";
+    let rolesArray: string[];
+    if (!roleValue || roleValue === "all") {
+      rolesArray = ["all"];
+    } else {
+      // Split by comma and filter out empty strings
+      rolesArray = roleValue.split(",").map((r: string) => r.trim()).filter((r: string) => r.length > 0);
+      // If no valid roles after parsing, default to ['all']
+      if (rolesArray.length === 0) {
+        rolesArray = ["all"];
+      }
+    }
+    setEditSelectedRoles(rolesArray);
     setIsEditDialogOpen(true);
   };
 
@@ -408,9 +464,10 @@ const BugDocsPage = () => {
     setIsEditDialogOpen(false);
     setDocumentToEdit(null);
     setEditDocTitle("");
-    setEditSelectedProjectId("");
+    setEditSelectedProjectIds([]);
     setEditSelectedTemplateId("0");
-    setEditSelectedRole("all");
+    setEditSelectedRoles(["all"]);
+    setEditProjectSearchTerm("");
   };
 
   const handleEditConfirm = async () => {
@@ -423,18 +480,34 @@ const BugDocsPage = () => {
       return;
     }
 
+    if (editSelectedRoles.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select at least one role",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsUpdating(true);
     try {
       // Convert selected values
-      const projectId = editSelectedProjectId && editSelectedProjectId !== "none" ? editSelectedProjectId : null;
+      const projectIdValue = editSelectedProjectIds.length > 0
+        ? editSelectedProjectIds.join(',')
+        : null;
       const templateId = editSelectedTemplateId && editSelectedTemplateId !== "0" ? parseInt(editSelectedTemplateId) : null;
+      
+      // Convert roles array to comma-separated string (or 'all' if only 'all' is selected)
+      const roleValue = editSelectedRoles.length === 1 && editSelectedRoles[0] === 'all' 
+        ? 'all' 
+        : editSelectedRoles.filter(r => r !== 'all').join(',');
 
       await googleDocsService.updateDocument(
         documentToEdit.id,
         editDocTitle.trim(),
-        projectId,
+        projectIdValue,
         templateId,
-        editSelectedRole
+        roleValue
       );
 
       toast({
@@ -449,9 +522,9 @@ const BugDocsPage = () => {
       setIsEditDialogOpen(false);
       setDocumentToEdit(null);
       setEditDocTitle("");
-      setEditSelectedProjectId("");
+      setEditSelectedProjectIds([]);
       setEditSelectedTemplateId("0");
-      setEditSelectedRole("all");
+      setEditSelectedRoles(["all"]);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -536,25 +609,56 @@ const BugDocsPage = () => {
       case "admins":
         return {
           label: "Admins Only",
-          className: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800"
+          icon: <Shield className="h-3 w-3" />,
+          className: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
         };
       case "developers":
         return {
           label: "Developers Only",
+          icon: <Code className="h-3 w-3" />,
           className: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
         };
       case "testers":
         return {
           label: "Testers Only",
-          className: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+          icon: <TestTube className="h-3 w-3" />,
+          className: "bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800"
         };
       case "all":
       default:
         return {
           label: "All Users",
+          icon: <Users className="h-3 w-3" />,
           className: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
         };
     }
+  };
+
+  // Get all role badges for comma-separated roles
+  const getRoleBadges = (role: string | undefined) => {
+    if (!role || role === "all") {
+      return [getRoleBadge("all")];
+    }
+    
+    const roles = role.split(",").map(r => r.trim()).filter(r => r);
+    if (roles.length === 0) {
+      return [getRoleBadge("all")];
+    }
+    
+    return roles.map(r => getRoleBadge(r));
+  };
+
+  // Get project names for comma-separated project IDs
+  const getProjectNames = (projectId: string | null | undefined): string[] => {
+    if (!projectId) {
+      return [];
+    }
+    
+    const projectIds = projectId.split(",").map(id => id.trim()).filter(id => id);
+    return projectIds.map(id => {
+      const project = projects.find(p => p.id === id);
+      return project ? project.name : id;
+    });
   };
 
   // Filtered documents with useMemo - sorted by latest first
@@ -570,15 +674,15 @@ const BugDocsPage = () => {
       filtered = documents;
     }
 
-    // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
+    // Apply search filter (use localSearchTerm for immediate filtering)
+    const searchValue = localSearchTerm.toLowerCase();
+    if (searchValue) {
       filtered = filtered.filter(doc =>
-        doc.doc_title.toLowerCase().includes(searchLower) ||
-        doc.template_name?.toLowerCase().includes(searchLower) ||
-        doc.doc_type.toLowerCase().includes(searchLower) ||
-        doc.creator_name?.toLowerCase().includes(searchLower) ||
-        doc.project_name?.toLowerCase().includes(searchLower)
+        doc.doc_title.toLowerCase().includes(searchValue) ||
+        doc.template_name?.toLowerCase().includes(searchValue) ||
+        doc.doc_type.toLowerCase().includes(searchValue) ||
+        doc.creator_name?.toLowerCase().includes(searchValue) ||
+        doc.project_name?.toLowerCase().includes(searchValue)
       );
     }
 
@@ -610,13 +714,16 @@ const BugDocsPage = () => {
       });
     }
 
-    // Apply project filter
+    // Apply project filter (support comma-separated project IDs)
     if (projectFilter !== "all") {
       filtered = filtered.filter(doc => {
         if (projectFilter === "none") {
-          return !doc.project_id || doc.project_id === null;
+          return !doc.project_id || doc.project_id === null || doc.project_id === "";
         }
-        return doc.project_id === projectFilter;
+        // Check if the project ID is in the comma-separated list
+        if (!doc.project_id) return false;
+        const projectIds = doc.project_id.split(",").map(id => id.trim());
+        return projectIds.includes(String(projectFilter));
       });
     }
 
@@ -626,7 +733,7 @@ const BugDocsPage = () => {
       const dateB = new Date(b.created_at);
       return dateB.getTime() - dateA.getTime(); // Descending order (latest first)
     });
-  }, [documents, activeTab, searchTerm, dateFilter, projectFilter]);
+  }, [documents, activeTab, localSearchTerm, dateFilter, projectFilter]);
 
 
   // Get tab counts - use separate state variables for accurate counts
@@ -900,9 +1007,10 @@ const BugDocsPage = () => {
                           <input
                             type="text"
                             placeholder="Search documents..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            value={localSearchTerm}
+                            onChange={(e) => setLocalSearchTerm(e.target.value)}
                             className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                            autoComplete="off"
                           />
                         </div>
 
@@ -949,11 +1057,12 @@ const BugDocsPage = () => {
                           </div>
 
                           {/* Clear Filters Button */}
-                          {(searchTerm || dateFilter !== "all" || projectFilter !== "all") && (
+                          {(localSearchTerm || dateFilter !== "all" || projectFilter !== "all") && (
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => {
+                                setLocalSearchTerm("");
                                 setSearchTerm("");
                                 setDateFilter("all");
                                 setProjectFilter("all");
@@ -1038,31 +1147,53 @@ const BugDocsPage = () => {
                                 </div>
                               </div>
 
-                              {/* Role Badge - Top Right */}
-                              {(() => {
-                                const roleBadge = getRoleBadge((doc as any).role);
-                                return (
-                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border shadow-sm flex-shrink-0 ${roleBadge.className}`}>
-                                    <User className="h-3 w-3 mr-1" />
+                              {/* Role Badges - Top Right */}
+                              <div className="flex flex-wrap gap-1.5 justify-end">
+                                {getRoleBadges((doc as any).role).map((roleBadge, index) => (
+                                  <Badge
+                                    key={index}
+                                    variant="outline"
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold border shadow-sm ${roleBadge.className}`}
+                                  >
+                                    {roleBadge.icon}
                                     <span className="hidden sm:inline">{roleBadge.label}</span>
                                     <span className="sm:hidden">{roleBadge.label.split(' ')[0]}</span>
-                                  </span>
-                                );
-                              })()}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
 
                             {/* Document Details Grid */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
-                              {/* Project */}
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex-shrink-0">
+                              {/* Projects */}
+                              <div className="flex items-start gap-2">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex-shrink-0 mt-0.5">
                                   <FolderOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-xs text-gray-500 dark:text-gray-500 font-medium">Project</div>
-                                  <div className="font-semibold text-gray-900 dark:text-white truncate">
-                                    {doc.project_name || <span className="italic text-gray-400">No Project</span>}
-                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-500 font-medium mb-1">Projects</div>
+                                  {(() => {
+                                    const projectNames = getProjectNames(doc.project_id);
+                                    if (projectNames.length === 0) {
+                                      return (
+                                        <span className="italic text-gray-400 text-sm">No Project</span>
+                                      );
+                                    }
+                                    return (
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {projectNames.map((name, index) => (
+                                          <Badge
+                                            key={index}
+                                            variant="secondary"
+                                            className="text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                                          >
+                                            <FolderOpen className="h-3 w-3 mr-1" />
+                                            {name}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
 
@@ -1224,49 +1355,228 @@ const BugDocsPage = () => {
                     )}
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="project" className="text-sm font-medium">Project (Optional)</Label>
-                  <Select
-                    value={selectedProjectId || "none"}
-                    onValueChange={(value) => setSelectedProjectId(value === "none" ? "" : value)}
-                    disabled={isCreating}
-                  >
-                    <SelectTrigger id="project" className="w-full">
-                      <SelectValue placeholder="No project (general document)" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px] overflow-y-auto">
-                      <SelectItem value="none">No project (general document)</SelectItem>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Associate this document with a project for better organization
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="project" className="text-sm font-medium flex items-center gap-2">
+                      <FolderOpen className="h-4 w-4" />
+                      Project (Optional)
+                    </Label>
+                    {selectedProjectIds.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {selectedProjectIds.length} selected
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {/* Selected Projects Chips */}
+                  {selectedProjectIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
+                      {selectedProjectIds.map((projectId) => {
+                        const project = projects.find(p => p.id === projectId);
+                        if (!project) return null;
+                        return (
+                          <Badge
+                            key={projectId}
+                            variant="secondary"
+                            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
+                          >
+                            <FolderOpen className="h-3 w-3" />
+                            {project.name}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProjectIds(prev => prev.filter(id => id !== projectId))}
+                              className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                              disabled={isCreating}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Search Projects */}
+                  {projects.length > 3 && (
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search projects..."
+                        value={projectSearchTerm}
+                        onChange={(e) => setProjectSearchTerm(e.target.value)}
+                        className="pl-9 h-9"
+                        disabled={isCreating}
+                      />
+                    </div>
+                  )}
+
+                  {/* Projects List */}
+                  <div className="space-y-2 p-4 border rounded-lg bg-background max-h-[200px] overflow-y-auto">
+                    {projects.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <FolderOpen className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No projects available</p>
+                      </div>
+                    ) : (
+                      (() => {
+                        const filteredProjects = projectSearchTerm
+                          ? projects.filter(p => p.name.toLowerCase().includes(projectSearchTerm.toLowerCase()))
+                          : projects;
+                        
+                        if (filteredProjects.length === 0) {
+                          return (
+                            <div className="flex flex-col items-center justify-center py-6 text-center">
+                              <Search className="h-6 w-6 text-muted-foreground mb-2" />
+                              <p className="text-sm text-muted-foreground">No projects found</p>
+                            </div>
+                          );
+                        }
+
+                        return filteredProjects.map((project) => (
+                          <div
+                            key={project.id}
+                            className={`flex items-center space-x-3 p-2 rounded-md transition-colors ${
+                              selectedProjectIds.includes(project.id)
+                                ? "bg-primary/10 border border-primary/20"
+                                : "hover:bg-muted/50 border border-transparent"
+                            }`}
+                          >
+                            <Checkbox
+                              id={`project-${project.id}`}
+                              checked={selectedProjectIds.includes(project.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedProjectIds((prev) => [...prev, project.id]);
+                                } else {
+                                  setSelectedProjectIds((prev) => prev.filter(id => id !== project.id));
+                                }
+                              }}
+                              disabled={isCreating}
+                            />
+                            <label
+                              htmlFor={`project-${project.id}`}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
+                            >
+                              <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                              {project.name}
+                              {selectedProjectIds.includes(project.id) && (
+                                <CheckCircle2 className="h-4 w-4 text-primary" />
+                              )}
+                            </label>
+                          </div>
+                        ));
+                      })()
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <span>💡</span>
+                    <span>Select one or more projects to associate this document with</span>
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role" className="text-sm font-medium">Accessible to Roles *</Label>
-                  <Select
-                    value={selectedRole}
-                    onValueChange={setSelectedRole}
-                    disabled={isCreating}
-                  >
-                    <SelectTrigger id="role" className="w-full">
-                      <SelectValue placeholder="Select roles" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Users</SelectItem>
-                      <SelectItem value="admins">Admins Only</SelectItem>
-                      <SelectItem value="developers">Developers Only</SelectItem>
-                      <SelectItem value="testers">Testers Only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Specify which user roles can access this document
-                  </p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="role" className="text-sm font-medium flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      Accessible to Roles *
+                    </Label>
+                    {selectedRoles.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {selectedRoles.length} selected
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Selected Roles Chips */}
+                  {selectedRoles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
+                      {selectedRoles.map((roleValue) => {
+                        const roleMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                          all: { label: "All Users", icon: <Users className="h-3 w-3" />, color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300" },
+                          admins: { label: "Admins Only", icon: <Shield className="h-3 w-3" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300" },
+                          developers: { label: "Developers Only", icon: <Code className="h-3 w-3" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" },
+                          testers: { label: "Testers Only", icon: <TestTube className="h-3 w-3" />, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300" },
+                        };
+                        const role = roleMap[roleValue];
+                        if (!role) return null;
+                        return (
+                          <Badge
+                            key={roleValue}
+                            variant="outline"
+                            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.color}`}
+                          >
+                            {role.icon}
+                            {role.label}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRoles(prev => prev.filter(r => r !== roleValue))}
+                              className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                              disabled={isCreating}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Roles List */}
+                  <div className="space-y-2 p-4 border rounded-lg bg-background">
+                    {[
+                      { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
+                      { value: "admins", label: "Admins Only", icon: <Shield className="h-4 w-4" />, color: "text-purple-600 dark:text-purple-400" },
+                      { value: "developers", label: "Developers Only", icon: <Code className="h-4 w-4" />, color: "text-blue-600 dark:text-blue-400" },
+                      { value: "testers", label: "Testers Only", icon: <TestTube className="h-4 w-4" />, color: "text-pink-600 dark:text-pink-400" },
+                    ].map((role) => (
+                      <div
+                        key={role.value}
+                        className={`flex items-center space-x-3 p-2.5 rounded-md transition-colors ${
+                          selectedRoles.includes(role.value)
+                            ? "bg-primary/10 border border-primary/20"
+                            : "hover:bg-muted/50 border border-transparent"
+                        }`}
+                      >
+                        <Checkbox
+                          id={`role-${role.value}`}
+                          checked={selectedRoles.includes(role.value)}
+                          onCheckedChange={(checked) => {
+                            if (role.value === "all") {
+                              // If "All Users" is selected, clear other selections
+                              setSelectedRoles(checked ? ["all"] : []);
+                            } else {
+                              // If a specific role is selected, remove "all" and toggle the role
+                              if (checked) {
+                                setSelectedRoles((prev) => 
+                                  prev.filter(r => r !== "all").concat(role.value)
+                                );
+                              } else {
+                                setSelectedRoles((prev) => prev.filter(r => r !== role.value));
+                              }
+                            }
+                          }}
+                          disabled={isCreating}
+                        />
+                        <label
+                          htmlFor={`role-${role.value}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
+                        >
+                          <span className={role.color}>{role.icon}</span>
+                          {role.label}
+                          {selectedRoles.includes(role.value) && (
+                            <CheckCircle2 className="h-4 w-4 text-primary" />
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
+                    <p className="text-xs text-blue-900 dark:text-blue-100">
+                      <strong>Tip:</strong> Selecting "All Users" will automatically override other role selections. 
+                      For specific access, uncheck "All Users" and select individual roles.
+                    </p>
+                  </div>
                 </div>
               </div>
               <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
@@ -1358,46 +1668,228 @@ const BugDocsPage = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-project" className="text-sm font-medium">Project (Optional)</Label>
-                <Select
-                  value={editSelectedProjectId || "none"}
-                  onValueChange={(value) => setEditSelectedProjectId(value === "none" ? "" : value)}
-                  disabled={isUpdating}
-                >
-                  <SelectTrigger id="edit-project" className="w-full">
-                    <SelectValue placeholder="No project (general document)" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px] overflow-y-auto">
-                    <SelectItem value="none">No project (general document)</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-role" className="text-sm font-medium">Accessible to Roles *</Label>
-                <Select
-                  value={editSelectedRole}
-                  onValueChange={setEditSelectedRole}
-                  disabled={isUpdating}
-                >
-                  <SelectTrigger id="edit-role" className="w-full">
-                    <SelectValue placeholder="Select roles" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Users</SelectItem>
-                    <SelectItem value="admins">Admins Only</SelectItem>
-                    <SelectItem value="developers">Developers Only</SelectItem>
-                    <SelectItem value="testers">Testers Only</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Specify which user roles can access this document
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="edit-project" className="text-sm font-medium flex items-center gap-2">
+                    <FolderOpen className="h-4 w-4" />
+                    Project (Optional)
+                  </Label>
+                  {editSelectedProjectIds.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {editSelectedProjectIds.length} selected
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Selected Projects Chips */}
+                {editSelectedProjectIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
+                    {editSelectedProjectIds.map((projectId) => {
+                      const project = projects.find(p => p.id === projectId);
+                      if (!project) return null;
+                      return (
+                        <Badge
+                          key={projectId}
+                          variant="secondary"
+                          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
+                        >
+                          <FolderOpen className="h-3 w-3" />
+                          {project.name}
+                          <button
+                            type="button"
+                            onClick={() => setEditSelectedProjectIds(prev => prev.filter(id => id !== projectId))}
+                            className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                            disabled={isUpdating}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Search Projects */}
+                {projects.length > 3 && (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search projects..."
+                      value={editProjectSearchTerm}
+                      onChange={(e) => setEditProjectSearchTerm(e.target.value)}
+                      className="pl-9 h-9"
+                      disabled={isUpdating}
+                    />
+                  </div>
+                )}
+
+                {/* Projects List */}
+                <div className="space-y-2 p-4 border rounded-lg bg-background max-h-[200px] overflow-y-auto">
+                  {projects.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <FolderOpen className="h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">No projects available</p>
+                    </div>
+                  ) : (
+                    (() => {
+                      const filteredProjects = editProjectSearchTerm
+                        ? projects.filter(p => p.name.toLowerCase().includes(editProjectSearchTerm.toLowerCase()))
+                        : projects;
+                      
+                      if (filteredProjects.length === 0) {
+                        return (
+                          <div className="flex flex-col items-center justify-center py-6 text-center">
+                            <Search className="h-6 w-6 text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">No projects found</p>
+                          </div>
+                        );
+                      }
+
+                      return filteredProjects.map((project) => (
+                        <div
+                          key={project.id}
+                          className={`flex items-center space-x-3 p-2 rounded-md transition-colors ${
+                            editSelectedProjectIds.includes(project.id)
+                              ? "bg-primary/10 border border-primary/20"
+                              : "hover:bg-muted/50 border border-transparent"
+                          }`}
+                        >
+                          <Checkbox
+                            id={`edit-project-${project.id}`}
+                            checked={editSelectedProjectIds.includes(project.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setEditSelectedProjectIds((prev) => [...prev, project.id]);
+                              } else {
+                                setEditSelectedProjectIds((prev) => prev.filter(id => id !== project.id));
+                              }
+                            }}
+                            disabled={isUpdating}
+                          />
+                          <label
+                            htmlFor={`edit-project-${project.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
+                          >
+                            <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                            {project.name}
+                            {editSelectedProjectIds.includes(project.id) && (
+                              <CheckCircle2 className="h-4 w-4 text-primary" />
+                            )}
+                          </label>
+                        </div>
+                      ));
+                    })()
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <span>💡</span>
+                  <span>Select one or more projects to associate this document with</span>
                 </p>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="edit-role" className="text-sm font-medium flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Accessible to Roles *
+                  </Label>
+                  {editSelectedRoles.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {editSelectedRoles.length} selected
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Selected Roles Chips */}
+                {editSelectedRoles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
+                    {editSelectedRoles.map((roleValue) => {
+                      const roleMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                        all: { label: "All Users", icon: <Users className="h-3 w-3" />, color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300" },
+                        admins: { label: "Admins Only", icon: <Shield className="h-3 w-3" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300" },
+                        developers: { label: "Developers Only", icon: <Code className="h-3 w-3" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" },
+                        testers: { label: "Testers Only", icon: <TestTube className="h-3 w-3" />, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300" },
+                      };
+                      const role = roleMap[roleValue];
+                      if (!role) return null;
+                      return (
+                        <Badge
+                          key={roleValue}
+                          variant="outline"
+                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.color}`}
+                        >
+                          {role.icon}
+                          {role.label}
+                          <button
+                            type="button"
+                            onClick={() => setEditSelectedRoles(prev => prev.filter(r => r !== roleValue))}
+                            className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                            disabled={isUpdating}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Roles List */}
+                <div className="space-y-2 p-4 border rounded-lg bg-background">
+                  {[
+                    { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
+                    { value: "admins", label: "Admins Only", icon: <Shield className="h-4 w-4" />, color: "text-purple-600 dark:text-purple-400" },
+                    { value: "developers", label: "Developers Only", icon: <Code className="h-4 w-4" />, color: "text-blue-600 dark:text-blue-400" },
+                    { value: "testers", label: "Testers Only", icon: <TestTube className="h-4 w-4" />, color: "text-pink-600 dark:text-pink-400" },
+                  ].map((role) => (
+                    <div
+                      key={role.value}
+                      className={`flex items-center space-x-3 p-2.5 rounded-md transition-colors ${
+                        editSelectedRoles.includes(role.value)
+                          ? "bg-primary/10 border border-primary/20"
+                          : "hover:bg-muted/50 border border-transparent"
+                      }`}
+                    >
+                      <Checkbox
+                        id={`edit-role-${role.value}`}
+                        checked={editSelectedRoles.includes(role.value)}
+                        onCheckedChange={(checked) => {
+                          if (role.value === "all") {
+                            // If "All Users" is selected, clear other selections
+                            setEditSelectedRoles(checked ? ["all"] : []);
+                          } else {
+                            // If a specific role is selected, remove "all" and toggle the role
+                            if (checked) {
+                              setEditSelectedRoles((prev) => 
+                                prev.filter(r => r !== "all").concat(role.value)
+                              );
+                            } else {
+                              setEditSelectedRoles((prev) => prev.filter(r => r !== role.value));
+                            }
+                          }
+                        }}
+                        disabled={isUpdating}
+                      />
+                      <label
+                        htmlFor={`edit-role-${role.value}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
+                      >
+                        <span className={role.color}>{role.icon}</span>
+                        {role.label}
+                        {editSelectedRoles.includes(role.value) && (
+                          <CheckCircle2 className="h-4 w-4 text-primary" />
+                        )}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
+                  <p className="text-xs text-blue-900 dark:text-blue-100">
+                    <strong>Tip:</strong> Selecting "All Users" will automatically override other role selections. 
+                    For specific access, uncheck "All Users" and select individual roles.
+                  </p>
+                </div>
               </div>
             </div>
             <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
