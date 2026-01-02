@@ -304,7 +304,7 @@ export default function Notifications() {
                         </>
                       )}
                     </Button>
-                    <Button 
+                    {/* <Button 
                       variant="outline"
                       onClick={() => setShowClearDialog(true)}
                       disabled={notifications.length === 0 || isClearing}
@@ -321,7 +321,7 @@ export default function Notifications() {
                           Clear all
                         </>
                       )}
-                    </Button>
+                    </Button> */}
                   </div>
                 )}
                 

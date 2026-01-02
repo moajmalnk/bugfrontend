@@ -6,6 +6,7 @@ export interface Announcement {
   content: string;
   is_active: number;
   expiry_date: string | null;
+  role: string | null;
   created_at: string;
   last_broadcast_at: string | null;
 }

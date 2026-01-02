@@ -31,11 +31,11 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
-import { googleDocsService, UserDocument, Template } from "@/services/googleDocsService";
+import { googleSheetsService, UserSheet, Template } from "@/services/googleSheetsService";
 import { projectService } from "@/services/projectService";
 import { ProjectCardsGrid, ProjectWithCount } from "@/components/docs/ProjectCardsGrid";
 import {
-  FileText,
+  FileSpreadsheet,
   Plus,
   ExternalLink,
   Trash2,
@@ -58,23 +58,23 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-const BugDocsPage = () => {
+const BugSheetsPage = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const userRole = currentUser ? getEffectiveRole(currentUser) : 'user';
   const isAdmin = userRole === 'admin';
   const isDevOrTester = userRole === 'developer' || userRole === 'tester';
 
-  const [documents, setDocuments] = useState<UserDocument[]>([]);
-  const [allDocumentsGrouped, setAllDocumentsGrouped] = useState<Array<{
+  const [sheets, setSheets] = useState<UserSheet[]>([]);
+  const [allSheetsGrouped, setAllSheetsGrouped] = useState<Array<{
     project_id: string | null;
     project_name: string;
-    documents: UserDocument[];
+    sheets: UserSheet[];
   }>>([]);
   // Separate counts for each tab to fix tab count display
-  const [myDocsCount, setMyDocsCount] = useState<number>(0);
-  const [allDocsCount, setAllDocsCount] = useState<number>(0);
-  const [sharedDocsCount, setSharedDocsCount] = useState<number>(0);
+  const [mySheetsCount, setMySheetsCount] = useState<number>(0);
+  const [allSheetsCount, setAllSheetsCount] = useState<number>(0);
+  const [sharedSheetsCount, setSharedSheetsCount] = useState<number>(0);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [projects, setProjects] = useState<ProjectWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,12 +88,12 @@ const BugDocsPage = () => {
 
   // Delete confirmation state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [documentToDelete, setDocumentToDelete] = useState<UserDocument | null>(null);
+  const [sheetToDelete, setSheetToDelete] = useState<UserSheet | null>(null);
 
-  // Edit document state
+  // Edit sheet state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [documentToEdit, setDocumentToEdit] = useState<UserDocument | null>(null);
-  const [editDocTitle, setEditDocTitle] = useState("");
+  const [sheetToEdit, setSheetToEdit] = useState<UserSheet | null>(null);
+  const [editSheetTitle, setEditSheetTitle] = useState("");
   const [editSelectedProjectIds, setEditSelectedProjectIds] = useState<string[]>([]);
   const [editSelectedTemplateId, setEditSelectedTemplateId] = useState<string>("0");
   const [editSelectedRoles, setEditSelectedRoles] = useState<string[]>(["all"]);
@@ -104,7 +104,7 @@ const BugDocsPage = () => {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   // Form state
-  const [docTitle, setDocTitle] = useState("");
+  const [sheetTitle, setSheetTitle] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("0");
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(["all"]);
@@ -115,9 +115,9 @@ const BugDocsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Set default tab based on role
   const getDefaultTab = () => {
-    if (isAdmin) return "all-docs";
-    if (isDevOrTester) return "shared-docs";
-    return "my-docs";
+    if (isAdmin) return "all-sheets";
+    if (isDevOrTester) return "shared-sheets";
+    return "my-sheets";
   };
   const initialTab = searchParams.get("tab") || getDefaultTab();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -146,31 +146,31 @@ const BugDocsPage = () => {
     loadData();
   }, []);
 
-  // Load documents when connection status changes to true
+  // Load sheets when connection status changes to true
   useEffect(() => {
-    if (isConnected && documents.length === 0 && !isLoading) {
-      console.log('🔄 Connection became true, refreshing documents...');
-      refreshDocuments();
+    if (isConnected && sheets.length === 0 && !isLoading) {
+      console.log('🔄 Connection became true, refreshing sheets...');
+      refreshSheets();
     }
   }, [isConnected]);
 
-  // Reload documents when tab changes
+  // Reload sheets when tab changes
   useEffect(() => {
     if (isConnected && !isCheckingConnection) {
-      loadDocuments();
+      loadSheets();
     }
   }, [activeTab, isConnected]);
 
-  // Debug document count changes
+  // Debug sheet count changes
   useEffect(() => {
-    console.log('📊 Document count changed:', documents.length);
-  }, [documents.length]);
+    console.log('📊 Sheet count changed:', sheets.length);
+  }, [sheets.length]);
 
   const loadProjects = async () => {
     setIsLoadingProjects(true);
     try {
-      const projsWithCounts = await googleDocsService.getProjectsWithDocumentCounts();
-      setProjects(projsWithCounts);
+      const projsWithCounts = await googleSheetsService.getProjectsWithSheetCounts();
+      setProjects(projsWithCounts.map(p => ({ ...p, document_count: p.sheet_count })));
     } catch (error: any) {
       console.error("Error loading projects:", error);
       // Fallback to regular project service
@@ -196,16 +196,16 @@ const BugDocsPage = () => {
       // Check connection first
       const connected = await checkConnection();
       console.log('🔗 Connection result:', connected);
-      // Load documents and templates if connected
+      // Load sheets and templates if connected
       if (connected) {
-        console.log('📄 Loading documents and templates...');
+        console.log('📄 Loading sheets and templates...');
         // Preload all tab counts first for accurate badge numbers
         await preloadAllTabCounts();
-        // Then load documents for the active tab
-        await Promise.all([loadDocuments(), loadTemplates()]);
-        console.log('✅ Documents and templates loaded');
+        // Then load sheets for the active tab
+        await Promise.all([loadSheets(), loadTemplates()]);
+        console.log('✅ Sheets and templates loaded');
       } else {
-        console.log('❌ Not connected, skipping document load');
+        console.log('❌ Not connected, skipping sheet load');
       }
     } catch (error) {
       console.error("❌ Error loading data:", error);
@@ -218,14 +218,14 @@ const BugDocsPage = () => {
 
   const checkConnection = async () => {
     try {
-      console.log('Checking Google Docs connection...');
-      const result = await googleDocsService.checkConnection();
+      console.log('Checking Google Sheets connection...');
+      const result = await googleSheetsService.checkConnection();
       console.log('Connection status:', result);
       setIsConnected(result.connected);
       setConnectedEmail(result.email || null);
       return result.connected;
     } catch (error) {
-      console.error('Failed to check Google Docs connection:', error);
+      console.error('Failed to check Google Sheets connection:', error);
       setIsConnected(false);
       setConnectedEmail(null);
       return false;
@@ -235,7 +235,7 @@ const BugDocsPage = () => {
   const handleDisconnect = async () => {
     setIsDisconnecting(true);
     try {
-      await googleDocsService.disconnect();
+      await googleSheetsService.disconnect();
       setIsConnected(false);
       setConnectedEmail(null);
       setShowDisconnectDialog(false);
@@ -243,8 +243,8 @@ const BugDocsPage = () => {
         title: "Disconnected",
         description: "Google account has been disconnected successfully.",
       });
-      // Refresh documents list to clear any cached data
-      await loadDocuments();
+      // Refresh sheets list to clear any cached data
+      await loadSheets();
     } catch (error: any) {
       console.error('Failed to disconnect:', error);
       toast({
@@ -257,7 +257,7 @@ const BugDocsPage = () => {
     }
   };
 
-  const handleConnectGoogleDocs = () => {
+  const handleConnectGoogleSheets = () => {
     // Get JWT token to pass as state parameter (check sessionStorage first for impersonation tokens)
     const token = sessionStorage.getItem('token') || localStorage.getItem('token');
 
@@ -269,29 +269,29 @@ const BugDocsPage = () => {
 
     // Navigate to Google OAuth with JWT token and return URL as state
     // In impersonation mode, the token's user_id is the impersonated user's ID
-    const authUrl = googleDocsService.getAuthUrl(token, returnUrl);
+    const authUrl = googleSheetsService.getAuthUrl(token, returnUrl);
     window.location.href = authUrl;
   };
 
   // Preload all tab counts for accurate tab badge numbers
   const preloadAllTabCounts = async () => {
     try {
-      // Load My Docs count
-      const myDocs = await googleDocsService.listGeneralDocuments();
-      setMyDocsCount(myDocs.length);
+      // Load My Sheets count
+      const mySheets = await googleSheetsService.listGeneralSheets();
+      setMySheetsCount(mySheets.length);
 
-      // Load All Docs count (admin only)
+      // Load All Sheets count (admin only)
       if (isAdmin) {
-        const allDocsResult = await googleDocsService.getAllDocuments();
-        const allDocs = allDocsResult.documents.flatMap(group => group.documents);
-        setAllDocsCount(allDocs.length);
-        setAllDocumentsGrouped(allDocsResult.documents);
+        const allSheetsResult = await googleSheetsService.getAllSheets();
+        const allSheets = allSheetsResult.sheets.flatMap(group => group.sheets);
+        setAllSheetsCount(allSheets.length);
+        setAllSheetsGrouped(allSheetsResult.sheets);
       }
 
-      // Load Shared Docs count (developer/tester only)
+      // Load Shared Sheets count (developer/tester only)
       if (isDevOrTester) {
-        const sharedDocs = await googleDocsService.getSharedDocuments();
-        setSharedDocsCount(sharedDocs.length);
+        const sharedSheets = await googleSheetsService.getSharedSheets();
+        setSharedSheetsCount(sharedSheets.length);
       }
     } catch (error: any) {
       console.error("Error preloading tab counts:", error);
@@ -299,34 +299,34 @@ const BugDocsPage = () => {
     }
   };
 
-  const loadDocuments = async () => {
+  const loadSheets = async () => {
     try {
-      let docs: UserDocument[] = [];
+      let sheetsList: UserSheet[] = [];
 
-      if (activeTab === "my-docs") {
-        // Load user's own documents
-        docs = await googleDocsService.listGeneralDocuments();
-        setMyDocsCount(docs.length);
-      } else if (activeTab === "all-docs" && isAdmin) {
-        // Load all documents from all users (admins, developers, testers, and others) grouped by project
-        const result = await googleDocsService.getAllDocuments();
-        setAllDocumentsGrouped(result.documents);
+      if (activeTab === "my-sheets") {
+        // Load user's own sheets
+        sheetsList = await googleSheetsService.listGeneralSheets();
+        setMySheetsCount(sheetsList.length);
+      } else if (activeTab === "all-sheets" && isAdmin) {
+        // Load all sheets from all users (admins, developers, testers, and others) grouped by project
+        const result = await googleSheetsService.getAllSheets();
+        setAllSheetsGrouped(result.sheets);
         // Flatten for display
-        docs = result.documents.flatMap(group => group.documents);
-        setAllDocsCount(docs.length);
-      } else if (activeTab === "shared-docs" && isDevOrTester) {
-        // Load shared documents (from projects user is member of)
-        docs = await googleDocsService.getSharedDocuments();
-        setSharedDocsCount(docs.length);
+        sheetsList = result.sheets.flatMap(group => group.sheets);
+        setAllSheetsCount(sheetsList.length);
+      } else if (activeTab === "shared-sheets" && isDevOrTester) {
+        // Load shared sheets (from projects user is member of)
+        sheetsList = await googleSheetsService.getSharedSheets();
+        setSharedSheetsCount(sheetsList.length);
       }
 
-      setDocuments(docs);
-      console.log(`Loaded ${docs.length} documents for tab: ${activeTab}`);
+      setSheets(sheetsList);
+      console.log(`Loaded ${sheetsList.length} sheets for tab: ${activeTab}`);
     } catch (error: any) {
-      console.error("Error loading documents:", error);
+      console.error("Error loading sheets:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to load documents",
+        description: error.message || "Failed to load sheets",
         variant: "destructive",
       });
     }
@@ -334,7 +334,7 @@ const BugDocsPage = () => {
 
   const loadTemplates = async () => {
     try {
-      const temps = await googleDocsService.listTemplates();
+      const temps = await googleSheetsService.listTemplates();
       setTemplates(temps);
     } catch (error: any) {
       toast({
@@ -345,22 +345,22 @@ const BugDocsPage = () => {
     }
   };
 
-  const refreshDocuments = async () => {
-    console.log('🔄 Refreshing documents, isConnected:', isConnected);
+  const refreshSheets = async () => {
+    console.log('🔄 Refreshing sheets, isConnected:', isConnected);
     if (isConnected) {
       // Refresh all tab counts and then load current tab
       await preloadAllTabCounts();
-      await loadDocuments();
+      await loadSheets();
     } else {
-      console.log('❌ Not connected, cannot refresh documents');
+      console.log('❌ Not connected, cannot refresh sheets');
     }
   };
 
-  const handleCreateDocument = async () => {
-    if (!docTitle.trim()) {
+  const handleCreateSheet = async () => {
+    if (!sheetTitle.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please enter a document title",
+        description: "Please enter a sheet title",
         variant: "destructive",
       });
       return;
@@ -392,8 +392,8 @@ const BugDocsPage = () => {
         ? 'all' 
         : selectedRoles.filter(r => r !== 'all').join(',');
 
-      const result = await googleDocsService.createGeneralDocument(
-        docTitle.trim(),
+      const result = await googleSheetsService.createGeneralSheet(
+        sheetTitle.trim(),
         templateId,
         'general',
         projectIdValue,
@@ -402,17 +402,17 @@ const BugDocsPage = () => {
 
       toast({
         title: "Success!",
-        description: `Document "${result.document_title}" created successfully.`,
+        description: `Sheet "${result.sheet_title}" created successfully.`,
       });
 
-      // Open the document in a new tab
-      googleDocsService.openDocument(result.document_url);
+      // Open the sheet in a new tab
+      googleSheetsService.openSheet(result.sheet_url);
 
-      // Reload documents list
-      await refreshDocuments();
+      // Reload sheets list
+      await refreshSheets();
 
       // Reset form and close modal
-      setDocTitle("");
+      setSheetTitle("");
       setSelectedTemplateId("0");
       setSelectedProjectIds([]);
       setSelectedRoles(["all"]);
@@ -421,7 +421,7 @@ const BugDocsPage = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to create document",
+        description: error.message || "Failed to create sheet",
         variant: "destructive",
       });
     } finally {
@@ -429,22 +429,22 @@ const BugDocsPage = () => {
     }
   };
 
-  const handleDeleteClick = (doc: UserDocument) => {
-    setDocumentToDelete(doc);
+  const handleDeleteClick = (sheet: UserSheet) => {
+    setSheetToDelete(sheet);
     setIsDeleteDialogOpen(true);
   };
 
-  const handleEditClick = (doc: UserDocument) => {
-    setDocumentToEdit(doc);
-    setEditDocTitle(doc.doc_title);
+  const handleEditClick = (sheet: UserSheet) => {
+    setSheetToEdit(sheet);
+    setEditSheetTitle(sheet.sheet_title);
     // Parse comma-separated project IDs into array, or empty array if null/empty
-    const projectIdValue = doc.project_id || "";
+    const projectIdValue = sheet.project_id || "";
     const projectIdsArray = projectIdValue ? projectIdValue.split(",").map((p: string) => p.trim()) : [];
     setEditSelectedProjectIds(projectIdsArray);
     // template_id might not be in the interface but exists in database
-    setEditSelectedTemplateId((doc as any).template_id ? (doc as any).template_id.toString() : "0");
+    setEditSelectedTemplateId((sheet as any).template_id ? (sheet as any).template_id.toString() : "0");
     // Parse comma-separated roles into array, or default to ['all']
-    const roleValue = (doc as any).role || "all";
+    const roleValue = (sheet as any).role || "all";
     let rolesArray: string[];
     if (!roleValue || roleValue === "all") {
       rolesArray = ["all"];
@@ -462,8 +462,8 @@ const BugDocsPage = () => {
 
   const handleEditCancel = () => {
     setIsEditDialogOpen(false);
-    setDocumentToEdit(null);
-    setEditDocTitle("");
+    setSheetToEdit(null);
+    setEditSheetTitle("");
     setEditSelectedProjectIds([]);
     setEditSelectedTemplateId("0");
     setEditSelectedRoles(["all"]);
@@ -471,10 +471,10 @@ const BugDocsPage = () => {
   };
 
   const handleEditConfirm = async () => {
-    if (!documentToEdit || !editDocTitle.trim()) {
+    if (!sheetToEdit || !editSheetTitle.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please enter a document title",
+        description: "Please enter a sheet title",
         variant: "destructive",
       });
       return;
@@ -502,9 +502,9 @@ const BugDocsPage = () => {
         ? 'all' 
         : editSelectedRoles.filter(r => r !== 'all').join(',');
 
-      await googleDocsService.updateDocument(
-        documentToEdit.id,
-        editDocTitle.trim(),
+      await googleSheetsService.updateSheet(
+        sheetToEdit.id,
+        editSheetTitle.trim(),
         projectIdValue,
         templateId,
         roleValue
@@ -512,23 +512,23 @@ const BugDocsPage = () => {
 
       toast({
         title: "Success",
-        description: `Document updated successfully.`,
+        description: `Sheet updated successfully.`,
       });
 
-      // Reload documents list
-      await refreshDocuments();
+      // Reload sheets list
+      await refreshSheets();
 
       // Close dialog and reset state
       setIsEditDialogOpen(false);
-      setDocumentToEdit(null);
-      setEditDocTitle("");
+      setSheetToEdit(null);
+      setEditSheetTitle("");
       setEditSelectedProjectIds([]);
       setEditSelectedTemplateId("0");
       setEditSelectedRoles(["all"]);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to update document",
+        description: error.message || "Failed to update sheet",
         variant: "destructive",
       });
     } finally {
@@ -537,27 +537,27 @@ const BugDocsPage = () => {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!documentToDelete) return;
+    if (!sheetToDelete) return;
 
-    setIsDeleting(documentToDelete.id);
+    setIsDeleting(sheetToDelete.id);
     try {
-      await googleDocsService.deleteDocument(documentToDelete.id);
+      await googleSheetsService.deleteSheet(sheetToDelete.id);
 
       toast({
         title: "Success",
-        description: `Document "${documentToDelete.doc_title}" deleted successfully.`,
+        description: `Sheet "${sheetToDelete.sheet_title}" deleted successfully.`,
       });
 
-      // Reload documents list
-      await refreshDocuments();
+      // Reload sheets list
+      await refreshSheets();
 
       // Close dialog
       setIsDeleteDialogOpen(false);
-      setDocumentToDelete(null);
+      setSheetToDelete(null);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete document",
+        description: error.message || "Failed to delete sheet",
         variant: "destructive",
       });
     } finally {
@@ -567,19 +567,19 @@ const BugDocsPage = () => {
 
   const handleDeleteCancel = () => {
     setIsDeleteDialogOpen(false);
-    setDocumentToDelete(null);
+    setSheetToDelete(null);
   };
 
-  const handleViewDocument = (doc: UserDocument) => {
-    googleDocsService.openDocument(doc.google_doc_url);
+  const handleViewSheet = (sheet: UserSheet) => {
+    googleSheetsService.openSheet(sheet.google_sheet_url);
   };
 
-  const handleCopyDocumentUrl = async (doc: UserDocument) => {
+  const handleCopySheetUrl = async (sheet: UserSheet) => {
     try {
-      await navigator.clipboard.writeText(doc.google_doc_url);
+      await navigator.clipboard.writeText(sheet.google_sheet_url);
       toast({
         title: "Link copied",
-        description: "Document URL has been copied to clipboard.",
+        description: "Sheet URL has been copied to clipboard.",
       });
     } catch (error) {
       toast({
@@ -590,15 +590,15 @@ const BugDocsPage = () => {
     }
   };
 
-  const getDocTypeIcon = (docType: string) => {
-    switch (docType) {
+  const getSheetTypeIcon = (sheetType: string) => {
+    switch (sheetType) {
       case "meeting":
         return "📋";
       case "technical":
         return "⚙️";
       case "general":
       default:
-        return "📄";
+        return "📊";
     }
   };
 
@@ -667,28 +667,28 @@ const BugDocsPage = () => {
     });
   };
 
-  // Filtered documents with useMemo - sorted by latest first
-  const filteredDocuments = useMemo(() => {
-    let filtered = [...documents];
+  // Filtered sheets with useMemo - sorted by latest first
+  const filteredSheets = useMemo(() => {
+    let filtered = [...sheets];
 
     // Filter by tab
-    if (activeTab === "my-docs") {
-      // For now, show all documents in both tabs
+    if (activeTab === "my-sheets") {
+      // For now, show all sheets in both tabs
       // In the future, this could filter by user ownership
-      filtered = documents;
-    } else if (activeTab === "all-docs") {
-      filtered = documents;
+      filtered = sheets;
+    } else if (activeTab === "all-sheets") {
+      filtered = sheets;
     }
 
     // Apply search filter (use localSearchTerm for immediate filtering)
     const searchValue = localSearchTerm.toLowerCase();
     if (searchValue) {
-      filtered = filtered.filter(doc =>
-        doc.doc_title.toLowerCase().includes(searchValue) ||
-        doc.template_name?.toLowerCase().includes(searchValue) ||
-        doc.doc_type.toLowerCase().includes(searchValue) ||
-        doc.creator_name?.toLowerCase().includes(searchValue) ||
-        doc.project_name?.toLowerCase().includes(searchValue)
+      filtered = filtered.filter(sheet =>
+        sheet.sheet_title.toLowerCase().includes(searchValue) ||
+        sheet.template_name?.toLowerCase().includes(searchValue) ||
+        sheet.sheet_type.toLowerCase().includes(searchValue) ||
+        sheet.creator_name?.toLowerCase().includes(searchValue) ||
+        sheet.project_name?.toLowerCase().includes(searchValue)
       );
     }
 
@@ -703,17 +703,17 @@ const BugDocsPage = () => {
       const thisMonth = new Date(today);
       thisMonth.setMonth(thisMonth.getMonth() - 1);
 
-      filtered = filtered.filter(doc => {
-        const docDate = new Date(doc.created_at);
+      filtered = filtered.filter(sheet => {
+        const sheetDate = new Date(sheet.created_at);
         switch (dateFilter) {
           case "today":
-            return docDate >= today;
+            return sheetDate >= today;
           case "yesterday":
-            return docDate >= yesterday && docDate < today;
+            return sheetDate >= yesterday && sheetDate < today;
           case "this-week":
-            return docDate >= thisWeek;
+            return sheetDate >= thisWeek;
           case "this-month":
-            return docDate >= thisMonth;
+            return sheetDate >= thisMonth;
           default:
             return true;
         }
@@ -722,35 +722,35 @@ const BugDocsPage = () => {
 
     // Apply project filter (support comma-separated project IDs)
     if (projectFilter !== "all") {
-      filtered = filtered.filter(doc => {
+      filtered = filtered.filter(sheet => {
         if (projectFilter === "none") {
-          return !doc.project_id || doc.project_id === null || doc.project_id === "";
+          return !sheet.project_id || sheet.project_id === null || sheet.project_id === "";
         }
         // Check if the project ID is in the comma-separated list
-        if (!doc.project_id) return false;
-        const projectIds = doc.project_id.split(",").map(id => id.trim());
+        if (!sheet.project_id) return false;
+        const projectIds = sheet.project_id.split(",").map(id => id.trim());
         return projectIds.includes(String(projectFilter));
       });
     }
 
-    // Sort by latest first (newest documents at the top)
+    // Sort by latest first (newest sheets at the top)
     return filtered.sort((a, b) => {
       const dateA = new Date(a.created_at);
       const dateB = new Date(b.created_at);
       return dateB.getTime() - dateA.getTime(); // Descending order (latest first)
     });
-  }, [documents, activeTab, localSearchTerm, dateFilter, projectFilter]);
+  }, [sheets, activeTab, localSearchTerm, dateFilter, projectFilter]);
 
 
   // Get tab counts - use separate state variables for accurate counts
   const getTabCount = (tabType: string) => {
     switch (tabType) {
-      case "all-docs":
-        return isAdmin ? allDocsCount : 0;
-      case "shared-docs":
-        return isDevOrTester ? sharedDocsCount : 0;
-      case "my-docs":
-        return myDocsCount;
+      case "all-sheets":
+        return isAdmin ? allSheetsCount : 0;
+      case "shared-sheets":
+        return isDevOrTester ? sharedSheetsCount : 0;
+      case "my-sheets":
+        return mySheetsCount;
       default:
         return 0;
     }
@@ -758,19 +758,19 @@ const BugDocsPage = () => {
 
   // Check if should show project cards
   const shouldShowProjectCards = () => {
-    // Disabled: Show document list instead of project cards for better visibility
-    // Admins can see all documents directly in the "All Docs" tab
+    // Disabled: Show sheet list instead of project cards for better visibility
+    // Admins can see all sheets directly in the "All Sheets" tab
     return false;
   };
 
-  // Filter projects to only show those with documents
-  const projectsWithDocuments = useMemo(() => {
+  // Filter projects to only show those with sheets
+  const projectsWithSheets = useMemo(() => {
     return projects.filter(project => (project.document_count || 0) > 0);
   }, [projects]);
 
   // Keep tab in sync with URL changes (back/forward navigation)
   useEffect(() => {
-    const urlTab = searchParams.get("tab") || "all-docs";
+    const urlTab = searchParams.get("tab") || "all-sheets";
     if (urlTab !== activeTab) setActiveTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -785,18 +785,18 @@ const BugDocsPage = () => {
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
-                    <FileText className="h-6 w-6 text-white" />
+                  <div className="p-2 bg-gradient-to-br from-green-500 to-blue-600 rounded-xl shadow-lg">
+                    <FileSpreadsheet className="h-6 w-6 text-white" />
                   </div>
                   <div>
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
-                      BugDocs
+                      BugSheets
                     </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-orange-500 to-red-600 rounded-full mt-2"></div>
+                    <div className="h-1 w-20 bg-gradient-to-r from-green-500 to-blue-600 rounded-full mt-2"></div>
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Manage your Documents and templates
+                  Manage your Sheets and templates
                 </p>
               </div>
 
@@ -829,23 +829,23 @@ const BugDocsPage = () => {
                     <Button
                       onClick={() => setIsCreateModalOpen(true)}
                       size="lg"
-                      className="w-full xs:w-auto h-11 sm:h-12 px-4 sm:px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
+                      className="w-full xs:w-auto h-11 sm:h-12 px-4 sm:px-6 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
                     >
                       <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                      <span className="whitespace-nowrap">New Doc</span>
+                      <span className="whitespace-nowrap">New Sheet</span>
                     </Button>
                   </>
                 )}
 
                 {isConnected && (
                   <div className="flex items-center justify-center xs:justify-start gap-4">
-                    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
-                      <div className="p-1 sm:p-1.5 bg-orange-500 rounded-lg shrink-0">
-                        <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/30 dark:to-blue-950/30 border border-green-200 dark:border-green-800 rounded-xl shadow-sm">
+                      <div className="p-1 sm:p-1.5 bg-green-500 rounded-lg shrink-0">
+                        <FileSpreadsheet className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                       </div>
                       <div>
-                        <div className="text-xl sm:text-2xl font-bold text-orange-700 dark:text-orange-300">
-                          {documents.length}
+                        <div className="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-300">
+                          {sheets.length}
                         </div>
                       </div>
                     </div>
@@ -864,7 +864,7 @@ const BugDocsPage = () => {
             <DialogHeader>
               <DialogTitle>Disconnect Google Account?</DialogTitle>
               <DialogDescription>
-                Are you sure you want to disconnect your Google account? This will revoke access to Google Docs and you won't be able to create or manage documents until you reconnect.
+                Are you sure you want to disconnect your Google account? This will revoke access to Google Sheets and you won't be able to create or manage sheets until you reconnect.
               </DialogDescription>
             </DialogHeader>
             {connectedEmail && (
@@ -901,7 +901,7 @@ const BugDocsPage = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Documents Tabs */}
+        {/* Sheets Tabs */}
         {!isCheckingConnection && (
           <Tabs
             value={activeTab}
@@ -916,56 +916,56 @@ const BugDocsPage = () => {
             className="w-full"
           >
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-orange-50/50 dark:from-gray-800/50 dark:to-orange-900/50 rounded-2xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-green-50/50 dark:from-gray-800/50 dark:to-green-900/50 rounded-2xl"></div>
               <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
                 <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-2' : 'grid-cols-2'} h-12 sm:h-14 bg-transparent p-1 gap-1`}>
                   {isAdmin ? (
                     <>
                       <TabsTrigger
-                        value="all-docs"
+                        value="all-sheets"
                         className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 sm:px-4"
                       >
-                        <FileText className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
-                        <span className="hidden xs:inline">All Docs</span>
+                        <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
+                        <span className="hidden xs:inline">All Sheets</span>
                         <span className="xs:hidden">All</span>
-                        <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-[10px] sm:text-xs font-bold">
-                          {getTabCount("all-docs")}
+                        <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-[10px] sm:text-xs font-bold">
+                          {getTabCount("all-sheets")}
                         </span>
                       </TabsTrigger>
                       <TabsTrigger
-                        value="my-docs"
+                        value="my-sheets"
                         className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 sm:px-4"
                       >
                         <User className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
-                        <span className="hidden xs:inline">My Docs</span>
+                        <span className="hidden xs:inline">My Sheets</span>
                         <span className="xs:hidden">My</span>
                         <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-[10px] sm:text-xs font-bold">
-                          {getTabCount("my-docs")}
+                          {getTabCount("my-sheets")}
                         </span>
                       </TabsTrigger>
                     </>
                   ) : (
                     <>
                       <TabsTrigger
-                        value="shared-docs"
+                        value="shared-sheets"
                         className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 sm:px-4"
                       >
                         <FolderOpen className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
-                        <span className="hidden xs:inline">Shared Docs</span>
+                        <span className="hidden xs:inline">Shared Sheets</span>
                         <span className="xs:hidden">Shared</span>
                         <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-[10px] sm:text-xs font-bold">
-                          {getTabCount("shared-docs")}
+                          {getTabCount("shared-sheets")}
                         </span>
                       </TabsTrigger>
                       <TabsTrigger
-                        value="my-docs"
+                        value="my-sheets"
                         className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 sm:px-4"
                       >
                         <User className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
-                        <span className="hidden xs:inline">My Docs</span>
+                        <span className="hidden xs:inline">My Sheets</span>
                         <span className="xs:hidden">My</span>
                         <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-[10px] sm:text-xs font-bold">
-                          {getTabCount("my-docs")}
+                          {getTabCount("my-sheets")}
                         </span>
                       </TabsTrigger>
                     </>
@@ -975,7 +975,7 @@ const BugDocsPage = () => {
             </div>
 
             <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
-              {/* Project Cards View (Admin - All Docs) */}
+              {/* Project Cards View (Admin - All Sheets) */}
               {shouldShowProjectCards() && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -984,10 +984,10 @@ const BugDocsPage = () => {
                     </h2>
                   </div>
                   <ProjectCardsGrid
-                    projects={projectsWithDocuments}
+                    projects={projectsWithSheets}
                     isLoading={isLoadingProjects}
                     onProjectClick={(projectId) => {
-                      navigate(`/${userRole}/bugdocs/project/${projectId}`);
+                      navigate(`/${userRole}/bugsheets/project/${projectId}`);
                     }}
                   />
                 </div>
@@ -1012,10 +1012,10 @@ const BugDocsPage = () => {
                           <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
                           <input
                             type="text"
-                            placeholder="Search documents..."
+                            placeholder="Search sheets..."
                             value={localSearchTerm}
                             onChange={(e) => setLocalSearchTerm(e.target.value)}
-                            className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                            className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                             autoComplete="off"
                           />
                         </div>
@@ -1085,35 +1085,35 @@ const BugDocsPage = () => {
                 </div>
               )}
 
-              {/* Documents Content - only show when not showing project cards */}
+              {/* Sheets Content - only show when not showing project cards */}
               {!shouldShowProjectCards() && (
                 <div className="space-y-4">
                   {isLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                      <span className="ml-2 text-muted-foreground">Loading documents...</span>
+                      <span className="ml-2 text-muted-foreground">Loading sheets...</span>
                     </div>
-                  ) : filteredDocuments.length === 0 ? (
+                  ) : filteredSheets.length === 0 ? (
                     <div className="relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
+                      <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-blue-50/30 to-cyan-50/50 dark:from-green-950/20 dark:via-blue-950/10 dark:to-cyan-950/20 rounded-2xl"></div>
                       <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-                        <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-                          <FileText className="h-10 w-10 text-white" />
+                        <div className="mx-auto w-20 h-20 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                          <FileSpreadsheet className="h-10 w-10 text-white" />
                         </div>
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                          {!isConnected ? "Google Account Not Connected" : activeTab === "all-docs" ? "No documents found" : "No documents found"}
+                          {!isConnected ? "Google Account Not Connected" : activeTab === "all-sheets" ? "No sheets found" : "No sheets found"}
                         </h3>
                         <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
                           {!isConnected
-                            ? "Please connect your Google account first to view and manage documents."
-                            : activeTab === "all-docs"
-                              ? "No documents available. Create your first document to get started."
-                              : "No documents available. Create your first document to get started."}
+                            ? "Please connect your Google account first to view and manage sheets."
+                            : activeTab === "all-sheets"
+                              ? "No sheets available. Create your first sheet to get started."
+                              : "No sheets available. Create your first sheet to get started."}
                         </p>
                         {!isConnected ? (
                           <Button
                             onClick={() => navigate(`/${userRole}/profile`)}
-                            className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                            className="h-12 px-6 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                           >
                             <LinkIcon className="h-5 w-5 mr-2" />
                             Connect Google Account
@@ -1121,41 +1121,41 @@ const BugDocsPage = () => {
                         ) : (
                           <Button
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                            className="h-12 px-6 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                           >
                             <Plus className="h-5 w-5 mr-2" />
-                            Create Document
+                            Create Sheet
                           </Button>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 lg:grid-cols-2" style={{ minHeight: 200 }} aria-label="Document list">
-                      {filteredDocuments.map((doc) => (
+                    <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 lg:grid-cols-2" style={{ minHeight: 200 }} aria-label="Sheet list">
+                      {filteredSheets.map((sheet) => (
                         <div
-                          key={doc.id}
-                          className="group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-2xl hover:border-orange-300 dark:hover:border-orange-600 transition-all duration-300"
+                          key={sheet.id}
+                          className="group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-2xl hover:border-green-300 dark:hover:border-green-600 transition-all duration-300"
                         >
                           {/* Top accent bar */}
-                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-600"></div>
+                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-blue-600"></div>
 
                           <div className="p-5 sm:p-6">
                             {/* Header with title and role badge */}
                             <div className="flex items-start justify-between gap-3 mb-4">
                               <div className="flex items-start gap-3 flex-1 min-w-0">
                                 <div className="text-2xl sm:text-3xl flex-shrink-0 mt-1">
-                                  {getDocTypeIcon(doc.doc_type)}
+                                  {getSheetTypeIcon(sheet.sheet_type)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors break-words line-clamp-2">
-                                    {doc.doc_title}
+                                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors break-words line-clamp-2">
+                                    {sheet.sheet_title}
                                   </h3>
                                 </div>
                               </div>
 
                               {/* Role Badges - Top Right */}
                               <div className="flex flex-wrap gap-1.5 justify-end">
-                                {getRoleBadges((doc as any).role).map((roleBadge, index) => (
+                                {getRoleBadges((sheet as any).role).map((roleBadge, index) => (
                                   <Badge
                                     key={index}
                                     variant="outline"
@@ -1169,7 +1169,7 @@ const BugDocsPage = () => {
                               </div>
                             </div>
 
-                            {/* Document Details Grid */}
+                            {/* Sheet Details Grid */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
                               {/* Projects */}
                               <div className="flex items-start gap-2">
@@ -1179,7 +1179,7 @@ const BugDocsPage = () => {
                                 <div className="flex-1 min-w-0">
                                   <div className="text-xs text-gray-500 dark:text-gray-500 font-medium mb-1">Projects</div>
                                   {(() => {
-                                    const projectNames = getProjectNames(doc.project_id);
+                                    const projectNames = getProjectNames(sheet.project_id);
                                     if (projectNames.length === 0) {
                                       return (
                                         <span className="italic text-gray-400 text-sm">No Project</span>
@@ -1204,40 +1204,40 @@ const BugDocsPage = () => {
                               </div>
 
                               {/* Creator */}
-                              {doc.creator_name && activeTab !== "my-docs" && (
+                              {sheet.creator_name && activeTab !== "my-sheets" && (
                                 <div className="flex items-center gap-2">
                                   <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/20 flex-shrink-0">
                                     <User className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="text-xs text-gray-500 dark:text-gray-500 font-medium">Creator</div>
-                                    <div className="font-semibold text-gray-900 dark:text-white truncate">{doc.creator_name}</div>
+                                    <div className="font-semibold text-gray-900 dark:text-white truncate">{sheet.creator_name}</div>
                                   </div>
                                 </div>
                               )}
 
                               {/* Template */}
-                              {doc.template_name && (
+                              {sheet.template_name && (
                                 <div className="flex items-center gap-2">
                                   <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/20 flex-shrink-0">
-                                    <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                    <FileSpreadsheet className="h-4 w-4 text-green-600 dark:text-green-400" />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="text-xs text-gray-500 dark:text-gray-500 font-medium">Template</div>
-                                    <div className="font-semibold text-gray-900 dark:text-white truncate">{doc.template_name}</div>
+                                    <div className="font-semibold text-gray-900 dark:text-white truncate">{sheet.template_name}</div>
                                   </div>
                                 </div>
                               )}
 
                               {/* Created Time */}
                               <div className="flex items-center gap-2">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex-shrink-0">
-                                  <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/20 flex-shrink-0">
+                                  <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="text-xs text-gray-500 dark:text-gray-500 font-medium">Created</div>
                                   <div className="font-semibold text-gray-900 dark:text-white truncate">
-                                    {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                                    {formatDistanceToNow(new Date(sheet.created_at), { addSuffix: true })}
                                   </div>
                                 </div>
                               </div>
@@ -1248,8 +1248,8 @@ const BugDocsPage = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleViewDocument(doc)}
-                                className="flex-1 h-9 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-800 hover:from-orange-100 hover:to-red-100 dark:hover:from-orange-900/30 dark:hover:to-red-900/30 text-orange-700 dark:text-orange-300 font-semibold"
+                                onClick={() => handleViewSheet(sheet)}
+                                className="flex-1 h-9 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-green-200 dark:border-green-800 hover:from-green-100 hover:to-blue-100 dark:hover:from-green-900/30 dark:hover:to-blue-900/30 text-green-700 dark:text-green-300 font-semibold"
                               >
                                 <ExternalLink className="h-4 w-4 mr-1.5" />
                                 <span className="hidden sm:inline">View</span>
@@ -1257,7 +1257,7 @@ const BugDocsPage = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleEditClick(doc)}
+                                onClick={() => handleEditClick(sheet)}
                                 className="flex-1 h-9 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold"
                               >
                                 <Edit className="h-4 w-4 mr-1.5" />
@@ -1266,7 +1266,7 @@ const BugDocsPage = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleCopyDocumentUrl(doc)}
+                                onClick={() => handleCopySheetUrl(sheet)}
                                 className="h-9 px-3 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
                               >
                                 <Copy className="h-4 w-4" />
@@ -1274,11 +1274,11 @@ const BugDocsPage = () => {
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => handleDeleteClick(doc)}
-                                disabled={isDeleting === doc.id}
+                                onClick={() => handleDeleteClick(sheet)}
+                                disabled={isDeleting === sheet.id}
                                 className="h-9 px-3"
                               >
-                                {isDeleting === doc.id ? (
+                                {isDeleting === sheet.id ? (
                                   <RefreshCw className="h-4 w-4 animate-spin" />
                                 ) : (
                                   <Trash2 className="h-4 w-4" />
@@ -1296,24 +1296,24 @@ const BugDocsPage = () => {
           </Tabs>
         )}
 
-        {/* Create Document Modal */}
+        {/* Create Sheet Modal */}
         {isConnected && (
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="text-lg sm:text-xl">Create New Document</DialogTitle>
+                <DialogTitle className="text-lg sm:text-xl">Create New Sheet</DialogTitle>
                 <DialogDescription className="text-sm sm:text-base">
-                  Create a new Google Doc from a template or start from scratch
+                  Create a new Google Sheet from a template or start from scratch
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="doc-title" className="text-sm font-medium">Document Title *</Label>
+                  <Label htmlFor="sheet-title" className="text-sm font-medium">Sheet Title *</Label>
                   <Input
-                    id="doc-title"
-                    placeholder="Enter document title..."
-                    value={docTitle}
-                    onChange={(e) => setDocTitle(e.target.value)}
+                    id="sheet-title"
+                    placeholder="Enter sheet title..."
+                    value={sheetTitle}
+                    onChange={(e) => setSheetTitle(e.target.value)}
                     disabled={isCreating}
                     className="w-full"
                   />
@@ -1326,10 +1326,10 @@ const BugDocsPage = () => {
                     disabled={isCreating}
                   >
                     <SelectTrigger id="template" className="w-full">
-                      <SelectValue placeholder="Blank document (no template)" />
+                      <SelectValue placeholder="Blank sheet (no template)" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[200px] overflow-y-auto">
-                      <SelectItem value="0">Blank document (no template)</SelectItem>
+                      <SelectItem value="0">Blank sheet (no template)</SelectItem>
                       {templates.map((template) => (
                         <SelectItem key={template.id} value={template.id.toString()}>
                           <div className="flex flex-col items-start">
@@ -1351,12 +1351,12 @@ const BugDocsPage = () => {
                   </Select>
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">
-                      Templates provide pre-formatted structures for your documents
+                      Templates provide pre-formatted structures for your sheets
                     </p>
                     {templates.some(t => !t.is_configured) && (
-                      <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                      <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                         <span>⚠️</span>
-                        <span>Templates marked "not configured" will create blank documents</span>
+                        <span>Templates marked "not configured" will create blank sheets</span>
                       </p>
                     )}
                   </div>
@@ -1477,7 +1477,7 @@ const BugDocsPage = () => {
                   </div>
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <span>💡</span>
-                    <span>Select one or more projects to associate this document with</span>
+                    <span>Select one or more projects to associate this sheet with</span>
                   </p>
                 </div>
                 <div className="space-y-3">
@@ -1584,7 +1584,7 @@ const BugDocsPage = () => {
                   <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
                     <p className="text-xs text-blue-900 dark:text-blue-100">
-                      <strong>Tip:</strong> "For Me" makes the document private to you only. "All Users" will automatically override other role selections. 
+                      <strong>Tip:</strong> "For Me" makes the sheet private to you only. "All Users" will automatically override other role selections. 
                       For specific access, uncheck "All Users" and select individual roles.
                     </p>
                   </div>
@@ -1600,7 +1600,7 @@ const BugDocsPage = () => {
                   Cancel
                 </Button>
                 <Button
-                  onClick={handleCreateDocument}
+                  onClick={handleCreateSheet}
                   disabled={isCreating}
                   className="w-full sm:w-auto order-1 sm:order-2"
                 >
@@ -1612,7 +1612,7 @@ const BugDocsPage = () => {
                   ) : (
                     <>
                       <Plus className="h-4 w-4 mr-2" />
-                      Create Document
+                      Create Sheet
                     </>
                   )}
                 </Button>
@@ -1621,27 +1621,27 @@ const BugDocsPage = () => {
           </Dialog>
         )}
 
-        {/* Edit Document Dialog */}
+        {/* Edit Sheet Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">Edit Document</DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl">Edit Sheet</DialogTitle>
               <DialogDescription className="text-sm sm:text-base">
-                Update the document title, project, and template
+                Update the sheet title, project, and template
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-doc-title" className="text-sm font-medium">Document Title *</Label>
+                <Label htmlFor="edit-sheet-title" className="text-sm font-medium">Sheet Title *</Label>
                 <Input
-                  id="edit-doc-title"
-                  placeholder="Enter document title..."
-                  value={editDocTitle}
-                  onChange={(e) => setEditDocTitle(e.target.value)}
+                  id="edit-sheet-title"
+                  placeholder="Enter sheet title..."
+                  value={editSheetTitle}
+                  onChange={(e) => setEditSheetTitle(e.target.value)}
                   disabled={isUpdating}
                   className="w-full"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isUpdating && editDocTitle.trim()) {
+                    if (e.key === 'Enter' && !isUpdating && editSheetTitle.trim()) {
                       handleEditConfirm();
                     }
                   }}
@@ -1795,7 +1795,7 @@ const BugDocsPage = () => {
                 </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <span>💡</span>
-                  <span>Select one or more projects to associate this document with</span>
+                  <span>Select one or more projects to associate this sheet with</span>
                 </p>
               </div>
               <div className="space-y-3">
@@ -1902,7 +1902,7 @@ const BugDocsPage = () => {
                 <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
                   <p className="text-xs text-blue-900 dark:text-blue-100">
-                    <strong>Tip:</strong> "For Me" makes the document private to you only. "All Users" will automatically override other role selections. 
+                    <strong>Tip:</strong> "For Me" makes the sheet private to you only. "All Users" will automatically override other role selections. 
                     For specific access, uncheck "All Users" and select individual roles.
                   </p>
                 </div>
@@ -1919,7 +1919,7 @@ const BugDocsPage = () => {
               </Button>
               <Button
                 onClick={handleEditConfirm}
-                disabled={isUpdating || !editDocTitle.trim()}
+                disabled={isUpdating || !editSheetTitle.trim()}
                 className="w-full sm:w-auto order-1 sm:order-2"
               >
                 {isUpdating ? (
@@ -1930,7 +1930,7 @@ const BugDocsPage = () => {
                 ) : (
                   <>
                     <Edit className="h-4 w-4 mr-2" />
-                    Update Document
+                    Update Sheet
                   </>
                 )}
               </Button>
@@ -1942,9 +1942,9 @@ const BugDocsPage = () => {
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">Delete Document</DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl">Delete Sheet</DialogTitle>
               <DialogDescription className="text-sm sm:text-base">
-                Are you sure you want to delete "{documentToDelete?.doc_title}"? This action cannot be undone.
+                Are you sure you want to delete "{sheetToDelete?.sheet_title}"? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
@@ -1956,7 +1956,7 @@ const BugDocsPage = () => {
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-sm mb-1">Warning</h4>
                     <p className="text-sm text-muted-foreground">
-                      This will permanently delete the document from both BugRicer and Google Drive.
+                      This will permanently delete the sheet from both BugRicer and Google Drive.
                       This action cannot be undone.
                     </p>
                   </div>
@@ -1986,7 +1986,7 @@ const BugDocsPage = () => {
                 ) : (
                   <>
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Document
+                    Delete Sheet
                   </>
                 )}
               </Button>
@@ -1998,5 +1998,5 @@ const BugDocsPage = () => {
   );
 };
 
-export default BugDocsPage;
+export default BugSheetsPage;
 

@@ -131,8 +131,8 @@ class WhatsAppMessageService {
   async sendCustomMessage(phone: string, message: string): Promise<{ success: boolean; message: string }> {
     // This would integrate with your WhatsApp API
     // For now, we'll simulate sending a message
-    const apikey = "05ce7a9046414e42b3983330611f8bf5";
-    const url = `http://148.251.129.118/whatsapp/api/send?mobile=${phone}&msg=${encodeURIComponent(message)}&apikey=${apikey}`;
+    const apikey = "c9b175ddaec8904c2c26cc1e6ca2953c";
+    const url = `https://notifyapi.bugricer.com/wapp/api/send?apikey=${apikey}&number=${phone}&msg=${encodeURIComponent(message)}`;
     
     try {
       const response = await fetch(url);
@@ -154,14 +154,14 @@ class WhatsAppMessageService {
     try {
       // Create FormData for file upload
       const formData = new FormData();
-      formData.append('mobile', phone);
+      formData.append('number', phone);
       formData.append('audio', audioBlob, 'voice-note.wav');
       formData.append('duration', duration.toString());
-      formData.append('apikey', '05ce7a9046414e42b3983330611f8bf5');
+      formData.append('apikey', 'c9b175ddaec8904c2c26cc1e6ca2953c');
       
       // This would integrate with your WhatsApp API for voice notes
       // For now, we'll simulate sending a voice note
-      const url = `http://148.251.129.118/whatsapp/api/send-voice`;
+      const url = `https://notifyapi.bugricer.com/wapp/api/send-voice`;
       
       const response = await fetch(url, {
         method: 'POST',

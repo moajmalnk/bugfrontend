@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   Announcement,
@@ -32,8 +34,8 @@ import {
 } from "@/services/announcementService";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, parseISO } from "date-fns";
-import { CalendarIcon, X } from "lucide-react";
-import { useEffect } from "react";
+import { CalendarIcon, X, Users, Shield, Code, TestTube, CheckCircle2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "../ui/use-toast";
@@ -50,6 +52,7 @@ const announcementSchema = z.object({
   content: z.string().min(1, "Content is required"),
   is_active: z.boolean(),
   expiry_date: z.date().nullable(),
+  role: z.string().optional(),
 });
 
 export const AnnouncementDialog = ({
@@ -58,6 +61,8 @@ export const AnnouncementDialog = ({
   announcement,
   onSave,
 }: AnnouncementDialogProps) => {
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(["all"]);
+
   const form = useForm<z.infer<typeof announcementSchema>>({
     resolver: zodResolver(announcementSchema),
     defaultValues: {
@@ -65,11 +70,16 @@ export const AnnouncementDialog = ({
       content: "",
       is_active: false,
       expiry_date: null,
+      role: "all",
     },
   });
 
   useEffect(() => {
     if (announcement) {
+      const role = announcement.role || "all";
+      const rolesArray = role === "all" ? ["all"] : role.split(",").map(r => r.trim());
+      setSelectedRoles(rolesArray);
+      
       form.reset({
         title: announcement.title,
         content: announcement.content,
@@ -77,19 +87,27 @@ export const AnnouncementDialog = ({
         expiry_date: announcement.expiry_date
           ? parseISO(announcement.expiry_date)
           : null,
+        role: role,
       });
     } else {
+      setSelectedRoles(["all"]);
       form.reset({
         title: "",
         content: "",
         is_active: false,
         expiry_date: null,
+        role: "all",
       });
     }
   }, [announcement, form, open]);
 
   const onSubmit = async (values: z.infer<typeof announcementSchema>) => {
     try {
+      // Determine role value from selected roles
+      const roleValue = selectedRoles.length === 1 && selectedRoles[0] === 'all' 
+        ? 'all' 
+        : selectedRoles.filter(r => r !== 'all').join(',');
+      
       const payload: AnnouncementPayload = {
         title: values.title,
         content: values.content,
@@ -97,6 +115,7 @@ export const AnnouncementDialog = ({
         expiry_date: values.expiry_date
           ? format(values.expiry_date, "yyyy-MM-dd HH:mm:ss")
           : null,
+        role: roleValue,
       };
 
       if (announcement) {
@@ -253,6 +272,110 @@ export const AnnouncementDialog = ({
                 </FormItem>
               )}
             />
+            
+            {/* Role Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <FormLabel className="text-sm sm:text-base font-medium flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Accessible to Roles *
+                </FormLabel>
+                {selectedRoles.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {selectedRoles.length} selected
+                  </Badge>
+                )}
+              </div>
+
+              {/* Selected Roles Chips */}
+              {selectedRoles.length > 0 && (
+                <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
+                  {selectedRoles.map((roleValue) => {
+                    const roleMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                      all: { label: "All Users", icon: <Users className="h-3 w-3" />, color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300" },
+                      admins: { label: "Admins Only", icon: <Shield className="h-3 w-3" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300" },
+                      developers: { label: "Developers Only", icon: <Code className="h-3 w-3" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" },
+                      testers: { label: "Testers Only", icon: <TestTube className="h-3 w-3" />, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300" },
+                    };
+                    const role = roleMap[roleValue];
+                    if (!role) return null;
+                    return (
+                      <Badge
+                        key={roleValue}
+                        variant="outline"
+                        className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.color}`}
+                      >
+                        {role.icon}
+                        {role.label}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRoles(prev => prev.filter(r => r !== roleValue))}
+                          className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Roles List */}
+              <div className="space-y-2 p-4 border rounded-lg bg-background">
+                {[
+                  { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
+                  { value: "admins", label: "Admins Only", icon: <Shield className="h-4 w-4" />, color: "text-purple-600 dark:text-purple-400" },
+                  { value: "developers", label: "Developers Only", icon: <Code className="h-4 w-4" />, color: "text-blue-600 dark:text-blue-400" },
+                  { value: "testers", label: "Testers Only", icon: <TestTube className="h-4 w-4" />, color: "text-pink-600 dark:text-pink-400" },
+                ].map((role) => (
+                  <div
+                    key={role.value}
+                    className={`flex items-center space-x-3 p-2.5 rounded-md transition-colors ${
+                      selectedRoles.includes(role.value)
+                        ? "bg-primary/10 border border-primary/20"
+                        : "hover:bg-muted/50 border border-transparent"
+                    }`}
+                  >
+                    <Checkbox
+                      id={`announcement-role-${role.value}`}
+                      checked={selectedRoles.includes(role.value)}
+                      onCheckedChange={(checked) => {
+                        if (role.value === "all") {
+                          // If "All Users" is selected, clear other selections
+                          setSelectedRoles(checked ? ["all"] : []);
+                        } else {
+                          // If a specific role is selected, remove "all" and toggle the role
+                          if (checked) {
+                            setSelectedRoles((prev) => 
+                              prev.filter(r => r !== "all").concat(role.value)
+                            );
+                          } else {
+                            setSelectedRoles((prev) => prev.filter(r => r !== role.value));
+                          }
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor={`announcement-role-${role.value}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
+                    >
+                      <span className={role.color}>{role.icon}</span>
+                      {role.label}
+                      {selectedRoles.includes(role.value) && (
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
+                <p className="text-xs text-blue-900 dark:text-blue-100">
+                  <strong>Tip:</strong> Selecting "All Users" will automatically override other role selections. 
+                  For specific access, uncheck "All Users" and select individual roles.
+                </p>
+              </div>
+            </div>
             <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
               <Button
                 type="button"

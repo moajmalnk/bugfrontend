@@ -107,6 +107,7 @@ const NewBug = lazy(() => import("@/pages/NewBug"));
 const Activity = lazy(() => import("@/pages/Activity"));
 const Users = lazy(() => import("@/pages/Users"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const BugBackup = lazy(() => import("@/pages/BugBackup"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const Fixes = lazy(() => import("@/pages/Fixes"));
@@ -172,6 +173,7 @@ const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
 const DocsSetupError = lazy(() => import("@/pages/DocsSetupError"));
 const BugDocsPage = lazy(() => import("@/pages/BugDocsPage"));
+const BugSheetsPage = lazy(() => import("@/pages/BugSheetsPage"));
 const ProjectDocumentsPage = lazy(() => import("@/pages/ProjectDocumentsPage"));
 const UserPermissions = lazy(() => import("@/pages/UserPermissions"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
@@ -285,6 +287,7 @@ const RouteConfig = () => {
           <Route path="users/:userId/permissions" element={<UserPermissions />} />
           <Route path="fixes" element={<Fixes />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="bugbackup" element={<BugBackup />} />
           <Route path="profile" element={<Profile />} />
           <Route path="reports" element={<Reports />} />
           <Route path="messages" element={<Messages />} />
@@ -301,6 +304,8 @@ const RouteConfig = () => {
           <Route path="feedback-stats" element={<FeedbackStats />} />
           <Route path="bugdocs" element={<BugDocsPage />} />
           <Route path="bugdocs/project/:projectId" element={<ProjectDocumentsPage />} />
+          <Route path="bugsheets" element={<BugSheetsPage />} />
+          <Route path="bugsheets/project/:projectId" element={<ProjectDocumentsPage />} />
           <Route path="notifications" element={<Notifications />} />
           {/* Redirect from /:role to /:role/projects */}
           <Route index element={<Navigate to="projects" replace />} />

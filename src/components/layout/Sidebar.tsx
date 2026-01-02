@@ -17,11 +17,13 @@ import {
   Settings,
   Users,
   FileText,
+  FileSpreadsheet,
   ListTodo,
   BarChart3,
   Activity,
   Mic,
   Calendar,
+  Database,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
@@ -178,6 +180,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 label="BugDocs"
               />
             )}
+            {/* BugSheets - Hide for testers */}
+            {role !== 'tester' && (
+              <NavLink
+                to="/bugsheets"
+                icon={<FileSpreadsheet className="h-5 w-5" />}
+                label="BugSheets"
+              />
+            )}
             {/* BugMeet - Hide for testers */}
             {role !== 'tester' && (
               <NavLink
@@ -283,6 +293,15 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/settings"
                       icon={<Settings className="h-5 w-5" />}
                       label="Settings"
+                    />
+                  )}
+
+                  {/* BugBackup */}
+                  {hasSettingsEdit && (
+                    <NavLink
+                      to="/bugbackup"
+                      icon={<Database className="h-5 w-5" />}
+                      label="BugBackup"
                     />
                   )}
                 </div>

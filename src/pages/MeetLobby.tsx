@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { createMeeting, getMeeting } from "@/services/meetings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2, RefreshCw, Link as LinkIcon } from "lucide-react";
+import { Loader2, Video, Users, Copy, Check, Plus, Clock, ExternalLink, Calendar, Search, Filter, X, User, Shield, Code, TestTube, Mail, Eye, BarChart3, UserCheck, Timer, Trash2, RefreshCw, Link as LinkIcon, Phone } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { TimePicker } from "@/components/ui/TimePicker";
 import { googleDocsService } from "@/services/googleDocsService";
@@ -65,12 +65,18 @@ interface RunningMeetsResponse {
 // Team member interfaces
 interface TeamMember {
   email: string;
+  phone?: string | null;
   role: 'admin' | 'developer' | 'tester';
 }
 
 interface TeamMembersResponse {
   success: boolean;
   emails: string[];
+  data?: Array<{
+    email: string;
+    phone?: string | null;
+    [key: string]: any;
+  }>;
   error?: string;
 }
 
@@ -350,7 +356,7 @@ export default function MeetLobby() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Cache for API responses
+  // Cache for API responses - extended cache duration for better performance
   const [cache, setCache] = useState<{
     data: RunningMeetsResponse | null;
     timestamp: number;
@@ -365,10 +371,10 @@ export default function MeetLobby() {
       return;
     }
 
-    // Check cache first (5 minute cache)
+    // Check cache first (15 minute cache for better performance)
     const now = Date.now();
     const cacheAge = now - cache.timestamp;
-    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes - longer cache for better UX
 
     if (!forceRefresh && cache.data && cacheAge < CACHE_DURATION) {
       setRunningMeets(cache.data.runningMeetings || []);
@@ -417,7 +423,6 @@ export default function MeetLobby() {
             setError(null);
           }
       } else {
-          console.error("❌ Failed to fetch running meets:", data?.error);
         // Check if it's a scope issue
         if (data?.error?.includes?.('insufficient authentication scopes') || 
             data?.error?.includes?.('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
@@ -427,7 +432,6 @@ export default function MeetLobby() {
         }
       }
     } catch (err: any) {
-        console.error("❌ Error fetching running meets:", err?.message);
       // Check if it's a scope issue from the error response
       if (err?.response?.data?.error?.includes?.('insufficient authentication scopes') ||
           err?.response?.data?.error?.includes?.('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
@@ -549,7 +553,8 @@ export default function MeetLobby() {
     }
   };
 
-  const formatMeetingTime = (startTime: string, endTime: string) => {
+  // Memoized format meeting time function for better performance
+  const formatMeetingTime = useCallback((startTime: string, endTime: string) => {
     const start = new Date(startTime);
     const end = new Date(endTime);
     const now = new Date();
@@ -574,7 +579,7 @@ export default function MeetLobby() {
     } else {
       return `Ended at ${endStr}`;
     }
-  };
+  }, []);
 
   // Optimized filtered meetings with useMemo - sorted by latest first
   const filteredMeetings = useMemo(() => {
@@ -812,28 +817,31 @@ export default function MeetLobby() {
     };
   }, [fetchRunningMeets]); // Keep fetchRunningMeets in dependencies
 
-  // Fetch running meets on component mount with progressive loading
+  // Fetch running meets on component mount only (no auto-refresh)
   useEffect(() => {
     // Only fetch if we don't have an error about Google connection
     if (!error || !error.includes("Please connect your Google account")) {
       fetchRunningMeets();
     }
-    
-    // Background refresh every 30 seconds (reduced frequency for better performance)
-    const interval = setInterval(() => {
-      // Only refresh if we don't have a Google connection error
-      if (!error || !error.includes("Please connect your Google account")) {
-        fetchRunningMeets();
-      }
-    }, 60000); // Increased to 1 minute for better performance
-    
-    return () => {
-      clearInterval(interval);
-    };
-  }, []); // Remove fetchRunningMeets from dependencies to prevent infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount - no auto-refresh
 
-  // Fetch team members from all three endpoints
+  // Cache for team members to avoid refetching
+  const [teamMembersCache, setTeamMembersCache] = useState<TeamMember[]>([]);
+  const [teamMembersCacheTime, setTeamMembersCacheTime] = useState(0);
+
+  // Fetch team members from all three endpoints - optimized with caching
   const fetchTeamMembers = useCallback(async () => {
+    // Check cache first (30 minute cache for team members - they don't change often)
+    const now = Date.now();
+    const cacheAge = now - teamMembersCacheTime;
+    const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+    if (teamMembersCache.length > 0 && cacheAge < CACHE_DURATION) {
+      setTeamMembers(teamMembersCache);
+      return;
+    }
+
     setLoadingUsers(true);
     try {
       // Fetch all three types of users in parallel (apiClient handles token and impersonation automatically)
@@ -847,29 +855,49 @@ export default function MeetLobby() {
       const developersData = developersResponse.data as TeamMembersResponse;
       const testersData = testersResponse.data as TeamMembersResponse;
 
-      // Combine all team members with their roles
+      // Helper function to create team member with phone number
+      const createTeamMember = (email: string, role: 'admin' | 'developer' | 'tester', dataArray?: Array<{email: string; phone?: string | null}>) => {
+        const userData = dataArray?.find(user => user.email === email);
+        return {
+          email,
+          phone: userData?.phone || null,
+          role
+        };
+      };
+
+      // Combine all team members with their roles and phone numbers
       const allTeamMembers: TeamMember[] = [
-        ...(adminsData.emails || []).map(email => ({ email, role: 'admin' as const })),
-        ...(developersData.emails || []).map(email => ({ email, role: 'developer' as const })),
-        ...(testersData.emails || []).map(email => ({ email, role: 'tester' as const }))
+        ...(adminsData.emails || []).map(email => createTeamMember(email, 'admin', adminsData.data)),
+        ...(developersData.emails || []).map(email => createTeamMember(email, 'developer', developersData.data)),
+        ...(testersData.emails || []).map(email => createTeamMember(email, 'tester', testersData.data))
       ];
 
+      // Update cache
+      setTeamMembersCache(allTeamMembers);
+      setTeamMembersCacheTime(now);
       setTeamMembers(allTeamMembers);
     } catch (err: any) {
-      console.error("❌ Error fetching team members:", err?.message);
-      // Fallback to empty array on error
-      setTeamMembers([]);
+      // Fallback to cached data or empty array on error
+      if (teamMembersCache.length > 0) {
+        setTeamMembers(teamMembersCache);
+      } else {
+        setTeamMembers([]);
+      }
     } finally {
       setLoadingUsers(false);
     }
-  }, []);
+  }, [teamMembersCache, teamMembersCacheTime]);
 
-  // Fetch team members when create modal opens
+  // Fetch team members when create modal opens (lazy loading for better performance)
   useEffect(() => {
-    if (isModalOpen && modalType === "create" && teamMembers.length === 0) {
-      fetchTeamMembers();
+    if (isModalOpen && modalType === "create") {
+      // Only fetch if we don't have cached data
+      if (teamMembers.length === 0) {
+        fetchTeamMembers();
+      }
     }
-  }, [isModalOpen, modalType, teamMembers.length, fetchTeamMembers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isModalOpen, modalType]); // Removed teamMembers.length and fetchTeamMembers from deps to prevent unnecessary fetches
 
   // Add a manual refresh function that can be called from the UI
   const handleRefresh = () => {
@@ -942,59 +970,30 @@ export default function MeetLobby() {
     }
   };
 
-  const getSelectedUsers = () => {
+  // Get selected users - memoized for performance
+  const getSelectedUsers = useMemo(() => {
     return teamMembers.filter(member => selectedUsers.includes(member.email));
-  };
+  }, [teamMembers, selectedUsers]);
 
-  // Filter team members by role
-  const getFilteredTeamMembers = () => {
+  // Filter team members by role - memoized for performance
+  const getFilteredTeamMembers = useMemo(() => {
     if (activeRoleTab === "all") {
       return teamMembers;
     }
     return teamMembers.filter(member => member.role === activeRoleTab);
-  };
+  }, [teamMembers, activeRoleTab]);
 
-  // Get role counts
-  const getRoleCounts = () => {
+  // Get role counts - memoized for performance
+  const getRoleCounts = useMemo(() => {
     return {
       all: teamMembers.length,
       admin: teamMembers.filter(m => m.role === 'admin').length,
       developer: teamMembers.filter(m => m.role === 'developer').length,
       tester: teamMembers.filter(m => m.role === 'tester').length
     };
-  };
+  }, [teamMembers]);
 
-  // Debug state changes
-  useEffect(() => {
-    console.log("📊 Meeting state changed:", {
-      runningMeets: runningMeets.length,
-      completedMeets: completedMeets.length,
-      loadingMeets,
-      error: error ? error.substring(0, 50) + "..." : null
-    });
-  }, [runningMeets, completedMeets, loadingMeets, error]);
-
-  // Add window focus listener to refresh data when user returns to tab (optimized)
-  useEffect(() => {
-    let focusTimeout: NodeJS.Timeout;
-    
-    const handleFocus = () => {
-      // Debounce focus events to prevent multiple rapid refreshes
-      clearTimeout(focusTimeout);
-      focusTimeout = setTimeout(() => {
-        // Only refresh if we don't have a Google connection error
-        if (!error || !error.includes("Please connect your Google account")) {
-          fetchRunningMeets(true);
-        }
-      }, 1000); // 1 second delay to prevent rapid refreshes
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      clearTimeout(focusTimeout);
-    };
-  }, [error]); // Only depend on error state, not fetchRunningMeets
+  // Removed auto-refresh on window focus for better UX - user can manually refresh if needed
 
   // Keep tab in sync with URL changes (back/forward navigation)
   useEffect(() => {
@@ -1276,7 +1275,11 @@ export default function MeetLobby() {
                           variant="outline"
                           className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                         >
-                          <Clock className={`h-5 w-5 mr-2 ${loadingMeets ? "animate-spin" : ""}`} />
+                          {loadingMeets ? (
+                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-5 w-5 mr-2" />
+                          )}
                           Refresh
                         </Button>
                       </div>
@@ -1570,7 +1573,7 @@ export default function MeetLobby() {
                             <span className="hidden sm:inline">All</span>
                             <span className="sm:hidden">All</span>
                             <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-xs">
-                              {getRoleCounts().all}
+                              {getRoleCounts.all}
                             </span>
                           </button>
                           <button
@@ -1585,7 +1588,7 @@ export default function MeetLobby() {
                             <span className="hidden sm:inline">Admins</span>
                             <span className="sm:hidden">Admin</span>
                             <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-300 rounded-full text-xs">
-                              {getRoleCounts().admin}
+                              {getRoleCounts.admin}
                             </span>
                           </button>
                           <button
@@ -1600,7 +1603,7 @@ export default function MeetLobby() {
                             <span className="hidden sm:inline">Devs</span>
                             <span className="sm:hidden">Dev</span>
                             <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-full text-xs">
-                              {getRoleCounts().developer}
+                              {getRoleCounts.developer}
                             </span>
                           </button>
                           <button
@@ -1615,14 +1618,14 @@ export default function MeetLobby() {
                             <span className="hidden sm:inline">Testers</span>
                             <span className="sm:hidden">Test</span>
                             <span className="ml-1 px-1.5 sm:px-2 py-0.5 bg-green-200 dark:bg-green-800 text-green-700 dark:text-green-300 rounded-full text-xs">
-                              {getRoleCounts().tester}
+                              {getRoleCounts.tester}
                             </span>
                           </button>
                         </div>
 
                         {/* Team Members List */}
                         <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-200 dark:border-gray-700 rounded-xl p-3 bg-gray-50 dark:bg-gray-800/50">
-                          {getFilteredTeamMembers().map((member) => (
+                          {getFilteredTeamMembers.map((member) => (
                             <div
                               key={member.email}
                               onClick={() => toggleUserSelection(member.email)}
@@ -1644,10 +1647,18 @@ export default function MeetLobby() {
                                     {member.email}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-1 mt-1">
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
                                   <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${getRoleColor(member.role)}`}>
                                     {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
                                   </span>
+                                  {member.phone && (
+                                    <div className="flex items-center gap-1">
+                                      <Phone className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                                      <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                                        {member.phone}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex-shrink-0">
@@ -1677,7 +1688,7 @@ export default function MeetLobby() {
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {getSelectedUsers().map((member) => (
+                          {getSelectedUsers.map((member) => (
                             <span
                               key={member.email}
                               className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-800/30 text-blue-800 dark:text-blue-300 rounded-md text-xs"
