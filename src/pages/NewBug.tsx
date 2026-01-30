@@ -23,8 +23,6 @@ import { useBugs } from "@/context/BugContext";
 import { ENV } from "@/lib/env";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { sendNewBugNotification } from "@/services/emailService";
-import { notificationService } from "@/services/notificationService";
-import { whatsappService } from "@/services/whatsappService";
 import { BugPriority, Project } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -287,44 +285,19 @@ const NewBug = () => {
         }, 500);
 
         // Send frontend notifications asynchronously (non-blocking)
-        // Backend already handles email and WhatsApp, but we still need to handle:
-        // - Browser broadcast notifications
-        // - WhatsApp share (if enabled in user settings)
+        // Backend handles email and WhatsApp via BugRicer notify API - no browser redirect
         setTimeout(async () => {
           try {
             const bugId =
               data.data?.bug?.id || (data as any).bugId || data.data?.id || (data as any).id;
 
-            // Broadcast browser notification to all users
+            // Broadcast browser notification to all users (in-app only)
             if (bugId) {
               await broadcastNotificationService.broadcastNewBug(
                 name,
                 String(bugId),
                 currentUser?.name || "BugRicer"
               );
-
-              // Check if WhatsApp notifications are enabled and share
-              const notificationSettings = notificationService.getSettings();
-              if (
-                notificationSettings.whatsappNotifications &&
-                notificationSettings.newBugNotifications
-              ) {
-                // Get project name for WhatsApp message
-                const selectedProject = (projects as Project[])?.find(
-                  (p) => p.id === projectId
-                );
-
-                whatsappService.shareNewBug({
-                  bugTitle: name,
-                  bugId: String(bugId),
-                  priority: priority,
-                  description: description,
-                  expectedResult: expectedResult,
-                  actualResult: actualResult,
-                  reportedBy: currentUser?.name || "BugRicer",
-                  projectName: selectedProject?.name || "BugRicer Project",
-                });
-              }
             }
           } catch (error) {
             // Silently fail - notifications are handled by backend
