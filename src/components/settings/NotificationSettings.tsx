@@ -544,6 +544,51 @@ export function NotificationSettingsCard() {
                     >
                       Check Status
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const token = localStorage.getItem("token");
+                          const res = await fetch(`${ENV.API_URL}/test-notifications.php`, {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({}),
+                          });
+                          const data = await res.json();
+                          if (res.status === 403) {
+                            toast({
+                              title: "Admin required",
+                              description: "Only admins can test server notifications.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const r = data?.results || {};
+                          const wa = r.whatsapp;
+                          const em = r.email;
+                          const waMsg = wa?.success ? "WhatsApp: sent ✅" : `WhatsApp: ${wa?.message || "failed"}`;
+                          const emMsg = em ? (em.success ? "Email: sent ✅" : `Email: ${em.message || "failed"}`) : "Email: not tested";
+                          toast({
+                            title: "Server test result",
+                            description: `${waMsg} | ${emMsg}. Check your phone/email.`,
+                            variant: wa?.success || em?.success ? "default" : "destructive",
+                          });
+                        } catch (e) {
+                          toast({
+                            title: "Test failed",
+                            description: e instanceof Error ? e.message : "Could not reach server",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      className="h-10 text-sm hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700 dark:hover:bg-amber-900/20 dark:hover:border-amber-600 dark:hover:text-amber-400"
+                    >
+                      Test WhatsApp & Email
+                    </Button>
                   </div>
                   <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                     <p className="text-gray-700 dark:text-gray-300 mb-2 font-medium">
@@ -553,6 +598,7 @@ export function NotificationSettingsCard() {
                       <p>• <strong>Reset Check Time:</strong> Forces polling to check all recent notifications</p>
                       <p>• <strong>Force Check Now:</strong> Manually triggers notification check</p>
                       <p>• <strong>Check Status:</strong> Shows current polling and settings status</p>
+                      <p>• <strong>Test WhatsApp & Email:</strong> Sends real test messages (admin only). Use to verify server notifications work.</p>
                     </div>
                   </div>
                 </div>
