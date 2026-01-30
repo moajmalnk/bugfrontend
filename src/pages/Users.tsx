@@ -176,34 +176,44 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Please log in to view users.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
       const response = await fetch(`${ENV.API_URL}/users/get.php`, {
+        method: "GET",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
         },
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error("Failed to fetch users");
+        throw new Error(data?.message || `Request failed (${response.status})`);
       }
-
-      const data = await response.json();
-      if (data.success) {
-        setUsers(
-          data.data.map((user: any) => ({
-            ...user,
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              user.username
-            )}&background=3b82f6&color=fff`,
-          }))
-        );
-      } else {
-        throw new Error(data.message || "Failed to fetch users");
+      if (!data.success || !Array.isArray(data.data)) {
+        throw new Error(data?.message || "Invalid response from server");
       }
+      setUsers(
+        data.data.map((user: any) => ({
+          ...user,
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+            user.username || user.name || "?"
+          )}&background=3b82f6&color=fff`,
+        }))
+      );
     } catch (error) {
-      // console.error("Error:", error);
+      const msg = error instanceof Error ? error.message : "Failed to load users. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to load users. Please try again.",
+        description: msg,
         variant: "destructive",
       });
     } finally {
