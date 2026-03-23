@@ -26,6 +26,7 @@ export default function DailyUpdate() {
   const [subsLoading, setSubsLoading] = useState(false);
   const [activeMonth, setActiveMonth] = useState<string>(searchParams.get('month') || ''); // YYYY-MM
   const [submissionToDelete, setSubmissionToDelete] = useState<any | null>(null);
+  const [showRequestsOnly, setShowRequestsOnly] = useState(false);
 
   // Initialize undo delete hook
   const undoDelete = useUndoDelete({
@@ -203,6 +204,32 @@ export default function DailyUpdate() {
     return submissionDate === today;
   }
 
+  function parseOvertimeRequestFromNotes(notes?: string) {
+    const text = (notes || '').trim();
+    if (!text) return { requestedHours: '', reason: '' };
+
+    const requestedMatch = text.match(/Requested Extra Hours:\s*([^\n\r]+)/i);
+    const reasonMatch = text.match(/Reason:\s*([^\n\r]+)/i);
+
+    return {
+      requestedHours: requestedMatch?.[1]?.trim() || '',
+      reason: reasonMatch?.[1]?.trim() || '',
+    };
+  }
+
+  function parseBreakLinesFromNotes(notes?: string) {
+    const text = (notes || '').trim();
+    if (!text) return [];
+    return (text.match(/^\[BREAK\].*$/gim) || []).map((line) => line.trim()).filter(Boolean);
+  }
+
+  function getBreakMinutes(lines: string[]) {
+    return lines.reduce((sum, line) => {
+      const mins = Number(line.match(/\((\d+)\s*min\)/i)?.[1] || 0);
+      return sum + (Number.isFinite(mins) ? mins : 0);
+    }, 0);
+  }
+
   function formatSubmissionText(s: any) {
     const d = new Date(s.submission_date);
     const weekday = d.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' });
@@ -216,6 +243,29 @@ export default function DailyUpdate() {
     const pCount = countItems(p);
     const oCount = countItems(o);
     const uCount = countItems(u);
+    const { requestedHours, reason } = parseOvertimeRequestFromNotes(s.notes);
+    const requestedHoursFromRow = s.requested_extra_hours ?? s.requestedExtraHours ?? '';
+    const approvalReasonFromRow = (s.approval_reason ?? s.approvalReason ?? '').toString().trim();
+    const requestedFromRowNum = Number(requestedHoursFromRow || 0);
+    const requestedFromNotesNum = Number(requestedHours || 0);
+    const finalRequestedHoursNum = requestedFromRowNum > 0 ? requestedFromRowNum : requestedFromNotesNum;
+    const finalRequestedHours = finalRequestedHoursNum > 0 ? String(finalRequestedHoursNum) : '';
+    const finalApprovalReason = approvalReasonFromRow || reason;
+    const breaksFromRow = (() => {
+      const raw = s.break_entries;
+      if (Array.isArray(raw)) return raw.map((x: any) => String(x).trim()).filter(Boolean);
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed.map((x: any) => String(x).trim()).filter(Boolean) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    })();
+    const breakLines = breaksFromRow.length > 0 ? breaksFromRow : parseBreakLinesFromNotes(s.notes);
+    const totalBreakMinutes = Number(s.total_break_minutes || 0) > 0 ? Number(s.total_break_minutes || 0) : getBreakMinutes(breakLines);
     let body =
       `🧾 CODO Daily Work Update — User\n` +
       `📅 Date: ${dateText}\n` +
@@ -223,11 +273,23 @@ export default function DailyUpdate() {
       `⏱ Today's Working Hours: ${Number(s.hours_today || 0)} Hours`;
     
     // Add overtime breakdown if applicable
-    const overtimeHours = Number(s.overtime_hours || 0);
+    // Keep before-save and after-save display aligned:
+    // if dedicated overtime field is empty, fall back to requested extra hours.
+    const overtimeHoursRaw = Number(s.overtime_hours || 0);
+    const overtimeHours = overtimeHoursRaw > 0 ? overtimeHoursRaw : finalRequestedHoursNum;
     if (overtimeHours > 0) {
       const regularHours = Math.min(Number(s.hours_today || 0), 8);
       body += `\n📊 Regular Hours: ${regularHours} Hours`;
       body += `\n⏰ Overtime Hours: ${overtimeHours} Hours`;
+    }
+    if (finalRequestedHours) {
+      body += `\n🧾 Requested Extra Hours: ${finalRequestedHours} Hours`;
+    }
+    if (finalApprovalReason) {
+      body += `\n📝 Approval Reason: ${finalApprovalReason}`;
+    }
+    if (totalBreakMinutes > 0) {
+      body += `\n☕ Total Break Time: ${totalBreakMinutes} min`;
     }
 
     // Totals for CODO period
@@ -239,13 +301,51 @@ export default function DailyUpdate() {
     body += `\n🧮 Total Hours Completed : ${hours} hours`;
 
     const sections: string[] = [];
+    // Include planning fields in saved-card details when present.
+    if (s.planned_projects) {
+      try {
+        const projects = Array.isArray(s.planned_projects) ? s.planned_projects : JSON.parse(s.planned_projects);
+        if (Array.isArray(projects) && projects.length > 0) {
+          sections.push(`📁 *Projects:* ${projects.join(', ')}`);
+        }
+      } catch {
+        // Ignore malformed planned_projects and keep rendering other details.
+      }
+    }
+    if ((s.planned_work || '').trim()) {
+      sections.push(`📝 *Planned Work:*\n${String(s.planned_work).trim()}`);
+    }
     if (cCount > 0) sections.push(`✅ Completed (${cCount})\n\n${c}`);
     if (pCount > 0) sections.push(`⌛ Pending (${pCount})\n\n${p}`);
     if (oCount > 0) sections.push(`🔄 Ongoing (${oCount})\n\n${o}`);
     if (uCount > 0) sections.push(`🔥 Upcoming (${uCount})\n\n${u}`);
+    if (breakLines.length > 0) sections.push(`☕ Breaks (${breakLines.length})\n\n${breakLines.join('\n')}`);
+    if ((s.planned_work_notes || '').trim()) {
+      sections.push(`📝 Work Notes\n\n${String(s.planned_work_notes).trim()}`);
+    }
+    if ((s.planned_work_status || '').trim()) {
+      const statusMap: Record<string, string> = {
+        not_started: 'Not Started',
+        in_progress: 'In Progress',
+        completed: 'Completed',
+        on_hold: 'On Hold',
+        blocked: 'Blocked',
+      };
+      const statusKey = String(s.planned_work_status).trim();
+      sections.push(`📊 Planned Work Status: ${statusMap[statusKey] || statusKey}`);
+    }
 
     if (sections.length) body += `\n\n` + sections.join(`\n\n`);
     return body;
+  }
+
+  function hasApprovalRequest(submission: any) {
+    const requestedFromRow = Number(submission?.requested_extra_hours ?? submission?.requestedExtraHours ?? 0);
+    const reasonFromRow = String(submission?.approval_reason ?? submission?.approvalReason ?? '').trim();
+    if (requestedFromRow > 0 || reasonFromRow.length > 0) return true;
+
+    const fromNotes = parseOvertimeRequestFromNotes(submission?.notes);
+    return Number(fromNotes.requestedHours || 0) > 0 || fromNotes.reason.length > 0;
   }
 
   async function loadSubmissions(refDate?: string) {
@@ -297,6 +397,21 @@ export default function DailyUpdate() {
     }
     return submissions;
   }, [submissions, activeTab]);
+
+  const visibleSubmissions = useMemo(() => {
+    const byRequest = showRequestsOnly ? filteredSubmissions.filter(hasApprovalRequest) : filteredSubmissions;
+    return byRequest.filter((s) => {
+      if (!activeMonth) return true;
+      const { from, to } = getCodoPeriodForMonth(activeMonth);
+      const submissionDate = String(s.submission_date || "");
+      return submissionDate >= from && submissionDate <= to;
+    });
+  }, [filteredSubmissions, showRequestsOnly, activeMonth]);
+
+  const requestCount = useMemo(
+    () => filteredSubmissions.filter(hasApprovalRequest).length,
+    [filteredSubmissions]
+  );
 
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
@@ -483,7 +598,7 @@ export default function DailyUpdate() {
         <div className="relative overflow-hidden rounded-2xl shadow-lg border border-gray-200/40 dark:border-gray-700/40">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 md:p-8 lg:p-10">
-            <div className="flex items-center gap-4 mb-8">
+            <div className="flex items-center justify-between gap-4 mb-8">
               <div className="p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20">
                 <FileText className="h-6 w-6 text-white" />
               </div>
@@ -491,12 +606,30 @@ export default function DailyUpdate() {
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Saved Submissions</h2>
                 <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">Your previous daily work updates</p>
               </div>
+              {currentUser?.role === 'admin' && (
+                <Button
+                  type="button"
+                  variant={showRequestsOnly ? 'default' : 'outline'}
+                  onClick={() => setShowRequestsOnly((prev) => !prev)}
+                  className={`ml-auto h-10 px-4 rounded-xl text-xs sm:text-sm ${
+                    showRequestsOnly
+                      ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:from-orange-700 hover:to-amber-700'
+                      : ''
+                  }`}
+                >
+                  <Bell className="h-4 w-4 mr-2" />
+                  Requests
+                  <span className="ml-2 px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/20 text-[11px] font-semibold">
+                    {requestCount}
+                  </span>
+                </Button>
+              )}
             </div>
             
             {/* Month Tabs - Only show for All Submissions, not Today Submissions */}
                 {!subsLoading && filteredSubmissions.length > 0 && activeTab === "all-submissions" && (
               <div className="flex flex-wrap justify-center gap-3 mb-8">
-                    {Array.from(new Set(filteredSubmissions.map((s)=>monthKey(s.submission_date))))
+                    {Array.from(new Set((showRequestsOnly ? filteredSubmissions.filter(hasApprovalRequest) : filteredSubmissions).map((s)=>monthKey(s.submission_date))))
                   .sort((a,b)=> a < b ? 1 : -1)
                   .map((key)=> (
                     <button
@@ -520,11 +653,13 @@ export default function DailyUpdate() {
                 <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse"></div>
                 <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse"></div>
               </div>
-                ) : filteredSubmissions.length === 0 ? (
+                ) : visibleSubmissions.length === 0 ? (
               <div className="text-center py-8">
                 <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                     <p className="text-gray-500 dark:text-gray-400">
-                      {activeTab === "today-submissions" 
+                      {showRequestsOnly
+                        ? "No approval requests found for this period."
+                        : activeTab === "today-submissions" 
                         ? "No submissions found for today." 
                         : "No submissions found for this period."
                       }
@@ -532,12 +667,7 @@ export default function DailyUpdate() {
               </div>
             ) : (
               <div className={`grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8 ${activeTab === "today-submissions" ? "lg:grid-cols-1" : "lg:grid-cols-2"}`}>
-                    {filteredSubmissions.filter(s => {
-                      if (!activeMonth) return true;
-                      const { from, to } = getCodoPeriodForMonth(activeMonth);
-                      const submissionDate = String(s.submission_date || "");
-                      return submissionDate >= from && submissionDate <= to;
-                    }).map((s) => (
+                    {visibleSubmissions.map((s) => (
                   <div key={s.id ?? s.submission_date} className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-6 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div>

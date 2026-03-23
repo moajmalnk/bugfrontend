@@ -7,7 +7,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, ArrowLeft, Plus, Bell, FolderKanban, X } from 'lucide-react';
+import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, ArrowLeft, Plus, Bell, FolderKanban, PauseCircle, PlayCircle, Search, X } from 'lucide-react';
 import { projectService, Project } from '@/services/projectService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -65,12 +65,21 @@ export default function DailyWorkUpdate() {
   const [plannedWorkStatus, setPlannedWorkStatus] = useState<StatusOption>('not_started');
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [projectSearch, setProjectSearch] = useState('');
   const [requestAdminApproval, setRequestAdminApproval] = useState(false);
   const [requestedExtraHours, setRequestedExtraHours] = useState<number>(0);
   const [approvalReason, setApprovalReason] = useState('');
+  const [isOnBreak, setIsOnBreak] = useState(false);
+  const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null);
+  const [breakEntries, setBreakEntries] = useState<string[]>([]);
 
   const overtimeHours = useMemo(() => requestedExtraHours, [requestedExtraHours]);
   const regularHours = useMemo(() => Math.min(Number(form.hours_today), 8), [form.hours_today]);
+  const filteredProjects = useMemo(() => {
+    const query = projectSearch.trim().toLowerCase();
+    if (!query) return projects;
+    return projects.filter((project) => project.name.toLowerCase().includes(query));
+  }, [projects, projectSearch]);
 
   const canSubmit = useMemo(() => {
     const hasDate = !!form.submission_date;
@@ -78,7 +87,7 @@ export default function DailyWorkUpdate() {
     const hasHours = hrs >= 1 && hrs <= 8;
     const overtimeRequestValid = !requestAdminApproval
       ? true
-      : requestedExtraHours > 0 && requestedExtraHours <= 16 && approvalReason.trim().length >= 10;
+      : requestedExtraHours > 0 && requestedExtraHours <= 16 && approvalReason.trim().length > 0;
 
     // Check if at least one task field has content
     const hasTasks = countItems(form.completed_tasks) > 0 ||
@@ -105,6 +114,82 @@ export default function DailyWorkUpdate() {
     } catch {
       return t;
     }
+  }
+
+  function to12hTime(d: Date) {
+    return d.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata',
+    });
+  }
+
+  function onToggleBreak() {
+    if (!isOnBreak) {
+      const now = new Date();
+      setIsOnBreak(true);
+      setBreakStartedAt(now);
+      toast({
+        title: 'Break started',
+        description: `Started at ${to12hTime(now)}`,
+      });
+      return;
+    }
+
+    const endedAt = new Date();
+    const startedAt = breakStartedAt ?? endedAt;
+    const durationMins = Math.max(1, Math.round((endedAt.getTime() - startedAt.getTime()) / 60000));
+    const breakLine = `[BREAK] ${to12hTime(startedAt)} - ${to12hTime(endedAt)} (${durationMins} min)`;
+    setBreakEntries((prev) => [...prev, breakLine]);
+    setForm((prev) => {
+      const current = (prev.notes || '').trim();
+      return {
+        ...prev,
+        notes: current ? `${current}\n${breakLine}` : breakLine,
+      };
+    });
+    setIsOnBreak(false);
+    setBreakStartedAt(null);
+    toast({
+      title: 'Break ended',
+      description: `Added break entry (${durationMins} min) to Upcoming notes.`,
+    });
+  }
+
+  function parseOvertimeRequestFromNotes(notes?: string) {
+    const source = notes || '';
+    const blockRegex = /\n?\[OVERTIME APPROVAL REQUEST\][\s\S]*?(?=\n\[[A-Z _-]+\]|\s*$)/i;
+    const blockMatch = source.match(blockRegex);
+    const block = blockMatch?.[0] || '';
+
+    const requestedFromBlock = block.match(/Requested Extra Hours:\s*([^\n\r]+)/i)?.[1]?.trim() || '';
+    const reasonFromBlock = block.match(/Reason:\s*([^\n\r]+)/i)?.[1]?.trim() || '';
+
+    return {
+      requestedFromBlock,
+      reasonFromBlock,
+      cleanNotes: source.replace(blockRegex, '').trim(),
+    };
+  }
+
+  function parseBreakLinesFromNotes(notes?: string) {
+    const source = notes || '';
+    const breakLines = (source.match(/^\[BREAK\].*$/gim) || [])
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const cleanNotes = source
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('[BREAK]'))
+      .join('\n')
+      .trim();
+    return { breakLines, cleanNotes };
+  }
+
+  function getBreakMinutes(lines: string[]) {
+    return lines.reduce((sum, line) => {
+      const mins = Number(line.match(/\((\d+)\s*min\)/i)?.[1] || 0);
+      return sum + (Number.isFinite(mins) ? mins : 0);
+    }, 0);
   }
 
   function getCodoPeriodStart(dateStr: string) {
@@ -139,8 +224,8 @@ export default function DailyWorkUpdate() {
         if (!(requestedExtraHours > 0 && requestedExtraHours <= 16)) {
           throw new Error('Requested extra hours must be between 0.25 and 16');
         }
-        if (approvalReason.trim().length < 10) {
-          throw new Error('Please provide a detailed reason (minimum 10 characters) for admin approval');
+        if (approvalReason.trim().length === 0) {
+          throw new Error('Please provide a reason for admin approval');
         }
       }
 
@@ -170,6 +255,10 @@ export default function DailyWorkUpdate() {
       const payload: any = {
         ...form,
         notes: `${form.notes || ''}${noteParts.join('\n')}`.trim(),
+        requested_extra_hours: requestAdminApproval ? requestedExtraHours : 0,
+        approval_reason: requestAdminApproval ? approvalReason.trim() : '',
+        break_entries: breakEntries,
+        total_break_minutes: getBreakMinutes(breakEntries),
         planned_projects: selectedProjects.length > 0 ? selectedProjects : undefined,
         planned_work: plannedWork.trim() || undefined
       };
@@ -328,6 +417,15 @@ export default function DailyWorkUpdate() {
       header += `\n📊 Regular Hours: ${regularHours} Hours`;
       header += `\n⏰ Overtime Hours: ${overtimeHours} Hours`;
     }
+    if (requestAdminApproval && requestedExtraHours > 0) {
+      header += `\n🧾 Requested Extra Hours: ${requestedExtraHours} Hours`;
+      if (approvalReason.trim()) {
+        header += `\n📝 Approval Reason: ${approvalReason.trim()}`;
+      }
+    }
+    if (breakEntries.length > 0) {
+      header += `\n☕ Total Break Time: ${getBreakMinutes(breakEntries)} min`;
+    }
 
     // Compute totals for current CODO period up to selected date
     const since = getCodoPeriodStart(form.submission_date);
@@ -364,6 +462,7 @@ export default function DailyWorkUpdate() {
     if (pCount > 0) sec.push(`⌛ Pending (${pCount})\n\n${pTxt}`);
     if (oCount > 0) sec.push(`🔄 Ongoing (${oCount})\n\n${oTxt}`);
     if (uCount > 0) sec.push(`🔥 Upcoming (${uCount})\n\n${uTxt}`);
+    if (breakEntries.length > 0) sec.push(`☕ Breaks (${breakEntries.length})\n\n${breakEntries.join('\n')}`);
 
     // Add Work Notes (always show if there's content)
     const workNotesTxt = (form.planned_work_notes || '').trim();
@@ -387,7 +486,7 @@ export default function DailyWorkUpdate() {
 
     const text = sec.length ? header + `\n\n` + sec.join(`\n\n`) : header;
     setTemplate(text);
-  }, [form.submission_date, form.check_in_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes, form.planned_work_notes, form.planned_work_status, selectedProjects, plannedWork, projects]);
+  }, [form.submission_date, form.check_in_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes, form.planned_work_notes, form.planned_work_status, selectedProjects, plannedWork, projects, requestAdminApproval, requestedExtraHours, approvalReason, overtimeHours, regularHours, breakEntries]);
 
   // Load projects when check-in dialog opens or when we need them for preview
   useEffect(() => {
@@ -437,6 +536,20 @@ export default function DailyWorkUpdate() {
           const existingSubmission = submissions.find(s => s.submission_date === currentDate);
 
           if (existingSubmission) {
+            const parsedBreaks = parseBreakLinesFromNotes(existingSubmission.notes || '');
+            const breaksFromRow = (() => {
+              const raw = existingSubmission.break_entries;
+              if (Array.isArray(raw)) return raw;
+              if (typeof raw === 'string') {
+                try {
+                  const parsed = JSON.parse(raw);
+                  return Array.isArray(parsed) ? parsed : [];
+                } catch {
+                  return [];
+                }
+              }
+              return [];
+            })();
             // Load check-in time if available
             if (existingSubmission.check_in_time) {
               setForm((prev) => ({
@@ -444,6 +557,7 @@ export default function DailyWorkUpdate() {
                 check_in_time: existingSubmission.check_in_time,
               }));
             }
+            setBreakEntries(breaksFromRow.length > 0 ? breaksFromRow : parsedBreaks.breakLines);
 
             // Load planned projects if available
             if (existingSubmission.planned_projects) {
@@ -471,6 +585,7 @@ export default function DailyWorkUpdate() {
             }));
             setSelectedProjects([]);
             setPlannedWork('');
+            setBreakEntries([]);
           }
         } catch (error) {
           console.error('Failed to load check-in data for date:', error);
@@ -502,6 +617,20 @@ export default function DailyWorkUpdate() {
           const existingSubmission = submissions.find(s => s.id == editId);
 
           if (existingSubmission) {
+            const parsedOvertime = parseOvertimeRequestFromNotes(existingSubmission.notes || '');
+            const parsedBreaks = parseBreakLinesFromNotes(parsedOvertime.cleanNotes || '');
+            const requestedFromRow = Number(
+              existingSubmission.requested_extra_hours ?? existingSubmission.requestedExtraHours ?? 0
+            );
+            const reasonFromRow = String(
+              existingSubmission.approval_reason ?? existingSubmission.approvalReason ?? ''
+            ).trim();
+            const resolvedRequested = requestedFromRow > 0
+              ? requestedFromRow
+              : Number(parsedOvertime.requestedFromBlock || 0);
+            const resolvedReason = reasonFromRow || parsedOvertime.reasonFromBlock;
+            const hasApprovalRequest = resolvedRequested > 0 || resolvedReason.length > 0;
+
             setForm({
               submission_date: existingSubmission.submission_date,
               check_in_time: existingSubmission.check_in_time || undefined,
@@ -510,8 +639,25 @@ export default function DailyWorkUpdate() {
               completed_tasks: existingSubmission.completed_tasks || '',
               pending_tasks: existingSubmission.pending_tasks || '',
               ongoing_tasks: existingSubmission.ongoing_tasks || '',
-              notes: existingSubmission.notes || '',
+              notes: parsedBreaks.cleanNotes || '',
             });
+            setRequestAdminApproval(hasApprovalRequest);
+            setRequestedExtraHours(hasApprovalRequest ? resolvedRequested : 0);
+            setApprovalReason(hasApprovalRequest ? resolvedReason : '');
+            const breaksFromRow = (() => {
+              const raw = existingSubmission.break_entries;
+              if (Array.isArray(raw)) return raw;
+              if (typeof raw === 'string') {
+                try {
+                  const parsed = JSON.parse(raw);
+                  return Array.isArray(parsed) ? parsed : [];
+                } catch {
+                  return [];
+                }
+              }
+              return [];
+            })();
+            setBreakEntries(breaksFromRow.length > 0 ? breaksFromRow : parsedBreaks.breakLines);
 
             // Load planned projects and work if available
             if (existingSubmission.planned_projects) {
@@ -531,56 +677,6 @@ export default function DailyWorkUpdate() {
               setPlannedWork(existingSubmission.planned_work);
             }
           }
-        } else {
-          // Load check-in data for current date if not editing
-          // This ensures check-in data persists after page refresh
-          try {
-            const currentDate = form.submission_date || todayYMD();
-            const submissionsRes = await listMySubmissions({ 
-              from: currentDate, 
-              to: currentDate 
-            });
-            const submissions: any[] = (submissionsRes && submissionsRes.data) 
-              ? submissionsRes.data 
-              : Array.isArray(submissionsRes) 
-                ? submissionsRes 
-                : [];
-            
-            // Find submission for current date
-            const existingSubmission = submissions.find(s => s.submission_date === currentDate);
-
-            if (existingSubmission) {
-              // Load check-in time if available
-              if (existingSubmission.check_in_time) {
-                setForm((prev) => ({
-                  ...prev,
-                  check_in_time: existingSubmission.check_in_time,
-                }));
-              }
-
-              // Load planned projects if available
-              if (existingSubmission.planned_projects) {
-                try {
-                  const plannedProjectsArray = typeof existingSubmission.planned_projects === 'string'
-                    ? JSON.parse(existingSubmission.planned_projects)
-                    : existingSubmission.planned_projects;
-                  if (Array.isArray(plannedProjectsArray) && plannedProjectsArray.length > 0) {
-                    setSelectedProjects(plannedProjectsArray);
-                  }
-                } catch (e) {
-                  console.error('Failed to parse planned_projects:', e);
-                }
-              }
-
-              // Load planned work if available
-              if (existingSubmission.planned_work) {
-                setPlannedWork(existingSubmission.planned_work);
-              }
-            }
-          } catch (error) {
-            console.error('Failed to load check-in data:', error);
-            // Don't show error to user, just log it
-          }
         }
       } catch (e) {
         setPendingTasks([]);
@@ -589,7 +685,7 @@ export default function DailyWorkUpdate() {
         setTasksLoading(false);
       }
     })();
-  }, [isEditing, editId, form.submission_date]);
+  }, [isEditing, editId]);
 
   async function startEdit(t: UserTask) {
     setEditingTaskId((t.id as number) ?? null);
@@ -644,6 +740,24 @@ export default function DailyWorkUpdate() {
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Button
+                onClick={onToggleBreak}
+                type="button"
+                variant={isOnBreak ? 'destructive' : 'outline'}
+                className="flex-1 sm:flex-none border-2 transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+              >
+                {isOnBreak ? (
+                  <>
+                    <PlayCircle className="h-4 w-4 mr-2" />
+                    End Break
+                  </>
+                ) : (
+                  <>
+                    <PauseCircle className="h-4 w-4 mr-2" />
+                    Break
+                  </>
+                )}
+              </Button>
               <Button
                 onClick={() => setIsCheckInDialogOpen(true)}
                 disabled={isCheckingIn}
@@ -778,7 +892,7 @@ export default function DailyWorkUpdate() {
                         setRequestedExtraHours(Math.max(0, Math.min(16, next)));
                       }}
                       placeholder="e.g. 2"
-                      className="h-11"
+                      className="h-[110px] text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <p className="text-xs text-gray-600 dark:text-gray-400">
                       Range: 0.25 to 16 hours
@@ -1028,6 +1142,9 @@ Example:
       {/* Professional Check-in Dialog */}
       <Dialog open={isCheckInDialogOpen} onOpenChange={(open) => {
         setIsCheckInDialogOpen(open);
+        if (!open) {
+          setProjectSearch('');
+        }
         // Don't reset selectedProjects and plannedWork when dialog closes
         // They should persist for preview and submission
       }}>
@@ -1112,6 +1229,18 @@ Example:
                 )}
               </Label>
               <div className="border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 shadow-sm">
+                <div className="p-3 pb-0">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      type="text"
+                      value={projectSearch}
+                      onChange={(e) => setProjectSearch(e.target.value)}
+                      placeholder="Search projects..."
+                      className="h-10 pl-10 border-gray-200 dark:border-gray-700"
+                    />
+                  </div>
+                </div>
                 <div className="max-h-56 overflow-y-auto p-3">
                   {loadingProjects ? (
                     <div className="flex items-center justify-center py-8">
@@ -1123,9 +1252,14 @@ Example:
                       <FolderKanban className="h-10 w-10 text-gray-400 mx-auto mb-2 opacity-50" />
                       <p className="text-sm text-gray-500 dark:text-gray-400">No projects available</p>
                     </div>
+                  ) : filteredProjects.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Search className="h-8 w-8 text-gray-400 mx-auto mb-2 opacity-60" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No matching projects</p>
+                    </div>
                   ) : (
                     <div className="space-y-1.5">
-                      {projects.map((project) => {
+                      {filteredProjects.map((project) => {
                         const isSelected = selectedProjects.includes(project.id);
                         return (
                           <div

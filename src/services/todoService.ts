@@ -22,6 +22,10 @@ export type WorkSubmission = {
   check_in_time?: string; // YYYY-MM-DD HH:mm:ss
   hours_today: number;
   overtime_hours?: number;
+  requested_extra_hours?: number;
+  approval_reason?: string;
+  break_entries?: string[];
+  total_break_minutes?: number;
   total_working_days?: number | null;
   total_hours_cumulative?: number | null;
   completed_tasks?: string;

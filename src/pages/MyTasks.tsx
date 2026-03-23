@@ -9,7 +9,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2, Undo2, X, Share2, Copy } from 'lucide-react';
+import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2, Undo2, X, Share2, Copy, ChevronsUpDown, Check } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { useAuth } from '@/context/AuthContext';
@@ -17,6 +17,8 @@ import { useUndoDelete } from '@/hooks/useUndoDelete';
 import { useSearchParams } from 'react-router-dom';
 import { projectService, Project } from '@/services/projectService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
@@ -48,6 +50,7 @@ export default function MyTasks() {
   const [sharedSearchTerm, setSharedSearchTerm] = useState("");
   const [selectedUserTab, setSelectedUserTab] = useState<'all' | 'admin' | 'developer' | 'tester'>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [sharedProjectPickerOpen, setSharedProjectPickerOpen] = useState(false);
   const [showAllAssignees, setShowAllAssignees] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<'details' | 'members'>('details');
   
@@ -1781,9 +1784,12 @@ export default function MyTasks() {
                         <div className="space-y-3">
                           {/* Row 1 */}
                           {row1Buttons.length > 0 && (
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="flex flex-wrap gap-3">
                               {row1Buttons.map((button, index) => (
-                                <div key={`row1-${index}`} className="col-span-1 min-w-0">
+                                <div
+                                  key={`row1-${index}`}
+                                  className="flex-[1_1_132px] min-w-[132px] sm:min-w-[140px]"
+                                >
                                   {button.component}
                                 </div>
                               ))}
@@ -1792,17 +1798,20 @@ export default function MyTasks() {
                           
                           {/* Row 2 */}
                           {row2Buttons.length > 0 && (
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="flex flex-col sm:flex-row gap-3 items-stretch">
                               {row2Buttons.map((button, index) => {
-                                let colSpan = "col-span-1";
+                                let colSpan = "w-full";
                                 if (button.isEdit) {
-                                  colSpan = "sm:col-span-2";
+                                  colSpan = "sm:flex-[2]";
                                 } else if (button.isDelete) {
-                                  colSpan = "sm:col-span-1";
+                                  colSpan = "sm:flex-1";
                                 }
                                 
                                 return (
-                                  <div key={`row2-${index}`} className={`${colSpan} min-w-0`}>
+                                  <div
+                                    key={`row2-${index}`}
+                                    className={`${colSpan} min-w-[132px]`}
+                                  >
                                     {button.component}
                                   </div>
                                 );
@@ -2303,24 +2312,58 @@ export default function MyTasks() {
                     <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Project <span className="text-red-500">*</span>
                     </Label>
-                  <Select
-                      value={editingShared?.project_ids?.[0] || ''}
-                      onValueChange={(value) => setEditingShared({ ...editingShared, project_ids: value ? [value] : [] } as SharedTask)}
-                  >
-                      <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
-                        <SelectValue placeholder="Select a project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {projects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600"></div>
-                              {project.name}
-                            </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <Popover open={sharedProjectPickerOpen} onOpenChange={setSharedProjectPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={sharedProjectPickerOpen}
+                          className="w-full h-12 justify-between border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
+                        >
+                          <span className="truncate flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600"></div>
+                            {editingShared?.project_ids?.[0]
+                              ? projects.find((p) => p.id === editingShared.project_ids?.[0])?.name || "Select a project"
+                              : "Select a project"}
+                          </span>
+                          <ChevronsUpDown className="h-4 w-4 opacity-60" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[90]" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search project..." />
+                          <CommandList className="max-h-64">
+                            <CommandEmpty>No project found.</CommandEmpty>
+                            <CommandGroup>
+                              {projects.map((project) => (
+                                <CommandItem
+                                  key={project.id}
+                                  value={`${project.name} ${project.id}`}
+                                  onSelect={() => {
+                                    setEditingShared({
+                                      ...editingShared,
+                                      project_ids: project.id ? [project.id] : [],
+                                    } as SharedTask);
+                                    setSharedProjectPickerOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      editingShared?.project_ids?.[0] === project.id ? "opacity-100" : "opacity-0"
+                                    }`}
+                                  />
+                                  <div className="flex items-center gap-2 truncate">
+                                    <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600"></div>
+                                    <span className="truncate">{project.name}</span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                 {/* Due Date */}
