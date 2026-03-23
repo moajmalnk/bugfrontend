@@ -1750,9 +1750,9 @@ export default function MyTasks() {
                         }
                       }
 
-                      // Always 2 rows layout with specific grid distribution
-                      // Row 1: Share, Copy, View, Complete/Incomplete/Approve (distribute evenly)
-                      // Row 2: Edit (8 cols) + Delete (4 cols) = 12 cols total
+                      // Responsive 2-row layout:
+                      // Row 1: action buttons in 2 cols (mobile) / 4 cols (desktop)
+                      // Row 2: Edit + Delete split 2:1 on >=sm
                       
                       // Separate buttons into rows by identifying their types
                       const row1Buttons = [];
@@ -1779,49 +1779,30 @@ export default function MyTasks() {
 
                       return (
                         <div className="space-y-3">
-                          {/* Row 1: Share, Copy, View, Complete/Incomplete/Approve (distribute evenly) */}
+                          {/* Row 1 */}
                           {row1Buttons.length > 0 && (
-                            <div className="grid grid-cols-12 gap-3">
-                              {row1Buttons.map((button, index) => {
-                                // Distribute evenly: 3 buttons = 4 cols each, 2 buttons = 6 cols each, 1 button = 12 cols
-                                const colSpan = row1Buttons.length === 3 ? "col-span-4" : 
-                                              row1Buttons.length === 2 ? "col-span-6" : 
-                                              row1Buttons.length === 4 ? "col-span-3" :
-                                              "col-span-12";
-                                return (
-                                  <div key={`row1-${index}`} className={colSpan}>
-                                    {button.component}
-                                  </div>
-                                );
-                              })}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                              {row1Buttons.map((button, index) => (
+                                <div key={`row1-${index}`} className="col-span-1 min-w-0">
+                                  {button.component}
+                                </div>
+                              ))}
                             </div>
                           )}
                           
-                          {/* Row 2: Edit (8 cols) + Delete (4 cols) */}
+                          {/* Row 2 */}
                           {row2Buttons.length > 0 && (
-                            <div className="grid grid-cols-12 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                               {row2Buttons.map((button, index) => {
-                                // Edit gets 8 cols, Delete gets 4 cols
-                                let colSpan = "col-span-12";
+                                let colSpan = "col-span-1";
                                 if (button.isEdit) {
-                                  colSpan = "col-span-8";
+                                  colSpan = "sm:col-span-2";
                                 } else if (button.isDelete) {
-                                  colSpan = "col-span-4";
-                                } else {
-                                  // Fallback for any other buttons in row 2
-                                  const hasEdit = row2Buttons.some(b => b.isEdit);
-                                  const hasDelete = row2Buttons.some(b => b.isDelete);
-                                  if (hasEdit && hasDelete) {
-                                    colSpan = "col-span-12"; // Takes full width if Edit and Delete already present
-                                  } else if (hasEdit) {
-                                    colSpan = "col-span-4"; // Shares remaining 4 cols with Edit's 8
-                                  } else if (hasDelete) {
-                                    colSpan = "col-span-8"; // Shares remaining 8 cols with Delete's 4
-                                  }
+                                  colSpan = "sm:col-span-1";
                                 }
                                 
                                 return (
-                                  <div key={`row2-${index}`} className={colSpan}>
+                                  <div key={`row2-${index}`} className={`${colSpan} min-w-0`}>
                                     {button.component}
                                   </div>
                                 );
@@ -1904,32 +1885,52 @@ export default function MyTasks() {
                     <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Status
                     </Label>
-                  <select
-                      id="edit-task-status"
-                      className="h-11 w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-                    value={editing?.status || 'todo'}
-                    onChange={(e) => setEditing((prev) => ({ ...(prev as UserTask), status: e.target.value as UserTask['status'] }))}
-                  >
-                    {statuses.map((s) => (
-                      <option key={s} value={s}>{s.replace('_',' ')}</option>
-                    ))}
-                  </select>
+                    <Select
+                      value={editing?.status || 'todo'}
+                      onValueChange={(value) =>
+                        setEditing((prev) => ({
+                          ...(prev as UserTask),
+                          status: value as UserTask['status'],
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="edit-task-status" className="h-11 w-full">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[80]">
+                        {statuses.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s.replace('_', ' ')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                 </div>
 
                 <div>
                     <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Priority
                     </Label>
-                  <select
-                      id="edit-task-priority"
-                      className="h-11 w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-                    value={editing?.priority || 'medium'}
-                    onChange={(e) => setEditing((prev) => ({ ...(prev as UserTask), priority: e.target.value as UserTask['priority'] }))}
-                  >
-                    {['low','medium','high'].map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                    <Select
+                      value={editing?.priority || 'medium'}
+                      onValueChange={(value) =>
+                        setEditing((prev) => ({
+                          ...(prev as UserTask),
+                          priority: value as UserTask['priority'],
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="edit-task-priority" className="h-11 w-full">
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[80]">
+                        {['low', 'medium', 'high'].map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -1950,16 +1951,26 @@ export default function MyTasks() {
                     <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Period
                     </Label>
-                  <select
-                      id="edit-task-period"
-                      className="h-11 w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-                    value={editing?.period || 'daily'}
-                    onChange={(e) => setEditing((prev) => ({ ...(prev as UserTask), period: e.target.value as UserTask['period'] }))}
-                  >
-                    {['daily','weekly','monthly','yearly','custom'].map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                    <Select
+                      value={editing?.period || 'daily'}
+                      onValueChange={(value) =>
+                        setEditing((prev) => ({
+                          ...(prev as UserTask),
+                          period: value as UserTask['period'],
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="edit-task-period" className="h-11 w-full">
+                        <SelectValue placeholder="Select period" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[80]">
+                        {['daily', 'weekly', 'monthly', 'yearly', 'custom'].map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

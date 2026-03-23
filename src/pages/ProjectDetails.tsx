@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -27,6 +28,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -56,6 +65,7 @@ import {
   Bug,
   BugIcon,
   CheckCircle2,
+  Check,
   ChevronDown,
   ChevronLeft,
   Calendar,
@@ -3789,6 +3799,7 @@ const ProjectDetails = () => {
     "all"
   );
   const [isAdding, setIsAdding] = useState(false);
+  const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   // Member tab state management
   const [activeMemberTab, setActiveMemberTab] = useState<"developers" | "testers" | "admins">(() => {
     if (currentUser?.role === "admin") return "developers";
@@ -5239,17 +5250,22 @@ const ProjectDetails = () => {
                   </div>
                   <div className="sm:w-48">
                     <div className="relative">
-                      <select
+                      <Select
                         value={roleFilter}
-                        onChange={(e) => setRoleFilter(e.target.value as any)}
-                        className="w-full h-11 pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200 appearance-none"
+                        onValueChange={(value) =>
+                          setRoleFilter(value as "all" | "developer" | "tester")
+                        }
                       >
-                        <option value="all">All Roles</option>
-                        <option value="developer">Developers</option>
-                        <option value="tester">Testers</option>
-                      </select>
+                        <SelectTrigger className="w-full h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200">
+                          <SelectValue placeholder="All Roles" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[80]">
+                          <SelectItem value="all">All Roles</SelectItem>
+                          <SelectItem value="developer">Developers</SelectItem>
+                          <SelectItem value="tester">Testers</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                         </div>
                       </div>
                 </div>
@@ -5307,44 +5323,63 @@ const ProjectDetails = () => {
                       )}
                     </div>
 
-                    {/* Single-select to add more users */}
+                    {/* Searchable custom dropdown to add members */}
                   <div className="relative mb-4">
-                      <select
-                      className="appearance-none w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 pr-10 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none transition-all duration-200 text-sm"
-                        value=""
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value) {
-                            setSelectedUsers((prev) =>
-                              prev.includes(value) ? prev : [...prev, value]
-                            );
-                          }
-                        }}
-                        onClick={fetchAvailableMembers}
-                        aria-label="Select member to add"
-                      >
-                        <option value="" disabled>
+                    <Popover
+                      open={memberPickerOpen}
+                      onOpenChange={(open) => {
+                        setMemberPickerOpen(open);
+                        if (open) fetchAvailableMembers();
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={memberPickerOpen}
+                          aria-label="Select member to add"
+                          className="w-full justify-between border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm font-normal h-10"
+                        >
                           Select member to add...
-                        </option>
-                        {availableMembers
-                          ?.slice()
-                          .sort((a, b) =>
-                            (a.username || "").localeCompare(b.username || "")
-                          )
-                          .filter(
-                            (user) =>
-                              user.id && !selectedUsers.includes(user.id)
-                          )
-                          .map((user) => (
-                            <option
-                              key={user.id}
-                              value={user.id}
-                              className="py-1"
-                            >
-                              {user.username} ({user.role})
-                            </option>
-                          ))}
-                      </select>
+                          <ChevronDown className="h-4 w-4 opacity-60" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[90]" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search member by name or role..." />
+                          <CommandList className="max-h-64">
+                            <CommandEmpty>No available members found.</CommandEmpty>
+                            <CommandGroup>
+                              {availableMembers
+                                ?.slice()
+                                .sort((a, b) =>
+                                  (a.username || "").localeCompare(b.username || "")
+                                )
+                                .filter((user) => user.id && !selectedUsers.includes(user.id))
+                                .map((user) => (
+                                  <CommandItem
+                                    key={user.id}
+                                    value={`${user.id} ${user.username} ${user.role}`}
+                                    onSelect={() => {
+                                      if (user.id) {
+                                        setSelectedUsers((prev) =>
+                                          prev.includes(user.id) ? prev : [...prev, user.id]
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <Check className="mr-2 h-4 w-4 opacity-0" />
+                                    <span className="truncate">
+                                      {user.username} ({user.role})
+                                    </span>
+                                  </CommandItem>
+                                ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                       <p className="mt-1 text-xs text-muted-foreground">
                       Pick a user to add; they appear above. Remove with the ×.
                       </p>

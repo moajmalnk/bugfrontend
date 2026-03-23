@@ -16,6 +16,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -35,6 +44,8 @@ import {
   ImagePlus,
   Paperclip,
   Plus,
+  Check,
+  ChevronsUpDown,
   X,
 } from "lucide-react";
 import {
@@ -98,6 +109,7 @@ const NewBug = () => {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
   const [activeVoiceNoteId, setActiveVoiceNoteId] = useState<string | null>(null);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
   // Refs for file inputs
   const screenshotInputRef = useRef<HTMLInputElement>(null);
@@ -603,32 +615,66 @@ const NewBug = () => {
                         <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-violet-600 rounded-full"></div>
                         Project
                       </Label>
-                      <Select value={projectId} onValueChange={setProjectId} required>
-                        <SelectTrigger id="project" className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md">
-                          <SelectValue placeholder="Select a project" />
-                        </SelectTrigger>
-                        <SelectContent className="z-[60]">
-                          {isLoading ? (
-                            <SelectItem value="loading" disabled>
-                              Loading projects...
-                            </SelectItem>
-                          ) : error ? (
-                            <SelectItem value="error" disabled>
-                              Error loading projects
-                            </SelectItem>
-                          ) : (projects as Project[])?.length === 0 ? (
-                            <SelectItem value="none" disabled>
-                              No projects available
-                            </SelectItem>
-                          ) : (
-                            (projects as Project[])?.map((project: Project) => (
-                              <SelectItem key={project.id} value={project.id}>
-                                {project.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            id="project"
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={projectPickerOpen}
+                            className="h-12 w-full justify-between border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                          >
+                            <span className="truncate">
+                              {projectId
+                                ? (projects as Project[])?.find((p) => p.id === projectId)?.name || "Select a project"
+                                : "Select a project"}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[70]" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search project..." />
+                            <CommandList>
+                              <CommandEmpty>No project found.</CommandEmpty>
+                              {isLoading ? (
+                                <CommandGroup>
+                                  <CommandItem disabled>Loading projects...</CommandItem>
+                                </CommandGroup>
+                              ) : error ? (
+                                <CommandGroup>
+                                  <CommandItem disabled>Error loading projects</CommandItem>
+                                </CommandGroup>
+                              ) : (projects as Project[])?.length === 0 ? (
+                                <CommandGroup>
+                                  <CommandItem disabled>No projects available</CommandItem>
+                                </CommandGroup>
+                              ) : (
+                                <CommandGroup>
+                                  {(projects as Project[])?.map((project: Project) => (
+                                    <CommandItem
+                                      key={project.id}
+                                      value={`${project.name} ${project.id}`}
+                                      onSelect={() => {
+                                        setProjectId(project.id);
+                                        setProjectPickerOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${
+                                          projectId === project.id ? "opacity-100" : "opacity-0"
+                                        }`}
+                                      />
+                                      {project.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   )}
 

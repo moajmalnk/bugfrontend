@@ -94,7 +94,9 @@ export function HourPicker({
           <div className="space-y-2">
             <div className="text-xs text-muted-foreground">Quick Select</div>
             <div className="grid grid-cols-3 gap-2">
-              {[4, 6, 8, 10, 12, 24].map((h) => (
+              {[4, 6, 8, 10, 12, 24]
+                .filter((h) => h >= min && h <= max)
+                .map((h) => (
                 <Button
                   key={h}
                   type="button"

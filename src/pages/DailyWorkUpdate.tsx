@@ -65,22 +65,20 @@ export default function DailyWorkUpdate() {
   const [plannedWorkStatus, setPlannedWorkStatus] = useState<StatusOption>('not_started');
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [requestAdminApproval, setRequestAdminApproval] = useState(false);
+  const [requestedExtraHours, setRequestedExtraHours] = useState<number>(0);
+  const [approvalReason, setApprovalReason] = useState('');
 
-  // Calculate overtime automatically
-  const overtimeHours = useMemo(() => {
-    const hours = Number(form.hours_today);
-    return hours > 8 ? hours - 8 : 0;
-  }, [form.hours_today]);
-
-  const regularHours = useMemo(() => {
-    const hours = Number(form.hours_today);
-    return Math.min(hours, 8);
-  }, [form.hours_today]);
+  const overtimeHours = useMemo(() => requestedExtraHours, [requestedExtraHours]);
+  const regularHours = useMemo(() => Math.min(Number(form.hours_today), 8), [form.hours_today]);
 
   const canSubmit = useMemo(() => {
     const hasDate = !!form.submission_date;
     const hrs = Number(form.hours_today);
-    const hasHours = hrs >= 1 && hrs <= 24;
+    const hasHours = hrs >= 1 && hrs <= 8;
+    const overtimeRequestValid = !requestAdminApproval
+      ? true
+      : requestedExtraHours > 0 && requestedExtraHours <= 16 && approvalReason.trim().length >= 10;
 
     // Check if at least one task field has content
     const hasTasks = countItems(form.completed_tasks) > 0 ||
@@ -88,8 +86,8 @@ export default function DailyWorkUpdate() {
       countItems(form.ongoing_tasks) > 0 ||
       countItems(form.notes) > 0;
 
-    return hasDate && hasHours && hasTasks;
-  }, [form]);
+    return hasDate && hasHours && hasTasks && overtimeRequestValid;
+  }, [form, requestAdminApproval, requestedExtraHours, approvalReason]);
 
   function countItems(text?: string) {
     if (!text) return 0;
@@ -134,8 +132,16 @@ export default function DailyWorkUpdate() {
         throw new Error('Date is required');
       }
       const hoursNum = Number(form.hours_today);
-      if (!(hoursNum >= 1 && hoursNum <= 24)) {
-        throw new Error("Today's Hours must be between 1 and 24");
+      if (!(hoursNum >= 1 && hoursNum <= 8)) {
+        throw new Error("Today's Hours must be between 1 and 8");
+      }
+      if (requestAdminApproval) {
+        if (!(requestedExtraHours > 0 && requestedExtraHours <= 16)) {
+          throw new Error('Requested extra hours must be between 0.25 and 16');
+        }
+        if (approvalReason.trim().length < 10) {
+          throw new Error('Please provide a detailed reason (minimum 10 characters) for admin approval');
+        }
       }
 
       // Validate that at least one task field has content
@@ -154,8 +160,16 @@ export default function DailyWorkUpdate() {
       });
       
       // Get planned projects and work from check-in data if available
+      const noteParts: string[] = [];
+      if (requestAdminApproval) {
+        noteParts.push(
+          `\n[OVERTIME APPROVAL REQUEST]\nRequested Extra Hours: ${requestedExtraHours}\nReason: ${approvalReason.trim()}`
+        );
+      }
+
       const payload: any = {
         ...form,
+        notes: `${form.notes || ''}${noteParts.join('\n')}`.trim(),
         planned_projects: selectedProjects.length > 0 ? selectedProjects : undefined,
         planned_work: plannedWork.trim() || undefined
       };
@@ -694,7 +708,7 @@ export default function DailyWorkUpdate() {
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Basic Information</h2>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="work-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Work Date <span className="text-red-500">*</span>
@@ -714,21 +728,85 @@ export default function DailyWorkUpdate() {
                     value={form.hours_today}
                     onChange={(v) => setForm((p) => ({ ...p, hours_today: v }))}
                     min={1}
-                    max={24}
+                    max={8}
                     step={0.25}
                     placeholder="Select hours"
                   />
                 </div>
               </div>
 
+              <div className="mt-4 p-3 sm:p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-start sm:items-center gap-3">
+                  <Checkbox
+                    id="request-admin-approval"
+                    checked={requestAdminApproval}
+                    onCheckedChange={(checked) => {
+                      const enabled = Boolean(checked);
+                      setRequestAdminApproval(enabled);
+                      if (!enabled) {
+                        setRequestedExtraHours(0);
+                        setApprovalReason('');
+                      }
+                    }}
+                  />
+                  <div className="space-y-1 min-w-0">
+                    <Label htmlFor="request-admin-approval" className="text-sm font-semibold text-blue-900 dark:text-blue-200 cursor-pointer">
+                      Worked more than 8 hours? Request Admin Approval
+                    </Label>
+                    <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300">
+                      Daily hours are capped at 8. Use this option to request extra-hour approval.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {requestAdminApproval && (
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                  <div className="space-y-2 md:col-span-4">
+                    <Label htmlFor="requested-extra-hours" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Requested Extra Hours
+                    </Label>
+                    <Input
+                      id="requested-extra-hours"
+                      type="number"
+                      min={0.25}
+                      max={16}
+                      step={0.25}
+                      value={requestedExtraHours || ''}
+                      onChange={(e) => {
+                        const next = Number(e.target.value || 0);
+                        setRequestedExtraHours(Math.max(0, Math.min(16, next)));
+                      }}
+                      placeholder="e.g. 2"
+                      className="h-11"
+                    />
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      Range: 0.25 to 16 hours
+                    </p>
+                  </div>
+                  <div className="space-y-2 md:col-span-8">
+                    <Label htmlFor="approval-reason" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Reason for Approval
+                    </Label>
+                    <Textarea
+                      id="approval-reason"
+                      className="min-h-[110px] border-2 border-orange-200 dark:border-orange-800 focus:border-orange-500 dark:focus:border-orange-400 rounded-xl text-sm leading-relaxed resize-none"
+                      value={approvalReason}
+                      onChange={(e) => setApprovalReason(e.target.value)}
+                      placeholder="Explain why extra hours are needed..."
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Overtime Breakdown - Compact */}
-              {overtimeHours > 0 && (
-                <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                  <div className="flex items-center justify-between text-sm">
+              {requestAdminApproval && overtimeHours > 0 && (
+                <div className="mt-4 p-3 sm:p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-sm">
                     <span className="text-gray-600 dark:text-gray-400">Regular Hours:</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{regularHours}h</span>
-                    <span className="text-gray-600 dark:text-gray-400">Overtime:</span>
-                    <span className="font-semibold text-orange-600 dark:text-orange-400">{overtimeHours}h</span>
+                    <span className="font-semibold text-gray-900 dark:text-white text-right sm:text-left">{regularHours}h</span>
+                    <span className="text-gray-600 dark:text-gray-400">Requested Extra:</span>
+                    <span className="font-semibold text-orange-600 dark:text-orange-400 text-right sm:text-left">{overtimeHours}h</span>
                   </div>
                 </div>
               )}
@@ -736,7 +814,8 @@ export default function DailyWorkUpdate() {
               {!canSubmit && (
                 <div className="mt-4 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
                   <p className="text-sm text-red-700 dark:text-red-300">
-                    Please complete: Date, Hours (1–24), and at least one task field.
+                    Please complete: Date, Hours (1–8), and at least one task field.
+                    {requestAdminApproval && ' For approval requests, add requested extra hours and a detailed reason.'}
                   </p>
                 </div>
               )}

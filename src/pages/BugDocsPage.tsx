@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,46 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+
+const BugDocCardSkeleton = ({ index = 0 }: { index?: number }) => (
+  <div
+    className="group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 animate-pulse"
+    style={{ animationDelay: `${index * 80}ms` }}
+  >
+    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-300/60 to-red-400/60" />
+    <div className="p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <Skeleton className="h-10 w-10 rounded-lg" />
+          <div className="flex-1 min-w-0 space-y-2">
+            <Skeleton className="h-5 w-4/5" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        </div>
+        <Skeleton className="h-6 w-20 rounded-full" />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        {[0, 1, 2, 3].map((item) => (
+          <div key={item} className="flex items-center gap-2">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <div className="space-y-1.5 flex-1">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
+        <Skeleton className="h-9 flex-1 rounded-md" />
+        <Skeleton className="h-9 flex-1 rounded-md" />
+        <Skeleton className="h-9 w-10 rounded-md" />
+        <Skeleton className="h-9 w-10 rounded-md" />
+      </div>
+    </div>
+  </div>
+);
 
 const BugDocsPage = () => {
   const { currentUser } = useAuth();
@@ -1089,9 +1130,10 @@ const BugDocsPage = () => {
               {!shouldShowProjectCards() && (
                 <div className="space-y-4">
                   {isLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                      <span className="ml-2 text-muted-foreground">Loading documents...</span>
+                    <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 lg:grid-cols-2" aria-label="Loading documents">
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <BugDocCardSkeleton key={`bugdoc-skeleton-${index}`} index={index} />
+                      ))}
                     </div>
                   ) : filteredDocuments.length === 0 ? (
                     <div className="relative overflow-hidden">
