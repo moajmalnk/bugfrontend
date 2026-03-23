@@ -879,58 +879,62 @@ const NewBug = () => {
                             disabled={isSubmitting}
                             maxDuration={300}
                           />
+
+                          {/* Preview of voice notes */}
+                          {voiceNotes.length > 0 && (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                  Voice Notes ({voiceNotes.length})
+                                </Label>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={clearAllVoiceNotes}
+                                  className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                                >
+                                  Clear All
+                                </Button>
+                              </div>
+                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                {voiceNotes.map((voiceNote, index) => {
+                                  const voiceId = voiceNote.id;
+                                  return (
+                                    <div
+                                      key={voiceId}
+                                      className="rounded-xl border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800"
+                                    >
+                                      <WhatsAppVoiceMessage
+                                        id={voiceId}
+                                        audioSource={voiceNote.blob}
+                                        duration={voiceNote.duration}
+                                        waveform={voiceNote.waveform}
+                                        accent="sent"
+                                        autoPlay
+                                        isActive={activeVoiceNoteId === voiceId}
+                                        onPlay={(id) => setActiveVoiceNoteId(id)}
+                                        onPause={(id) => {
+                                          if (id === activeVoiceNoteId) {
+                                            setActiveVoiceNoteId(null);
+                                          }
+                                        }}
+                                        onRemove={() => {
+                                          if (activeVoiceNoteId === voiceId) {
+                                            setActiveVoiceNoteId(null);
+                                          }
+                                          removeVoiceNote(index);
+                                        }}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-
-                  {/* Compact WhatsApp-style voice notes list below attachments */}
-                  {voiceNotes.length > 0 && (
-                    <div className="mt-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                          Voice Notes ({voiceNotes.length})
-                        </Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={clearAllVoiceNotes}
-                          className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
-                        >
-                          Clear All
-                        </Button>
-                      </div>
-                      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                        {voiceNotes.map((voiceNote, index) => {
-                          const voiceId = voiceNote.id;
-                          return (
-                            <WhatsAppVoiceMessage
-                              key={voiceId}
-                              id={voiceId}
-                              audioSource={voiceNote.blob}
-                              duration={voiceNote.duration}
-                              waveform={voiceNote.waveform}
-                              accent="sent"
-                              autoPlay
-                              isActive={activeVoiceNoteId === voiceId}
-                              onPlay={(id) => setActiveVoiceNoteId(id)}
-                              onPause={(id) => {
-                                if (id === activeVoiceNoteId) {
-                                  setActiveVoiceNoteId(null);
-                                }
-                              }}
-                              onRemove={() => {
-                                if (activeVoiceNoteId === voiceId) {
-                                  setActiveVoiceNoteId(null);
-                                }
-                                removeVoiceNote(index);
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
                 <CardFooter className="p-6 sm:p-8 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
                   <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">
