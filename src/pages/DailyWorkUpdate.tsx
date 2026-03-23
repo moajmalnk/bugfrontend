@@ -200,19 +200,15 @@ export default function DailyWorkUpdate() {
     const startedAt = breakStartedAt ?? endedAt;
     const durationMins = Math.max(1, Math.round((endedAt.getTime() - startedAt.getTime()) / 60000));
     const breakLine = `[BREAK] ${to12hTime(startedAt)} - ${to12hTime(endedAt)} (${durationMins} min)`;
-    setBreakEntries((prev) => [...prev, breakLine]);
-    setForm((prev) => {
-      const current = (prev.notes || '').trim();
-      return {
-        ...prev,
-        notes: current ? `${current}\n${breakLine}` : breakLine,
-      };
+    setBreakEntries((prev) => {
+      if (prev.includes(breakLine)) return prev;
+      return [...prev, breakLine];
     });
     setIsOnBreak(false);
     setBreakStartedAt(null);
     toast({
       title: 'Break ended',
-      description: `Added break entry (${durationMins} min) to Upcoming notes.`,
+      description: `Break recorded (${durationMins} min).`,
     });
   }
 
@@ -312,9 +308,10 @@ export default function DailyWorkUpdate() {
         );
       }
 
+      const cleanedNotes = parseBreakLinesFromNotes(form.notes || '').cleanNotes;
       const payload: any = {
         ...form,
-        notes: `${form.notes || ''}${noteParts.join('\n')}`.trim(),
+        notes: `${cleanedNotes}${noteParts.join('\n')}`.trim(),
         requested_extra_hours: requestAdminApproval ? requestedExtraHours : 0,
         approval_reason: requestAdminApproval ? approvalReason.trim() : '',
         break_entries: breakEntries,
@@ -517,7 +514,7 @@ export default function DailyWorkUpdate() {
     const cTxt = (form.completed_tasks || '').trim();
     const pTxt = (form.pending_tasks || '').trim();
     const oTxt = (form.ongoing_tasks || '').trim();
-    const uTxt = (form.notes || '').trim();
+    const uTxt = parseBreakLinesFromNotes(form.notes || '').cleanNotes;
     if (cCount > 0) sec.push(`✅ Completed (${cCount})\n\n${cTxt}`);
     if (pCount > 0) sec.push(`⌛ Pending (${pCount})\n\n${pTxt}`);
     if (oCount > 0) sec.push(`🔄 Ongoing (${oCount})\n\n${oTxt}`);

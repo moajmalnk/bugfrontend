@@ -26,6 +26,10 @@ interface WorkStats {
     period_name: string;
     days: number;
     hours: number;
+    overtime_hours?: number;
+    requested_extra_hours?: number;
+    approval_requests?: number;
+    break_minutes?: number;
     task_counts: TaskCounts;
   };
   period_trend: Array<{
@@ -33,6 +37,10 @@ interface WorkStats {
     period_name: string;
     days: number;
     hours: number;
+    overtime_hours?: number;
+    requested_extra_hours?: number;
+    approval_requests?: number;
+    break_minutes?: number;
     task_counts: TaskCounts;
   }>;
   last_updated: string;
@@ -351,6 +359,33 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                 </Card>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-orange-100/40 dark:from-orange-950/20 dark:to-orange-900/10">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Overtime Hours</p>
+                    <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                      {Number(selectedPeriod.overtime_hours || 0).toFixed(1)}h
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100/40 dark:from-amber-950/20 dark:to-amber-900/10">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">OT Requested</p>
+                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                      {Number(selectedPeriod.requested_extra_hours || 0).toFixed(1)}h
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-cyan-50 to-cyan-100/40 dark:from-cyan-950/20 dark:to-cyan-900/10">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Break Time</p>
+                    <p className="text-2xl font-bold text-cyan-700 dark:text-cyan-300">
+                      {Math.max(0, Number(selectedPeriod.break_minutes || 0))}m
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
               <Separator />
 
               {/* Task Breakdown */}
@@ -658,6 +693,24 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                                     <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
                                     <span className="text-gray-600 dark:text-gray-400">Upcoming:</span>
                                     <span className="font-medium text-purple-600 dark:text-purple-400">{submission.upcoming_count}</span>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mt-2">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-gray-600 dark:text-gray-400">OT:</span>
+                                    <span className="font-medium text-orange-600 dark:text-orange-400">{Number(submission.overtime_hours || 0).toFixed(1)}h</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-gray-600 dark:text-gray-400">Requested:</span>
+                                    <span className="font-medium text-amber-600 dark:text-amber-400">{Number(submission.requested_extra_hours || 0).toFixed(1)}h</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-gray-600 dark:text-gray-400">Break:</span>
+                                    <span className="font-medium text-cyan-600 dark:text-cyan-400">{Math.max(0, Number(submission.break_minutes || 0))}m</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-gray-600 dark:text-gray-400">Requests:</span>
+                                    <span className="font-medium text-rose-600 dark:text-rose-400">{submission.approval_reason || Number(submission.requested_extra_hours || 0) > 0 ? 'Yes' : 'No'}</span>
                                   </div>
                                 </div>
                                 {submission.planned_work && (
