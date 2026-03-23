@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { listMySubmissions, deleteSubmission } from '@/services/todoService';
+import { listMySubmissions, listAllRequestSubmissions, deleteSubmission } from '@/services/todoService';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
@@ -23,6 +23,7 @@ export default function DailyUpdate() {
   const initialTab = searchParams.get("tab") || "all-submissions";
   const [activeTab, setActiveTab] = useState(initialTab);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [allUserRequestSubmissions, setAllUserRequestSubmissions] = useState<any[]>([]);
   const [subsLoading, setSubsLoading] = useState(false);
   const [activeMonth, setActiveMonth] = useState<string>(searchParams.get('month') || ''); // YYYY-MM
   const [submissionToDelete, setSubmissionToDelete] = useState<any | null>(null);
@@ -128,6 +129,16 @@ export default function DailyUpdate() {
     return {
       from: start.toISOString().slice(0, 10),
       to: end.toISOString().slice(0, 10),
+    };
+  }
+
+  function getSubmissionWindow(refDate?: string) {
+    const base = refDate ? new Date(refDate) : new Date();
+    const windowEnd = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+    const windowStart = new Date(base.getFullYear(), base.getMonth() - 11, 1);
+    return {
+      from: windowStart.toISOString().slice(0, 10),
+      to: windowEnd.toISOString().slice(0, 10),
     };
   }
 
@@ -351,12 +362,7 @@ export default function DailyUpdate() {
   async function loadSubmissions(refDate?: string) {
     try {
       setSubsLoading(true);
-      const base = refDate ? new Date(refDate) : new Date();
-      // Load a 12-month window ending at end of the base month
-      const windowEnd = new Date(base.getFullYear(), base.getMonth()+1, 0);
-      const windowStart = new Date(base.getFullYear(), base.getMonth()-11, 1);
-      const from = windowStart.toISOString().slice(0, 10);
-      const to = windowEnd.toISOString().slice(0, 10);
+      const { from, to } = getSubmissionWindow(refDate);
       const res: any = await listMySubmissions({ from, to });
       const items: any[] = (res && res.data) ? res.data : Array.isArray(res) ? res : [];
       setSubmissions(items);
@@ -377,10 +383,31 @@ export default function DailyUpdate() {
     }
   }
 
+  async function loadAllUserRequestSubmissions(refDate?: string) {
+    if (currentUser?.role !== 'admin') return;
+    try {
+      setSubsLoading(true);
+      const { from, to } = getSubmissionWindow(refDate);
+      const res: any = await listAllRequestSubmissions({ from, to });
+      const items: any[] = (res && res.data) ? res.data : Array.isArray(res) ? res : [];
+      setAllUserRequestSubmissions(items);
+    } catch {
+      setAllUserRequestSubmissions([]);
+    } finally {
+      setSubsLoading(false);
+    }
+  }
+
   // Load my submissions for current month
   useEffect(() => {
     loadSubmissions();
   }, []);
+
+  useEffect(() => {
+    if (currentUser?.role === 'admin' && showRequestsOnly) {
+      loadAllUserRequestSubmissions();
+    }
+  }, [currentUser?.role, showRequestsOnly]);
 
   // Keep tab in sync with URL changes (back/forward navigation)
   useEffect(() => {
@@ -391,12 +418,16 @@ export default function DailyUpdate() {
 
   // Filter submissions based on active tab
   const filteredSubmissions = useMemo(() => {
+    const source =
+      currentUser?.role === 'admin' && showRequestsOnly
+        ? allUserRequestSubmissions
+        : submissions;
     if (activeTab === "today-submissions") {
       const today = todayYMD();
-      return submissions.filter(s => s.submission_date === today);
+      return source.filter(s => s.submission_date === today);
     }
-    return submissions;
-  }, [submissions, activeTab]);
+    return source;
+  }, [submissions, allUserRequestSubmissions, activeTab, currentUser?.role, showRequestsOnly]);
 
   const visibleSubmissions = useMemo(() => {
     const byRequest = showRequestsOnly ? filteredSubmissions.filter(hasApprovalRequest) : filteredSubmissions;
@@ -415,12 +446,16 @@ export default function DailyUpdate() {
 
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
+    const source =
+      currentUser?.role === 'admin' && showRequestsOnly
+        ? allUserRequestSubmissions
+        : submissions;
     switch (tabType) {
       case "all-submissions":
-        return submissions.length;
+        return source.length;
       case "today-submissions":
         const today = todayYMD();
-        return submissions.filter(s => s.submission_date === today).length;
+        return source.filter(s => s.submission_date === today).length;
       default:
         return 0;
     }
@@ -598,11 +633,11 @@ export default function DailyUpdate() {
         <div className="relative overflow-hidden rounded-2xl shadow-lg border border-gray-200/40 dark:border-gray-700/40">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 md:p-8 lg:p-10">
-            <div className="flex items-center justify-between gap-4 mb-8">
-              <div className="p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20">
+            <div className="relative flex items-center justify-center mb-8 min-h-[56px]">
+              <div className="absolute left-0 p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20">
                 <FileText className="h-6 w-6 text-white" />
               </div>
-              <div>
+              <div className="text-center">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Saved Submissions</h2>
                 <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">Your previous daily work updates</p>
               </div>
@@ -611,7 +646,7 @@ export default function DailyUpdate() {
                   type="button"
                   variant={showRequestsOnly ? 'default' : 'outline'}
                   onClick={() => setShowRequestsOnly((prev) => !prev)}
-                  className={`ml-auto h-10 px-4 rounded-xl text-xs sm:text-sm ${
+                  className={`absolute right-0 h-10 px-4 rounded-xl text-xs sm:text-sm ${
                     showRequestsOnly
                       ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:from-orange-700 hover:to-amber-700'
                       : ''
@@ -674,6 +709,11 @@ export default function DailyUpdate() {
                         <div className="font-semibold text-sm text-gray-900 dark:text-white">
                           {s.submission_date}
                         </div>
+                        {currentUser?.role === 'admin' && showRequestsOnly && (
+                          <div className="text-xs text-blue-600 dark:text-blue-300 font-medium mt-0.5">
+                            {s.username || 'User'} {s.role ? `• ${String(s.role).toUpperCase()}` : ''}
+                          </div>
+                        )}
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {s.start_time ? `Started at ${s.start_time}` : 'No start time'} • {s.hours_today ?? 0} hours
                           {Number(s.overtime_hours || 0) > 0 && (
@@ -685,7 +725,7 @@ export default function DailyUpdate() {
                       </div>
                       <div className="flex items-center gap-1">
                         {/* Edit button - only for today */}
-                        {isToday(s.submission_date) && (
+                        {!(currentUser?.role === 'admin' && showRequestsOnly) && isToday(s.submission_date) && (
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -707,12 +747,12 @@ export default function DailyUpdate() {
                         >
                           <ClipboardCopy className="h-3 w-3" />
                         </Button>
-                        {submissionToDelete?.id === s.id && undoDelete.isCountingDown ? (
+                        {!(currentUser?.role === 'admin' && showRequestsOnly) && submissionToDelete?.id === s.id && undoDelete.isCountingDown ? (
                           <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium">
                             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
                             Deleting in {undoDelete.timeLeft}s
                           </div>
-                        ) : (
+                        ) : !(currentUser?.role === 'admin' && showRequestsOnly) ? (
                           <Button 
                             variant="destructive" 
                             size="sm" 
@@ -721,7 +761,7 @@ export default function DailyUpdate() {
                           >
                             Delete
                           </Button>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                     <div className="max-h-48 overflow-y-auto overflow-x-hidden rounded-lg bg-gray-50 dark:bg-gray-800 p-3 no-scrollbar">

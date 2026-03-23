@@ -227,6 +227,15 @@ export async function listMySubmissions(params: { from?: string; to?: string } =
   return data;
 }
 
+export async function listAllRequestSubmissions(params: { from?: string; to?: string } = {}) {
+  const qs = new URLSearchParams({ ...params, _t: Date.now().toString() });
+  const res = await fetch(`${API}/tasks/all_request_submissions.php${qs ? `?${qs}` : ''}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to load request submissions');
+  return res.json();
+}
+
 export async function deleteSubmission(arg: { id?: number; submission_date?: string }) {
   const res = await fetch(`${API}/tasks/delete_submission.php`, {
     method: 'POST',
