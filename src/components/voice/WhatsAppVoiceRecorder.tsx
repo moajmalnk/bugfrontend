@@ -159,9 +159,13 @@ export function WhatsAppVoiceRecorder({
   };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    if (!Number.isFinite(seconds) || seconds <= 0) return "00:00";
+    const normalizedSeconds = seconds < 1 ? 1 : Math.floor(seconds);
+    const mins = Math.floor(normalizedSeconds / 60);
+    const secs = normalizedSeconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   const isIdle = !isRecording && !isProcessing && elapsed === 0;

@@ -61,7 +61,6 @@ interface VoiceNote {
   duration: number;
   name: string;
   isPlaying: boolean;
-  audioUrl?: string;
   waveform?: number[];
 }
 
@@ -104,23 +103,6 @@ const NewBug = () => {
   const screenshotInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Cleanup effect for blob URLs
-  useEffect(() => {
-    return () => {
-      // Clean up all blob URLs when component unmounts
-      voiceNotes.forEach((voiceNote) => {
-        if (voiceNote.audioUrl && voiceNote.audioUrl.startsWith("blob:")) {
-          try {
-            URL.revokeObjectURL(voiceNote.audioUrl);
-          } catch (error) {
-            console.error("Error revoking blob URL on cleanup:", error);
-          }
-        }
-      });
-
-    };
-  }, [voiceNotes]);
-
   const {
     data: projects = [],
     isLoading,
@@ -154,14 +136,12 @@ const NewBug = () => {
     duration,
     waveform,
   }: RecordedVoiceNote) => {
-    const audioUrl = URL.createObjectURL(blob);
     const voiceNote: VoiceNote = {
       id: Date.now().toString(),
       blob,
       duration: Math.max(1, Math.round(duration || 0)),
       name: `Voice Note ${voiceNotes.length + 1}`,
       isPlaying: false,
-      audioUrl,
       waveform,
     };
 
@@ -171,14 +151,6 @@ const NewBug = () => {
 
   const removeVoiceNote = (index: number) => {
     const voiceNote = voiceNotes[index];
-    if (voiceNote.audioUrl) {
-      try {
-        URL.revokeObjectURL(voiceNote.audioUrl);
-        console.log("Revoked blob URL for:", voiceNote.name);
-      } catch (error) {
-        console.error("Error revoking blob URL:", error);
-      }
-    }
     setActiveVoiceNoteId((prev) => (prev === voiceNote.id ? null : prev));
     setVoiceNotes((prev) => prev.filter((_, i) => i !== index));
   };
@@ -249,49 +221,63 @@ const NewBug = () => {
         console.log(`Added voice note ${index + 1}: ${fileName}, Size: ${voiceNote.blob.size}, Type: ${voiceNote.blob.type}`);
       });
 
-      // Show optimistic success toast immediately for better UX
-      toast({
-        title: "Submitting...",
-        description: "Your bug report is being submitted",
-      });
-
       const response = await apiClient.post('/bugs/create.php', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 60000, // Allow time if server runs notifications inline fallback
+        timeout: 30000,
       });
 
       const data = response.data as ApiResponse<any>;
 
       if (data.success) {
+        const bugId =
+          data.data?.bug?.id || (data as any).bugId || data.data?.id || (data as any).id;
+
+        // Fire-and-forget notification trigger to keep UX fast while still sharing via email/WhatsApp.
+        if (bugId) {
+          const triggerUrl = `${ENV.API_URL}/notifications/trigger-bug.php`;
+          const payload = new URLSearchParams({ bug_id: String(bugId) }).toString();
+          const blob = new Blob([payload], {
+            type: "application/x-www-form-urlencoded;charset=UTF-8",
+          });
+          if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+            navigator.sendBeacon(triggerUrl, blob);
+          } else {
+            fetch(triggerUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+              },
+              body: payload,
+              keepalive: true,
+            }).catch(() => {
+              // Ignore failure: backend also attempts async trigger.
+            });
+          }
+        }
+
         // Show success toast immediately
         toast({
           title: "Success",
-          description: "Bug report submitted successfully",
+          description: "Bug submitted. Email and WhatsApp sharing is processing in background.",
         });
 
-        // Navigate immediately after successful submission (notifications handled by backend)
-        // Small delay to show success message before navigation
-        setTimeout(() => {
-          if (preSelectedProjectId) {
-            navigate(
-              currentUser?.role
-                ? `/${currentUser.role}/projects/${preSelectedProjectId}`
-                : `/projects/${preSelectedProjectId}`
-            );
-          } else {
-            navigate(currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs");
-          }
-        }, 500);
+        // Navigate immediately after successful submission.
+        if (preSelectedProjectId) {
+          navigate(
+            currentUser?.role
+              ? `/${currentUser.role}/projects/${preSelectedProjectId}`
+              : `/projects/${preSelectedProjectId}`
+          );
+        } else {
+          navigate(currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs");
+        }
 
         // Send frontend notifications asynchronously (non-blocking)
-        // Backend handles email and WhatsApp via BugRicer notify API - no browser redirect
+        // Backend handles email and WhatsApp asynchronously as well.
         setTimeout(async () => {
           try {
-            const bugId =
-              data.data?.bug?.id || (data as any).bugId || data.data?.id || (data as any).id;
-
             // Broadcast browser notification to all users (in-app only)
             if (bugId) {
               await broadcastNotificationService.broadcastNewBug(
@@ -406,9 +392,6 @@ const NewBug = () => {
   };
 
   const clearAllVoiceNotes = () => {
-    voiceNotes.forEach((vn) => {
-      if (vn.audioUrl) URL.revokeObjectURL(vn.audioUrl);
-    });
     setVoiceNotes([]);
     setActiveVoiceNoteId(null);
   };
@@ -440,9 +423,6 @@ const NewBug = () => {
         if (file.preview) URL.revokeObjectURL(file.preview);
       });
 
-      voiceNotes.forEach((voiceNote) => {
-        if (voiceNote.audioUrl) URL.revokeObjectURL(voiceNote.audioUrl);
-      });
     };
   }, [screenshots, files, voiceNotes]);
 

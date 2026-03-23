@@ -136,6 +136,11 @@ interface ProjectMemberCounts {
   testers: number;
 }
 
+interface ProjectMember {
+  id: string | number;
+  role?: string;
+}
+
 const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
@@ -216,14 +221,11 @@ const Projects = () => {
 
   useEffect(() => {
     if (projects.length > 0) {
-      // Optimize: Run membership and project data fetching in parallel first
+      // Fetch project membership/member counts first (batched), then bug counts.
       const minLoadingTime = 800; // 800ms minimum for better UX
       const startTime = Date.now();
       
-      Promise.all([
-        checkUserMembership(),
-        fetchProjectMembers()
-      ]).then(() => {
+      fetchProjectMembershipAndCounts().then(() => {
         // After membership is determined, fetch bugs
         fetchAndCountBugs();
         
@@ -253,8 +255,28 @@ const Projects = () => {
     setCurrentPage(1);
   }, [searchQuery, userProjectMemberships, projects.length, statusFilter, dateFilter]);
 
-  // Optimized membership checking with parallel requests
-  const checkUserMembership = async () => {
+  const mapWithConcurrency = async <T, R>(
+    items: T[],
+    concurrency: number,
+    mapper: (item: T) => Promise<R>
+  ): Promise<R[]> => {
+    const results: R[] = new Array(items.length);
+    let currentIndex = 0;
+
+    const workers = new Array(Math.min(concurrency, items.length))
+      .fill(null)
+      .map(async () => {
+        while (currentIndex < items.length) {
+          const index = currentIndex++;
+          results[index] = await mapper(items[index]);
+        }
+      });
+
+    await Promise.all(workers);
+    return results;
+  };
+
+  const fetchProjectMembershipAndCounts = async () => {
     if (!currentUser) {
       return;
     }
@@ -266,18 +288,17 @@ const Projects = () => {
       }
 
       const memberships: Record<string, boolean> = {};
+      const memberCounts: Record<string, ProjectMemberCounts> = {};
 
       // Admins have access to all projects
       if (currentUser.role === "admin") {
         projects.forEach((project) => {
           memberships[project.id] = true;
         });
-        setUserProjectMemberships(memberships);
-        return;
       }
 
-      // For developers and testers, make parallel requests for all projects
-      const membershipPromises = projects.map(async (project) => {
+      // Batched requests to avoid overwhelming API and causing 500 bursts.
+      const results = await mapWithConcurrency(projects, 5, async (project) => {
         try {
           const response = await fetch(
             `${ENV.API_URL}/projects/get_members.php?project_id=${project.id}`,
@@ -293,30 +314,48 @@ const Projects = () => {
           if (response.ok) {
             const data = await response.json();
             if (data.success) {
-              const members = data.data?.members || [];
+              const members: ProjectMember[] = data.data?.members || [];
               const isMember = members.some(
                 (member) => String(member.id) === String(currentUser.id)
               );
-              return { projectId: project.id, isMember };
+              const developers = members.filter((m) => m.role === "developer").length;
+              const testers = members.filter((m) => m.role === "tester").length;
+              return {
+                projectId: project.id,
+                isMember,
+                counts: {
+                  total: members.length,
+                  developers,
+                  testers,
+                },
+              };
             }
           }
-          return { projectId: project.id, isMember: false };
+          return {
+            projectId: project.id,
+            isMember: false,
+            counts: { total: 0, developers: 0, testers: 0 },
+          };
         } catch (error) {
-          return { projectId: project.id, isMember: false };
+          return {
+            projectId: project.id,
+            isMember: false,
+            counts: { total: 0, developers: 0, testers: 0 },
+          };
         }
       });
 
-      // Wait for all membership checks to complete
-      const results = await Promise.all(membershipPromises);
-      
-      // Build memberships object
-      results.forEach(({ projectId, isMember }) => {
-        memberships[projectId] = isMember;
+      results.forEach(({ projectId, isMember, counts }) => {
+        if (currentUser.role !== "admin") {
+          memberships[projectId] = isMember;
+        }
+        memberCounts[projectId] = counts;
       });
 
       setUserProjectMemberships(memberships);
+      setProjectMemberCounts(memberCounts);
     } catch (error) {
-      console.error("Error checking memberships:", error);
+      console.error("Error fetching memberships/member counts:", error);
     }
   };
 
@@ -399,61 +438,6 @@ const Projects = () => {
     setFilteredProjects(filtered);
   };
 
-  const fetchProjectMembers = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-
-      // Make parallel requests for all projects
-      const memberPromises = projects.map(async (project) => {
-        try {
-          const response = await fetch(
-            `${ENV.API_URL}/projects/get_members.php?project_id=${project.id}`,
-            {
-              headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-              const members = data.data?.members || [];
-              const devCount = members.filter((m) => m.role === "developer").length;
-              const testerCount = members.filter((m) => m.role === "tester").length;
-
-              return {
-                projectId: project.id,
-                counts: {
-                  total: members.length,
-                  developers: devCount,
-                  testers: testerCount,
-                }
-              };
-            }
-          }
-          return { projectId: project.id, counts: { total: 0, developers: 0, testers: 0 } };
-        } catch (error) {
-          return { projectId: project.id, counts: { total: 0, developers: 0, testers: 0 } };
-        }
-      });
-
-      const results = await Promise.all(memberPromises);
-      const memberCounts: Record<string, ProjectMemberCounts> = {};
-      
-      results.forEach(({ projectId, counts }) => {
-        memberCounts[projectId] = counts;
-      });
-
-      setProjectMemberCounts(memberCounts);
-    } catch (error) {
-      console.error("Error fetching project members:", error);
-    }
-  };
-
   const fetchAndCountBugs = async () => {
     try {
       const totalCounts: Record<string, number> = {};
@@ -474,8 +458,8 @@ const Projects = () => {
         return;
       }
 
-      // Make parallel requests for all accessible projects
-      const bugPromises = accessibleProjects.map(async (project) => {
+      // Batched requests to reduce backend pressure and avoid 500 spikes.
+      const bugResults = await mapWithConcurrency(accessibleProjects, 4, async (project) => {
         try {
           const { bugs } = await bugService.getBugs({
             projectId: project.id,
@@ -506,9 +490,7 @@ const Projects = () => {
         }
       });
 
-      const results = await Promise.all(bugPromises);
-      
-      results.forEach(({ projectId, total, open, fixed }) => {
+      bugResults.forEach(({ projectId, total, open, fixed }) => {
         totalCounts[projectId] = total;
         openCounts[projectId] = open;
         fixedCounts[projectId] = fixed;
@@ -533,7 +515,7 @@ const Projects = () => {
         title: "Success",
         description: "Project created successfully",
       });
-      await checkUserMembership();
+      await fetchProjectMembershipAndCounts();
       applyFilters();
       return true;
     } catch (error) {

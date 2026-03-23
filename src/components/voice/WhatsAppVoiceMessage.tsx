@@ -282,6 +282,8 @@ export function WhatsAppVoiceMessage({
     () => formatTime(currentTime || 0),
     [currentTime]
   );
+  const displayCurrentTime =
+    currentTime > 0 || isPlaying ? formattedCurrent : formattedDuration;
   const progress =
     (mediaDuration || duration) > 0
       ? Math.min(1, (currentTime || 0) / (mediaDuration || duration))
@@ -363,8 +365,7 @@ export function WhatsAppVoiceMessage({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between text-[11px] uppercase tracking-wide">
-            <span className="font-semibold">{formattedCurrent}</span>
-            <span className="text-xs opacity-70">{formattedDuration}</span>
+            <span className="font-semibold">{displayCurrentTime}</span>
           </div>
           <div className="mt-1 flex h-10 items-end gap-[2px] overflow-hidden">
             {bars}
@@ -430,10 +431,14 @@ export function WhatsAppVoiceMessage({
 }
 
 const formatTime = (seconds: number) => {
-  if (!seconds || Number.isNaN(seconds)) return "0:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
+  if (!Number.isFinite(seconds) || seconds <= 0) return "00:00";
+  // Any positive duration below 1s should still display as 1 second.
+  const normalizedSeconds = seconds < 1 ? 1 : Math.floor(seconds);
+  const mins = Math.floor(normalizedSeconds / 60);
+  const secs = normalizedSeconds % 60;
+  return `${mins.toString().padStart(2, "0")}:${secs
+    .toString()
+    .padStart(2, "0")}`;
 };
 
 const placeholderWaveform = () =>
