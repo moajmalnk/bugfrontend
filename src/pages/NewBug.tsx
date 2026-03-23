@@ -259,6 +259,7 @@ const NewBug = () => {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 60000, // Allow time if server runs notifications inline fallback
       });
 
       const data = response.data as ApiResponse<any>;
