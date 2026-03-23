@@ -15,6 +15,8 @@ import { DateDropdown } from '@/components/ui/DateDropdown';
 import { HourPicker } from '@/components/ui/HourPicker';
 import { StatusDropdown, type StatusOption } from '@/components/ui/StatusDropdown';
 import { useAuth } from '@/context/AuthContext';
+import { bugService } from '@/services/bugService';
+import { updateService } from '@/services/updateService';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
@@ -65,6 +67,8 @@ export default function DailyWorkUpdate() {
   const [plannedWorkStatus, setPlannedWorkStatus] = useState<StatusOption>('not_started');
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [loadingProjectStats, setLoadingProjectStats] = useState(false);
+  const [projectStats, setProjectStats] = useState<Record<string, { bugs: number; updates: number }>>({});
   const [projectSearch, setProjectSearch] = useState('');
   const [requestAdminApproval, setRequestAdminApproval] = useState(false);
   const [requestedExtraHours, setRequestedExtraHours] = useState<number>(0);
@@ -80,6 +84,62 @@ export default function DailyWorkUpdate() {
     if (!query) return projects;
     return projects.filter((project) => project.name.toLowerCase().includes(query));
   }, [projects, projectSearch]);
+
+  const mapWithConcurrency = async <T, R>(
+    items: T[],
+    concurrency: number,
+    mapper: (item: T) => Promise<R>
+  ): Promise<R[]> => {
+    const results: R[] = new Array(items.length);
+    let currentIndex = 0;
+    const workers = new Array(Math.min(concurrency, items.length))
+      .fill(null)
+      .map(async () => {
+        while (currentIndex < items.length) {
+          const index = currentIndex++;
+          results[index] = await mapper(items[index]);
+        }
+      });
+    await Promise.all(workers);
+    return results;
+  };
+
+  const fetchProjectStats = useCallback(async (projectList: Project[]) => {
+    if (projectList.length === 0) {
+      setProjectStats({});
+      return;
+    }
+    setLoadingProjectStats(true);
+    try {
+      const statResults = await mapWithConcurrency(projectList, 4, async (project) => {
+        try {
+          const [bugResponse, updates] = await Promise.all([
+            bugService.getBugs({ projectId: project.id, page: 1, limit: 1 }),
+            updateService.getUpdatesByProject(project.id),
+          ]);
+          return {
+            projectId: project.id,
+            bugs: Number(bugResponse?.pagination?.totalBugs ?? bugResponse?.bugs?.length ?? 0),
+            updates: Array.isArray(updates) ? updates.length : 0,
+          };
+        } catch {
+          return {
+            projectId: project.id,
+            bugs: 0,
+            updates: 0,
+          };
+        }
+      });
+
+      const nextStats: Record<string, { bugs: number; updates: number }> = {};
+      statResults.forEach((result) => {
+        nextStats[result.projectId] = { bugs: result.bugs, updates: result.updates };
+      });
+      setProjectStats(nextStats);
+    } finally {
+      setLoadingProjectStats(false);
+    }
+  }, []);
 
   const canSubmit = useMemo(() => {
     const hasDate = !!form.submission_date;
@@ -498,6 +558,7 @@ export default function DailyWorkUpdate() {
           // Filter to show only active projects
           const activeProjects = projectsData.filter(p => p.status === 'active' || !p.status);
           setProjects(activeProjects);
+          fetchProjectStats(activeProjects);
           console.log('Loaded projects:', activeProjects.length, 'out of', projectsData.length);
         } catch (error: any) {
           console.error('Failed to load projects:', error);
@@ -509,12 +570,13 @@ export default function DailyWorkUpdate() {
             });
           }
           setProjects([]);
+          setProjectStats({});
         } finally {
           setLoadingProjects(false);
         }
       })();
     }
-  }, [isCheckInDialogOpen, selectedProjects.length]);
+  }, [isCheckInDialogOpen, selectedProjects.length, fetchProjectStats]);
 
   // Load check-in data when date changes (for non-editing mode)
   useEffect(() => {
@@ -1228,19 +1290,17 @@ Example:
                   </span>
                 )}
               </Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Input
+                  type="text"
+                  value={projectSearch}
+                  onChange={(e) => setProjectSearch(e.target.value)}
+                  placeholder="Search projects..."
+                  className="h-10 pl-10 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                />
+              </div>
               <div className="border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 shadow-sm">
-                <div className="p-3 pb-0">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      type="text"
-                      value={projectSearch}
-                      onChange={(e) => setProjectSearch(e.target.value)}
-                      placeholder="Search projects..."
-                      className="h-10 pl-10 border-gray-200 dark:border-gray-700"
-                    />
-                  </div>
-                </div>
                 <div className="max-h-56 overflow-y-auto p-3">
                   {loadingProjects ? (
                     <div className="flex items-center justify-center py-8">
@@ -1287,9 +1347,14 @@ Example:
                             >
                               {project.name}
                             </label>
-                            {isSelected && (
-                              <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                {loadingProjectStats ? '...' : (projectStats[project.id]?.bugs ?? 0)} bugs
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                {loadingProjectStats ? '...' : (projectStats[project.id]?.updates ?? 0)} updates
+                              </span>
+                            </div>
                           </div>
                         );
                       })}
