@@ -202,12 +202,23 @@ export default function DailyUpdate() {
   function monthLabel(key: string, list: any[]) {
     const { from, to } = getCodoPeriodForMonth(key);
     const { days, hours } = computeTotalsInRange(list, from, to);
-    
-    // Format the date range for display
+
     const startDisplay = formatDateForDisplay(from);
     const endDisplay = formatDateForDisplay(to);
-    
+
     return `${startDisplay} to ${endDisplay} (${hours} hours) (${days} ${days === 1 ? 'day' : 'days'})`;
+  }
+
+  function monthTabLines(key: string, list: any[]) {
+    const { from, to } = getCodoPeriodForMonth(key);
+    const { days, hours } = computeTotalsInRange(list, from, to);
+    const startDisplay = formatDateForDisplay(from);
+    const endDisplay = formatDateForDisplay(to);
+    return {
+      full: monthLabel(key, list),
+      compactTitle: `${startDisplay} → ${endDisplay}`,
+      compactMeta: `${hours} h · ${days} ${days === 1 ? 'day' : 'days'}`,
+    };
   }
 
   function isToday(submissionDate: string) {
@@ -500,52 +511,49 @@ export default function DailyUpdate() {
 
   // New Daily Update Button
   const NewDailyUpdateButton = () => (
-    <Button 
+    <Button
       onClick={() => navigate(`/${currentUser?.role}/daily-work-update`)}
-      className="h-12 px-6 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+      className="h-12 w-full min-w-0 px-4 sm:w-auto sm:px-6 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 sm:hover:scale-105"
     >
-      <Plus className="mr-2 h-5 w-5" /> New Daily Update
+      <Plus className="mr-2 h-5 w-5 shrink-0" /> New Daily Update
     </Button>
   );
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
+      <section className="max-w-7xl mx-auto min-w-0 space-y-6 sm:space-y-8">
         {/* Professional Header */}
-        <div className="relative overflow-hidden">
+        <div className="relative min-w-0 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg">
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-5 lg:gap-6 min-w-0">
+              <div className="space-y-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
                     <FileText className="h-6 w-6 text-white" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
                       Work Update
                     </h1>
                     <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Track your daily progress and efficiently
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl leading-relaxed">
+                  Track your daily progress, log hours, and manage submissions in one place.
                 </p>
               </div>
-              
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full min-w-0 lg:w-auto lg:shrink-0">
                 <NewDailyUpdateButton />
-                
-                
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-950/30 dark:to-blue-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
-                    <div className="p-1.5 bg-emerald-600 rounded-lg">
-                      <Calendar className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                        {monthHours}
-                      </div>
+                <div className="flex items-center justify-center sm:justify-start gap-3 px-4 py-3 w-full sm:w-auto min-w-0 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-950/30 dark:to-blue-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
+                  <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
+                    <Calendar className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80">Hours this month</div>
+                    <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                      {monthHours}
                     </div>
                   </div>
                 </div>
@@ -570,8 +578,8 @@ export default function DailyUpdate() {
           {/* Professional tab bar with sliding indicator */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
-            <div className="relative rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm p-2">
-              <div className="relative">
+            <div className="relative rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm p-1.5 sm:p-2">
+              <div className="relative min-w-0">
                 {/* indicator */}
                 <div
                   className={`absolute top-1 bottom-1 left-1 w-1/2 rounded-xl bg-white dark:bg-gray-800 shadow-lg border border-gray-200/70 dark:border-gray-700/70 transition-transform duration-300 ease-out ${
@@ -580,7 +588,7 @@ export default function DailyUpdate() {
                   aria-hidden="true"
                 />
                 {/* tab buttons */}
-                <div className="relative grid grid-cols-2 gap-2">
+                <div className="relative grid grid-cols-2 gap-1.5 sm:gap-2 min-w-0">
                   <button
                     type="button"
                     role="tab"
@@ -593,12 +601,12 @@ export default function DailyUpdate() {
                         return p as any;
                       });
                     }}
-                    className="z-10 h-12 sm:h-14 px-3 sm:px-4 rounded-xl text-sm sm:text-base font-semibold flex items-center justify-center gap-2 transition-colors"
+                    className="z-10 min-h-12 sm:min-h-14 px-2 sm:px-4 rounded-xl text-xs sm:text-base font-semibold flex items-center justify-center gap-1 sm:gap-2 transition-colors min-w-0"
                   >
-                    <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="hidden sm:inline">All Submissions</span>
-                    <span className="sm:hidden">All</span>
-                    <span className="ml-2 px-2 py-1 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                    <Bell className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                    <span className="hidden sm:inline truncate">All Submissions</span>
+                    <span className="sm:hidden truncate">All</span>
+                    <span className="ml-0.5 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 tabular-nums shrink-0">
                       {getTabCount('all-submissions')}
                     </span>
                   </button>
@@ -614,12 +622,12 @@ export default function DailyUpdate() {
                         return p as any;
                       });
                     }}
-                    className="z-10 h-12 sm:h-14 px-3 sm:px-4 rounded-xl text-sm sm:text-base font-semibold flex items-center justify-center gap-2 transition-colors"
+                    className="z-10 min-h-12 sm:min-h-14 px-2 sm:px-4 rounded-xl text-xs sm:text-base font-semibold flex items-center justify-center gap-1 sm:gap-2 transition-colors min-w-0"
                   >
-                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="hidden sm:inline">Today Submissions</span>
-                    <span className="sm:hidden">Today</span>
-                    <span className="ml-2 px-2 py-1 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-green-300">
+                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                    <span className="hidden sm:inline truncate">Today Submissions</span>
+                    <span className="sm:hidden truncate">Today</span>
+                    <span className="ml-0.5 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-green-300 tabular-nums shrink-0">
                       {getTabCount('today-submissions')}
                     </span>
                   </button>
@@ -633,28 +641,34 @@ export default function DailyUpdate() {
         <div className="relative overflow-hidden rounded-2xl shadow-lg border border-gray-200/40 dark:border-gray-700/40">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 md:p-8 lg:p-10">
-            <div className="relative flex items-center justify-center mb-8 min-h-[56px]">
-              <div className="absolute left-0 p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20">
-                <FileText className="h-6 w-6 text-white" />
-              </div>
-              <div className="text-center">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Saved Submissions</h2>
-                <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">Your previous daily work updates</p>
+            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
+              <div className="flex gap-3 min-w-0 flex-1">
+                <div className="p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20 shrink-0 self-start">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
+                    Saved Submissions
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 break-words leading-relaxed">
+                    Your previous daily work updates
+                  </p>
+                </div>
               </div>
               {currentUser?.role === 'admin' && (
                 <Button
                   type="button"
                   variant={showRequestsOnly ? 'default' : 'outline'}
                   onClick={() => setShowRequestsOnly((prev) => !prev)}
-                  className={`absolute right-0 h-10 px-4 rounded-xl text-xs sm:text-sm ${
+                  className={`h-10 w-full sm:w-auto shrink-0 justify-center px-4 rounded-xl text-xs sm:text-sm ${
                     showRequestsOnly
                       ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:from-orange-700 hover:to-amber-700'
                       : ''
                   }`}
                 >
-                  <Bell className="h-4 w-4 mr-2" />
+                  <Bell className="h-4 w-4 mr-2 shrink-0" />
                   Requests
-                  <span className="ml-2 px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/20 text-[11px] font-semibold">
+                  <span className="ml-2 px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/20 text-[11px] font-semibold tabular-nums">
                     {requestCount}
                   </span>
                 </Button>
@@ -662,25 +676,43 @@ export default function DailyUpdate() {
             </div>
             
             {/* Month Tabs - Only show for All Submissions, not Today Submissions */}
-                {!subsLoading && filteredSubmissions.length > 0 && activeTab === "all-submissions" && (
-              <div className="flex flex-wrap justify-center gap-3 mb-8">
-                    {Array.from(new Set((showRequestsOnly ? filteredSubmissions.filter(hasApprovalRequest) : filteredSubmissions).map((s)=>monthKey(s.submission_date))))
+                {!subsLoading && filteredSubmissions.length > 0 && activeTab === "all-submissions" && (() => {
+              const listForMonths = showRequestsOnly
+                ? filteredSubmissions.filter(hasApprovalRequest)
+                : filteredSubmissions;
+              return (
+              <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8 min-w-0">
+                    {Array.from(new Set(listForMonths.map((s) => monthKey(s.submission_date))))
                   .sort((a,b)=> a < b ? 1 : -1)
-                  .map((key)=> (
+                  .map((key)=> {
+                    const lines = monthTabLines(key, listForMonths);
+                    return (
                     <button
                       key={key}
                       onClick={()=>handleMonthTabClick(key)}
-                      className={`px-6 py-3 text-sm font-medium rounded-xl border-2 transition-all duration-200 ${
+                      className={`min-h-[4.25rem] flex-1 min-w-[calc(100%-0.5rem)] xs:min-w-[12rem] sm:min-w-[14rem] max-w-full px-4 py-3 text-left sm:text-center rounded-xl border-2 transition-all duration-200 ${
                         activeMonth===key 
                           ? 'bg-gradient-to-r from-blue-600 to-emerald-600 text-white border-blue-600 shadow-lg' 
                           : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                     >
-                          {monthLabel(key, filteredSubmissions)}
+                      <span className="hidden sm:block text-sm font-medium leading-snug whitespace-normal">
+                        {lines.full}
+                      </span>
+                      <span className="sm:hidden flex flex-col gap-1 w-full min-w-0">
+                        <span className="text-sm font-semibold leading-snug break-words">
+                          {lines.compactTitle}
+                        </span>
+                        <span className="text-xs font-normal opacity-90 leading-snug">
+                          {lines.compactMeta}
+                        </span>
+                      </span>
                     </button>
-                  ))}
+                    );
+                  })}
               </div>
-            )}
+              );
+            })()}
             
             {/* Submissions List */}
             {subsLoading ? (
@@ -703,10 +735,10 @@ export default function DailyUpdate() {
             ) : (
               <div className={`grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8 ${activeTab === "today-submissions" ? "lg:grid-cols-1" : "lg:grid-cols-2"}`}>
                     {visibleSubmissions.map((s) => (
-                  <div key={s.id ?? s.submission_date} className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-6 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <div className="font-semibold text-sm text-gray-900 dark:text-white">
+                  <div key={s.id ?? s.submission_date} className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-4 sm:p-6 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 min-w-0">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 mb-3 min-w-0">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-sm text-gray-900 dark:text-white break-words">
                           {s.submission_date}
                         </div>
                         {currentUser?.role === 'admin' && showRequestsOnly && (
@@ -714,7 +746,7 @@ export default function DailyUpdate() {
                             {s.username || 'User'} {s.role ? `• ${String(s.role).toUpperCase()}` : ''}
                           </div>
                         )}
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 break-words mt-1">
                           {s.start_time ? `Started at ${s.start_time}` : 'No start time'} • {s.hours_today ?? 0} hours
                           {Number(s.overtime_hours || 0) > 0 && (
                             <span className="ml-2 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium">
@@ -723,7 +755,7 @@ export default function DailyUpdate() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1 sm:justify-end shrink-0">
                         {/* Edit button - only for today */}
                         {!(currentUser?.role === 'admin' && showRequestsOnly) && isToday(s.submission_date) && (
                           <Button 

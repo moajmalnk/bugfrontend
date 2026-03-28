@@ -776,34 +776,34 @@ export default function DailyWorkUpdate() {
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0">
         {/* Simplified Header */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 sm:p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 sm:p-6 shadow-sm min-w-0">
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 min-w-0">
+            <div className="space-y-1 min-w-0 flex-1">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <button
                   onClick={() => navigate(`/${currentUser?.role}/daily-update`)}
-                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  className="p-1.5 shrink-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                 >
                   <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                 </button>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white min-w-0 break-words">
                   {isEditing ? 'Edit Work Update' : 'Daily Work Update'}
                 </h1>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 ml-11">
+              <p className="text-sm text-gray-600 dark:text-gray-400 pl-9 sm:ml-11 sm:pl-0">
                 Fill out your daily work progress and tasks
               </p>
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end sm:w-auto sm:gap-3">
               <Button
                 onClick={onToggleBreak}
                 type="button"
                 variant={isOnBreak ? 'destructive' : 'outline'}
-                className="flex-1 sm:flex-none border-2 transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                className="w-full sm:w-auto shrink-0 border-2 transition-all duration-200 hover:scale-[1.02] sm:hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
               >
                 {isOnBreak ? (
                   <>
@@ -821,7 +821,7 @@ export default function DailyWorkUpdate() {
                 onClick={() => setIsCheckInDialogOpen(true)}
                 disabled={isCheckingIn}
                 variant="outline"
-                className="flex-1 sm:flex-none border-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                className="w-full sm:w-auto shrink-0 border-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all duration-200 hover:scale-[1.02] sm:hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
               >
                 {isCheckingIn ? (
                   <>
@@ -838,7 +838,7 @@ export default function DailyWorkUpdate() {
               <Button
                 disabled={!canSubmit || loading}
                 onClick={onSubmit}
-                className="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold transition-all duration-200 hover:scale-[1.02] sm:hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
@@ -1331,12 +1331,22 @@ Example:
                             <Checkbox
                               id={`project-${project.id}`}
                               checked={isSelected}
-                              onCheckedChange={() => handleProjectToggle(project.id)}
-                              className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                              onClick={(e) => e.stopPropagation()}
+                              onCheckedChange={(checked) => {
+                                if (checked === true) {
+                                  setSelectedProjects((prev) =>
+                                    prev.includes(project.id) ? prev : [...prev, project.id]
+                                  );
+                                } else {
+                                  setSelectedProjects((prev) => prev.filter((id) => id !== project.id));
+                                }
+                              }}
+                              className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 shrink-0"
                             />
                             <label
                               htmlFor={`project-${project.id}`}
-                              className={`text-sm font-medium cursor-pointer flex-1 ${
+                              onClick={(e) => e.stopPropagation()}
+                              className={`text-sm font-medium cursor-pointer flex-1 min-w-0 ${
                                 isSelected
                                   ? 'text-blue-900 dark:text-blue-100'
                                   : 'text-gray-900 dark:text-white'
