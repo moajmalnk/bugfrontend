@@ -47,6 +47,7 @@ import {
   ArrowLeft,
   Search,
   Filter,
+  UserPlus,
   Users,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
@@ -67,12 +68,15 @@ interface ChatInterfaceProps {
   onBackToChatList?: () => void;
   /** Bump when messages change so the sidebar can refresh last-message previews */
   onChatActivity?: () => void;
+  /** Open the same member-management dialog as the sidebar (group managers only). */
+  onOpenGroupMembers?: () => void;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   selectedGroup,
   onBackToChatList,
   onChatActivity,
+  onOpenGroupMembers,
 }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -673,6 +677,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-0.5 flex-shrink-0 text-[#aebac1]">
+              {onOpenGroupMembers && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full text-[#aebac1] hover:bg-[#2a3942] hover:text-[#e9edef]"
+                  title="Members"
+                  aria-label="Manage members"
+                  onClick={onOpenGroupMembers}
+                >
+                  <UserPlus className="h-5 w-5" />
+                </Button>
+              )}
               <MessageSearch
                 groupId={selectedGroup.id}
                 onMessageClick={handleMessageClick}

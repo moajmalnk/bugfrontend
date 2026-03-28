@@ -55,3 +55,16 @@ export const getEffectiveRole = (user: { role?: string; role_id?: number | null 
   // Fallback to legacy role field
   return user.role || 'user';
 };
+
+/** Show BugMessage in the main sidebar (after BugUpdate) for admins and developers. */
+export const showBugMessageInMainNav = (role: string | undefined | null): boolean =>
+  role === "admin" || role === "developer";
+
+/**
+ * Who may open the Messages (BugMessage) page: admins, developers, or anyone with MESSAGING_VIEW.
+ */
+export const canOpenMessagesPage = (
+  role: string | undefined | null,
+  hasPermission: (key: string) => boolean
+): boolean =>
+  showBugMessageInMainNav(role) || hasPermission("MESSAGING_VIEW");

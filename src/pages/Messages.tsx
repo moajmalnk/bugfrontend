@@ -1,7 +1,7 @@
 import { ChatGroupSelector } from "@/components/messaging/ChatGroupSelector";
 import { ChatInterface } from "@/components/messaging/ChatInterface";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { canOpenMessagesPage, cn, getEffectiveRole } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ChatGroup } from "@/types";
@@ -19,7 +19,7 @@ import {
   FolderOpen,
   Lock
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { toast } from "sonner";
@@ -36,8 +36,17 @@ const Messages = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [chatListVersion, setChatListVersion] = useState(0);
   const [showSidebar, setShowSidebar] = useState(false);
+  const openGroupMembersRef = useRef<((groupId: string) => void) | null>(null);
+
+  const registerOpenGroupMembers = useCallback(
+    (fn: (groupId: string) => void) => {
+      openGroupMembersRef.current = fn;
+    },
+    []
+  );
 
   const bumpChatList = () => setChatListVersion((v) => v + 1);
+  const effectiveRole = getEffectiveRole(currentUser || {});
 
   // Handle responsive behavior
   useEffect(() => {
@@ -151,7 +160,17 @@ const Messages = () => {
     );
   }
 
-  if (!hasPermission('MESSAGING_VIEW')) {
+  const canManageMembersOnSelected =
+    Boolean(selectedGroup) &&
+    (effectiveRole === "admin" ||
+      hasPermission("MESSAGING_MANAGE") ||
+      Boolean(
+        currentUser?.id &&
+          selectedGroup &&
+          String(selectedGroup.created_by) === String(currentUser.id)
+      ));
+
+  if (!canOpenMessagesPage(effectiveRole, hasPermission)) {
     return (
       <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
         <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
@@ -322,6 +341,8 @@ const Messages = () => {
                     }}
                     refreshTrigger={refreshTrigger}
                     chatListVersion={chatListVersion}
+                    onMembersChanged={bumpChatList}
+                    exposeOpenMembers={registerOpenGroupMembers}
                   />
                 </div>
               </aside>
@@ -353,6 +374,12 @@ const Messages = () => {
                     selectedGroup={selectedGroup}
                     onBackToChatList={handleBackToChatList}
                     onChatActivity={bumpChatList}
+                    onOpenGroupMembers={
+                      canManageMembersOnSelected
+                        ? () =>
+                            openGroupMembersRef.current?.(selectedGroup.id)
+                        : undefined
+                    }
                   />
                 ) : (
                   // Enhanced Professional Empty State

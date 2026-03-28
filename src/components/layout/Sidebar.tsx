@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
-import { cn, getEffectiveRole } from "@/lib/utils";
+import { cn, getEffectiveRole, showBugMessageInMainNav } from "@/lib/utils";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -214,6 +214,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 label="BugUpdate"
               />
             )}
+
+            {showBugMessageInMainNav(role) && (
+              <NavLink
+                to="/messages"
+                icon={<MessageSquare className="h-5 w-5" />}
+                label="BugMessage"
+              />
+            )}
             
           </div>
 
@@ -262,8 +270,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {/* Messaging Links */}
-                  {hasMessagingView && (
+                  {/* Messaging: BugMessage lives under main nav for admin/developer; others use MESSAGING_VIEW here */}
+                  {hasMessagingView && !showBugMessageInMainNav(role) && (
                     <NavLink
                       to="/messages"
                       icon={<MessageSquare className="h-5 w-5" />}

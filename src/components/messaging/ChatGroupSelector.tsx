@@ -20,8 +20,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 import { ENV } from "@/lib/env";
-import { cn } from "@/lib/utils";
+import { cn, getEffectiveRole } from "@/lib/utils";
 import { MessagingService } from "@/services/messagingService";
 import { projectService } from "@/services/projectService";
 import { userService } from "@/services/userService";
@@ -42,7 +43,34 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+
+function messagingAuthToken(): string {
+  return (
+    sessionStorage.getItem("token") ||
+    localStorage.getItem("auth_token") ||
+    localStorage.getItem("token") ||
+    ""
+  );
+}
+
+function normalizeGroupRow(g: ChatGroup & { project_name?: string }): ChatGroup {
+  const raw = g.is_member as unknown;
+  const isMember =
+    raw === true ||
+    raw === 1 ||
+    raw === "1";
+  const mc = g.member_count as unknown;
+  const memberCount =
+    typeof mc === "number" ? mc : Number(mc) || 0;
+  return {
+    ...g,
+    is_member: isMember,
+    member_count: memberCount,
+    projectName: g.projectName ?? g.project_name,
+  };
+}
+
 interface ChatGroupSelectorProps {
   selectedGroup: ChatGroup | null;
   onGroupSelect: (group: ChatGroup) => void;
@@ -57,6 +85,10 @@ interface ChatGroupSelectorProps {
   refreshTrigger?: number;
   /** Increment when chat messages change to reload last-message previews */
   chatListVersion?: number;
+  /** After members are added/removed, bump parent list (e.g. chatListVersion). */
+  onMembersChanged?: () => void;
+  /** Parent stores the callback to open the member dialog for a group (e.g. chat header). */
+  exposeOpenMembers?: (openForGroup: (groupId: string) => void) => void;
 }
 
 export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
@@ -71,9 +103,12 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   onGroupDelete,
   refreshTrigger,
   chatListVersion = 0,
+  onMembersChanged,
+  exposeOpenMembers,
 }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const { hasPermission } = usePermissions(null);
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -121,6 +156,22 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   });
 
   const isAdmin = currentUser?.role === "admin";
+  const effectiveRole = getEffectiveRole(currentUser || {});
+
+  const canManageGroupMembers = (group: ChatGroup) =>
+    effectiveRole === "admin" ||
+    hasPermission("MESSAGING_MANAGE") ||
+    Boolean(
+      currentUser?.id &&
+        String(group.created_by) === String(currentUser.id)
+    );
+
+  const canEditOrDeleteGroup = () =>
+    effectiveRole === "admin" || hasPermission("MESSAGING_MANAGE");
+
+  const handleManageMembersRef = useRef<(groupId: string) => Promise<void>>(
+    async () => {}
+  );
 
   // Handle external trigger to open create group dialog
   useEffect(() => {
@@ -185,18 +236,29 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     try {
       const allProjects = await projectService.getProjects();
       setProjects(allProjects as unknown as Project[]);
-      let allGroups: ChatGroup[] = [];
-      for (const project of allProjects) {
-        const groups = await MessagingService.getGroupsByProject(project.id);
-        allGroups = allGroups.concat(
-          groups.map((g) => ({
-            ...g,
-            projectName: project.name,
-            projectId: project.id,
-          }))
+
+      if (variant === "messaging") {
+        const my = await MessagingService.getMyChatGroups();
+        setGroups(
+          my.map((g) =>
+            normalizeGroupRow(g as ChatGroup & { project_name?: string })
+          )
         );
+      } else {
+        let allGroups: ChatGroup[] = [];
+        for (const project of allProjects) {
+          const groups = await MessagingService.getGroupsByProject(project.id);
+          allGroups = allGroups.concat(
+            groups.map((g) =>
+              normalizeGroupRow({
+                ...g,
+                projectName: project.name,
+              })
+            )
+          );
+        }
+        setGroups(allGroups);
       }
-      setGroups(allGroups);
     } catch (error) {
       toast({
         title: "Error",
@@ -210,7 +272,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
 
   useEffect(() => {
     loadGroups();
-  }, [refreshTrigger, chatListVersion]);
+  }, [refreshTrigger, chatListVersion, variant]);
 
   const handleCreateGroup = async () => {
     if (!createForm.projectId || !createForm.name.trim()) {
@@ -472,6 +534,49 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     setDeleteDialog(null);
   };
 
+  const refreshMemberDialogLists = async (groupId: string) => {
+    setIsLoadingExistingMembers(true);
+    setIsLoadingMembers(true);
+    try {
+      const token = messagingAuthToken();
+      const res = await fetch(
+        `${ENV.API_URL}/messaging/get_members.php?group_id=${encodeURIComponent(groupId)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.message || "Failed to load members");
+      }
+      const members = data.data || [];
+      setExistingMembers(members);
+
+      const users = await userService.getUsers();
+      const memberIds = members.map((m: { id: string }) => m.id);
+      setAvailableMembers(users.filter((u) => !memberIds.includes(u.id)));
+    } catch (error) {
+      console.error("Error loading member dialog lists:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to load group members",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingExistingMembers(false);
+      setIsLoadingMembers(false);
+    }
+  };
+
   const handleManageMembers = async (groupId: string) => {
     const group = groups.find((g) => g.id === groupId);
     if (!group) return;
@@ -481,38 +586,19 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       groupId,
       groupName: group.name,
     });
-
-    await loadAvailableMembers(groupId);
-    await loadExistingMembers(groupId);
+    setSelectedMembers([]);
+    setSelectedExistingMembers([]);
+    await refreshMemberDialogLists(groupId);
   };
 
-  const loadAvailableMembers = async (groupId: string) => {
-    setIsLoadingMembers(true);
-    try {
-      // Load all users (admins, developers, testers)
-      const users = await userService.getUsers();
+  handleManageMembersRef.current = handleManageMembers;
 
-      // Filter out users who are already members of this group
-      const existingMemberIds = existingMembers.map((member) => member.id);
-      const available = users.filter(
-        (user) => !existingMemberIds.includes(user.id)
-      );
-
-      setAvailableMembers(available || []);
-    } catch (error) {
-      console.error("Error loading available members:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to load available members",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingMembers(false);
-    }
-  };
+  useEffect(() => {
+    if (!exposeOpenMembers) return;
+    exposeOpenMembers((groupId) => {
+      void handleManageMembersRef.current(groupId);
+    });
+  }, [exposeOpenMembers]);
 
   const handleAddMembers = async () => {
     if (selectedMembers.length === 0) {
@@ -532,9 +618,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${
-            sessionStorage.getItem("token") || localStorage.getItem("token")
-          }`,
+          Authorization: `Bearer ${messagingAuthToken()}`,
         },
         body: JSON.stringify({
           group_id: memberDialog.groupId,
@@ -545,23 +629,27 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       const data = await response.json();
 
       if (data.success) {
-        // Update the group in the list
+        const added =
+          typeof data.data?.added_count === "number"
+            ? data.data.added_count
+            : selectedMembers.length;
+        let patched: ChatGroup | undefined;
         setGroups((prev) =>
-          prev.map((group) =>
-            group.id === memberDialog.groupId
-              ? {
-                  ...group,
-                  member_count:
-                    group.member_count +
-                    (data.data?.added_count || selectedMembers.length),
-                }
-              : group
-          )
+          prev.map((group) => {
+            if (group.id !== memberDialog.groupId) return group;
+            patched = {
+              ...group,
+              member_count: group.member_count + added,
+            };
+            return patched;
+          })
         );
+        if (patched && selectedGroup?.id === memberDialog.groupId) {
+          onGroupSelect(patched);
+        }
 
-        // Reload both existing and available members
-        await loadExistingMembers(memberDialog.groupId);
-        await loadAvailableMembers(memberDialog.groupId);
+        await refreshMemberDialogLists(memberDialog.groupId);
+        onMembersChanged?.();
 
         toast({
           title: "Success",
@@ -570,7 +658,6 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
             `${selectedMembers.length} member(s) added to the group`,
         });
 
-        setMemberDialog(null);
         setSelectedMembers([]);
       } else {
         throw new Error(data.message || "Failed to add members");
@@ -606,47 +693,6 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     );
   };
 
-  const loadExistingMembers = async (groupId: string) => {
-    setIsLoadingExistingMembers(true);
-    try {
-      const response = await fetch(
-        `${ENV.API_URL}/messaging/get_members.php?group_id=${groupId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${
-              sessionStorage.getItem("token") || localStorage.getItem("token")
-            }`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setExistingMembers(data.data || []);
-      } else {
-        throw new Error(data.message || "Failed to load existing members");
-      }
-    } catch (error) {
-      console.error("Error loading existing members:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to load existing members",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingExistingMembers(false);
-    }
-  };
-
   const handleDeleteMembers = async () => {
     if (selectedExistingMembers.length === 0) {
       toast({
@@ -667,9 +713,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
           method: "DELETE",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${
-              sessionStorage.getItem("token") || localStorage.getItem("token")
-            }`,
+            Authorization: `Bearer ${messagingAuthToken()}`,
           },
           body: JSON.stringify({
             group_id: memberDialog.groupId,
@@ -681,23 +725,27 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       const data = await response.json();
 
       if (data.success) {
-        // Update the group in the list
+        const removed =
+          typeof data.data?.removed_count === "number"
+            ? data.data.removed_count
+            : selectedExistingMembers.length;
+        let patched: ChatGroup | undefined;
         setGroups((prev) =>
-          prev.map((group) =>
-            group.id === memberDialog.groupId
-              ? {
-                  ...group,
-                  member_count:
-                    group.member_count -
-                    (data.data?.removed_count ||
-                      selectedExistingMembers.length),
-                }
-              : group
-          )
+          prev.map((group) => {
+            if (group.id !== memberDialog.groupId) return group;
+            patched = {
+              ...group,
+              member_count: Math.max(0, group.member_count - removed),
+            };
+            return patched;
+          })
         );
+        if (patched && selectedGroup?.id === memberDialog.groupId) {
+          onGroupSelect(patched);
+        }
 
-        // Reload existing members
-        await loadExistingMembers(memberDialog.groupId);
+        await refreshMemberDialogLists(memberDialog.groupId);
+        onMembersChanged?.();
 
         toast({
           title: "Success",
@@ -1016,7 +1064,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                           : ""}
                         {!group.is_member ? " · Not a member" : ""}
                       </span>
-                      {isAdmin && (
+                      {(canManageGroupMembers(group) || canEditOrDeleteGroup()) && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -1034,36 +1082,42 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                             align="end"
                             className="w-48 bg-[#233138] border-[#2a3942] text-[#e9edef]"
                           >
-                            <DropdownMenuItem
-                              className="focus:bg-[#2a3942] cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleManageMembers(group.id);
-                              }}
-                            >
-                              <UserPlus className="h-4 w-4 mr-2" />
-                              Members
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="focus:bg-[#2a3942] cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditGroup(group);
-                              }}
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit group
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="focus:bg-[#3f1f1f] text-red-300 cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteGroup(group.id);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete group
-                            </DropdownMenuItem>
+                            {canManageGroupMembers(group) && (
+                              <DropdownMenuItem
+                                className="focus:bg-[#2a3942] cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleManageMembers(group.id);
+                                }}
+                              >
+                                <UserPlus className="h-4 w-4 mr-2" />
+                                Members
+                              </DropdownMenuItem>
+                            )}
+                            {canEditOrDeleteGroup() && (
+                              <>
+                                <DropdownMenuItem
+                                  className="focus:bg-[#2a3942] cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditGroup(group);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit group
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="focus:bg-[#3f1f1f] text-red-300 cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteGroup(group.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete group
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
@@ -1115,47 +1169,53 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                               )}
                             </div>
                           </div>
-                          {isAdmin && (
+                          {(canManageGroupMembers(group) || canEditOrDeleteGroup()) && (
                             <div className="flex items-center space-x-1 ml-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleManageMembers(group.id);
-                                }}
-                                tabIndex={-1}
-                                className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
-                                title="Manage members"
-                              >
-                                <UserPlus className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditGroup(group);
-                                }}
-                                tabIndex={-1}
-                                className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
-                                title="Edit group"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteGroup(group.id);
-                                }}
-                                tabIndex={-1}
-                                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all duration-200"
-                                title="Delete group"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {canManageGroupMembers(group) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleManageMembers(group.id);
+                                  }}
+                                  tabIndex={-1}
+                                  className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
+                                  title="Manage members"
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canEditOrDeleteGroup() && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditGroup(group);
+                                    }}
+                                    tabIndex={-1}
+                                    className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
+                                    title="Edit group"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteGroup(group.id);
+                                    }}
+                                    tabIndex={-1}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all duration-200"
+                                    title="Delete group"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>

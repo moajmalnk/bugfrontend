@@ -64,6 +64,14 @@ export class MessagingService {
     return response.data.data;
   }
 
+  /** Groups the current user is a member of (sidebar "my chats"). */
+  static async getMyChatGroups(): Promise<ChatGroup[]> {
+    const response = await axiosInstance.get<{ data: ChatGroup[] }>(
+      `${MESSAGING_API_BASE}/get_my_chat_groups.php`
+    );
+    return response.data.data;
+  }
+
   static async updateGroup(groupId: string, data: {
     name?: string;
     description?: string;
