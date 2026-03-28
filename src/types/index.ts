@@ -103,6 +103,10 @@ export interface ChatGroup {
   updated_at: string;
   member_count: number;
   last_message_at?: string;
+  /** Latest non-deleted message snippet for chat list */
+  last_message_preview?: string | null;
+  last_message_sender_id?: string | null;
+  last_message_sender_name?: string | null;
   is_member: boolean;
   projectName?: string;
   // WhatsApp features

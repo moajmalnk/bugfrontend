@@ -41,13 +41,13 @@ import {
   Bug,
   File,
   FileImage,
-  ImagePlus,
   Paperclip,
   Plus,
   Check,
   ChevronsUpDown,
   X,
 } from "lucide-react";
+import { ScreenshotDropZone } from "@/components/attachments/ScreenshotDropZone";
 import {
   RecordedVoiceNote,
   WhatsAppVoiceRecorder,
@@ -329,20 +329,27 @@ const NewBug = () => {
     fileInputRef.current?.click();
   };
 
+  const addScreenshotFiles = (raw: File[]) => {
+    if (raw.length === 0) return;
+    const imageFiles = raw.filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) {
+      toast({
+        title: "Images only",
+        description: "Please use image files (PNG, JPG, GIF, WebP, …).",
+        variant: "destructive",
+      });
+      return;
+    }
+    const newFiles = imageFiles as FileWithPreview[];
+    newFiles.forEach((file) => {
+      file.preview = URL.createObjectURL(file);
+    });
+    setScreenshots((prev) => [...prev, ...newFiles]);
+  };
+
   const handleScreenshotChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files) as FileWithPreview[];
-
-      // Create preview URLs for each file
-      newFiles.forEach((file) => {
-        if (file.type.startsWith("image/")) {
-          file.preview = URL.createObjectURL(file);
-        }
-      });
-
-      setScreenshots((prev) => [...prev, ...newFiles]);
-
-      // Reset input value so the same file can be selected again
+      addScreenshotFiles(Array.from(e.target.files));
       e.target.value = "";
     }
   };
@@ -409,19 +416,15 @@ const NewBug = () => {
   };
 
   const handlePasteScreenshot = (e: React.ClipboardEvent<HTMLDivElement>) => {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+    const files: File[] = [];
+    for (let i = 0; i < e.clipboardData.items.length; i++) {
+      const item = e.clipboardData.items[i];
       if (item.type.indexOf("image") !== -1) {
         const file = item.getAsFile();
-        if (file) {
-          const fileWithPreview = Object.assign(file, {
-            preview: URL.createObjectURL(file),
-          });
-          setScreenshots((prev) => [...prev, fileWithPreview]);
-        }
+        if (file) files.push(file);
       }
     }
+    if (files.length > 0) addScreenshotFiles(files);
   };
 
   // Clean up object URLs when component unmounts
@@ -749,19 +752,11 @@ const NewBug = () => {
                           tabIndex={0}
                           onPaste={handlePasteScreenshot}
                         >
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-300 rounded-xl group"
-                            onClick={handleScreenshotClick}
-                          >
-                            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
-                              <ImagePlus className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">
-                              Add Screenshots
-                            </span>
-                          </Button>
+                          <ScreenshotDropZone
+                            onAddFiles={addScreenshotFiles}
+                            onOpenPicker={handleScreenshotClick}
+                            disabled={isSubmitting}
+                          />
 
                           {/* Preview of screenshots */}
                           {screenshots.length > 0 && (

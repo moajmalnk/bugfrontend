@@ -9,17 +9,26 @@ interface AudioWaveformProps {
   onPlayPause?: () => void;
 }
 
+function safeSeconds(value: number | string | undefined | null): number {
+  const n = typeof value === "string" ? parseFloat(value) : Number(value);
+  if (!Number.isFinite(n) || n < 0) {
+    return 0;
+  }
+  return n;
+}
+
 export const AudioWaveform: React.FC<AudioWaveformProps> = ({
   audioUrl,
   duration = 0,
   isPlaying = false,
   onPlayPause,
 }) => {
+  const fallbackDuration = safeSeconds(duration);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(duration);
+  const [audioDuration, setAudioDuration] = useState(fallbackDuration);
   const [isLoading, setIsLoading] = useState(true);
   const [audioData, setAudioData] = useState<number[]>([]);
 
@@ -30,7 +39,11 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
 
     audio.addEventListener("loadedmetadata", () => {
       console.log("✅ Audio loaded successfully, duration:", audio.duration);
-      setAudioDuration(audio.duration);
+      let d = safeSeconds(audio.duration);
+      if (d <= 0) {
+        d = fallbackDuration;
+      }
+      setAudioDuration(d);
       setIsLoading(false);
       generateWaveformData(audio);
     });
@@ -59,7 +72,7 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
       audio.pause();
       audio.remove();
     };
-  }, [audioUrl]);
+  }, [audioUrl, fallbackDuration]);
 
   const generateWaveformData = async (audio: HTMLAudioElement) => {
     // Generate mock waveform data (bars)
@@ -145,8 +158,9 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
   };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+    const s = safeSeconds(seconds);
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 

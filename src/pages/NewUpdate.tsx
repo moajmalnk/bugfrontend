@@ -38,7 +38,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send, ImagePlus, Paperclip, File, X, Calendar, Clock, FileImage, Check, ChevronsUpDown, Timer, Flag } from "lucide-react";
+import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send, Paperclip, File, X, Calendar, Clock, FileImage, Check, ChevronsUpDown, Timer, Flag } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useState, useRef, useEffect, ChangeEvent } from "react";
@@ -47,6 +47,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Skeleton } from '@/components/ui/skeleton';
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { apiClient } from "@/lib/axios";
+import { ScreenshotDropZone } from "@/components/attachments/ScreenshotDropZone";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { TimePicker } from "@/components/ui/TimePicker";
 import {
@@ -243,16 +244,29 @@ const NewUpdate = () => {
     screenshotInputRef.current?.click();
   };
 
-  const handleScreenshotChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = e.target.files;
-    if (!selectedFiles) return;
-
-    const newFiles = Array.from(selectedFiles).map((file) =>
+  const addScreenshotFiles = (raw: File[]) => {
+    if (raw.length === 0) return;
+    const imageFiles = raw.filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) {
+      toast({
+        title: "Images only",
+        description: "Please use image files (PNG, JPG, GIF, WebP, …).",
+        variant: "destructive",
+      });
+      return;
+    }
+    const newFiles = imageFiles.map((file) =>
       Object.assign(file, {
         preview: URL.createObjectURL(file),
       })
-    );
+    ) as FileWithPreview[];
     setScreenshots((prev) => [...prev, ...newFiles]);
+  };
+
+  const handleScreenshotChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles?.length) return;
+    addScreenshotFiles(Array.from(selectedFiles));
     e.target.value = "";
   };
 
@@ -340,19 +354,15 @@ const NewUpdate = () => {
   };
 
   const handlePasteScreenshot = (e: React.ClipboardEvent<HTMLDivElement>) => {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+    const files: File[] = [];
+    for (let i = 0; i < e.clipboardData.items.length; i++) {
+      const item = e.clipboardData.items[i];
       if (item.type.indexOf("image") !== -1) {
         const file = item.getAsFile();
-        if (file) {
-          const fileWithPreview = Object.assign(file, {
-            preview: URL.createObjectURL(file),
-          });
-          setScreenshots((prev) => [...prev, fileWithPreview]);
-        }
+        if (file) files.push(file);
       }
     }
+    if (files.length > 0) addScreenshotFiles(files);
   };
 
   const mutation = useMutation<unknown, unknown, z.infer<typeof formSchema>>({
@@ -901,20 +911,11 @@ const NewUpdate = () => {
                           tabIndex={0}
                           onPaste={handlePasteScreenshot}
                         >
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-300 rounded-xl group"
-                            onClick={handleScreenshotClick}
+                          <ScreenshotDropZone
+                            onAddFiles={addScreenshotFiles}
+                            onOpenPicker={handleScreenshotClick}
                             disabled={isSubmitting}
-                          >
-                            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
-                              <ImagePlus className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">
-                              Add Screenshots
-                            </span>
-                          </Button>
+                          />
 
                           {screenshots.length > 0 && (
                             <div className="space-y-3">

@@ -1,4 +1,5 @@
 import { apiClient as axiosInstance } from '@/lib/axios';
+import { ENV } from '@/lib/env';
 import {
     ChatGroup,
     ChatGroupMember,
@@ -22,6 +23,30 @@ interface VoiceUploadResponse {
 }
 
 export class MessagingService {
+  /**
+   * Rewrites stored get_media.php URLs to the configured API base (fixes legacy rows
+   * saved as http://localhost/api/messaging/... when the app lives under /BugRicer/backend/api).
+   */
+  static resolveMediaUrl(url: string | null | undefined): string {
+    if (!url) return '';
+    const apiBase = ENV.API_URL.replace(/\/$/, '');
+    const messagingTarget = `${apiBase}/messaging/get_media.php`;
+    try {
+      const baseOrigin =
+        typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+      const u = new URL(url, baseOrigin);
+      if (u.pathname.includes('get_media.php')) {
+        const file = u.searchParams.get('file');
+        if (file) {
+          return `${messagingTarget}?file=${encodeURIComponent(file)}`;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return url;
+  }
+
   // Chat Groups
   static async createGroup(data: {
     name: string;

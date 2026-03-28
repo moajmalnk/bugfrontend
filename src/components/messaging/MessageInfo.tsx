@@ -27,6 +27,7 @@ export const MessageInfo: React.FC<MessageInfoProps> = ({
   message,
   groupMemberCount,
 }) => {
+  const isEdited = Boolean(message.is_edited);
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
@@ -104,9 +105,9 @@ export const MessageInfo: React.FC<MessageInfoProps> = ({
                       ? "📄 Document"
                       : message.content}
                   </p>
-                  {message.is_edited && (
+                  {isEdited && message.edited_at && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Edited: {MessagingService.formatMessageTime(message.edited_at!)}
+                      Edited: {MessagingService.formatMessageTime(message.edited_at)}
                     </p>
                   )}
                 </div>

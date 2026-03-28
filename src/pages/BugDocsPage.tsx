@@ -56,6 +56,8 @@ import {
   TestTube,
   Users,
   CheckCircle2,
+  Lightbulb,
+  AlertTriangle,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -1341,14 +1343,19 @@ const BugDocsPage = () => {
         {/* Create Document Modal */}
         {isConnected && (
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-lg sm:text-xl">Create New Document</DialogTitle>
-                <DialogDescription className="text-sm sm:text-base">
+            <DialogContent className="flex h-[min(92vh,920px)] w-[min(96vw,56rem)] max-w-none flex-col gap-0 overflow-hidden rounded-2xl border border-border/60 p-0 shadow-2xl sm:max-w-none">
+              <DialogHeader className="shrink-0 space-y-2 border-b border-border/50 bg-gradient-to-br from-muted/50 via-background to-background px-6 pb-5 pt-7 text-left sm:px-8 sm:pb-6 sm:pt-8 pr-14">
+                <DialogTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+                  Create New Document
+                </DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground sm:text-base max-w-2xl">
                   Create a new Google Doc from a template or start from scratch
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <div className="px-6 py-6 sm:px-8 sm:py-8">
+                  <div className="grid gap-8 lg:grid-cols-2 lg:gap-10 lg:items-start">
+                    <div className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="doc-title" className="text-sm font-medium">Document Title *</Label>
                   <Input
@@ -1370,7 +1377,7 @@ const BugDocsPage = () => {
                     <SelectTrigger id="template" className="w-full">
                       <SelectValue placeholder="Blank document (no template)" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                    <SelectContent className="max-h-[min(280px,45vh)] overflow-y-auto z-[200]">
                       <SelectItem value="0">Blank document (no template)</SelectItem>
                       {templates.map((template) => (
                         <SelectItem key={template.id} value={template.id.toString()}>
@@ -1396,13 +1403,15 @@ const BugDocsPage = () => {
                       Templates provide pre-formatted structures for your documents
                     </p>
                     {templates.some(t => !t.is_configured) && (
-                      <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                        <span>⚠️</span>
-                        <span>Templates marked "not configured" will create blank documents</span>
+                      <p className="text-xs text-orange-600 dark:text-orange-400 flex items-start gap-2 rounded-lg border border-orange-200/60 bg-orange-50/50 p-3 dark:border-orange-900/40 dark:bg-orange-950/20">
+                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+                        <span>Templates marked &quot;not configured&quot; will create blank documents</span>
                       </p>
                     )}
                   </div>
                 </div>
+                    </div>
+                    <div className="space-y-6">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="project" className="text-sm font-medium flex items-center gap-2">
@@ -1460,7 +1469,7 @@ const BugDocsPage = () => {
                   )}
 
                   {/* Projects List */}
-                  <div className="space-y-2 p-4 border rounded-lg bg-background max-h-[200px] overflow-y-auto">
+                  <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4 max-h-[min(320px,42vh)] overflow-y-auto">
                     {projects.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <FolderOpen className="h-8 w-8 text-muted-foreground mb-2" />
@@ -1517,11 +1526,15 @@ const BugDocsPage = () => {
                       })()
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <span>💡</span>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Lightbulb className="h-3.5 w-3.5 shrink-0 text-amber-500/90" aria-hidden />
                     <span>Select one or more projects to associate this document with</span>
                   </p>
                 </div>
+                    </div>
+                  </div>
+
+                <div className="mt-8 space-y-4 border-t border-border/50 pt-8">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="role" className="text-sm font-medium flex items-center gap-2">
@@ -1571,7 +1584,7 @@ const BugDocsPage = () => {
                   )}
 
                   {/* Roles List */}
-                  <div className="space-y-2 p-4 border rounded-lg bg-background">
+                  <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4 sm:p-5">
                     {[
                       { value: "for_me", label: "For Me", icon: <User className="h-4 w-4" />, color: "text-orange-600 dark:text-orange-400" },
                       { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
@@ -1623,28 +1636,30 @@ const BugDocsPage = () => {
                       </div>
                     ))}
                   </div>
-                  <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
-                    <p className="text-xs text-blue-900 dark:text-blue-100">
+                  <div className="flex items-start gap-3 rounded-xl border border-blue-200/70 bg-blue-50/80 p-4 dark:border-blue-900/50 dark:bg-blue-950/25">
+                    <Lightbulb className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" aria-hidden />
+                    <p className="text-xs leading-relaxed text-blue-900 dark:text-blue-100">
                       <strong>Tip:</strong> "For Me" makes the document private to you only. "All Users" will automatically override other role selections. 
                       For specific access, uncheck "All Users" and select individual roles.
                     </p>
                   </div>
                 </div>
+                </div>
+                </div>
               </div>
-              <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+              <DialogFooter className="flex shrink-0 flex-col gap-2 border-t border-border/50 bg-muted/20 px-6 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-8 sm:py-5">
                 <Button
                   variant="outline"
                   onClick={() => setIsCreateModalOpen(false)}
                   disabled={isCreating}
-                  className="w-full sm:w-auto order-2 sm:order-1"
+                  className="w-full sm:w-auto order-2 sm:order-1 min-w-[7rem]"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleCreateDocument}
                   disabled={isCreating}
-                  className="w-full sm:w-auto order-1 sm:order-2"
+                  className="w-full sm:w-auto order-1 sm:order-2 min-w-[10rem] font-semibold"
                 >
                   {isCreating ? (
                     <>

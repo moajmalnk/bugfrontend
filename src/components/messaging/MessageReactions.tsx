@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { MessagingService } from '@/services/messagingService';
 import { MessageReaction, EmojiReaction } from '@/types';
+import { cn } from '@/lib/utils';
 
 interface MessageReactionsProps {
   messageId: string;
@@ -31,6 +32,8 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [isAddingReaction, setIsAddingReaction] = useState(false);
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
+  const [morePickerOpen, setMorePickerOpen] = useState(false);
 
   const commonEmojis = MessagingService.getCommonEmojis();
 
@@ -49,12 +52,21 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
   }, {} as Record<string, EmojiReaction>);
 
   const handleAddReaction = async (emoji: string) => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      toast({
+        title: "Sign in required",
+        description: "You must be signed in to react.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsAddingReaction(true);
     try {
       const newReaction = await MessagingService.addReaction(messageId, emoji);
       onReactionUpdate([...reactions, newReaction]);
+      setAddPickerOpen(false);
+      setMorePickerOpen(false);
       toast({
         title: "Success",
         description: "Reaction added"
@@ -98,20 +110,27 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
     return reactions.some(r => r.emoji === emoji && r.user_id === currentUser?.id);
   };
 
-  const handleReactionClick = (emoji: string) => {
+  const handleReactionClick = async (emoji: string) => {
     if (hasUserReacted(emoji)) {
-      handleRemoveReaction(emoji);
+      await handleRemoveReaction(emoji);
     } else {
-      handleAddReaction(emoji);
+      await handleAddReaction(emoji);
     }
   };
 
   if (reactions.length === 0) {
     return (
-      <div className="flex items-center gap-1 mt-1">
-        <Popover>
+      <div
+        className={cn(
+          "flex items-center gap-1 mt-1 min-h-[28px] transition-opacity duration-150",
+          "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
+          addPickerOpen && "opacity-100 pointer-events-auto relative z-[100]"
+        )}
+      >
+        <Popover open={addPickerOpen} onOpenChange={setAddPickerOpen} modal={false}>
           <PopoverTrigger asChild>
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               className="h-6 w-6 p-0 hover:bg-muted/50"
@@ -120,11 +139,18 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
               <Smile className="h-3 w-3" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64 p-2" align="start">
+          <PopoverContent
+            className="w-64 p-2 z-[200]"
+            align="start"
+            side="top"
+            sideOffset={6}
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
             <div className="grid grid-cols-5 gap-1">
               {commonEmojis.map((emoji) => (
                 <Button
                   key={emoji}
+                  type="button"
                   variant="ghost"
                   size="sm"
                   className="h-8 w-8 p-0 text-lg hover:bg-muted/50"
@@ -145,6 +171,7 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
     <div className="flex items-center gap-1 mt-1">
       {Object.values(groupedReactions).map((group) => (
         <Button
+          type="button"
           key={group.emoji}
           variant={hasUserReacted(group.emoji) ? "secondary" : "ghost"}
           size="sm"
@@ -161,9 +188,10 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
         </Button>
       ))}
       
-      <Popover>
+      <Popover open={morePickerOpen} onOpenChange={setMorePickerOpen} modal={false}>
         <PopoverTrigger asChild>
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             className="h-6 w-6 p-0 hover:bg-muted/50"
@@ -172,11 +200,18 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
             <Plus className="h-3 w-3" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-64 p-2" align="start">
+        <PopoverContent
+          className="w-64 p-2 z-[200]"
+          align="start"
+          side="top"
+          sideOffset={6}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <div className="grid grid-cols-5 gap-1">
             {commonEmojis.map((emoji) => (
               <Button
                 key={emoji}
+                type="button"
                 variant="ghost"
                 size="sm"
                 className={`h-8 w-8 p-0 text-lg hover:bg-muted/50 ${
@@ -197,6 +232,7 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
         <Popover key={`users-${group.emoji}`}>
           <PopoverTrigger asChild>
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               className="h-6 w-6 p-0 hover:bg-muted/50"

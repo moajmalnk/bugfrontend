@@ -1,3 +1,4 @@
+import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -671,42 +672,14 @@ const Users = () => {
               </span>
             </div>
             <div className="flex items-center justify-center sm:justify-end gap-3">
-              <label
-                htmlFor="items-per-page"
-                className="text-sm text-muted-foreground font-medium whitespace-nowrap"
-              >
+              <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
                 Items per page:
-              </label>
-              <div className="relative group">
-                <select
-                  id="items-per-page"
-                  value={itemsPerPage}
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                  aria-label="Items per page"
-                >
-                  {[10, 25, 50].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                  <svg
-                    className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </div>
-              </div>
+              </span>
+              <ItemsPerPageSelect
+                id="items-per-page"
+                value={itemsPerPage}
+                onChange={setItemsPerPage}
+              />
             </div>
           </div>
 
@@ -897,42 +870,14 @@ const Users = () => {
             </span>
           </div>
           <div className="flex items-center justify-center sm:justify-end gap-3">
-            <label
-              htmlFor="items-per-page-simple"
-              className="text-sm text-muted-foreground font-medium whitespace-nowrap"
-            >
+            <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
               Items per page:
-            </label>
-            <div className="relative group">
-              <select
-                id="items-per-page-simple"
-                value={itemsPerPage}
-                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                aria-label="Items per page"
-              >
-                {[10, 25, 50].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                <svg
-                  className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </div>
-            </div>
+            </span>
+            <ItemsPerPageSelect
+              id="items-per-page-simple"
+              value={itemsPerPage}
+              onChange={setItemsPerPage}
+            />
           </div>
         </div>
         )}

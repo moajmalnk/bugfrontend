@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { ENV } from "@/lib/env";
+import { cn } from "@/lib/utils";
 import { MessagingService } from "@/services/messagingService";
 import { projectService } from "@/services/projectService";
 import { userService } from "@/services/userService";
@@ -28,35 +29,48 @@ import type { ChatGroup, Project } from "@/types";
 import {
   Edit,
   MessageCircle,
+  MoreVertical,
   Plus,
   Search,
   Trash2,
   UserPlus,
   Users,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import React, { useEffect, useState } from "react";
 interface ChatGroupSelectorProps {
   selectedGroup: ChatGroup | null;
   onGroupSelect: (group: ChatGroup) => void;
   showAllProjects?: boolean;
+  /** Dark compact list styled like common chat apps (use inside Messages sidebar) */
+  variant?: "default" | "messaging";
   onCreateGroupClick?: () => void;
   triggerCreateGroup?: boolean;
   onTriggerCreateGroupReset?: () => void;
   onGroupsCountUpdate?: (count: number) => void;
   onGroupDelete?: (group: ChatGroup) => void;
   refreshTrigger?: number;
+  /** Increment when chat messages change to reload last-message previews */
+  chatListVersion?: number;
 }
 
 export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   selectedGroup,
   onGroupSelect,
   showAllProjects = false,
+  variant = "default",
   onCreateGroupClick,
   triggerCreateGroup = false,
   onTriggerCreateGroupReset,
   onGroupsCountUpdate,
   onGroupDelete,
   refreshTrigger,
+  chatListVersion = 0,
 }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -196,14 +210,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
 
   useEffect(() => {
     loadGroups();
-  }, []);
-
-  // Listen for refresh trigger from parent
-  useEffect(() => {
-    if (refreshTrigger && refreshTrigger > 0) {
-      loadGroups();
-    }
-  }, [refreshTrigger]);
+  }, [refreshTrigger, chatListVersion]);
 
   const handleCreateGroup = async () => {
     if (!createForm.projectId || !createForm.name.trim()) {
@@ -731,72 +738,138 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     return MessagingService.formatMessageTime(timestamp);
   };
 
+  const formatChatListSubtitle = (group: ChatGroup) => {
+    const preview = group.last_message_preview?.trim();
+    const sid = group.last_message_sender_id;
+    const sname = group.last_message_sender_name?.trim();
+    if (preview) {
+      const who =
+        currentUser?.id && sid && String(sid) === String(currentUser.id)
+          ? "You"
+          : sname || "Member";
+      return `${who}: ${preview}`;
+    }
+    if (group.last_message_at) return "Open to view messages";
+    const desc = group.description?.trim();
+    if (desc) return desc;
+    return "No messages yet";
+  };
+
   const filteredGroups = groups.filter(
     (group) =>
       group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       group.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const isMessaging = variant === "messaging";
+
   return (
-    <div className="flex flex-col h-full min-h-0 bg-background overflow-hidden">
-      {/* Professional Header */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"></div>
-        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-3 sticky top-0 z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-1.5 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg">
-                <MessageCircle className="h-4 w-4 text-white" />
+    <div
+      className={cn(
+        "flex flex-col h-full min-h-0 overflow-hidden",
+        isMessaging ? "bg-[#111b21] text-[#e9edef]" : "bg-background"
+      )}
+    >
+      {isMessaging ? (
+        <>
+          <div className="flex-shrink-0 bg-[#202c33] border-b border-[#2a3942] px-3 py-2.5 z-10">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <MessageCircle className="h-5 w-5 text-[#00a884] shrink-0" />
+                <h2 className="text-base font-semibold text-[#e9edef] truncate">
+                  Chats
+                </h2>
               </div>
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Chat Groups</h2>
+              {isAdmin && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  className="h-9 w-9 rounded-full text-[#aebac1] hover:bg-[#2a3942] hover:text-[#e9edef] shrink-0"
+                  title="New group"
+                >
+                  <Plus className="h-5 w-5" />
+                </Button>
+              )}
             </div>
-            {isAdmin && (
-              <Button
-                size="icon"
-                variant={
-                  filteredGroups.length === 0 && !searchQuery
-                    ? "default"
-                    : "outline"
-                }
-                onClick={() => setIsCreateDialogOpen(true)}
-                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl transition-all duration-200 ${
-                  filteredGroups.length === 0 && !searchQuery
-                    ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg"
-                    : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-                }`}
-                title={
-                  filteredGroups.length === 0 && !searchQuery
-                    ? "Create your first group"
-                    : "Create new group"
-                }
-              >
-                <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
-            )}
           </div>
-        </div>
-      </div>
-      
-      {/* Professional Search Bar - Always visible */}
-      <div className="sticky top-16 z-10">
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30"></div>
-          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-2">
+          <div className="flex-shrink-0 px-2 py-2 border-b border-[#2a3942]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0] pointer-events-none" />
               <Input
-                placeholder="Search chats..."
+                placeholder="Search or start new chat"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm transition-all duration-300"
+                className="pl-9 h-9 bg-[#2a3942] border-0 rounded-lg text-sm text-[#e9edef] placeholder:text-[#8696a0] focus-visible:ring-1 focus-visible:ring-[#00a884]"
               />
             </div>
           </div>
-        </div>
-      </div>
-      
-      {/* Scrollable Groups List */}
-      <div className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden space-y-0 bg-background hide-scrollbar">
+        </>
+      ) : (
+        <>
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"></div>
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-3 sticky top-0 z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg">
+                    <MessageCircle className="h-4 w-4 text-white" />
+                  </div>
+                  <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+                    Chat Groups
+                  </h2>
+                </div>
+                {isAdmin && (
+                  <Button
+                    size="icon"
+                    variant={
+                      filteredGroups.length === 0 && !searchQuery
+                        ? "default"
+                        : "outline"
+                    }
+                    onClick={() => setIsCreateDialogOpen(true)}
+                    className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl transition-all duration-200 ${
+                      filteredGroups.length === 0 && !searchQuery
+                        ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg"
+                        : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    }`}
+                    title={
+                      filteredGroups.length === 0 && !searchQuery
+                        ? "Create your first group"
+                        : "Create new group"
+                    }
+                  >
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="sticky top-16 z-10">
+            <div className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30"></div>
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search chats..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm transition-all duration-300"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div
+        className={cn(
+          "flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden space-y-0 hide-scrollbar",
+          isMessaging ? "bg-[#111b21]" : "bg-background"
+        )}
+      >
         {isLoading ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground">
             <div className="text-center">
@@ -897,126 +970,224 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
             )}
           </div>
         ) : (
-          <div className="space-y-1 p-2">
-            {filteredGroups.map((group) => (
-              <div
-                key={group.id}
-                className={`group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.01] cursor-pointer ${
-                  selectedGroup?.id === group.id
-                    ? "ring-2 ring-primary/50 border-primary/50 bg-primary/5"
-                    : "hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 dark:hover:from-blue-950/20 dark:hover:to-purple-950/20"
-                }`}
-                onClick={() => onGroupSelect(group)}
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onGroupSelect(group);
-                }}
-                aria-selected={selectedGroup?.id === group.id}
-              >
-                {/* Status indicator */}
-                {selectedGroup?.id === group.id && (
-                  <div className="absolute top-3 right-3 w-2 h-2 bg-primary rounded-full shadow-lg"></div>
-                )}
-                
-                <div className="p-4">
-                  <div className="flex items-start gap-3">
-                    {/* Group Avatar */}
-                    <Avatar className="h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0">
-                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-lg">
-                        {group.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    {/* Group Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white truncate group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
-                            {group.name}
-                          </h4>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs px-2 py-1 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
-                              {group.projectName}
-                            </Badge>
-                            {!group.is_member && (
-                              <Badge variant="secondary" className="text-xs px-2 py-1">
-                                Not Member
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Admin Actions - Mobile responsive */}
-                        {isAdmin && (
-                          <div className="flex items-center space-x-1 ml-2">
+          <div className={isMessaging ? "" : "space-y-1 p-2"}>
+            {filteredGroups.map((group) =>
+              isMessaging ? (
+                <div
+                  key={group.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onGroupSelect(group)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onGroupSelect(group);
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 cursor-pointer outline-none transition-colors border-b border-[#222d34]",
+                    selectedGroup?.id === group.id
+                      ? "bg-[#2a3942]"
+                      : "hover:bg-[#202c33]"
+                  )}
+                  aria-selected={selectedGroup?.id === group.id}
+                >
+                  <Avatar className="h-12 w-12 flex-shrink-0 rounded-full">
+                    <AvatarFallback className="bg-[#6b7c85] text-white text-lg font-medium">
+                      {group.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium text-[#e9edef] truncate leading-tight">
+                        {group.name}
+                      </span>
+                      {group.last_message_at ? (
+                        <span className="text-[11px] text-[#8696a0] shrink-0 tabular-nums pt-0.5 max-w-[4.5rem] text-right">
+                          {formatLastMessageTime(group.last_message_at)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-sm text-[#8696a0] truncate mt-0.5 leading-snug">
+                      {formatChatListSubtitle(group)}
+                    </p>
+                    <div className="flex items-center justify-between gap-2 mt-1">
+                      <span className="text-[11px] text-[#667781] truncate">
+                        {group.projectName}
+                        {typeof group.member_count === "number"
+                          ? ` · ${group.member_count} members`
+                          : ""}
+                        {!group.is_member ? " · Not a member" : ""}
+                      </span>
+                      {isAdmin && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <Button
+                              type="button"
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 rounded-full text-[#8696a0] hover:bg-[#3b4a54] hover:text-[#e9edef]"
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="Chat options"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-48 bg-[#233138] border-[#2a3942] text-[#e9edef]"
+                          >
+                            <DropdownMenuItem
+                              className="focus:bg-[#2a3942] cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleManageMembers(group.id);
                               }}
-                              tabIndex={-1}
-                              className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
-                              title="Manage members"
                             >
-                              <UserPlus className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                              <UserPlus className="h-4 w-4 mr-2" />
+                              Members
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="focus:bg-[#2a3942] cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleEditGroup(group);
                               }}
-                              tabIndex={-1}
-                              className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
-                              title="Edit group"
                             >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit group
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="focus:bg-[#3f1f1f] text-red-300 cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteGroup(group.id);
                               }}
-                              tabIndex={-1}
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all duration-200"
-                              title="Delete group"
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {group.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2 leading-relaxed">
-                          {group.description}
-                        </p>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete group
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1 bg-blue-500 rounded-lg">
-                            <Users className="h-3 w-3 text-white" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  key={group.id}
+                  className={`group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.01] cursor-pointer ${
+                    selectedGroup?.id === group.id
+                      ? "ring-2 ring-primary/50 border-primary/50 bg-primary/5"
+                      : "hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 dark:hover:from-blue-950/20 dark:hover:to-purple-950/20"
+                  }`}
+                  onClick={() => onGroupSelect(group)}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onGroupSelect(group);
+                  }}
+                  aria-selected={selectedGroup?.id === group.id}
+                >
+                  {selectedGroup?.id === group.id && (
+                    <div className="absolute top-3 right-3 w-2 h-2 bg-primary rounded-full shadow-lg"></div>
+                  )}
+                  <div className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-lg">
+                          {group.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white truncate group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                              {group.name}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge
+                                variant="outline"
+                                className="text-xs px-2 py-1 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                              >
+                                {group.projectName}
+                              </Badge>
+                              {!group.is_member && (
+                                <Badge variant="secondary" className="text-xs px-2 py-1">
+                                  Not Member
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                          <span className="font-medium">{group.member_count} members</span>
+                          {isAdmin && (
+                            <div className="flex items-center space-x-1 ml-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleManageMembers(group.id);
+                                }}
+                                tabIndex={-1}
+                                className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
+                                title="Manage members"
+                              >
+                                <UserPlus className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditGroup(group);
+                                }}
+                                tabIndex={-1}
+                                className="h-8 w-8 p-0 hover:bg-primary/10 rounded-lg transition-all duration-200"
+                                title="Edit group"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteGroup(group.id);
+                                }}
+                                tabIndex={-1}
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all duration-200"
+                                title="Delete group"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="p-1 bg-green-500 rounded-lg">
-                            <MessageCircle className="h-3 w-3 text-white" />
+                        {group.last_message_preview?.trim() ? (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
+                            {formatChatListSubtitle(group)}
+                          </p>
+                        ) : group.description ? (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2 leading-relaxed">
+                            {group.description}
+                          </p>
+                        ) : null}
+                        <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1 bg-blue-500 rounded-lg">
+                              <Users className="h-3 w-3 text-white" />
+                            </div>
+                            <span className="font-medium">{group.member_count} members</span>
                           </div>
-                          <span className="font-medium">Active chat</span>
+                          <div className="flex items-center gap-2">
+                            <div className="p-1 bg-green-500 rounded-lg">
+                              <MessageCircle className="h-3 w-3 text-white" />
+                            </div>
+                            <span className="font-medium">Active chat</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         )}
       </div>

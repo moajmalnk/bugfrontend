@@ -34,7 +34,10 @@ const Messages = () => {
   const [groupsCount, setGroupsCount] = useState(0);
   const [deletedGroup, setDeletedGroup] = useState<ChatGroup | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [chatListVersion, setChatListVersion] = useState(0);
   const [showSidebar, setShowSidebar] = useState(false);
+
+  const bumpChatList = () => setChatListVersion((v) => v + 1);
 
   // Handle responsive behavior
   useEffect(() => {
@@ -306,6 +309,7 @@ const Messages = () => {
                     selectedGroup={selectedGroup}
                     onGroupSelect={handleGroupSelect}
                     showAllProjects={true}
+                    variant="messaging"
                     onCreateGroupClick={() => {
                       setTriggerCreateGroup(true);
                     }}
@@ -317,6 +321,7 @@ const Messages = () => {
                       undoDelete.startCountdown();
                     }}
                     refreshTrigger={refreshTrigger}
+                    chatListVersion={chatListVersion}
                   />
                 </div>
               </aside>
@@ -347,6 +352,7 @@ const Messages = () => {
                   <ChatInterface
                     selectedGroup={selectedGroup}
                     onBackToChatList={handleBackToChatList}
+                    onChatActivity={bumpChatList}
                   />
                 ) : (
                   // Enhanced Professional Empty State

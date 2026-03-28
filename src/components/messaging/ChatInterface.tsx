@@ -1,3 +1,12 @@
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
@@ -56,11 +65,14 @@ import { StarredMessages } from "./StarredMessages";
 interface ChatInterfaceProps {
   selectedGroup: ChatGroup | null;
   onBackToChatList?: () => void;
+  /** Bump when messages change so the sidebar can refresh last-message previews */
+  onChatActivity?: () => void;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   selectedGroup,
   onBackToChatList,
+  onChatActivity,
 }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -83,6 +95,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
   const [editMessage, setEditMessage] = useState<ChatMessage | null>(null);
   const [messageInfo, setMessageInfo] = useState<ChatMessage | null>(null);
+  const [messagePendingDelete, setMessagePendingDelete] =
+    useState<ChatMessage | null>(null);
+  const [isDeletingMessage, setIsDeletingMessage] = useState(false);
   const [availableGroups, setAvailableGroups] = useState<ChatGroup[]>([]);
   const [pinnedMessagesKey, setPinnedMessagesKey] = useState(0);
 
@@ -94,8 +109,35 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sidebarBumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAdmin = currentUser?.role === "admin";
+
+  const scheduleSidebarListRefresh = () => {
+    if (!onChatActivity) return;
+    if (sidebarBumpTimerRef.current) clearTimeout(sidebarBumpTimerRef.current);
+    sidebarBumpTimerRef.current = setTimeout(() => {
+      onChatActivity();
+      sidebarBumpTimerRef.current = null;
+    }, 800);
+  };
+
+  const refreshSidebarListNow = () => {
+    onChatActivity?.();
+  };
+
+  const displaySenderLabel = (name?: string | null) => {
+    if (!name || name === "0") return "Member";
+    return name;
+  };
+
+  const normalizeDeliveryStatus = (
+    s: ChatMessage["delivery_status"]
+  ): "sent" | "delivered" | "read" | "failed" => {
+    if (s === "delivered" || s === "read" || s === "failed" || s === "sent")
+      return s;
+    return "sent";
+  };
 
   useEffect(() => {
     if (selectedGroup) {
@@ -114,6 +156,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return () => {
       if (pollingCleanupRef.current) {
         pollingCleanupRef.current();
+      }
+      if (sidebarBumpTimerRef.current) {
+        clearTimeout(sidebarBumpTimerRef.current);
+        sidebarBumpTimerRef.current = null;
       }
     };
   }, [selectedGroup]);
@@ -203,6 +249,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           if (prev.find((m) => m.id === newMessage.id)) {
             return prev;
           }
+          scheduleSidebarListRefresh();
           return [...prev, newMessage];
         });
       },
@@ -244,6 +291,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const sentMessage = await MessagingService.sendMessage(messageData);
       setMessages((prev) => [...prev, sentMessage]);
       setReplyToMessage(null);
+      refreshSidebarListNow();
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
@@ -392,6 +440,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       const sentMessage = await MessagingService.sendMessage(messageData);
       setMessages((prev) => [...prev, sentMessage]);
+      refreshSidebarListNow();
     } catch (error) {
       console.error("Error sending voice message:", error);
       toast({
@@ -418,6 +467,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     try {
       await MessagingService.deleteMessage(message.id);
       setMessages((prev) => prev.filter((m) => m.id !== message.id));
+      setMessagePendingDelete(null);
       toast({
         title: "Success",
         description: "Message deleted successfully",
@@ -429,6 +479,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         description: "Failed to delete message",
         variant: "destructive",
       });
+    }
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!messagePendingDelete) return;
+    setIsDeletingMessage(true);
+    try {
+      await handleDeleteMessage(messagePendingDelete);
+    } finally {
+      setIsDeletingMessage(false);
     }
   };
 
@@ -461,7 +521,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const canDeleteMessage = (message: ChatMessage) => {
     if (isAdmin) return true;
-    if (message.sender_id !== currentUser?.id) return false;
+    if (String(message.sender_id) !== String(currentUser?.id ?? ""))
+      return false;
 
     const messageTime = new Date(message.created_at).getTime();
     const currentTime = new Date().getTime();
@@ -537,6 +598,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     try {
       const sentMessage = await MessagingService.sendMessage(mediaData);
       setMessages((prev) => [...prev, sentMessage]);
+      refreshSidebarListNow();
       toast({
         title: "Success",
         description: "Media sent successfully",
@@ -571,56 +633,46 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background hide-scrollbar">
-      {/* Professional Header - Fixed/Sticky */}
-      <div className="relative overflow-hidden flex-shrink-0 z-20">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"></div>
-        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 px-3 sm:px-4 py-3 sm:py-4">
+      <div className="flex-shrink-0 z-20 bg-[#202c33] border-b border-[#2a3942]">
+        <div className="px-3 sm:px-4 py-2.5 sm:py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-              {/* Back button for mobile */}
               {onBackToChatList && (
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={onBackToChatList}
-                  className="md:hidden h-8 w-8 sm:h-9 sm:w-9 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200 flex-shrink-0"
+                  className="md:hidden h-9 w-9 text-[#aebac1] hover:bg-[#2a3942] hover:text-[#e9edef] rounded-full flex-shrink-0"
                 >
-                  <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <ArrowLeft className="h-5 w-5" />
                 </Button>
               )}
-              
-              {/* Group Avatar */}
               <div className="relative flex-shrink-0">
-                <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-blue-500/20 shadow-lg">
-                  <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-semibold text-sm sm:text-base">
+                <Avatar className="h-9 w-9 sm:h-10 sm:w-10">
+                  <AvatarFallback className="bg-[#6b7c85] text-white font-semibold text-sm">
                     {selectedGroup.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900"></div>
               </div>
-              
-              {/* Group Info */}
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate">
+                <CardTitle className="text-base font-medium text-[#e9edef] truncate leading-tight">
                   {selectedGroup.name}
                 </CardTitle>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
+                <div className="text-xs text-[#8696a0] mt-0.5">
                   {typingUsers.length > 0 ? (
-                    <span className="text-blue-600 dark:text-blue-400 animate-pulse font-medium">
-                      {typingUsers.map((u) => u.user_name).join(", ")} typing...
+                    <span className="text-[#00a884] animate-pulse font-medium">
+                      {typingUsers.map((u) => u.user_name).join(", ")} typing…
                     </span>
                   ) : (
                     <span className="flex items-center gap-1">
-                      <Users className="h-3 w-3" />
+                      <Users className="h-3 w-3 shrink-0" />
                       {selectedGroup.member_count} members
                     </span>
                   )}
                 </div>
               </div>
             </div>
-            
-            {/* Header Actions */}
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-0.5 flex-shrink-0 text-[#aebac1]">
               <MessageSearch
                 groupId={selectedGroup.id}
                 onMessageClick={handleMessageClick}
@@ -659,8 +711,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         )}
         {messages.map((message) => {
-          const isOwnMessage = message.sender_id === currentUser?.id;
-          const isDeleted = message.is_deleted;
+          const isOwnMessage =
+            String(message.sender_id) === String(currentUser?.id ?? "");
+          const isDeleted = Boolean(message.is_deleted);
+          const isPinned = Boolean(message.is_pinned);
+          const isEdited = Boolean(message.is_edited);
+          const replyToId = message.reply_to_message_id;
+          const hasReply =
+            replyToId != null && String(replyToId).trim() !== "";
           return (
             <div
               key={message.id}
@@ -677,18 +735,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 {!isOwnMessage && (
                   <Avatar className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 mr-2 flex-shrink-0">
                     <AvatarFallback className="text-xs font-semibold">
-                      {(message.sender_name && message.sender_name !== '0' ? message.sender_name : 'User').charAt(0).toUpperCase()}
+                      {displaySenderLabel(message.sender_name).charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 )}
                 <div
                   className={`space-y-1 ${
                     isOwnMessage ? "mr-2 items-end" : "ml-2 items-start"
-                  } flex flex-col w-full`}
+                  } flex flex-col w-full min-w-0`}
                 >
                   {!isOwnMessage && (
-                    <div className="text-xs text-muted-foreground font-medium px-1 mb-1">
-                      {message.sender_name && message.sender_name !== '0' ? message.sender_name : 'User'}
+                    <div className="text-xs text-muted-foreground font-medium px-1 mb-0.5">
+                      {displaySenderLabel(message.sender_name)}
                     </div>
                   )}
                   <div
@@ -700,7 +758,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       isDeleted
                         ? "opacity-60 italic"
                         : "hover:ring-1 hover:ring-primary/20"
-                    } ${message.is_pinned ? "ring-2 ring-yellow-400/50" : ""}`}
+                    } ${isPinned ? "ring-2 ring-yellow-400/50" : ""}`}
                   >
                     {isDeleted ? (
                       <div className="text-muted-foreground italic">
@@ -709,7 +767,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     ) : (
                       <>
                         {/* Pinned indicator */}
-                        {message.is_pinned && (
+                        {isPinned && (
                           <div className="flex items-center gap-1 mb-2 text-xs text-yellow-600 dark:text-yellow-400">
                             <Pin className="h-3 w-3" />
                             <span>Pinned by {message.pinned_by_name}</span>
@@ -717,10 +775,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         )}
 
                         {/* Reply to message */}
-                        {message.reply_to_message_id && (
+                        {hasReply && (
                           <div className="mb-2 p-2 bg-background/60 rounded text-xs border-l-4 border-primary/30">
                             <div className="font-medium">
-                              Replying to {message.reply_sender_name && message.reply_sender_name !== '0' ? message.reply_sender_name : 'User'}
+                              Replying to {displaySenderLabel(message.reply_sender_name)}
                             </div>
                             <div className="text-muted-foreground">
                               {message.reply_type === "voice"
@@ -741,23 +799,23 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         ) : message.message_type === "image" ? (
                           <div>
                             <img
-                              src={message.media_file_path}
+                              src={MessagingService.resolveMediaUrl(message.media_file_path)}
                               alt={message.media_file_name || "Image"}
                               className="max-w-full rounded-lg max-h-80 sm:max-h-96 object-contain shadow-sm"
                               loading="lazy"
                             />
-                            {message.content && (
+                            {Boolean(message.content) && (
                               <div className="mt-2 text-sm leading-relaxed">{message.content}</div>
                             )}
                           </div>
                         ) : message.message_type === "video" ? (
                           <div>
                             <video
-                              src={message.media_file_path}
+                              src={MessagingService.resolveMediaUrl(message.media_file_path)}
                               controls
                               className="max-w-full rounded-lg max-h-80 sm:max-h-96 shadow-sm"
                             />
-                            {message.content && (
+                            {Boolean(message.content) && (
                               <div className="mt-2 text-sm leading-relaxed">{message.content}</div>
                             )}
                           </div>
@@ -775,7 +833,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => window.open(message.media_file_path, '_blank')}
+                              onClick={() =>
+                                window.open(
+                                  MessagingService.resolveMediaUrl(message.media_file_path),
+                                  '_blank'
+                                )
+                              }
                               className="flex-shrink-0 h-8 w-8 p-0 rounded-lg"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -802,10 +865,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                 __html: formatMentions(message.content || ""),
                               }}
                             />
-                            {message.is_edited && (
+                            {isEdited && (
                               <span className="text-xs text-muted-foreground italic ml-1">
                                 (edited)
                               </span>
+                            )}
+                          </div>
+                        )}
+                        {!isDeleted && (
+                          <div
+                            className={`flex items-center gap-1.5 mt-1.5 pt-1 border-t border-black/[0.06] dark:border-white/[0.08] ${
+                              isOwnMessage ? "justify-end" : "justify-end"
+                            } text-[11px] text-[#667781] dark:text-[#8696a0] shrink-0`}
+                          >
+                            <span className="tabular-nums whitespace-nowrap">
+                              {MessagingService.formatMessageTime(message.created_at)}
+                            </span>
+                            {isOwnMessage && (
+                              <MessageStatus
+                                status={normalizeDeliveryStatus(message.delivery_status)}
+                                size="sm"
+                              />
                             )}
                           </div>
                         )}
@@ -813,10 +893,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     )}
                   </div>
 
-                  {/* Message reactions */}
+                  {/* Reactions: show chips always; add-reaction control on hover when none */}
                   {!isDeleted &&
-                    message.reactions &&
-                    message.reactions.length > 0 && (
+                    (Array.isArray(message.reactions) &&
+                    message.reactions.length > 0 ? (
                       <MessageReactions
                         messageId={message.id}
                         reactions={message.reactions}
@@ -830,18 +910,33 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                           );
                         }}
                       />
-                    )}
+                    ) : (
+                      <div
+                        className={`w-full mt-0.5 flex ${
+                          isOwnMessage ? "justify-end" : "justify-start"
+                        }`}
+                      >
+                        <MessageReactions
+                          messageId={message.id}
+                          reactions={[]}
+                          onReactionUpdate={(updatedReactions) => {
+                            setMessages((prev) =>
+                              prev.map((m) =>
+                                m.id === message.id
+                                  ? { ...m, reactions: updatedReactions }
+                                  : m
+                              )
+                            );
+                          }}
+                        />
+                      </div>
+                    ))}
 
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 px-1">
-                    <span className="text-xs">
-                      {MessagingService.formatMessageTime(message.created_at)}
-                    </span>
-                    {isOwnMessage && !isDeleted && (
-                      <MessageStatus
-                        status={message.delivery_status || "sent"}
-                        size="sm"
-                      />
-                    )}
+                  <div
+                    className={`flex items-center gap-1 mt-0.5 px-1 ${
+                      isOwnMessage ? "justify-end" : "justify-start"
+                    }`}
+                  >
                     {!isDeleted && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
@@ -883,7 +978,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             </DropdownMenuItem>
                             
                             {/* Edit - only for own text messages */}
-                            {isOwnMessage && message.message_type === "text" && !message.is_edited && (
+                            {isOwnMessage &&
+                              message.message_type === "text" &&
+                              !isEdited && (
                               <DropdownMenuItem
                                 onClick={() => setEditMessage(message)}
                                 className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -904,14 +1001,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                               </DropdownMenuItem>
                             )}
                             
-                            <DropdownMenuItem
-                              onClick={() => copyMessage(message.content || "")}
-                              className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                            >
-                              <Copy className="h-4 w-4 mr-3" />
-                              Copy
-                            </DropdownMenuItem>
-                            {isAdmin && !message.is_pinned && (
+                            {message.message_type !== "voice" && (
+                              <DropdownMenuItem
+                                onClick={() => copyMessage(message.content || "")}
+                                className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                              >
+                                <Copy className="h-4 w-4 mr-3" />
+                                Copy
+                              </DropdownMenuItem>
+                            )}
+                            {isAdmin && !isPinned && (
                               <DropdownMenuItem
                                 onClick={() => handlePinMessage(message)}
                                 className="text-sm px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -922,7 +1021,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             )}
                             {canDeleteMessage(message) && (
                               <DropdownMenuItem
-                                onClick={() => handleDeleteMessage(message)}
+                                onClick={() => setMessagePendingDelete(message)}
                                 className="text-sm px-3 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
                               >
                                 <Trash2 className="h-4 w-4 mr-3" />
@@ -949,7 +1048,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <div className="px-3 sm:px-4 py-2 bg-[#2a3942] dark:bg-[#2a3942] border-b border-[#3b4a54] flex items-center justify-between">
             <div className="text-sm flex-1 min-w-0">
               <span className="font-medium text-[#00a884]">
-                Replying to {replyToMessage.sender_name}
+                Replying to {displaySenderLabel(replyToMessage.sender_name)}
               </span>
               <div className="text-[#8696a0] text-xs truncate">
                 {replyToMessage.message_type === "voice"
@@ -1091,6 +1190,37 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           groupMemberCount={selectedGroup.member_count}
         />
       )}
+
+      <AlertDialog
+        open={!!messagePendingDelete}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingMessage) {
+            setMessagePendingDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="z-[200]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone. The message will be removed for everyone in
+              this chat.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingMessage}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={isDeletingMessage}
+              onClick={() => void confirmDeleteMessage()}
+            >
+              {isDeletingMessage ? "Deleting…" : "Delete"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -77,8 +77,20 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     setUploadProgress(0);
 
     try {
+      // Match axios interceptor (lib/axios.ts) so XHR uploads authenticate the same as API calls
       const token =
-        sessionStorage.getItem("token") || localStorage.getItem("token");
+        sessionStorage.getItem("token") ||
+        localStorage.getItem("auth_token") ||
+        localStorage.getItem("token");
+
+      if (!token) {
+        toast({
+          title: "Not signed in",
+          description: "Sign in again, then try attaching the file.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Upload file
       const formData = new FormData();
