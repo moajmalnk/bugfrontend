@@ -3,11 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
   listAllRequestSubmissions,
+  normalizeAllRequestSubmissionsResponse,
   reviewOvertimeRequest,
 } from '@/services/todoService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   AlertDialog,
@@ -20,11 +22,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Clock, User, Check, X, Pencil, FileText } from 'lucide-react';
+import { toLocalCalendarDateString } from '@/lib/dateUtils';
+import { ENV } from '@/lib/env';
+import { ArrowLeft, Clock, User, Check, X, Pencil, FileText, Timer } from 'lucide-react';
 
 type Row = Record<string, unknown> & {
   id?: number;
-  user_id?: number;
+  /** Int or UUID string depending on schema */
+  user_id?: number | string;
   username?: string;
   role?: string;
   submission_date?: string;
@@ -44,8 +49,8 @@ function getSubmissionWindow() {
   const windowEnd = new Date(base.getFullYear(), base.getMonth() + 1, 0);
   const windowStart = new Date(base.getFullYear(), base.getMonth() - 11, 1);
   return {
-    from: windowStart.toISOString().slice(0, 10),
-    to: windowEnd.toISOString().slice(0, 10),
+    from: toLocalCalendarDateString(windowStart),
+    to: toLocalCalendarDateString(windowEnd),
   };
 }
 
@@ -110,19 +115,10 @@ function monthTabLinesForList(key: string, list: Row[]) {
   };
 }
 
-function parseRows(res: unknown): Row[] {
-  if (!res || typeof res !== 'object') return [];
-  const o = res as { data?: unknown };
-  const d = o.data;
-  if (Array.isArray(d)) return d as Row[];
-  if (Array.isArray(res)) return res as Row[];
-  return [];
-}
-
 function statusPill(status: string | undefined) {
   const s = (status || 'none').toLowerCase();
   const base =
-    'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize';
+    'inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium capitalize shrink-0';
   if (s === 'pending')
     return (
       <span className={`${base} bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200`}>
@@ -164,14 +160,19 @@ export default function AdminOvertimeRequests() {
   const [changeRow, setChangeRow] = useState<Row | null>(null);
   const [changeHours, setChangeHours] = useState('1');
   const [rejectRow, setRejectRow] = useState<Row | null>(null);
+  const [approveRow, setApproveRow] = useState<Row | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [reviewAdminNote, setReviewAdminNote] = useState('');
+  const [queryWindow, setQueryWindow] = useState<{ from: string; to: string }>(() => getSubmissionWindow());
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { from, to } = getSubmissionWindow();
-      const res = await listAllRequestSubmissions({ from, to });
-      setRows(parseRows(res));
+      const fallback = getSubmissionWindow();
+      const res = await listAllRequestSubmissions({});
+      const { submissions, window } = normalizeAllRequestSubmissionsResponse(res, fallback);
+      setRows(submissions as Row[]);
+      setQueryWindow(window);
     } catch (e) {
       toast({
         title: 'Failed to load requests',
@@ -184,18 +185,17 @@ export default function AdminOvertimeRequests() {
     }
   }, []);
 
+  const isAdmin = (currentUser?.role || '').toLowerCase() === 'admin';
+
   useEffect(() => {
-    if (currentUser?.role !== 'admin') return;
+    if (!isAdmin) return;
     load();
-  }, [currentUser?.role, load]);
+  }, [isAdmin, load]);
 
   const byUser = useMemo(() => {
-    const m = new Map<
-      number,
-      { userId: number; username: string; role: string; list: Row[]; pending: number }
-    >();
+    const m = new Map<string, { userId: string; username: string; role: string; list: Row[]; pending: number }>();
     for (const r of rows) {
-      const uid = Number(r.user_id);
+      const uid = String(r.user_id ?? '').trim();
       if (!uid) continue;
       const un = String(r.username || `User ${uid}`);
       const role = String(r.role || '');
@@ -212,7 +212,13 @@ export default function AdminOvertimeRequests() {
     );
   }, [rows]);
 
-  const selectedUserId = userIdParam ? Number(userIdParam) : 0;
+  const pendingTotal = useMemo(
+    () =>
+      rows.filter((r) => String(r.extra_hours_approval_status || '').toLowerCase() === 'pending').length,
+    [rows]
+  );
+
+  const selectedUserId = userIdParam.trim();
   const selectedGroup = byUser.find((g) => g.userId === selectedUserId);
 
   const monthKeys = useMemo(() => {
@@ -238,10 +244,10 @@ export default function AdminOvertimeRequests() {
       .sort((a, b) => String(b.submission_date).localeCompare(String(a.submission_date)));
   }, [selectedGroup, activeMonth]);
 
-  const setUser = (uid: number) => {
+  const setUser = (uid: string) => {
     const p = new URLSearchParams(searchParams);
-    p.set('userId', String(uid));
-    const list = rows.filter((r) => Number(r.user_id) === uid);
+    p.set('userId', uid);
+    const list = rows.filter((r) => String(r.user_id ?? '').trim() === uid);
     const ks = new Set<string>();
     for (const r of list) {
       const d = String(r.submission_date || '');
@@ -259,20 +265,35 @@ export default function AdminOvertimeRequests() {
     setSearchParams(p);
   };
 
+  const clearUser = () => {
+    const p = new URLSearchParams(searchParams);
+    p.delete('userId');
+    p.delete('month');
+    setSearchParams(p);
+  };
+
   const onReview = async (
     row: Row,
     action: 'approve' | 'reject' | 'change',
-    approvedHours?: number
+    options?: { approvedHours?: number; adminNote?: string }
   ) => {
     const id = row.id as number;
     if (!id) return;
     setBusyId(id);
     try {
-      await reviewOvertimeRequest({
-        id,
-        action,
-        ...(action === 'change' && approvedHours != null ? { approved_hours: approvedHours } : {}),
-      });
+      const body: {
+        id: number;
+        action: 'approve' | 'reject' | 'change';
+        approved_hours?: number;
+        admin_note?: string;
+      } = { id, action };
+      if (action === 'change' && options?.approvedHours != null) {
+        body.approved_hours = options.approvedHours;
+      }
+      if (action === 'reject' || action === 'change') {
+        body.admin_note = (options?.adminNote ?? '').trim();
+      }
+      await reviewOvertimeRequest(body);
       toast({
         title: action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : 'Updated',
         description: `Submission ${row.submission_date}`,
@@ -280,6 +301,8 @@ export default function AdminOvertimeRequests() {
       await load();
       setChangeRow(null);
       setRejectRow(null);
+      setApproveRow(null);
+      setReviewAdminNote('');
     } catch (e) {
       toast({
         title: 'Action failed',
@@ -291,16 +314,12 @@ export default function AdminOvertimeRequests() {
     }
   };
 
-  if (currentUser?.role !== 'admin') {
+  if (!isAdmin) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6">
-        <div className="max-w-7xl mx-auto rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 p-6">
-          <p className="text-gray-600 dark:text-gray-400">Admin access required.</p>
-          <Button
-            className="mt-4 rounded-xl"
-            variant="outline"
-            onClick={() => navigate(`/${currentUser?.role}/projects`)}
-          >
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-6 sm:px-6">
+        <div className="max-w-lg mx-auto rounded-xl border border-border bg-card p-5 shadow-sm">
+          <p className="text-sm text-muted-foreground">Admin access required.</p>
+          <Button className="mt-4 rounded-lg w-full sm:w-auto" variant="outline" onClick={() => navigate(`/${currentUser?.role}/projects`)}>
             Back
           </Button>
         </div>
@@ -311,85 +330,297 @@ export default function AdminOvertimeRequests() {
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
       <section className="max-w-7xl mx-auto min-w-0 space-y-6 sm:space-y-8">
-        {/* Header — same back control + title layout as Daily Work Update */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 sm:p-6 shadow-sm min-w-0">
-          <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={() => navigate(`/${currentUser.role}/daily-update`)}
-                className="p-1.5 shrink-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                aria-label="Back to BugUpdate"
-              >
-                <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              </button>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white min-w-0 break-words">
-                Extra-hour requests
-              </h1>
+        {/* Match DailyUpdate / Work Update professional header */}
+        <div className="relative min-w-0 overflow-hidden rounded-2xl">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-5 lg:gap-6 min-w-0">
+              <div className="space-y-3 min-w-0">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
+                    <Timer className="h-6 w-6 text-white" aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
+                      Extra-hour requests
+                    </h1>
+                    <div className="h-1 w-24 sm:w-28 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2" />
+                  </div>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl leading-relaxed">
+                  Pending, approved, rejected, and changed requests.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full min-w-0 lg:w-auto lg:shrink-0">
+                <Button
+                  type="button"
+                  onClick={() => navigate(`/${currentUser.role}/daily-update`)}
+                  className="h-12 w-full min-w-0 px-4 sm:w-auto sm:px-6 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 sm:hover:scale-105 rounded-xl"
+                >
+                  <ArrowLeft className="mr-2 h-5 w-5 shrink-0" />
+                  Back to Work Update
+                </Button>
+                <div className="flex items-center justify-center sm:justify-start gap-3 px-4 py-3 w-full sm:w-auto min-w-0 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-950/30 dark:to-blue-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
+                  <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
+                    <Timer className="h-5 w-5 text-white" aria-hidden />
+                  </div>
+                  <div className="text-center sm:text-left min-w-0">
+                    <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80"></div>
+                    <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                      {pendingTotal}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 pl-9 sm:ml-11 sm:pl-0">
-              All roles — review pending overtime by user and CODO month. Rejected requests store 0 overtime hours.
-            </p>
           </div>
         </div>
 
-        {/* Main panel — matches Saved Submissions card */}
-        <div className="relative overflow-hidden rounded-2xl shadow-lg border border-gray-200/40 dark:border-gray-700/40">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20" />
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 md:p-8 lg:p-10">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10 min-w-0">
-              {/* Users column */}
-              <div className="min-w-0 lg:border-r lg:border-gray-200/60 dark:lg:border-gray-700/60 lg:pr-8">
-                <div className="flex gap-3 min-w-0 mb-6">
+        <div className="relative overflow-hidden rounded-2xl shadow-lg border border-gray-200/40 dark:border-gray-700/40 min-w-0">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 pointer-events-none" />
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 md:p-8 lg:p-10 min-w-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 min-w-0 gap-0">
+              {/* Detail first in DOM so mobile (user selected) shows requests without an empty users row */}
+              {selectedGroup ? (
+                <div className="order-1 lg:order-2 lg:col-span-2 min-w-0 space-y-4 sm:space-y-5 lg:pl-6">
+                  <button
+                    type="button"
+                    onClick={clearUser}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl px-2 py-1.5 -ml-2 -mt-1 mb-2 hover:bg-gray-100/80 dark:hover:bg-gray-800/80 transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+                    All users
+                  </button>
+                  <div className="flex items-start gap-3 min-w-0 mb-1">
+                    <div className="p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20 shrink-0 self-start">
+                      <Clock className="h-6 w-6 text-white" aria-hidden />
+                    </div>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
+                        {selectedGroup.username}
+                      </h2>
+                      <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 leading-relaxed">
+                        Choose a CODO period, then approve, reject, or set hours.
+                      </p>
+                    </div>
+                  </div>
+
+                  {monthKeys.length > 0 && (
+                      <div className="flex flex-col xs:flex-row xs:flex-wrap gap-2">
+                        {monthKeys.map((mk) => {
+                          const lines = monthTabLinesForList(mk, selectedGroup.list);
+                          return (
+                            <button
+                              key={mk}
+                              type="button"
+                              onClick={() => setMonth(mk)}
+                              className={`min-h-[3.5rem] w-full xs:flex-1 xs:min-w-[min(100%,14rem)] xs:max-w-full sm:max-w-[20rem] px-3.5 py-3 text-left rounded-xl border-2 transition-all duration-200 ${
+                                activeMonth === mk
+                                  ? 'bg-gradient-to-r from-blue-600 to-emerald-600 text-white border-blue-600 shadow-lg'
+                                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                              }`}
+                            >
+                              <span
+                                className={`hidden sm:block text-sm font-medium leading-snug ${activeMonth === mk ? 'text-white' : ''}`}
+                              >
+                                {lines.full}
+                              </span>
+                              <span className="sm:hidden flex flex-col gap-0.5 w-full min-w-0 text-left">
+                                <span
+                                  className={`text-sm font-semibold leading-snug break-words ${activeMonth === mk ? 'text-white' : ''}`}
+                                >
+                                  {lines.compactTitle}
+                                </span>
+                                <span
+                                  className={`text-xs font-normal leading-snug ${activeMonth === mk ? 'text-white/90' : 'opacity-90'}`}
+                                >
+                                  {lines.compactMeta}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                  )}
+
+                  {visibleRows.length === 0 ? (
+                      <div className="text-center py-8 sm:py-10 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/30 px-3">
+                        <FileText className="h-9 w-9 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 dark:text-gray-400">No submissions for this month.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                        {visibleRows.map((r) => {
+                          const id = r.id as number;
+                          const reqH = Number(r.requested_extra_hours || 0);
+                          const ot = Number(r.overtime_hours || 0);
+                          const appr = Number(r.extra_hours_approved_amount ?? 0);
+                          return (
+                            <div
+                              key={id || String(r.submission_date)}
+                              className="rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/90 p-3.5 sm:p-5 shadow-sm hover:shadow-md transition-shadow min-w-0"
+                            >
+                              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3 mb-3 min-w-0">
+                                <div className="min-w-0 flex-1 order-2 sm:order-1">
+                                  <div className="font-semibold text-sm text-gray-900 dark:text-white break-words tabular-nums">
+                                    {String(r.submission_date)}
+                                  </div>
+                                  <div className="text-xs text-gray-600 dark:text-gray-400 break-words mt-1 leading-relaxed">
+                                    {r.start_time ? `Started at ${r.start_time}` : 'No start time'} •{' '}
+                                    {Number(r.hours_today || 0)} h
+                                    {ot > 0 && (
+                                      <span className="ml-1.5 inline-flex items-center px-2 py-0.5 bg-orange-500/10 text-orange-700 dark:text-orange-300 rounded-md text-[11px] font-medium border border-orange-500/20">
+                                        +{ot}h OT
+                                      </span>
+                                    )}
+                                    {reqH > 0 && (
+                                      <span className="ml-1.5 text-foreground/80">Req. +{reqH}h</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="shrink-0 order-1 sm:order-2 self-start sm:self-auto">
+                                  {statusPill(r.extra_hours_approval_status)}
+                                </div>
+                              </div>
+                              {(r.approval_reason || '').toString().trim() ? (
+                                <div className="max-h-36 sm:max-h-40 overflow-y-auto rounded-lg bg-gray-50 dark:bg-gray-900/50 p-3 border border-gray-200 dark:border-gray-700 mb-3">
+                                  <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                    Approval reason
+                                  </span>
+                                  <p className="mt-1.5 text-xs sm:text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-gray-800 dark:text-gray-200 leading-relaxed">
+                                    {String(r.approval_reason)}
+                                  </p>
+                                </div>
+                              ) : null}
+                              {r.extra_hours_reviewed_at ? (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 [overflow-wrap:anywhere] break-words">
+                                  Reviewed: {String(r.extra_hours_reviewed_at)}
+                                  {r.extra_hours_admin_note ? ` — ${String(r.extra_hours_admin_note)}` : ''}
+                                </p>
+                              ) : null}
+                              <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <p className="xs:col-span-3 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
+                                  Actions
+                                </p>
+                                <Button
+                                  type="button"
+                                  disabled={busyId === id}
+                                  onClick={() => setApproveRow(r)}
+                                  className="w-full h-10 rounded-xl bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-md border-0"
+                                >
+                                  <Check className="h-4 w-4 mr-2 shrink-0" />
+                                  Approve
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  disabled={busyId === id}
+                                  onClick={() => {
+                                    setReviewAdminNote(String(r.extra_hours_admin_note ?? ''));
+                                    setRejectRow(r);
+                                  }}
+                                  className="w-full h-10 rounded-xl font-medium"
+                                >
+                                  <X className="h-4 w-4 mr-2 shrink-0" />
+                                  Reject
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  disabled={busyId === id}
+                                  onClick={() => {
+                                    const changeDefault =
+                                      appr > 0 ? appr : reqH > 0 ? reqH : ot > 0 ? ot : 1;
+                                    setChangeRow(r);
+                                    setChangeHours(String(changeDefault));
+                                    setReviewAdminNote(String(r.extra_hours_admin_note ?? ''));
+                                  }}
+                                  className="w-full h-10 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 font-medium hover:bg-gray-50 dark:hover:bg-gray-700"
+                                >
+                                  <Pencil className="h-4 w-4 mr-2 shrink-0" />
+                                  Set hours
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                  )}
+                </div>
+              ) : null}
+
+              {/* Users: full width when none selected; sidebar on lg when reviewing a user */}
+              <div
+                className={`order-2 lg:order-1 min-w-0 ${
+                  selectedGroup
+                    ? 'hidden lg:block pb-0 lg:pr-6 lg:border-r border-gray-200/60 dark:border-gray-700/60'
+                    : 'pb-2 w-full max-w-2xl mx-auto'
+                }`}
+              >
+                <div className="flex items-start gap-3 min-w-0 mb-6">
                   <div className="p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20 shrink-0 self-start">
-                    <User className="h-6 w-6 text-white" />
+                    <User className="h-6 w-6 text-white" aria-hidden />
                   </div>
                   <div className="min-w-0 pt-0.5">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
-                      Users
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 leading-relaxed">
-                      Anyone with an extra-hour request in the last 12 months
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Users</h2>
+                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 leading-snug">
+                      With a stored extra-hour request — tap one to review by CODO month
                     </p>
                   </div>
                 </div>
                 {loading ? (
-                  <div className="space-y-3">
-                    <div className="h-14 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
-                    <div className="h-14 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+                  <div className="space-y-2">
+                    <div className="h-[3.25rem] bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+                    <div className="h-[3.25rem] bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
                   </div>
                 ) : byUser.length === 0 ? (
-                  <div className="text-center py-10 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
-                    <FileText className="h-10 w-10 text-gray-400 mx-auto mb-2 opacity-60" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400 px-4">
-                      No extra-hour requests in this window.
+                  <div className="text-center py-8 sm:py-10 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/30 px-3">
+                    <FileText className="h-9 w-9 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">No extra-hour requests in this window.</p>
+                    <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 px-1 mt-3 max-w-md mx-auto leading-relaxed text-left sm:text-center break-words">
+                      API range: {queryWindow.from} → {queryWindow.to}. Endpoint{' '}
+                      <span className="font-mono [overflow-wrap:anywhere]">{ENV.API_URL}/tasks/all_request_submissions.php</span>
+                      . If your DB client points elsewhere, set <span className="font-mono">VITE_API_URL</span>.
                     </p>
                   </div>
                 ) : (
-                  <ScrollArea className="h-[min(420px,52vh)] pr-3">
-                    <div className="space-y-2">
+                  <ScrollArea
+                    className={
+                      selectedGroup
+                        ? 'h-[min(240px,42dvh)] xs:h-[min(300px,46dvh)] sm:h-[min(360px,50vh)] lg:max-h-[min(420px,55vh)] pr-2 sm:pr-3'
+                        : 'h-[min(320px,52dvh)] sm:h-[min(400px,58dvh)] lg:h-[min(520px,72vh)] pr-2 sm:pr-3'
+                    }
+                  >
+                    <div className="space-y-2 pb-1">
                       {byUser.map((g) => (
                         <button
                           key={g.userId}
                           type="button"
                           onClick={() => setUser(g.userId)}
-                          className={`w-full text-left rounded-xl border-2 px-4 py-3 transition-all duration-200 ${
+                          className={`w-full text-left rounded-xl border-2 px-3 py-3 min-h-[3.25rem] active:scale-[0.99] transition-all duration-200 ${
                             selectedUserId === g.userId
-                              ? 'bg-gradient-to-r from-blue-600 to-emerald-600 text-white border-blue-600 shadow-lg'
-                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                              ? 'border-blue-600 bg-gradient-to-r from-blue-600 to-emerald-600 text-white shadow-lg'
+                              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                           }`}
                         >
-                          <div className="font-semibold text-sm truncate">{g.username}</div>
-                          <div className="flex items-center justify-between gap-2 mt-1 text-xs opacity-90">
-                            <span className={selectedUserId === g.userId ? 'text-white/90' : 'text-gray-500 dark:text-gray-400'}>
+                          <div
+                            className={`font-semibold text-sm [overflow-wrap:anywhere] break-words ${selectedUserId === g.userId ? 'text-white' : ''}`}
+                          >
+                            {g.username}
+                          </div>
+                          <div className="flex items-center justify-between gap-2 mt-1.5 text-xs">
+                            <span
+                              className={`font-medium tracking-wide ${selectedUserId === g.userId ? 'text-white/90' : 'text-gray-500 dark:text-gray-400'}`}
+                            >
                               {g.role.toUpperCase()}
                             </span>
                             {g.pending > 0 ? (
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
                                   selectedUserId === g.userId
-                                    ? 'bg-white/20 text-white'
-                                    : 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200'
+                                    ? 'bg-white/15 text-white border-white/30'
+                                    : 'bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border-amber-200/80 dark:border-amber-800/50'
                                 }`}
                               >
                                 {g.pending} pending
@@ -402,192 +633,122 @@ export default function AdminOvertimeRequests() {
                   </ScrollArea>
                 )}
               </div>
-
-              {/* Detail column */}
-              <div className="lg:col-span-2 min-w-0 space-y-6">
-                <div className="flex gap-3 min-w-0">
-                  <div className="p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20 shrink-0 self-start">
-                    <Clock className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="min-w-0 pt-0.5 flex-1">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
-                      {selectedGroup ? selectedGroup.username : 'Select a user'}
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 leading-relaxed">
-                      {selectedGroup
-                        ? 'Pick a CODO period, then approve, reject, or change approved overtime.'
-                        : 'Choose a user on the left to see their requests by month.'}
-                    </p>
-                  </div>
-                </div>
-
-                {!selectedGroup ? (
-                  <div className="text-center py-12 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
-                    <Clock className="h-10 w-10 text-gray-400 mx-auto mb-2 opacity-60" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Choose a user to see requests by CODO month.</p>
-                  </div>
-                ) : (
-                  <>
-                    {monthKeys.length > 0 && (
-                      <div className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-3">
-                        {monthKeys.map((mk) => {
-                          const lines = monthTabLinesForList(mk, selectedGroup.list);
-                          return (
-                            <button
-                              key={mk}
-                              type="button"
-                              onClick={() => setMonth(mk)}
-                              className={`min-h-[4.25rem] flex-1 min-w-[calc(100%-0.5rem)] xs:min-w-[12rem] sm:min-w-[14rem] max-w-full sm:max-w-[20rem] px-4 py-3 text-left sm:text-center rounded-xl border-2 transition-all duration-200 ${
-                                activeMonth === mk
-                                  ? 'bg-gradient-to-r from-blue-600 to-emerald-600 text-white border-blue-600 shadow-lg'
-                                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                              }`}
-                            >
-                              <span className="hidden sm:block text-sm font-medium leading-snug whitespace-normal">
-                                {lines.full}
-                              </span>
-                              <span className="sm:hidden flex flex-col gap-1 w-full min-w-0">
-                                <span className="text-sm font-semibold leading-snug break-words">
-                                  {lines.compactTitle}
-                                </span>
-                                <span className="text-xs font-normal opacity-90 leading-snug">{lines.compactMeta}</span>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {visibleRows.length === 0 ? (
-                      <div className="text-center py-10 rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-gray-50/50 dark:bg-gray-800/30">
-                        <FileText className="h-10 w-10 text-gray-400 mx-auto mb-2 opacity-60" />
-                        <p className="text-sm text-gray-500 dark:text-gray-400">No submissions for this month.</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-4 sm:gap-6">
-                        {visibleRows.map((r) => {
-                          const id = r.id as number;
-                          const pending =
-                            String(r.extra_hours_approval_status || '').toLowerCase() === 'pending';
-                          const reqH = Number(r.requested_extra_hours || 0);
-                          const ot = Number(r.overtime_hours || 0);
-                          return (
-                            <div
-                              key={id || String(r.submission_date)}
-                              className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-4 sm:p-6 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 min-w-0"
-                            >
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 mb-3 min-w-0">
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-semibold text-sm text-gray-900 dark:text-white break-words">
-                                    {String(r.submission_date)}
-                                  </div>
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 break-words mt-1">
-                                    {r.start_time ? `Started at ${r.start_time}` : 'No start time'} •{' '}
-                                    {Number(r.hours_today || 0)} hours
-                                    {ot > 0 && (
-                                      <span className="ml-2 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium">
-                                        +{ot}h OT
-                                      </span>
-                                    )}
-                                    {reqH > 0 && (
-                                      <span className="ml-2 text-gray-600 dark:text-gray-300">
-                                        Requested +{reqH}h
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="shrink-0">{statusPill(r.extra_hours_approval_status)}</div>
-                              </div>
-                              {(r.approval_reason || '').toString().trim() ? (
-                                <div className="max-h-40 overflow-y-auto rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-200/60 dark:border-gray-700/60 mb-3">
-                                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Approval reason</span>
-                                  <p className="mt-1 text-xs sm:text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed break-words">
-                                    {String(r.approval_reason)}
-                                  </p>
-                                </div>
-                              ) : null}
-                              {r.extra_hours_reviewed_at ? (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                                  Reviewed: {String(r.extra_hours_reviewed_at)}
-                                  {r.extra_hours_admin_note ? ` — ${String(r.extra_hours_admin_note)}` : ''}
-                                </p>
-                              ) : null}
-                              {pending ? (
-                                <div className="flex flex-col xs:flex-row flex-wrap gap-2 pt-1">
-                                  <Button
-                                    type="button"
-                                    disabled={busyId === id}
-                                    onClick={() => onReview(r, 'approve')}
-                                    className="w-full xs:w-auto rounded-xl bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white font-semibold shadow-md"
-                                  >
-                                    <Check className="h-4 w-4 mr-2 shrink-0" />
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    disabled={busyId === id}
-                                    onClick={() => setRejectRow(r)}
-                                    className="w-full xs:w-auto rounded-xl"
-                                  >
-                                    <X className="h-4 w-4 mr-2 shrink-0" />
-                                    Reject
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    disabled={busyId === id}
-                                    onClick={() => {
-                                      setChangeRow(r);
-                                      setChangeHours(String(reqH > 0 ? reqH : ot > 0 ? ot : 1));
-                                    }}
-                                    className="w-full xs:w-auto rounded-xl border-2"
-                                  >
-                                    <Pencil className="h-4 w-4 mr-2 shrink-0" />
-                                    Change
-                                  </Button>
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <AlertDialog open={!!changeRow} onOpenChange={(o) => !o && setChangeRow(null)}>
-        <AlertDialogContent className="rounded-2xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-gray-900 dark:text-white">Set approved overtime hours</AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-600 dark:text-gray-400">
-              This updates stored overtime for {changeRow ? String(changeRow.submission_date) : ''}. Range 0.25–16 hours.
+      <AlertDialog
+        open={!!approveRow}
+        onOpenChange={(o) => {
+          if (!o) setApproveRow(null);
+        }}
+      >
+        <AlertDialogContent className="w-[calc(100%-1.5rem)] max-w-xl md:max-w-2xl max-h-[min(92dvh,44rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-5 sm:p-6 gap-4 shadow-xl">
+          <AlertDialogHeader className="text-left space-y-1.5 sm:space-y-2">
+            <AlertDialogTitle className="text-foreground text-lg font-semibold tracking-tight pr-6">
+              Approve extra hours?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-sm leading-relaxed text-left">
+              Confirm approval for{' '}
+              <span className="font-semibold text-foreground">
+                {approveRow ? String(approveRow.submission_date) : ''}
+              </span>
+              . Overtime will follow the requested amount when set (otherwise current stored OT), and will count in
+              period totals.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-2">
-            <Label htmlFor="chg-h" className="text-gray-700 dark:text-gray-300">
-              Approved OT hours
-            </Label>
-            <Input
-              id="chg-h"
-              type="number"
-              step="0.25"
-              min={0.25}
-              max={16}
-              value={changeHours}
-              onChange={(e) => setChangeHours(e.target.value)}
-              className="mt-1 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800"
-            />
-          </div>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+          {approveRow ? (
+            <ul className="list-disc pl-5 text-xs sm:text-sm text-muted-foreground space-y-0.5 -mt-1">
+              <li>
+                Requested extra:{' '}
+                <span className="font-medium text-foreground tabular-nums">
+                  {Number(approveRow.requested_extra_hours || 0) > 0
+                    ? `${Number(approveRow.requested_extra_hours)}h`
+                    : '—'}
+                </span>
+              </li>
+              <li>
+                Current OT on record:{' '}
+                <span className="font-medium text-foreground tabular-nums">
+                  {Number(approveRow.overtime_hours || 0)}h
+                </span>
+              </li>
+            </ul>
+          ) : null}
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-3 mt-2 border-t border-border/60">
+            <AlertDialogCancel className="rounded-lg w-full sm:w-auto sm:min-w-[6.5rem] mt-0 h-10 border border-border/80 bg-background font-medium text-foreground shadow-none hover:bg-muted hover:text-foreground">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
-              className="rounded-xl bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700"
+              disabled={approveRow != null && busyId === (approveRow.id as number)}
+              className="rounded-lg w-full sm:w-auto sm:min-w-[6.5rem] h-10 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 focus-visible:ring-emerald-600 disabled:opacity-60 border-0 font-medium"
+              onClick={(e) => {
+                e.preventDefault();
+                if (approveRow) onReview(approveRow, 'approve');
+              }}
+            >
+              Approve
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!changeRow}
+        onOpenChange={(o) => {
+          if (!o) {
+            setChangeRow(null);
+            setReviewAdminNote('');
+          }
+        }}
+      >
+        <AlertDialogContent className="w-[calc(100%-1.5rem)] max-w-xl md:max-w-2xl max-h-[min(92dvh,44rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-5 sm:p-6 gap-4 shadow-xl">
+          <AlertDialogHeader className="text-left space-y-1.5 sm:space-y-2">
+            <AlertDialogTitle className="text-foreground text-lg font-semibold tracking-tight pr-6">
+              Set approved overtime hours
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-sm leading-relaxed text-left">
+              Updates status to &quot;changed&quot; and sets overtime for{' '}
+              {changeRow ? String(changeRow.submission_date) : ''}. Range 0.25–16 hours. You can run this again anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="chg-h" className="text-foreground text-sm font-medium">
+                Approved OT hours
+              </Label>
+              <Input
+                id="chg-h"
+                type="number"
+                step="0.25"
+                min={0.25}
+                max={16}
+                value={changeHours}
+                onChange={(e) => setChangeHours(e.target.value)}
+                className="mt-1.5 rounded-lg border-border bg-background"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="chg-note" className="text-foreground text-sm font-medium">
+                Admin note (optional)
+              </Label>
+              <Textarea
+                id="chg-note"
+                value={reviewAdminNote}
+                onChange={(e) => setReviewAdminNote(e.target.value)}
+                rows={3}
+                placeholder="Visible on the submission record…"
+                className="mt-1.5 rounded-lg border-border bg-background resize-y min-h-[72px]"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-2 border-t border-border/60 mt-1">
+            <AlertDialogCancel className="rounded-lg w-full sm:w-auto sm:min-w-[6.5rem] mt-0 h-10 border border-border/80 bg-background font-medium text-foreground shadow-none hover:bg-muted hover:text-foreground">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-lg w-full sm:w-auto sm:min-w-[6.5rem] h-10 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 focus-visible:ring-emerald-600 border-0 font-medium"
               onClick={(e) => {
                 e.preventDefault();
                 if (!changeRow) return;
@@ -596,7 +757,7 @@ export default function AdminOvertimeRequests() {
                   toast({ title: 'Invalid hours', variant: 'destructive' });
                   return;
                 }
-                onReview(changeRow, 'change', n);
+                onReview(changeRow, 'change', { approvedHours: n, adminNote: reviewAdminNote });
               }}
             >
               Save
@@ -605,21 +766,44 @@ export default function AdminOvertimeRequests() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!rejectRow} onOpenChange={(o) => !o && setRejectRow(null)}>
-        <AlertDialogContent className="rounded-2xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-gray-900 dark:text-white">Reject extra hours?</AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-600 dark:text-gray-400">
-              Overtime for this date will be set to 0 and will not count in totals.
+      <AlertDialog
+        open={!!rejectRow}
+        onOpenChange={(o) => {
+          if (!o) {
+            setRejectRow(null);
+            setReviewAdminNote('');
+          }
+        }}
+      >
+        <AlertDialogContent className="w-[calc(100%-1.5rem)] max-w-xl md:max-w-2xl max-h-[min(92dvh,44rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-5 sm:p-6 gap-4 shadow-xl">
+          <AlertDialogHeader className="text-left space-y-1.5 sm:space-y-2">
+            <AlertDialogTitle className="text-foreground text-lg font-semibold tracking-tight pr-6">Reject extra hours?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-sm leading-relaxed text-left">
+              Overtime for this date will be set to 0 and will not count in totals. You can approve again later if
+              needed.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+          <div className="space-y-1.5 py-1">
+            <Label htmlFor="rej-note" className="text-foreground text-sm font-medium">
+              Admin note (optional)
+            </Label>
+            <Textarea
+              id="rej-note"
+              value={reviewAdminNote}
+              onChange={(e) => setReviewAdminNote(e.target.value)}
+              rows={3}
+              className="mt-1.5 rounded-lg border-border bg-background resize-y min-h-[72px]"
+            />
+          </div>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-2 border-t border-border/60 mt-1">
+            <AlertDialogCancel className="rounded-lg w-full sm:w-auto sm:min-w-[6.5rem] mt-0 h-10 border border-border/80 bg-background font-medium text-foreground shadow-none hover:bg-muted hover:text-foreground">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
-              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="rounded-lg w-full sm:w-auto sm:min-w-[6.5rem] h-10 bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 focus-visible:ring-destructive border-0 font-medium"
               onClick={(e) => {
                 e.preventDefault();
-                if (rejectRow) onReview(rejectRow, 'reject');
+                if (rejectRow) onReview(rejectRow, 'reject', { adminNote: reviewAdminNote });
               }}
             >
               Reject

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { listMySubmissions, listAllRequestSubmissions, deleteSubmission } from '@/services/todoService';
+import {
+  listMySubmissions,
+  listAllRequestSubmissions,
+  deleteSubmission,
+  normalizeAllRequestSubmissionsResponse,
+} from '@/services/todoService';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
@@ -8,6 +13,7 @@ import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, Alert
 import { useAuth } from '@/context/AuthContext';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toLocalCalendarDateString } from '@/lib/dateUtils';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
@@ -127,8 +133,8 @@ export default function DailyUpdate() {
     const start = new Date(base.getFullYear(), base.getMonth(), 1);
     const end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
     return {
-      from: start.toISOString().slice(0, 10),
-      to: end.toISOString().slice(0, 10),
+      from: toLocalCalendarDateString(start),
+      to: toLocalCalendarDateString(end),
     };
   }
 
@@ -137,8 +143,8 @@ export default function DailyUpdate() {
     const windowEnd = new Date(base.getFullYear(), base.getMonth() + 1, 0);
     const windowStart = new Date(base.getFullYear(), base.getMonth() - 11, 1);
     return {
-      from: windowStart.toISOString().slice(0, 10),
-      to: windowEnd.toISOString().slice(0, 10),
+      from: toLocalCalendarDateString(windowStart),
+      to: toLocalCalendarDateString(windowEnd),
     };
   }
 
@@ -370,6 +376,32 @@ export default function DailyUpdate() {
     return Number(fromNotes.requestedHours || 0) > 0 || fromNotes.reason.length > 0;
   }
 
+  /** Same idea as backend `br_work_submission_has_extra_request` (row fields only). */
+  function workSubmissionHasExtraRequestRow(s: any): boolean {
+    const req = Number(s?.requested_extra_hours ?? s?.requestedExtraHours ?? 0) > 0;
+    const reason = String(s?.approval_reason ?? s?.approvalReason ?? '').trim();
+    return req || reason.length > 0;
+  }
+
+  /** Same idea as backend `br_effective_overtime_hours_for_stats` (reports / period totals). */
+  function effectiveOvertimeHoursForStats(s: any): number {
+    const ot = Number(s?.overtime_hours ?? 0);
+    const safeOt = Number.isFinite(ot) ? ot : 0;
+    if (!workSubmissionHasExtraRequestRow(s)) {
+      return safeOt;
+    }
+    const stRaw = s?.extra_hours_approval_status ?? s?.extraHoursApprovalStatus;
+    if (stRaw === undefined || stRaw === null || String(stRaw).trim() === '') {
+      return safeOt;
+    }
+    const st = String(stRaw).toLowerCase().trim();
+    if (st === 'pending') return 0;
+    if (st === 'rejected') return 0;
+    if (st === 'approved' || st === 'changed') return safeOt;
+    if (st === 'none') return workSubmissionHasExtraRequestRow(s) ? safeOt : 0;
+    return 0;
+  }
+
   async function loadSubmissions(refDate?: string) {
     try {
       setSubsLoading(true);
@@ -398,10 +430,10 @@ export default function DailyUpdate() {
     if (currentUser?.role !== 'admin') return;
     try {
       setSubsLoading(true);
-      const { from, to } = getSubmissionWindow(refDate);
-      const res: any = await listAllRequestSubmissions({ from, to });
-      const items: any[] = (res && res.data) ? res.data : Array.isArray(res) ? res : [];
-      setAllUserRequestSubmissions(items);
+      const fallback = getSubmissionWindow(refDate);
+      const res: unknown = await listAllRequestSubmissions({});
+      const { submissions } = normalizeAllRequestSubmissionsResponse(res, fallback);
+      setAllUserRequestSubmissions(submissions as any[]);
     } catch {
       setAllUserRequestSubmissions([]);
     } finally {
@@ -449,6 +481,14 @@ export default function DailyUpdate() {
       return submissionDate >= from && submissionDate <= to;
     });
   }, [filteredSubmissions, showRequestsOnly, activeMonth]);
+
+  const totalOtVisible = useMemo(() => {
+    let sum = 0;
+    for (const s of visibleSubmissions) {
+      sum += effectiveOvertimeHoursForStats(s);
+    }
+    return Math.round(sum * 100) / 100;
+  }, [visibleSubmissions]);
 
   const requestCount = useMemo(
     () => filteredSubmissions.filter(hasApprovalRequest).length,
@@ -655,35 +695,51 @@ export default function DailyUpdate() {
                   </p>
                 </div>
               </div>
-              {currentUser?.role === 'admin' && (
-                <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto shrink-0">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => navigate(`/${currentUser.role}/overtime-requests`)}
-                    className="h-10 w-full sm:w-auto justify-center px-4 rounded-xl text-xs sm:text-sm"
-                  >
-                    <Timer className="h-4 w-4 mr-2 shrink-0" />
-                    Admin requests
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={showRequestsOnly ? 'default' : 'outline'}
-                    onClick={() => setShowRequestsOnly((prev) => !prev)}
-                    className={`h-10 w-full sm:w-auto shrink-0 justify-center px-4 rounded-xl text-xs sm:text-sm ${
-                      showRequestsOnly
-                        ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:from-orange-700 hover:to-amber-700'
-                        : ''
-                    }`}
-                  >
-                    <Bell className="h-4 w-4 mr-2 shrink-0" />
-                    Filter
-                    <span className="ml-2 px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/20 text-[11px] font-semibold tabular-nums">
-                      {requestCount}
-                    </span>
-                  </Button>
+              <div className="flex flex-col items-stretch xs:items-end sm:items-start gap-2 w-full sm:w-auto shrink-0">
+                <div
+                  className="rounded-xl border border-orange-200/90 dark:border-orange-900/55 bg-orange-50/95 dark:bg-orange-950/35 px-3 py-2 text-right sm:ml-auto shadow-sm"
+                  title="Overtime that counts in period totals: approved or adjusted. Pending and rejected extra-hour requests count as 0."
+                >
+                  <p className="text-[10px] uppercase tracking-wide text-orange-800/85 dark:text-orange-200/85 font-semibold">
+                    Total OT
+                  </p>
+                  <p className="text-xl sm:text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-200 leading-tight">
+                    {totalOtVisible.toFixed(2)}h
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 max-w-[14rem] ml-auto leading-snug">
+                   pending/rejected requests excluded
+                  </p>
                 </div>
-              )}
+                {currentUser?.role === 'admin' && (
+                  <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => navigate(`/${currentUser.role}/overtime-requests`)}
+                      className="h-10 w-full sm:w-auto justify-center px-4 rounded-xl text-xs sm:text-sm"
+                    >
+                      <Timer className="h-4 w-4 mr-2 shrink-0" />
+                      Admin requests
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={showRequestsOnly ? 'default' : 'outline'}
+                      onClick={() => setShowRequestsOnly((prev) => !prev)}
+                      className={`h-10 w-full sm:w-auto shrink-0 justify-center px-4 rounded-xl text-xs sm:text-sm ${
+                        showRequestsOnly
+                          ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:from-orange-700 hover:to-amber-700'
+                          : ''
+                      }`}
+                    >
+                      <Bell className="h-4 w-4 mr-2 shrink-0" />
+                      Filter
+                      <span className="ml-2 px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/20 text-[11px] font-semibold tabular-nums">
+                        {requestCount}
+                      </span>
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* Month Tabs - Only show for All Submissions, not Today Submissions */}
@@ -820,8 +876,8 @@ export default function DailyUpdate() {
                         ) : null}
                       </div>
                     </div>
-                    <div className="max-h-48 overflow-y-auto overflow-x-hidden rounded-lg bg-gray-50 dark:bg-gray-800 p-3 no-scrollbar">
-                      <pre className="text-xs whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed">
+                    <div className="max-h-48 min-w-0 overflow-y-auto overflow-x-hidden rounded-lg bg-gray-50 dark:bg-gray-800 p-3 no-scrollbar">
+                      <pre className="max-w-full min-w-0 text-xs whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-gray-700 dark:text-gray-300 leading-relaxed">
                         {formatSubmissionText(s)}
                       </pre>
                     </div>

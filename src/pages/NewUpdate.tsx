@@ -24,12 +24,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send, ImagePlus, Paperclip, File, X, Calendar, Clock, FileImage } from "lucide-react";
+import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send, ImagePlus, Paperclip, File, X, Calendar, Clock, FileImage, Check, ChevronsUpDown, Timer, Flag } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useState, useRef, useEffect, ChangeEvent } from "react";
@@ -62,15 +71,32 @@ interface VoiceNote {
 
 const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
-const formSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  type: z.enum(["feature", "updation", "maintenance"], {
-    required_error: "Please select an update type",
-  }),
-  description: z.string().min(1, "Description is required"),
-  expected_date: z.string().optional(),
-  expected_time: z.string().optional(),
-});
+const formSchema = z
+  .object({
+    project_id: z.string().min(1, "Project is required"),
+    title: z.string().min(1, "Title is required"),
+    type: z.enum(["feature", "updation", "maintenance"], {
+      required_error: "Please select an update type",
+    }),
+    description: z.string().min(1, "Description is required"),
+    expected_date: z.string().optional(),
+    expected_time: z.string().optional(),
+    calculated_hours: z.string().optional(),
+    update_priority: z.enum(["high", "medium", "low", "none"]).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const raw = (data.calculated_hours || "").trim();
+    if (raw !== "") {
+      const n = Number(raw);
+      if (Number.isNaN(n) || n < 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Enter a valid non-negative number of hours",
+          path: ["calculated_hours"],
+        });
+      }
+    }
+  });
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center p-4">
@@ -138,6 +164,7 @@ const NewUpdate = () => {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
   const [activeVoiceNoteId, setActiveVoiceNoteId] = useState<string | null>(null);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
   // Refs for file inputs
   const screenshotInputRef = useRef<HTMLInputElement>(null);
@@ -177,8 +204,11 @@ const NewUpdate = () => {
   // Disable form if no projects
   const isFormDisabled = projects.length === 0;
 
-  const form = useForm<z.infer<typeof formSchema> & { project_id: string }>({
-    resolver: zodResolver(formSchema.extend({ project_id: z.string().min(1, "Project is required") })),
+  const canSetPlanningFields =
+    currentUser?.role === "admin" || currentUser?.role === "developer";
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       title: "",
       type: undefined,
@@ -186,6 +216,8 @@ const NewUpdate = () => {
       project_id: "",
       expected_date: "",
       expected_time: "",
+      calculated_hours: "",
+      update_priority: "none",
     },
   });
 
@@ -323,7 +355,7 @@ const NewUpdate = () => {
     }
   };
 
-  const mutation = useMutation<unknown, unknown, z.infer<typeof formSchema> & { project_id: string }>({
+  const mutation = useMutation<unknown, unknown, z.infer<typeof formSchema>>({
     mutationFn: async (values) => {
       // Show optimistic loading toast
       toast({ 
@@ -339,6 +371,13 @@ const NewUpdate = () => {
       formData.append("project_id", values.project_id);
       if (values.expected_date) formData.append("expected_date", values.expected_date);
       if (values.expected_time) formData.append("expected_time", values.expected_time);
+      if (canSetPlanningFields) {
+        const hrs = (values.calculated_hours || "").trim();
+        if (hrs !== "") formData.append("calculated_hours", hrs);
+        if (values.update_priority && values.update_priority !== "none") {
+          formData.append("update_priority", values.update_priority);
+        }
+      }
 
       // Add screenshots
       screenshots.forEach((file) => {
@@ -543,26 +582,62 @@ const NewUpdate = () => {
                               </div>
                               Project
                             </FormLabel>
-                            <FormControl>
-                              <Select
-                                onValueChange={field.onChange}
-                                defaultValue={field.value}
-                                disabled={isSubmitting || projects.length === 0}
+                            <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={projectPickerOpen}
+                                    disabled={isSubmitting || projects.length === 0}
+                                    className="h-12 w-full justify-between rounded-xl border-gray-200 bg-white font-medium shadow-sm hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                                  >
+                                    <span className="truncate">
+                                      {field.value
+                                        ? projects.find(
+                                            (p: { id: string | number; name: string }) =>
+                                              String(p.id) === String(field.value)
+                                          )?.name ?? "Select a project"
+                                        : "Select a project"}
+                                    </span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-[--radix-popover-trigger-width] p-0 z-[70]"
+                                align="start"
                               >
-                                <SelectTrigger className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                                  <SelectValue placeholder="Select a project" />
-                                </SelectTrigger>
-                                <SelectContent position="popper" className="z-[60]">
-                                  {projects.length === 0 ? (
-                                    <SelectItem value="" disabled>No projects available</SelectItem>
-                                  ) : (
-                                    projects.map((project) => (
-                                      <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
-                                    ))
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </FormControl>
+                                <Command>
+                                  <CommandInput placeholder="Search project..." />
+                                  <CommandList>
+                                    <CommandEmpty>No project found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {projects.map((project: { id: string | number; name: string }) => (
+                                        <CommandItem
+                                          key={project.id}
+                                          value={`${project.name} ${project.id}`}
+                                          onSelect={() => {
+                                            field.onChange(String(project.id));
+                                            setProjectPickerOpen(false);
+                                          }}
+                                        >
+                                          <Check
+                                            className={`mr-2 h-4 w-4 ${
+                                              String(field.value) === String(project.id)
+                                                ? "opacity-100"
+                                                : "opacity-0"
+                                            }`}
+                                          />
+                                          {project.name}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                             <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
                               The project this update belongs to
                             </FormDescription>
@@ -720,6 +795,75 @@ const NewUpdate = () => {
                           )}
                         />
                       </div>
+
+                      {canSetPlanningFields && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                          <FormField
+                            control={form.control}
+                            name="calculated_hours"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                                  <div className="p-1 bg-cyan-500 rounded-lg">
+                                    <Timer className="h-3 w-3 text-white" />
+                                  </div>
+                                  Calculated Hours to Update
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    step={0.25}
+                                    placeholder="e.g. 4 or 2.5"
+                                    className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+                                    {...field}
+                                    disabled={isSubmitting}
+                                  />
+                                </FormControl>
+                                <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
+                                  Estimated hours to complete this update (admins and developers only)
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="update_priority"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                                  <div className="p-1 bg-rose-500 rounded-lg">
+                                    <Flag className="h-3 w-3 text-white" />
+                                  </div>
+                                  Update Priority
+                                </FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value ?? "none"}
+                                  disabled={isSubmitting}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                                      <SelectValue placeholder="Select priority" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent position="popper" className="z-[60]">
+                                    <SelectItem value="none">Not set</SelectItem>
+                                    <SelectItem value="high">High</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="low">Low</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
+                                  Internal priority for planning (admins and developers only)
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Attachments Section */}
@@ -904,63 +1048,74 @@ const NewUpdate = () => {
                           )}
                         </div>
 
-                        {/* Voice Notes section */}
+                        {/* Voice Notes section - recorder + list (same layout as New Bug) */}
                         <div className="space-y-4">
-                          <div className="space-y-2">
-                            {/* <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center block">
-                              Voice Notes
-                            </Label> */}
-                            <WhatsAppVoiceRecorder
-                              onComplete={handleVoiceRecorderComplete}
-                              onCancel={() => {}}
-                              disabled={isSubmitting}
-                            />
-                          </div>
+                          <WhatsAppVoiceRecorder
+                            onComplete={handleVoiceRecorderComplete}
+                            onCancel={() =>
+                              toast({
+                                title: "Recording cancelled",
+                                description: "Hold the mic to record a new voice note.",
+                              })
+                            }
+                            disabled={isSubmitting}
+                            maxDuration={300}
+                          />
+
+                          {voiceNotes.length > 0 && (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                  Voice Notes ({voiceNotes.length})
+                                </Label>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={clearAllVoiceNotes}
+                                  className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                                  disabled={isSubmitting}
+                                >
+                                  Clear All
+                                </Button>
+                              </div>
+                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                {voiceNotes.map((voiceNote, index) => {
+                                  const voiceId = voiceNote.id;
+                                  return (
+                                    <div
+                                      key={voiceId}
+                                      className="rounded-xl border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800"
+                                    >
+                                      <WhatsAppVoiceMessage
+                                        id={voiceId}
+                                        audioSource={voiceNote.blob}
+                                        duration={voiceNote.duration}
+                                        waveform={voiceNote.waveform}
+                                        accent="sent"
+                                        autoPlay
+                                        isActive={activeVoiceNoteId === voiceId}
+                                        onPlay={(id) => setActiveVoiceNoteId(id)}
+                                        onPause={(id) => {
+                                          if (id === activeVoiceNoteId) {
+                                            setActiveVoiceNoteId(null);
+                                          }
+                                        }}
+                                        onRemove={() => {
+                                          if (activeVoiceNoteId === voiceId) {
+                                            setActiveVoiceNoteId(null);
+                                          }
+                                          removeVoiceNote(index);
+                                        }}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-
-                      {/* Voice Notes List */}
-                      {voiceNotes.length > 0 && (
-                        <div className="space-y-3 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                              Voice Notes ({voiceNotes.length})
-                            </Label>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={clearAllVoiceNotes}
-                              className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
-                              disabled={isSubmitting}
-                            >
-                              Clear All
-                            </Button>
-                          </div>
-                          <div className="space-y-2">
-                            {voiceNotes.map((voiceNote, index) => {
-                              const voiceId = voiceNote.id;
-                              return (
-                                <WhatsAppVoiceMessage
-                                  key={voiceId}
-                                  id={voiceId}
-                                  audioSource={voiceNote.blob}
-                                  duration={voiceNote.duration}
-                                  waveform={voiceNote.waveform}
-                                  onRemove={() => removeVoiceNote(index)}
-                                  isActive={activeVoiceNoteId === voiceId}
-                                  onPlay={(id) => setActiveVoiceNoteId(id)}
-                                  onPause={(id) => {
-                                    if (id === activeVoiceNoteId) {
-                                      setActiveVoiceNoteId(null);
-                                    }
-                                  }}
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     <div className="flex justify-end pt-6 border-t border-gray-200/50 dark:border-gray-700/50">

@@ -1,5 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -12,7 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { updateService } from "@/services/updateService";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, Undo2, CheckCircle2, ImagePlus, Paperclip, File, Clock, CalendarDays, Play } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, Undo2, CheckCircle2, ImagePlus, Paperclip, File, Clock, CalendarDays, Play, Timer, Flag } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -144,6 +154,14 @@ const UpdateDetails = () => {
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [completeForm, setCompleteForm] = useState({
+    tested: "" as "" | "yes" | "no",
+    devHours: "",
+    devStarted: "",
+    devEnded: "",
+    testedBy: "",
+    notes: "",
+  });
   const [updateList, setUpdateList] = useState<any[]>([]);
   const [updateListLoading, setUpdateListLoading] = useState(true);
   const [isDeletingUpdate, setIsDeletingUpdate] = useState(false);
@@ -229,9 +247,23 @@ const UpdateDetails = () => {
   });
 
   const completeMutation = useMutation({
-    mutationFn: () => updateService.markAsCompleted(updateId),
+    mutationFn: (payload: Parameters<typeof updateService.markAsCompleted>[1]) =>
+      updateService.markAsCompleted(updateId!, payload),
     ...mutationOptions,
   });
+
+  useEffect(() => {
+    if (showCompleteDialog) {
+      setCompleteForm({
+        tested: "",
+        devHours: "",
+        devStarted: "",
+        devEnded: "",
+        testedBy: "",
+        notes: "",
+      });
+    }
+  }, [showCompleteDialog]);
 
   const performActualDelete = useMutation({
     mutationFn: () => updateService.deleteUpdate(updateId),
@@ -287,6 +319,19 @@ const UpdateDetails = () => {
     }
   };
 
+  const getUpdatePriorityBadgeStyle = (p: string) => {
+    switch (String(p).toLowerCase()) {
+      case "high":
+        return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700";
+      case "medium":
+        return "bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700";
+      case "low":
+        return "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700";
+    }
+  };
+
   // Check if this is an access error
   const isAccessError =
     error &&
@@ -322,6 +367,17 @@ const UpdateDetails = () => {
   );
   
   const canPerformActions = currentUser?.role === "admin" || (currentUser?.role === "developer" && update?.created_by === currentUser?.username) || (currentUser?.role === "tester" && update?.created_by === currentUser?.username)
+
+  const canSeePlanningFields =
+    currentUser?.role === "admin" || currentUser?.role === "developer";
+
+  const formatStatusDateTime = (value: string | null | undefined) => {
+    if (!value) return null;
+    const normalized = value.includes("T") ? value : value.replace(" ", "T");
+    const d = new Date(normalized);
+    if (Number.isNaN(d.getTime())) return null;
+    return format(d, "MMM d, yyyy 'at' h:mm a");
+  };
 
   const formattedCreatedDate = formatDetailedDate(update.created_at);
 
@@ -555,7 +611,14 @@ const UpdateDetails = () => {
                 <CardHeader className="flex-row items-center justify-between">
                   <div>
                     <CardTitle className="text-blue-900 dark:text-blue-100">Update Approved</CardTitle>
-                    <CardDescription className="text-blue-700 dark:text-blue-400">This update has been approved and is ready to be marked as completed.</CardDescription>
+                    <CardDescription className="text-blue-700 dark:text-blue-400">
+                      This update has been approved and is ready to be marked as completed.
+                      {formatStatusDateTime(update.approved_at) && (
+                        <span className="block mt-2 text-sm font-medium text-blue-800 dark:text-blue-300">
+                          Approved on {formatStatusDateTime(update.approved_at)}
+                        </span>
+                      )}
+                    </CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent className="flex gap-4">
@@ -566,6 +629,22 @@ const UpdateDetails = () => {
                     <CheckCircle2 className="mr-2 h-4 w-4" />Mark as Completed
                   </Button>
                 </CardContent>
+              </Card>
+            )}
+
+            {update?.status === "completed" && (
+              <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950">
+                <CardHeader>
+                  <CardTitle className="text-emerald-900 dark:text-emerald-100">Update Completed</CardTitle>
+                  <CardDescription className="text-emerald-800 dark:text-emerald-300">
+                    This update has been marked as completed.
+                    {formatStatusDateTime(update.completed_at) && (
+                      <span className="block mt-2 text-sm font-medium">
+                        Completed on {formatStatusDateTime(update.completed_at)}
+                      </span>
+                    )}
+                  </CardDescription>
+                </CardHeader>
               </Card>
             )}
           </section>
@@ -614,6 +693,110 @@ const UpdateDetails = () => {
                     <span className="font-medium">{update.expected_time}</span>
                   </div>
                 )}
+                {formatStatusDateTime(update.approved_at) && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Check className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Approved on:</span>
+                    <span className="font-medium">{formatStatusDateTime(update.approved_at)}</span>
+                  </div>
+                )}
+                {formatStatusDateTime(update.declined_at) && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <X className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Declined on:</span>
+                    <span className="font-medium">{formatStatusDateTime(update.declined_at)}</span>
+                  </div>
+                )}
+                {formatStatusDateTime(update.completed_at) && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Marked completed on:</span>
+                    <span className="font-medium">{formatStatusDateTime(update.completed_at)}</span>
+                  </div>
+                )}
+                {update.status === "completed" && update.completion_tested !== null && update.completion_tested !== undefined && (
+                  <>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Tag className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Tested:</span>
+                      <span className="font-medium">{Number(update.completion_tested) === 1 ? "Yes" : "No"}</span>
+                    </div>
+                    {update.completion_dev_hours != null &&
+                      update.completion_dev_hours !== "" &&
+                      !Number.isNaN(Number(update.completion_dev_hours)) && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Timer className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Calculated hours (development):</span>
+                          <span className="font-medium">
+                            {Number(update.completion_dev_hours).toLocaleString(undefined, {
+                              maximumFractionDigits: 2,
+                            })}{" "}
+                            h
+                          </span>
+                        </div>
+                      )}
+                    {formatStatusDateTime(update.completion_dev_started_at) && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Development started:</span>
+                        <span className="font-medium">{formatStatusDateTime(update.completion_dev_started_at)}</span>
+                      </div>
+                    )}
+                    {formatStatusDateTime(update.completion_dev_ended_at) && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Development ended:</span>
+                        <span className="font-medium">{formatStatusDateTime(update.completion_dev_ended_at)}</span>
+                      </div>
+                    )}
+                    {update.completion_tested_by && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Tested by:</span>
+                        <span className="font-medium">{update.completion_tested_by}</span>
+                      </div>
+                    )}
+                    {update.completion_notes && (
+                      <div className="flex flex-col gap-1 text-sm pt-1">
+                        <span className="text-muted-foreground flex items-center gap-2">
+                          <File className="h-4 w-4" />
+                          Completion notes
+                        </span>
+                        <p className="text-foreground whitespace-pre-wrap rounded-lg border border-border/60 bg-muted/30 p-3 text-sm">
+                          {update.completion_notes}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+                {canSeePlanningFields && update.calculated_hours != null &&
+                  update.calculated_hours !== "" &&
+                  !Number.isNaN(Number(update.calculated_hours)) && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Timer className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Calculated hours:</span>
+                      <span className="font-medium">
+                        {Number(update.calculated_hours).toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        h
+                      </span>
+                    </div>
+                  )}
+                {canSeePlanningFields &&
+                  update.update_priority &&
+                  ["high", "medium", "low"].includes(String(update.update_priority).toLowerCase()) && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Flag className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Update priority:</span>
+                      <Badge
+                        variant="outline"
+                        className={getUpdatePriorityBadgeStyle(String(update.update_priority))}
+                      >
+                        {String(update.update_priority)}
+                      </Badge>
+                    </div>
+                  )}
               </CardContent>
             </Card>
           </section>
@@ -669,7 +852,115 @@ const UpdateDetails = () => {
       {/* Confirmation Dialogs */}
       <ConfirmationDialog open={showApproveDialog} onOpenChange={setShowApproveDialog} onConfirm={() => approveMutation.mutate()} title="Approve Update" description="Are you sure you want to approve this update?" confirmText="Approve" isLoading={approveMutation.isPending} />
       <ConfirmationDialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog} onConfirm={() => declineMutation.mutate()} title="Decline Update" description="Are you sure you want to decline this update? This cannot be undone." confirmText="Decline" isLoading={declineMutation.isPending} variant="destructive" />
-      <ConfirmationDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog} onConfirm={() => completeMutation.mutate()} title="Mark as Completed" description="Are you sure you want to mark this update as completed? This indicates the update has been fully implemented." confirmText="Mark as Completed" isLoading={completeMutation.isPending} />
+      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Mark as completed</DialogTitle>
+            <DialogDescription>
+              Record how this update was delivered and tested before closing it out.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="complete-tested">Was this update tested? *</Label>
+              <Select
+                value={completeForm.tested || undefined}
+                onValueChange={(v) =>
+                  setCompleteForm((f) => ({ ...f, tested: v as "yes" | "no" }))
+                }
+              >
+                <SelectTrigger id="complete-tested">
+                  <SelectValue placeholder="Select yes or no" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="complete-dev-hours">Calculated hours for development</Label>
+              <Input
+                id="complete-dev-hours"
+                type="number"
+                min={0}
+                step={0.25}
+                placeholder="e.g. 8"
+                value={completeForm.devHours}
+                onChange={(e) => setCompleteForm((f) => ({ ...f, devHours: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="complete-dev-started">Development started</Label>
+                <Input
+                  id="complete-dev-started"
+                  type="datetime-local"
+                  value={completeForm.devStarted}
+                  onChange={(e) => setCompleteForm((f) => ({ ...f, devStarted: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="complete-dev-ended">Development ended</Label>
+                <Input
+                  id="complete-dev-ended"
+                  type="datetime-local"
+                  value={completeForm.devEnded}
+                  onChange={(e) => setCompleteForm((f) => ({ ...f, devEnded: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="complete-tested-by">Who tested (name)</Label>
+              <Input
+                id="complete-tested-by"
+                placeholder="Tester name"
+                value={completeForm.testedBy}
+                onChange={(e) => setCompleteForm((f) => ({ ...f, testedBy: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="complete-notes">Notes</Label>
+              <Textarea
+                id="complete-notes"
+                placeholder="Optional notes about completion or testing"
+                className="min-h-[100px]"
+                value={completeForm.notes}
+                onChange={(e) => setCompleteForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setShowCompleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={completeMutation.isPending}
+              onClick={() => {
+                if (completeForm.tested === "") {
+                  toast({
+                    title: "Required",
+                    description: "Please select whether this update was tested (yes or no).",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                completeMutation.mutate({
+                  completion_tested: completeForm.tested === "yes",
+                  completion_dev_hours: completeForm.devHours.trim() || undefined,
+                  completion_dev_started_at: completeForm.devStarted || undefined,
+                  completion_dev_ended_at: completeForm.devEnded || undefined,
+                  completion_tested_by: completeForm.testedBy.trim() || undefined,
+                  completion_notes: completeForm.notes.trim() || undefined,
+                });
+              }}
+            >
+              {completeMutation.isPending ? "Saving…" : "Mark as completed"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };

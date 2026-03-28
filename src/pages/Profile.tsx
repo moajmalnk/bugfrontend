@@ -24,6 +24,7 @@ import {
   ArrowRight,
   Bug,
   Code2,
+  Rows3,
   Search,
   Github,
   Instagram,
@@ -403,12 +404,16 @@ export default function Profile() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
 
   // Reset current page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [activitySearch, activityType, activitySort]);
+
+  useEffect(() => {
+    setCurrentPage((p) => Math.min(p, totalPages));
+  }, [itemsPerPage, totalPages]);
 
   if (isLoading) {
     return (
@@ -948,44 +953,32 @@ export default function Profile() {
                         activities
                       </span>
                     </div>
-                    <div className="flex items-center justify-center sm:justify-end gap-3">
-                      <label
-                        htmlFor="items-per-page"
-                        className="text-sm text-muted-foreground font-medium whitespace-nowrap"
-                      >
+                    <div className="flex flex-col xs:flex-row items-stretch xs:items-center justify-center sm:justify-end gap-2 sm:gap-3">
+                      <span className="text-sm text-muted-foreground font-medium whitespace-nowrap self-center">
                         Items per page:
-                      </label>
-                      <div className="relative group">
-                        <select
-                          id="items-per-page"
-                          value={itemsPerPage}
-                          onChange={(e) =>
-                            setItemsPerPage(Number(e.target.value))
-                          }
-                          className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                          aria-label="Items per page"
-                        >
-                          {[10, 25, 50].map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                          <svg
-                            className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
+                      </span>
+                      <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-end">
+                        <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0">
+                          <Rows3 className="h-4 w-4 text-white" />
                         </div>
+                        <Select
+                          value={String(itemsPerPage)}
+                          onValueChange={(v) => setItemsPerPage(Number(v))}
+                        >
+                          <SelectTrigger
+                            className="w-full sm:w-[92px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                            aria-label="Items per page"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[100]">
+                            {[10, 25, 50].map((n) => (
+                              <SelectItem key={n} value={String(n)}>
+                                {n}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   </div>
@@ -1183,44 +1176,32 @@ export default function Profile() {
                       activities
                     </span>
                   </div>
-                  <div className="flex items-center justify-center sm:justify-end gap-3">
-                    <label
-                      htmlFor="items-per-page-simple"
-                      className="text-sm text-muted-foreground font-medium whitespace-nowrap"
-                    >
+                  <div className="flex flex-col xs:flex-row items-stretch xs:items-center justify-center sm:justify-end gap-2 sm:gap-3">
+                    <span className="text-sm text-muted-foreground font-medium whitespace-nowrap self-center">
                       Items per page:
-                    </label>
-                    <div className="relative group">
-                      <select
-                        id="items-per-page-simple"
-                        value={itemsPerPage}
-                        onChange={(e) =>
-                          setItemsPerPage(Number(e.target.value))
-                        }
-                        className="appearance-none border border-border/60 rounded-lg px-4 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200 min-w-[90px] font-medium group-hover:border-primary/40 group-hover:bg-background/90"
-                        aria-label="Items per page"
-                      >
-                        {[10, 25, 50].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none transition-transform duration-200 group-hover:scale-110">
-                        <svg
-                          className="w-4 h-4 text-muted-foreground group-hover:text-primary/70"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
+                    </span>
+                    <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-end">
+                      <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0">
+                        <Rows3 className="h-4 w-4 text-white" />
                       </div>
+                      <Select
+                        value={String(itemsPerPage)}
+                        onValueChange={(v) => setItemsPerPage(Number(v))}
+                      >
+                        <SelectTrigger
+                          className="w-full sm:w-[92px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                          aria-label="Items per page"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[100]">
+                          {[10, 25, 50].map((n) => (
+                            <SelectItem key={n} value={String(n)}>
+                              {n}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>

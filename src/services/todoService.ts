@@ -238,8 +238,49 @@ export async function listAllRequestSubmissions(
   const res = await fetch(`${API}/tasks/all_request_submissions.php?${qs.toString()}`, {
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error('Failed to load request submissions');
-  return res.json();
+  const data = (await res.json().catch(() => ({}))) as {
+    success?: boolean;
+    message?: string;
+    data?: unknown;
+  };
+  if (!res.ok) {
+    throw new Error(data.message || 'Failed to load request submissions');
+  }
+  if (data.success === false) {
+    throw new Error(data.message || 'Failed to load request submissions');
+  }
+  return data;
+}
+
+/** Server decides the date range; `data` is either Row[] (legacy) or { submissions, window }. */
+export function normalizeAllRequestSubmissionsResponse(
+  res: unknown,
+  fallbackWindow: { from: string; to: string }
+): { submissions: Record<string, unknown>[]; window: { from: string; to: string } } {
+  if (!res || typeof res !== 'object') {
+    return { submissions: [], window: fallbackWindow };
+  }
+  const root = res as { data?: unknown };
+  const payload = root.data;
+
+  if (Array.isArray(payload)) {
+    return { submissions: payload, window: fallbackWindow };
+  }
+
+  if (payload && typeof payload === 'object') {
+    const bundle = payload as {
+      submissions?: unknown;
+      window?: { from?: string; to?: string };
+    };
+    const list = Array.isArray(bundle.submissions) ? bundle.submissions : [];
+    const w =
+      bundle.window?.from && bundle.window?.to
+        ? { from: bundle.window.from, to: bundle.window.to }
+        : fallbackWindow;
+    return { submissions: list as Record<string, unknown>[], window: w };
+  }
+
+  return { submissions: [], window: fallbackWindow };
 }
 
 export async function reviewOvertimeRequest(body: {

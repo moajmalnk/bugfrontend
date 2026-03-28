@@ -26,6 +26,17 @@ export interface Update {
   updated_at?: string;
   expected_date?: string;
   expected_time?: string;
+  calculated_hours?: string | number | null;
+  update_priority?: 'high' | 'medium' | 'low' | string | null;
+  approved_at?: string | null;
+  declined_at?: string | null;
+  completed_at?: string | null;
+  completion_tested?: number | null;
+  completion_dev_hours?: string | number | null;
+  completion_dev_started_at?: string | null;
+  completion_dev_ended_at?: string | null;
+  completion_tested_by?: string | null;
+  completion_notes?: string | null;
   attachments?: Attachment[];
   screenshots?: Attachment[];
   files?: Attachment[];
@@ -99,16 +110,30 @@ class UpdateService {
     }
   }
 
-  async markAsCompleted(updateId: string): Promise<string> {
+  async markAsCompleted(
+    updateId: string,
+    payload: {
+      completion_tested: boolean;
+      completion_dev_hours?: string | number;
+      completion_dev_started_at?: string;
+      completion_dev_ended_at?: string;
+      completion_tested_by?: string;
+      completion_notes?: string;
+    }
+  ): Promise<string> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string }>(`/updates/complete.php?id=${updateId}`);
+      const response = await apiClient.post<{ success: boolean; message: string }>(
+        `/updates/complete.php?id=${updateId}`,
+        payload,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
       if (response.data.success) {
         return response.data.message || 'Update marked as completed successfully.';
       }
       throw new Error(response.data.message || 'Failed to mark update as completed.');
-    } catch (error) {
-      // console.error('Error marking update as completed:', error);
-      throw error;
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || error?.message || 'Failed to mark update as completed.';
+      throw new Error(msg);
     }
   }
 

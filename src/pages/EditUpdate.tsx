@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ImagePlus, Paperclip, File, X, Calendar, Clock, FileImage, CalendarDays } from "lucide-react";
+import { ArrowLeft, ImagePlus, Paperclip, File, X, Calendar, Clock, FileImage, CalendarDays, Timer, Flag } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useState, useEffect, useRef, ChangeEvent } from "react";
@@ -70,18 +70,34 @@ interface ExistingAttachment {
   full_url?: string;
 }
 
-const formSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  type: z.enum(["feature", "updation", "maintenance"], {
-    required_error: "Please select an update type",
-  }),
-  description: z.string().min(1, "Description is required"),
-  status: z.enum(["pending", "approved", "declined"]).optional(),
-  project_id: z.string().min(1, "Project is required"),
-  project_name: z.string().optional(),
-  expected_date: z.string().optional(),
-  expected_time: z.string().optional(),
-});
+const formSchema = z
+  .object({
+    title: z.string().min(1, "Title is required"),
+    type: z.enum(["feature", "updation", "maintenance"], {
+      required_error: "Please select an update type",
+    }),
+    description: z.string().min(1, "Description is required"),
+    status: z.enum(["pending", "approved", "declined"]).optional(),
+    project_id: z.string().min(1, "Project is required"),
+    project_name: z.string().optional(),
+    expected_date: z.string().optional(),
+    expected_time: z.string().optional(),
+    calculated_hours: z.string().optional(),
+    update_priority: z.enum(["high", "medium", "low", "none"]).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const raw = (data.calculated_hours || "").trim();
+    if (raw !== "") {
+      const n = Number(raw);
+      if (Number.isNaN(n) || n < 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Enter a valid non-negative number of hours",
+          path: ["calculated_hours"],
+        });
+      }
+    }
+  });
 
 const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
@@ -89,6 +105,8 @@ const EditUpdate = () => {
   const navigate = useNavigate();
   const { updateId } = useParams<{ updateId: string }>();
   const { currentUser } = useAuth();
+  const canSetPlanningFields =
+    currentUser?.role === "admin" || currentUser?.role === "developer";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const queryClient = useQueryClient();
@@ -136,6 +154,10 @@ const EditUpdate = () => {
       status: "pending",
       project_id: "",
       project_name: "",
+      expected_date: "",
+      expected_time: "",
+      calculated_hours: "",
+      update_priority: "none",
     },
   });
 
@@ -273,6 +295,14 @@ const EditUpdate = () => {
         if (values.status) formData.append("status", values.status);
         if (values.expected_date) formData.append("expected_date", values.expected_date);
         if (values.expected_time) formData.append("expected_time", values.expected_time);
+        if (canSetPlanningFields) {
+          const hrs = (values.calculated_hours || "").trim();
+          formData.append("calculated_hours", hrs === "" ? "" : hrs);
+          formData.append(
+            "update_priority",
+            values.update_priority && values.update_priority !== "none" ? values.update_priority : ""
+          );
+        }
         if (hasDeletions) {
           formData.append("attachments_to_delete", JSON.stringify(attachmentsToDelete));
         }
@@ -349,6 +379,12 @@ const EditUpdate = () => {
         }
         const data = await response.json();
         if (data.success) {
+          const pr = data.data.update_priority;
+          const priorityOk =
+            pr && ["high", "medium", "low"].includes(String(pr).toLowerCase())
+              ? String(pr).toLowerCase()
+              : "none";
+          const ch = data.data.calculated_hours;
           form.reset({
             title: data.data.title,
             type: data.data.type,
@@ -358,6 +394,11 @@ const EditUpdate = () => {
             project_name: data.data.project_name || "",
             expected_date: data.data.expected_date || "",
             expected_time: data.data.expected_time || "",
+            calculated_hours:
+              ch !== null && ch !== undefined && String(ch).trim() !== ""
+                ? String(ch)
+                : "",
+            update_priority: priorityOk as "high" | "medium" | "low" | "none",
           });
           
           // Load existing attachments
@@ -630,6 +671,75 @@ const EditUpdate = () => {
                     )}
                   />
 
+                  {canSetPlanningFields && canEdit && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="calculated_hours"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                              <div className="p-1 bg-cyan-500 rounded-lg">
+                                <Timer className="h-3 w-3 text-white" />
+                              </div>
+                              Calculated Hours to Update
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                step={0.25}
+                                placeholder="e.g. 4 or 2.5"
+                                className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl"
+                                {...field}
+                                disabled={isSubmitting || !canEdit}
+                              />
+                            </FormControl>
+                            <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
+                              Estimated hours to complete (admins and developers only)
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="update_priority"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                              <div className="p-1 bg-rose-500 rounded-lg">
+                                <Flag className="h-3 w-3 text-white" />
+                              </div>
+                              Update Priority
+                            </FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value ?? "none"}
+                              disabled={isSubmitting || !canEdit}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl">
+                                  <SelectValue placeholder="Select priority" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">Not set</SelectItem>
+                                <SelectItem value="high">High</SelectItem>
+                                <SelectItem value="medium">Medium</SelectItem>
+                                <SelectItem value="low">Low</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
+                              Internal priority for planning
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+
                   {/* Attachments Section */}
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
@@ -768,50 +878,93 @@ const EditUpdate = () => {
                         )}
                       </div>
 
-                      {/* Voice Notes section */}
+                      {/* Voice Notes section - same UX as New Bug */}
                       <div className="space-y-4">
                         <WhatsAppVoiceRecorder
                           onComplete={handleVoiceRecorderComplete}
-                          onCancel={() => console.log("Voice recording cancelled")}
+                          onCancel={() =>
+                            toast({
+                              title: "Recording cancelled",
+                              description: "Hold the mic to record a new voice note.",
+                            })
+                          }
                           disabled={isSubmitting || !canEdit}
+                          maxDuration={300}
                         />
                         {(existingVoiceNotes.length > 0 || voiceNotes.length > 0) && (
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Voice Notes ({existingVoiceNotes.length + voiceNotes.length})</Label>
-                              <Button type="button" variant="ghost" size="sm" onClick={clearAllVoiceNotes} className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400" disabled={isSubmitting || !canEdit}>Clear New</Button>
+                              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                Voice Notes ({existingVoiceNotes.length + voiceNotes.length})
+                              </Label>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearAllVoiceNotes}
+                                className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                                disabled={isSubmitting || !canEdit}
+                              >
+                                Clear New
+                              </Button>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                               {existingVoiceNotes.map((attachment) => (
-                                <div key={attachment.id} className="relative">
+                                <div
+                                  key={attachment.id}
+                                  className="rounded-xl border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800"
+                                >
                                   <WhatsAppVoiceMessage
                                     id={attachment.id}
-                                    audioSource={attachment.full_url || ''}
+                                    audioSource={attachment.full_url || ""}
                                     duration={attachment.duration || 0}
                                     waveform={[]}
-                                    onRemove={() => removeExistingVoiceNote(attachment.id)}
+                                    accent="sent"
                                     isActive={activeVoiceNoteId === attachment.id}
                                     onPlay={(id) => setActiveVoiceNoteId(id)}
-                                    onPause={(id) => setActiveVoiceNoteId(null)}
-                                    onEnded={() => setActiveVoiceNoteId(null)}
+                                    onPause={(id) => {
+                                      if (id === activeVoiceNoteId) {
+                                        setActiveVoiceNoteId(null);
+                                      }
+                                    }}
+                                    onRemove={() => {
+                                      if (activeVoiceNoteId === attachment.id) {
+                                        setActiveVoiceNoteId(null);
+                                      }
+                                      removeExistingVoiceNote(attachment.id);
+                                    }}
                                   />
                                 </div>
                               ))}
                               {voiceNotes.map((voiceNote, index) => {
                                 const voiceId = voiceNote.id;
                                 return (
-                                  <WhatsAppVoiceMessage
+                                  <div
                                     key={voiceId}
-                                    id={voiceId}
-                                    audioSource={voiceNote.blob}
-                                    duration={voiceNote.duration}
-                                    waveform={voiceNote.waveform}
-                                    onRemove={() => removeVoiceNote(index)}
-                                    isActive={activeVoiceNoteId === voiceId}
-                                    onPlay={(id) => setActiveVoiceNoteId(id)}
-                                    onPause={(id) => setActiveVoiceNoteId(null)}
-                                    onEnded={() => setActiveVoiceNoteId(null)}
-                                  />
+                                    className="rounded-xl border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800"
+                                  >
+                                    <WhatsAppVoiceMessage
+                                      id={voiceId}
+                                      audioSource={voiceNote.blob}
+                                      duration={voiceNote.duration}
+                                      waveform={voiceNote.waveform}
+                                      accent="sent"
+                                      autoPlay
+                                      isActive={activeVoiceNoteId === voiceId}
+                                      onPlay={(id) => setActiveVoiceNoteId(id)}
+                                      onPause={(id) => {
+                                        if (id === activeVoiceNoteId) {
+                                          setActiveVoiceNoteId(null);
+                                        }
+                                      }}
+                                      onRemove={() => {
+                                        if (activeVoiceNoteId === voiceId) {
+                                          setActiveVoiceNoteId(null);
+                                        }
+                                        removeVoiceNote(index);
+                                      }}
+                                    />
+                                  </div>
                                 );
                               })}
                             </div>
