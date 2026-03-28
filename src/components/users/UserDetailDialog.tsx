@@ -1,5 +1,17 @@
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import {
   Dialog,
   DialogClose,
   DialogContent,
@@ -29,6 +41,8 @@ import {
   Shield,
   X,
   Key,
+  UserX,
+  UserCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -115,6 +129,11 @@ export function UserDetailDialog({
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [isAccountToggleLoading, setIsAccountToggleLoading] = useState(false);
+
+  const isAccountDeactivated = user.account_active === 0;
+  const canAdminManageAccount =
+    loggedInUserRole === "admin" && currentUser?.id !== user.id;
 
   useQuery({
     queryKey: ["userStats", user.id],
@@ -258,6 +277,32 @@ export function UserDetailDialog({
     }
   };
 
+  const handleSetAccountActive = async (active: boolean) => {
+    setIsAccountToggleLoading(true);
+    try {
+      const updated = await userService.updateUser(user.id, {
+        account_active: active ? 1 : 0,
+      });
+      onUserUpdate(updated);
+      toast({
+        title: active ? "Account reactivated" : "Account deactivated",
+        description: active
+          ? "The user can sign in again. Their data was not removed."
+          : "The user has been signed out and cannot sign in until reactivated. No data was deleted.",
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update account status";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsAccountToggleLoading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -317,13 +362,19 @@ export function UserDetailDialog({
                 </div>
                 
                 {/* Role Badge */}
-                <div className="flex flex-col sm:flex-row items-center sm:items-center justify-center sm:justify-start gap-1.5 sm:gap-2">
+                <div className="flex flex-col sm:flex-row items-center sm:items-center justify-center sm:justify-start gap-1.5 sm:gap-2 flex-wrap">
                   <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-muted/60 rounded-lg border border-border/50">
                     {getRoleIcon(user.role)}
                     <span className="capitalize font-semibold text-sm sm:text-base text-foreground">
                       {user.role}
                     </span>
                   </div>
+                  <Badge
+                    variant={isAccountDeactivated ? "destructive" : "secondary"}
+                    className="text-xs font-medium"
+                  >
+                    {isAccountDeactivated ? "Account deactivated" : "Account active"}
+                  </Badge>
                   {user.last_active_at && (
                     <span className="text-[10px] sm:text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(user.last_active_at), { addSuffix: true })}
@@ -460,6 +511,87 @@ export function UserDetailDialog({
                   )}
                   Dashboard
                 </Button>
+              )}
+
+              {/* Deactivate account (Admin only, not self, not other admins while active) */}
+              {canAdminManageAccount && !isAccountDeactivated && user.role !== "admin" && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      className="flex-1 flex items-center justify-center gap-2 h-10 transition-all hover:scale-[1.02] min-w-0"
+                      disabled={isAccountToggleLoading}
+                    >
+                      {isAccountToggleLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserX className="h-4 w-4" />
+                      )}
+                      Deactivate
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Deactivate this account?</AlertDialogTitle>
+                      <AlertDialogDescription className="space-y-2">
+                        <span className="block">
+                          {user.name} will be signed out immediately, will not be able to sign in,
+                          and all their data on the platform will stay intact.
+                        </span>
+                        <span className="block text-muted-foreground">
+                          To permanently remove a user and related data, use{" "}
+                          <strong>Delete User</strong> instead.
+                        </span>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-amber-600 text-white hover:bg-amber-700"
+                        onClick={() => void handleSetAccountActive(false)}
+                      >
+                        Deactivate account
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
+              {canAdminManageAccount && isAccountDeactivated && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="flex-1 flex items-center justify-center gap-2 h-10 transition-all hover:scale-[1.02] min-w-0 border-emerald-600/50 text-emerald-700 dark:text-emerald-400"
+                      disabled={isAccountToggleLoading}
+                    >
+                      {isAccountToggleLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserCheck className="h-4 w-4" />
+                      )}
+                      Reactivate
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Reactivate this account?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {user.name} will be allowed to sign in again. No data was removed while
+                        the account was deactivated.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-emerald-600 text-white hover:bg-emerald-700"
+                        onClick={() => void handleSetAccountActive(true)}
+                      >
+                        Reactivate account
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
               
               {/* Delete User (Admin only) */}

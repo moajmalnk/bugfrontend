@@ -79,10 +79,11 @@ export const GOOGLE_OAUTH_CONFIG = {
  * 2. Navigate to APIs & Services → Credentials
  * 3. Find your OAuth 2.0 Client ID: 947044333217-u64nbc6pjmip562b4njg049mtddqaean.apps.googleusercontent.com
  * 4. Click on it to edit
- * 5. In "Authorized JavaScript origins", add:
- *    - http://localhost:8080
- *    - http://localhost:3000
+ * 5. In "Authorized JavaScript origins", add the EXACT origin your browser shows (scheme + host + port), e.g.:
+ *    - http://localhost:8080   (Vite dev — most common)
  *    - http://127.0.0.1:8080
+ *    - http://localhost:3000
+ *    If you see GSI_LOGGER "origin is not allowed", the origin you are using is missing from this list in Google Cloud.
  * 6. In "Authorized redirect URIs", add:
  *    - http://localhost:8080/login
  *    - http://localhost:3000/login

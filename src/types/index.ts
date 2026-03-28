@@ -77,6 +77,8 @@ export interface User {
   phone?: string;
   role: UserRole;
   role_id?: number | null;
+  /** 1 = active, 0 = deactivated by admin (when column exists) */
+  account_active?: number;
   avatar?: string;
   created_at?: string;
   admin_id?: string; // For impersonation tracking

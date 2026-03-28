@@ -18,14 +18,6 @@ const PrivacyPolicy = () => {
       <div className="container mx-auto px-4 py-8 max-w-4xl pb-12">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <Link to="/login">
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-            </Link>
-          </div>
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
               <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />

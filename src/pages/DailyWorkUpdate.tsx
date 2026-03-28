@@ -19,7 +19,7 @@ import { bugService } from '@/services/bugService';
 import { updateService } from '@/services/updateService';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
-
+ 
 function todayYMD() {
   const d = new Date();
   return d.toISOString().slice(0, 10);

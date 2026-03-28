@@ -314,27 +314,14 @@ const Users = () => {
     }
   };
 
-  const handleUpdateUser = async (updatedUser: User) => {
-    try {
-      await userService.updateUser(updatedUser.id, updatedUser);
-      setUsers(
-        users.map((user) => (user.id === updatedUser.id ? updatedUser : user))
-      );
-      // Update selectedUser if it's the same user being updated
-      if (selectedUser && selectedUser.id === updatedUser.id) {
-        setSelectedUser(updatedUser);
-      }
-      toast({
-        title: "Success",
-        description: "User has been updated successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update user.",
-        variant: "destructive",
-      });
-    }
+  /** Merge user into list after EditUserDialog / UserDetailDialog already persisted via API */
+  const handleUpdateUser = (updatedUser: User) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === updatedUser.id ? { ...u, ...updatedUser } : u))
+    );
+    setSelectedUser((prev) =>
+      prev && prev.id === updatedUser.id ? { ...prev, ...updatedUser } : prev
+    );
   };
 
   const performActualDelete = async (userId: string, force = false) => {

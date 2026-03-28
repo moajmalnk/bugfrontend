@@ -93,6 +93,12 @@ apiClient.interceptors.response.use(
     } else if (error.response?.status === 0) {
       error.message = 'Cannot connect to server - please check if the API is running';
     }
+
+    const status = error.response?.status;
+    const errData = error.response?.data as { error_code?: string } | undefined;
+    if (status === 403 && errData?.error_code === 'ACCOUNT_REVOKED') {
+      window.dispatchEvent(new CustomEvent('auth:revoked'));
+    }
     
     return Promise.reject(error);
   }

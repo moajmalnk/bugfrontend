@@ -97,19 +97,17 @@ const Login = () => {
   }, [otpCountdown]);
 
   useEffect(() => {
-    // Only redirect if authenticated AND token exists
-    const token =
-      localStorage.getItem("token") || sessionStorage.getItem("token");
-    if (isAuthenticated && currentUser && token) {
-      // navigate to projects
-    }
-
-    // Check for magic link token in URL
     const urlParams = new URLSearchParams(window.location.search);
-    const magicToken = urlParams.get('magic_token');
-    
+    const magicToken = urlParams.get("magic_token");
     if (magicToken) {
       handleMagicLinkVerification(magicToken);
+      return;
+    }
+
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (isAuthenticated && currentUser?.role && token) {
+      navigate(`/${currentUser.role}/projects`, { replace: true });
     }
   }, [isAuthenticated, currentUser, navigate]);
 
@@ -589,9 +587,20 @@ const Login = () => {
         type,
         value,
       });
-      const exists = (response.data as { exists: boolean }).exists;
+      const payload = response.data as {
+        exists: boolean;
+        inactive?: boolean;
+      };
+      const exists = payload.exists;
       setUserExists(exists);
-      if (!exists) {
+      if (payload.inactive) {
+        toast({
+          title: "Account unavailable",
+          description:
+            "This account has been deactivated. Contact an administrator to restore access.",
+          variant: "destructive",
+        });
+      } else if (!exists) {
         toast({
           title: "User Not Found",
           description: `No user found with this ${type}.`,
@@ -620,8 +629,20 @@ const Login = () => {
         type: "email",
         value: email,
       });
-      const exists = (response.data as { exists: boolean }).exists;
+      const payload = response.data as {
+        exists: boolean;
+        inactive?: boolean;
+      };
+      const exists = payload.exists;
       setForgotEmailExists(exists);
+      if (payload.inactive) {
+        toast({
+          title: "Account unavailable",
+          description:
+            "This account is deactivated. Password reset is not available until an administrator reactivates it.",
+          variant: "destructive",
+        });
+      }
       return exists;
     } catch (error) {
       setForgotEmailExists(false);
@@ -639,8 +660,20 @@ const Login = () => {
         type: "email",
         value: email,
       });
-      const exists = (response.data as { exists: boolean }).exists;
+      const payload = response.data as {
+        exists: boolean;
+        inactive?: boolean;
+      };
+      const exists = payload.exists;
       setMagicEmailExists(exists);
+      if (payload.inactive) {
+        toast({
+          title: "Account unavailable",
+          description:
+            "This account is deactivated. Magic link sign-in is not available until an administrator reactivates it.",
+          variant: "destructive",
+        });
+      }
       return exists;
     } catch (error) {
       setMagicEmailExists(false);

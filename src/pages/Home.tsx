@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthContext';
 import { 
   BugIcon, 
   ArrowRight, 
@@ -25,6 +26,18 @@ import {
 } from 'lucide-react';
 
 const Home = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, currentUser, isLoading: isAuthLoading } = useAuth();
+
+  const handleGetStarted = () => {
+    if (isAuthLoading) return;
+    if (isAuthenticated && currentUser?.role) {
+      navigate(`/${currentUser.role}/projects`);
+    } else {
+      navigate('/login');
+    }
+  };
+
   useEffect(() => {
     // Enable body scrolling for this page
     document.body.style.overflow = 'auto';
@@ -69,6 +82,11 @@ const Home = () => {
       icon: TrendingUp,
       title: "Progress Tracking",
       description: "Daily updates and work logs for transparent progress monitoring"
+    },
+    {
+      icon: Clock,
+      title: "Time Tracking",
+      description: "Track time spent on tasks and projects for better productivity"
     }
   ];
 
@@ -165,15 +183,16 @@ const Home = () => {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-              <Link to="/login">
-                <Button 
-                  size="lg" 
-                  className="w-full sm:w-auto h-12 sm:h-14 px-8 text-base sm:text-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group"
-                >
-                  Get Started
-                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
+              <Button 
+                type="button"
+                size="lg" 
+                disabled={isAuthLoading}
+                onClick={handleGetStarted}
+                className="w-full sm:w-auto h-12 sm:h-14 px-8 text-base sm:text-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group disabled:opacity-60 disabled:pointer-events-none"
+              >
+                Get Started
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
               <a href="#features">
                 <Button 
                   size="lg" 

@@ -4,6 +4,7 @@ import { User } from "@/types";
 import {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -43,6 +44,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  const revokeSessionForced = useCallback(() => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    localStorage.removeItem("intendedDestination");
+    localStorage.removeItem("bugricer_feedback_submitted");
+    setCurrentUser(null);
+    navigate("/login", { replace: true });
+    toast({
+      title: "Session ended",
+      description:
+        "Your account is no longer active or was removed by an administrator.",
+      variant: "destructive",
+    });
+  }, [navigate]);
 
   const updateCurrentUser = (user: User) => {
     setCurrentUser(user);
@@ -102,10 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         setCurrentUser(data.data);
       } else {
-        // console.error("Auth check failed:", data);
-        localStorage.removeItem("token");
-        sessionStorage.removeItem("token"); // Also clear from session storage
-        setCurrentUser(null);
+        if (data?.error_code === "ACCOUNT_REVOKED") {
+          revokeSessionForced();
+        } else {
+          localStorage.removeItem("token");
+          sessionStorage.removeItem("token");
+          setCurrentUser(null);
+        }
       }
     } catch (error) {
       // console.error("Auth check error:", error);
@@ -120,7 +139,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Run auth check on mount and token change
   useEffect(() => {
     checkAuthStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only bootstrap
   }, []);
+
+  useEffect(() => {
+    const onRevoked = () => revokeSessionForced();
+    window.addEventListener("auth:revoked", onRevoked);
+    return () => window.removeEventListener("auth:revoked", onRevoked);
+  }, [revokeSessionForced]);
 
   // Heartbeat system - send heartbeat every 30 seconds when user is authenticated
   useEffect(() => {
@@ -136,13 +162,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = sessionStorage.getItem("token") || localStorage.getItem("token");
         if (!token) return;
 
-        await fetch(`${ENV.API_URL}/user/heartbeat.php`, {
+        const res = await fetch(`${ENV.API_URL}/user/heartbeat.php`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         });
+
+        if (res.status === 403) {
+          let payload: { error_code?: string } = {};
+          try {
+            const text = await res.text();
+            if (text) payload = JSON.parse(text) as { error_code?: string };
+          } catch {
+            /* ignore non-JSON */
+          }
+          if (payload.error_code === "ACCOUNT_REVOKED") {
+            revokeSessionForced();
+          }
+        }
       } catch (error) {
         // Silently handle errors - don't disrupt user experience in production
         if (import.meta.env.DEV) {
@@ -159,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Cleanup interval on unmount or when user changes
     return () => clearInterval(intervalId);
-  }, [currentUser]);
+  }, [currentUser, revokeSessionForced]);
 
   const login = async (
     identifier: string,

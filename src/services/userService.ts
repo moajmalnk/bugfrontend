@@ -16,6 +16,7 @@ interface UpdateUserData {
   phone?: string;
   role?: UserRole;
   role_id?: number;
+  account_active?: boolean | number;
 }
 
 // Define the structure for user statistics
@@ -68,7 +69,11 @@ class UserService {
     }
     return response.data.map((user: any) => ({
       ...user,
-      avatar: this.generateAvatar(user.name, user.role) // <-- use name
+      avatar: this.generateAvatar(user.name, user.role), // <-- use name
+      account_active:
+        user.account_active !== undefined && user.account_active !== null
+          ? Number(user.account_active)
+          : undefined,
     }));
   }
 
@@ -130,6 +135,10 @@ class UserService {
         ),
         created_at: updatedUser.created_at,
         last_active_at: updatedUser.last_active_at || null,
+        account_active:
+          updatedUser.account_active !== undefined && updatedUser.account_active !== null
+            ? Number(updatedUser.account_active)
+            : undefined,
       };
     }
     
