@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { userService } from "@/services/userService";
-import { Calendar, Clock, TrendingUp, Users, X, CheckCircle2, AlertCircle, PlayCircle, CalendarDays, FileText, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Calendar, Clock, TrendingUp, Users, X, CheckCircle2, AlertCircle, PlayCircle, CalendarDays, FileText, Loader2, PlusCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 
 interface TaskCounts {
@@ -52,6 +52,64 @@ interface UserWorkStatsProps {
   showTrend?: boolean;
 }
 
+/** e.g. `Mar 28, 2026 - 10:26 PM` (Asia/Kolkata) from save time or check-in. */
+function formatDailySubmittedAt(
+  submissionDate: string,
+  createdAt?: string | null,
+  checkInTime?: string | null
+): string | null {
+  const datePart = String(submissionDate || '').trim();
+  if (!datePart) return null;
+
+  const formatInstant = (d: Date): string | null => {
+    if (Number.isNaN(d.getTime())) return null;
+    const dStr = d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    });
+    const tStr = d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    });
+    return `${dStr} - ${tStr}`;
+  };
+
+  const rawCreated = createdAt != null && String(createdAt).trim() !== '' ? String(createdAt).trim() : '';
+  if (rawCreated) {
+    const normalized = rawCreated.includes('T') ? rawCreated : rawCreated.replace(/^(\d{4}-\d{2}-\d{2})\s+/, '$1T');
+    const s = formatInstant(new Date(normalized));
+    if (s) return s;
+  }
+
+  const ci = checkInTime != null ? String(checkInTime).trim() : '';
+  if (ci) {
+    const timeOnly = ci.includes(' ') ? (ci.split(/\s+/).pop() as string) : ci;
+    if (/^\d{1,2}:\d{2}/.test(timeOnly)) {
+      const s = formatInstant(new Date(`${datePart}T${timeOnly}`));
+      if (s) return s;
+    }
+  }
+
+  return null;
+}
+
+function sumDailyBreakdownTotals(submissions: any[]) {
+  return submissions.reduce(
+    (acc, s) => {
+      acc.hours += Number(s.hours ?? 0) || 0;
+      acc.ot += Number(s.overtime_hours ?? 0) || 0;
+      acc.requested += Number(s.requested_extra_hours ?? 0) || 0;
+      acc.breakMin += Math.max(0, Number(s.break_minutes ?? 0) || 0);
+      return acc;
+    },
+    { hours: 0, ot: 0, requested: 0, breakMin: 0 }
+  );
+}
+
 export function UserWorkStats({ userId, compact = false, showTrend = true }: UserWorkStatsProps) {
   const [stats, setStats] = useState<WorkStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,6 +118,12 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [periodDetails, setPeriodDetails] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  const dailyBreakdownTotals = useMemo(() => {
+    const subs = periodDetails?.submissions;
+    if (!Array.isArray(subs) || subs.length === 0) return null;
+    return sumDailyBreakdownTotals(subs);
+  }, [periodDetails]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -119,6 +183,18 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
     }
   });
   const uniquePeriodTrend = Array.from(periodMap.values());
+
+  const workTrendVisible = uniquePeriodTrend.slice(0, 6);
+  const workTrendHeaderTotals = workTrendVisible.reduce(
+    (acc, p) => {
+      acc.hours += Number(p.hours || 0);
+      acc.ot += Number(p.overtime_hours || 0);
+      acc.days += Number(p.days || 0);
+      return acc;
+    },
+    { hours: 0, ot: 0, days: 0 }
+  );
+  const workTrendHeaderNet = workTrendHeaderTotals.hours + workTrendHeaderTotals.ot;
 
   if (compact) {
     return (
@@ -185,9 +261,43 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
       {showTrend && period_trend.length > 0 && (
         <Card className="border-0 shadow-sm bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <CardContent className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Work Trend</h4>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Work Trend</h4>
+              </div>
+              <div
+                className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 text-[11px] sm:text-xs"
+                title="Totals across the periods listed below"
+              >
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3 w-3 text-blue-500 shrink-0" />
+                  <span className="text-gray-500 dark:text-gray-400">Total</span>
+                  <span className="font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+                    {workTrendHeaderTotals.hours.toFixed(1)}h
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-bold text-orange-500 shrink-0">OT</span>
+                  <span className="font-semibold tabular-nums text-orange-600 dark:text-orange-400">
+                    {workTrendHeaderTotals.ot.toFixed(1)}h
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <PlusCircle className="h-3 w-3 text-violet-500 shrink-0" />
+                  <span className="text-gray-500 dark:text-gray-400">Net</span>
+                  <span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                    {workTrendHeaderNet.toFixed(1)}h
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3 text-green-500 shrink-0" />
+                  <span className="text-gray-500 dark:text-gray-400">Days</span>
+                  <span className="font-semibold text-green-600 dark:text-green-400">
+                    {workTrendHeaderTotals.days}d
+                  </span>
+                </div>
+              </div>
             </div>
             <div className="space-y-3">
               {uniquePeriodTrend.slice(0, 6).map((period, index) => (
@@ -237,17 +347,31 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                   }}
                   className="group p-3 rounded-xl bg-gradient-to-r from-gray-50/50 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/20 hover:from-gray-100/70 hover:to-blue-100/50 dark:hover:from-gray-700/50 dark:hover:to-blue-800/30 transition-all duration-200 border border-gray-200/30 dark:border-gray-700/30 cursor-pointer hover:shadow-md active:scale-[0.98]"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-0 shrink">
                       {period.period_name}
                     </span>
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-blue-500" />
-                        <span className="font-semibold text-blue-600 dark:text-blue-400">{period.hours}h</span>
+                    <div className="flex flex-wrap items-center justify-end gap-x-2 sm:gap-x-3 gap-y-1 text-[11px] sm:text-sm shrink-0">
+                      <div className="flex items-center gap-1" title="Total hours">
+                        <Clock className="h-3 w-3 text-blue-500 shrink-0" />
+                        <span className="font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+                          {Number(period.hours || 0).toFixed(1)}h
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-green-500" />
+                      <div className="flex items-center gap-1" title="Approved OT">
+                        <span className="font-bold text-[10px] sm:text-[11px] text-orange-500 shrink-0">OT</span>
+                        <span className="font-semibold tabular-nums text-orange-600 dark:text-orange-400">
+                          {Number(period.overtime_hours || 0).toFixed(1)}h
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1" title="Net hours (total + approved OT)">
+                        <PlusCircle className="h-3 w-3 text-violet-500 shrink-0" />
+                        <span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                          {(Number(period.hours || 0) + Number(period.overtime_hours || 0)).toFixed(1)}h
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1" title="Active days">
+                        <Calendar className="h-3 w-3 text-green-500 shrink-0" />
                         <span className="font-semibold text-green-600 dark:text-green-400">{period.days}d</span>
                       </div>
                     </div>
@@ -319,7 +443,7 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
               ) : (
                 <div className="space-y-6 mt-4">
               {/* Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20">
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
@@ -353,6 +477,29 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                       </div>
                       <div className="p-3 bg-green-200/50 dark:bg-green-900/40 rounded-xl">
                         <Calendar className="h-6 w-6 text-green-600 dark:text-green-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-violet-50 to-purple-100/50 dark:from-violet-950/30 dark:to-purple-900/20">
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Net hours</p>
+                        <p className="text-3xl font-bold text-violet-700 dark:text-violet-300 tabular-nums">
+                          {(
+                            Number(selectedPeriod.hours || 0) +
+                            Number(selectedPeriod.overtime_hours || 0)
+                          ).toFixed(1)}
+                          h
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                          Total hours + approved OT
+                        </p>
+                      </div>
+                      <div className="p-3 bg-violet-200/50 dark:bg-violet-900/40 rounded-xl">
+                        <PlusCircle className="h-6 w-6 text-violet-600 dark:text-violet-400" />
                       </div>
                     </div>
                   </CardContent>
@@ -643,14 +790,50 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                   {/* Daily Breakdown */}
                   {periodDetails.submissions && periodDetails.submissions.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                        Daily Breakdown ({periodDetails.submissions.length} days)
-                      </h3>
+                      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 shrink-0">
+                          <Calendar className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                          Daily Breakdown ({periodDetails.submissions.length} days)
+                        </h3>
+                        {dailyBreakdownTotals ? (
+                          <div className="flex flex-wrap items-center gap-2 sm:justify-end text-[11px] sm:text-xs">
+                            <div className="rounded-lg border border-indigo-200/60 dark:border-indigo-800/50 bg-white/70 dark:bg-gray-800/40 px-2.5 py-1.5 shadow-sm">
+                              <span className="text-gray-500 dark:text-gray-400">Total hours</span>
+                              <span className="ml-1.5 font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+                                {dailyBreakdownTotals.hours % 1 === 0
+                                  ? `${dailyBreakdownTotals.hours}h`
+                                  : `${dailyBreakdownTotals.hours.toFixed(1)}h`}
+                              </span>
+                            </div>
+                            <div className="rounded-lg border border-orange-200/60 dark:border-orange-900/40 bg-white/70 dark:bg-gray-800/40 px-2.5 py-1.5 shadow-sm">
+                              <span className="text-gray-500 dark:text-gray-400">Total OT</span>
+                              <span className="ml-1.5 font-semibold tabular-nums text-orange-600 dark:text-orange-400">
+                                {dailyBreakdownTotals.ot.toFixed(1)}h
+                              </span>
+                            </div>
+                            
+                            
+                            {typeof periodDetails.summary?.approval_requests === 'number' ? (
+                              <div className="rounded-lg border border-rose-200/60 dark:border-rose-900/40 bg-white/70 dark:bg-gray-800/40 px-2.5 py-1.5 shadow-sm">
+                                <span className="text-gray-500 dark:text-gray-400">OT requests</span>
+                                <span className="ml-1.5 font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                                  {periodDetails.summary.approval_requests}
+                                </span>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
                       <Card className="border-0 shadow-sm bg-gradient-to-br from-indigo-50/50 to-indigo-100/20 dark:from-indigo-950/10 dark:to-indigo-900/5">
                         <CardContent className="p-4">
                           <div className="space-y-3 max-h-96 overflow-y-auto">
-                            {periodDetails.submissions.map((submission: any, idx: number) => (
+                            {periodDetails.submissions.map((submission: any, idx: number) => {
+                              const submittedAt = formatDailySubmittedAt(
+                                submission.date,
+                                submission.created_at,
+                                submission.check_in_time
+                              );
+                              return (
                               <div key={idx} className="p-3 rounded-lg bg-white/50 dark:bg-gray-800/30 border border-gray-200/50 dark:border-gray-700/30">
                                 <div className="flex items-center justify-between mb-2">
                                   <div className="flex items-center gap-2">
@@ -673,6 +856,16 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                                     )}
                                   </div>
                                 </div>
+                                {submittedAt ? (
+                                  <div className="flex items-start gap-2 mb-2 text-xs text-gray-600 dark:text-gray-400">
+                                    <Clock className="h-3.5 w-3.5 text-indigo-500 shrink-0 mt-0.5" aria-hidden />
+                                    <div>
+                                      <span className="font-medium text-gray-700 dark:text-gray-300">Submitted</span>
+                                      <span className="mx-1">·</span>
+                                      <span className="tabular-nums">{submittedAt}</span>
+                                    </div>
+                                  </div>
+                                ) : null}
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                                   <div className="flex items-center gap-1">
                                     <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
@@ -730,7 +923,8 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                                   </div>
                                 )}
                               </div>
-                            ))}
+                            );
+                            })}
                           </div>
                         </CardContent>
                       </Card>
