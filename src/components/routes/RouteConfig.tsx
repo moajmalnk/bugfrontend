@@ -168,6 +168,7 @@ const MyTasks = lazy(() =>
   })
 );
 const DailyUpdate = lazy(() => import("@/pages/DailyUpdate"));
+const AdminOvertimeRequests = lazy(() => import("@/pages/AdminOvertimeRequests"));
 const DailyWorkUpdate = lazy(() => import("@/pages/DailyWorkUpdate"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
@@ -301,6 +302,7 @@ const RouteConfig = () => {
           <Route path="my-tasks" element={<MyTasks />} />
           <Route path="daily-update" element={<DailyUpdate />} />
           <Route path="daily-work-update" element={<DailyWorkUpdate />} />
+          <Route path="overtime-requests" element={<AdminOvertimeRequests />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
           <Route path="bugdocs" element={<BugDocsPage />} />
           <Route path="bugdocs/project/:projectId" element={<ProjectDocumentsPage />} />

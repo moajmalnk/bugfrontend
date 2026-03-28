@@ -24,6 +24,7 @@ import {
   Mic,
   Calendar,
   Database,
+  Timer,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
@@ -250,6 +251,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/users"
                       icon={<Users className="h-5 w-5" />}
                       label="Users"
+                    />
+                  )}
+
+                  {hasUsersPermission && (
+                    <NavLink
+                      to="/overtime-requests"
+                      icon={<Timer className="h-5 w-5" />}
+                      label="OT requests"
                     />
                   )}
 

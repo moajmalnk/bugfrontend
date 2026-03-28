@@ -227,13 +227,35 @@ export async function listMySubmissions(params: { from?: string; to?: string } =
   return data;
 }
 
-export async function listAllRequestSubmissions(params: { from?: string; to?: string } = {}) {
-  const qs = new URLSearchParams({ ...params, _t: Date.now().toString() });
-  const res = await fetch(`${API}/tasks/all_request_submissions.php${qs ? `?${qs}` : ''}`, {
+export async function listAllRequestSubmissions(
+  params: { from?: string; to?: string; pending_only?: boolean } = {}
+) {
+  const qs = new URLSearchParams();
+  if (params.from) qs.set('from', params.from);
+  if (params.to) qs.set('to', params.to);
+  if (params.pending_only) qs.set('pending_only', '1');
+  qs.set('_t', Date.now().toString());
+  const res = await fetch(`${API}/tasks/all_request_submissions.php?${qs.toString()}`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error('Failed to load request submissions');
   return res.json();
+}
+
+export async function reviewOvertimeRequest(body: {
+  id: number;
+  action: 'approve' | 'reject' | 'change';
+  approved_hours?: number;
+  admin_note?: string;
+}) {
+  const res = await fetch(`${API}/tasks/review_overtime_request.php`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { message?: string }).message || 'Failed to update request');
+  return data as { success?: boolean; message?: string; data?: Record<string, unknown> };
 }
 
 export async function deleteSubmission(arg: { id?: number; submission_date?: string }) {

@@ -4,7 +4,7 @@ import { listMySubmissions, listAllRequestSubmissions, deleteSubmission } from '
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
-import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, Undo2, Plus, Bell } from 'lucide-react';
+import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, Undo2, Plus, Bell, Timer } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -551,7 +551,7 @@ export default function DailyUpdate() {
                     <Calendar className="h-5 w-5 text-white" />
                   </div>
                   <div className="text-center sm:text-left">
-                    <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80">Hours this month</div>
+                    <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80"></div>
                     <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
                       {monthHours}
                     </div>
@@ -656,22 +656,33 @@ export default function DailyUpdate() {
                 </div>
               </div>
               {currentUser?.role === 'admin' && (
-                <Button
-                  type="button"
-                  variant={showRequestsOnly ? 'default' : 'outline'}
-                  onClick={() => setShowRequestsOnly((prev) => !prev)}
-                  className={`h-10 w-full sm:w-auto shrink-0 justify-center px-4 rounded-xl text-xs sm:text-sm ${
-                    showRequestsOnly
-                      ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:from-orange-700 hover:to-amber-700'
-                      : ''
-                  }`}
-                >
-                  <Bell className="h-4 w-4 mr-2 shrink-0" />
-                  Requests
-                  <span className="ml-2 px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/20 text-[11px] font-semibold tabular-nums">
-                    {requestCount}
-                  </span>
-                </Button>
+                <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto shrink-0">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => navigate(`/${currentUser.role}/overtime-requests`)}
+                    className="h-10 w-full sm:w-auto justify-center px-4 rounded-xl text-xs sm:text-sm"
+                  >
+                    <Timer className="h-4 w-4 mr-2 shrink-0" />
+                    Admin requests
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={showRequestsOnly ? 'default' : 'outline'}
+                    onClick={() => setShowRequestsOnly((prev) => !prev)}
+                    className={`h-10 w-full sm:w-auto shrink-0 justify-center px-4 rounded-xl text-xs sm:text-sm ${
+                      showRequestsOnly
+                        ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:from-orange-700 hover:to-amber-700'
+                        : ''
+                    }`}
+                  >
+                    <Bell className="h-4 w-4 mr-2 shrink-0" />
+                    Filter
+                    <span className="ml-2 px-1.5 py-0.5 rounded-md bg-black/10 dark:bg-white/20 text-[11px] font-semibold tabular-nums">
+                      {requestCount}
+                    </span>
+                  </Button>
+                </div>
               )}
             </div>
             
@@ -751,6 +762,19 @@ export default function DailyUpdate() {
                           {Number(s.overtime_hours || 0) > 0 && (
                             <span className="ml-2 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium">
                               +{s.overtime_hours}h OT
+                            </span>
+                          )}
+                          {hasApprovalRequest(s) && (
+                            <span
+                              className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                                String(s.extra_hours_approval_status || '').toLowerCase() === 'pending'
+                                  ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200'
+                                  : String(s.extra_hours_approval_status || '').toLowerCase() === 'rejected'
+                                    ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-200'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
+                              }`}
+                            >
+                              {String(s.extra_hours_approval_status || 'none').replace(/_/g, ' ')}
                             </span>
                           )}
                         </div>
