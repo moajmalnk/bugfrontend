@@ -17,12 +17,88 @@ import { StatusDropdown, type StatusOption } from '@/components/ui/StatusDropdow
 import { useAuth } from '@/context/AuthContext';
 import { bugService } from '@/services/bugService';
 import { updateService } from '@/services/updateService';
+import { toLocalCalendarDateString } from '@/lib/dateUtils';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
- 
+
+const DAILY_WORK_DRAFT_VERSION = 1;
+
+function dailyWorkDraftStorageKey(userId: string | number, date: string) {
+  return `bugRicer:dailyWorkDraft:v${DAILY_WORK_DRAFT_VERSION}:${userId}:${date}`;
+}
+
+type DailyWorkDraftStored = {
+  v: number;
+  savedAt: number;
+  submission_date: string;
+  form: WorkSubmission;
+  breakEntries: string[];
+  selectedProjects: string[];
+  plannedWork: string;
+  requestAdminApproval: boolean;
+  requestedExtraHours: number;
+  approvalReason: string;
+  isOnBreak: boolean;
+  breakStartedAtIso: string | null;
+};
+
+function clearDailyWorkDraft(userId: string | number, date: string) {
+  try {
+    localStorage.removeItem(dailyWorkDraftStorageKey(userId, date));
+  } catch {
+    /* ignore */
+  }
+}
+
+function countTaskLines(text?: string) {
+  if (!text) return 0;
+  return text
+    .split('\n')
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0).length;
+}
+
+function isWorkSubmissionRowComplete(row: any) {
+  const hours = Number(row.hours_today || 0);
+  if (hours < 1) return false;
+  return (
+    countTaskLines(row.completed_tasks) +
+      countTaskLines(row.pending_tasks) +
+      countTaskLines(row.ongoing_tasks) +
+      countTaskLines(row.notes) >
+    0
+  );
+}
+
+function parsePlannedProjectsFromRow(existingSubmission: any): string[] {
+  if (!existingSubmission?.planned_projects) return [];
+  try {
+    const plannedProjectsArray =
+      typeof existingSubmission.planned_projects === 'string'
+        ? JSON.parse(existingSubmission.planned_projects)
+        : existingSubmission.planned_projects;
+    return Array.isArray(plannedProjectsArray) ? plannedProjectsArray : [];
+  } catch {
+    return [];
+  }
+}
+
+function breakEntriesFromSubmissionRow(existingSubmission: any): string[] {
+  const raw = existingSubmission?.break_entries;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 function todayYMD() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
+  return toLocalCalendarDateString(new Date());
 }
 
 function getCurrentTime() {
@@ -76,6 +152,7 @@ export default function DailyWorkUpdate() {
   const [isOnBreak, setIsOnBreak] = useState(false);
   const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null);
   const [breakEntries, setBreakEntries] = useState<string[]>([]);
+  const [draftHydrationEpoch, setDraftHydrationEpoch] = useState(0);
 
   const overtimeHours = useMemo(() => requestedExtraHours, [requestedExtraHours]);
   const regularHours = useMemo(() => Math.min(Number(form.hours_today), 8), [form.hours_today]);
@@ -159,11 +236,7 @@ export default function DailyWorkUpdate() {
   }, [form, requestAdminApproval, requestedExtraHours, approvalReason]);
 
   function countItems(text?: string) {
-    if (!text) return 0;
-    return text
-      .split('\n')
-      .map((x) => x.trim())
-      .filter((x) => x.length > 0).length;
+    return countTaskLines(text);
   }
 
   function formatTime12h(t?: string | null) {
@@ -333,7 +406,11 @@ export default function DailyWorkUpdate() {
       // Reset planning details after successful submission
       setSelectedProjects([]);
       setPlannedWork('');
-      
+
+      if (currentUser?.id && form.submission_date) {
+        clearDailyWorkDraft(currentUser.id, form.submission_date);
+      }
+
       // Small delay for better UX before navigation (allows user to see success message)
       setTimeout(() => {
         navigate(`/${currentUser?.role}/daily-update`);
@@ -575,83 +652,256 @@ export default function DailyWorkUpdate() {
     }
   }, [isCheckInDialogOpen, selectedProjects.length, fetchProjectStats]);
 
-  // Load check-in data when date changes (for non-editing mode)
+  // Load server row + merge local draft so preview survives refresh (non-editing mode)
   useEffect(() => {
-    if (!isEditing && form.submission_date) {
-      (async () => {
-        try {
-          const currentDate = form.submission_date;
-          const submissionsRes = await listMySubmissions({ 
-            from: currentDate, 
-            to: currentDate 
-          });
-          const submissions: any[] = (submissionsRes && submissionsRes.data) 
-            ? submissionsRes.data 
-            : Array.isArray(submissionsRes) 
-              ? submissionsRes 
-              : [];
-          
-          // Find submission for current date
-          const existingSubmission = submissions.find(s => s.submission_date === currentDate);
+    if (isEditing || !form.submission_date || !currentUser?.id) return;
 
-          if (existingSubmission) {
-            const parsedBreaks = parseBreakLinesFromNotes(existingSubmission.notes || '');
-            const breaksFromRow = (() => {
-              const raw = existingSubmission.break_entries;
-              if (Array.isArray(raw)) return raw;
-              if (typeof raw === 'string') {
-                try {
-                  const parsed = JSON.parse(raw);
-                  return Array.isArray(parsed) ? parsed : [];
-                } catch {
-                  return [];
-                }
-              }
-              return [];
-            })();
-            // Load check-in time if available
+    let cancelled = false;
+    (async () => {
+      try {
+        const currentDate = form.submission_date;
+        const userId = currentUser.id;
+        const submissionsRes = await listMySubmissions({
+          from: currentDate,
+          to: currentDate,
+        });
+        const submissions: any[] =
+          submissionsRes && submissionsRes.data
+            ? submissionsRes.data
+            : Array.isArray(submissionsRes)
+              ? submissionsRes
+              : [];
+
+        const existingSubmission = submissions.find(
+          (s) => s.submission_date === currentDate
+        );
+
+        let draft: DailyWorkDraftStored | null = null;
+        try {
+          const raw = localStorage.getItem(dailyWorkDraftStorageKey(userId, currentDate));
+          if (raw) {
+            const parsed = JSON.parse(raw) as DailyWorkDraftStored;
+            if (
+              parsed &&
+              parsed.v === DAILY_WORK_DRAFT_VERSION &&
+              parsed.submission_date === currentDate
+            ) {
+              draft = parsed;
+            }
+          }
+        } catch {
+          draft = null;
+        }
+
+        if (cancelled) return;
+
+        if (existingSubmission && isWorkSubmissionRowComplete(existingSubmission)) {
+          const parsedOvertime = parseOvertimeRequestFromNotes(
+            existingSubmission.notes || ''
+          );
+          const parsedBreaks = parseBreakLinesFromNotes(parsedOvertime.cleanNotes || '');
+          const requestedFromRow = Number(
+            existingSubmission.requested_extra_hours ??
+              existingSubmission.requestedExtraHours ??
+              0
+          );
+          const reasonFromRow = String(
+            existingSubmission.approval_reason ??
+              existingSubmission.approvalReason ??
+              ''
+          ).trim();
+          const resolvedRequested =
+            requestedFromRow > 0
+              ? requestedFromRow
+              : Number(parsedOvertime.requestedFromBlock || 0);
+          const resolvedReason = reasonFromRow || parsedOvertime.reasonFromBlock;
+          const hasApprovalRequest =
+            resolvedRequested > 0 || resolvedReason.length > 0;
+
+          setForm({
+            submission_date: existingSubmission.submission_date,
+            check_in_time: existingSubmission.check_in_time || undefined,
+            hours_today: existingSubmission.hours_today || 8,
+            overtime_hours: existingSubmission.overtime_hours || 0,
+            completed_tasks: existingSubmission.completed_tasks || '',
+            pending_tasks: existingSubmission.pending_tasks || '',
+            ongoing_tasks: existingSubmission.ongoing_tasks || '',
+            notes: parsedBreaks.cleanNotes || '',
+            planned_work_status:
+              (existingSubmission.planned_work_status as StatusOption) ||
+              'not_started',
+            planned_work_notes: existingSubmission.planned_work_notes || '',
+          });
+          setRequestAdminApproval(hasApprovalRequest);
+          setRequestedExtraHours(hasApprovalRequest ? resolvedRequested : 0);
+          setApprovalReason(hasApprovalRequest ? resolvedReason : '');
+          const breaksFromRow = breakEntriesFromSubmissionRow(existingSubmission);
+          setBreakEntries(
+            breaksFromRow.length > 0 ? breaksFromRow : parsedBreaks.breakLines
+          );
+          setSelectedProjects(parsePlannedProjectsFromRow(existingSubmission));
+          setPlannedWork(existingSubmission.planned_work || '');
+          clearDailyWorkDraft(userId, currentDate);
+          setIsOnBreak(false);
+          setBreakStartedAt(null);
+        } else if (existingSubmission) {
+          const parsedBreaks = parseBreakLinesFromNotes(
+            existingSubmission.notes || ''
+          );
+          const breaksFromRow = breakEntriesFromSubmissionRow(existingSubmission);
+          const serverBreaks =
+            breaksFromRow.length > 0 ? breaksFromRow : parsedBreaks.breakLines;
+          const serverPlannedProjects =
+            parsePlannedProjectsFromRow(existingSubmission);
+          const serverPlannedWork = existingSubmission.planned_work || '';
+
+          if (draft) {
+            setForm((prev) => ({
+              ...prev,
+              ...draft.form,
+              submission_date: currentDate,
+              check_in_time:
+                existingSubmission.check_in_time || draft.form.check_in_time,
+            }));
+            setBreakEntries(
+              draft.breakEntries?.length ? draft.breakEntries : serverBreaks
+            );
+            setSelectedProjects(
+              draft.selectedProjects?.length
+                ? draft.selectedProjects
+                : serverPlannedProjects
+            );
+            setPlannedWork(
+              draft.plannedWork?.trim()
+                ? draft.plannedWork
+                : serverPlannedWork
+            );
+            setRequestAdminApproval(draft.requestAdminApproval);
+            setRequestedExtraHours(draft.requestedExtraHours);
+            setApprovalReason(draft.approvalReason || '');
+            if (draft.isOnBreak && draft.breakStartedAtIso) {
+              setIsOnBreak(true);
+              setBreakStartedAt(new Date(draft.breakStartedAtIso));
+            } else {
+              setIsOnBreak(false);
+              setBreakStartedAt(null);
+            }
+          } else {
             if (existingSubmission.check_in_time) {
               setForm((prev) => ({
                 ...prev,
                 check_in_time: existingSubmission.check_in_time,
               }));
+            } else {
+              setForm((prev) => ({
+                ...prev,
+                check_in_time: undefined,
+              }));
             }
-            setBreakEntries(breaksFromRow.length > 0 ? breaksFromRow : parsedBreaks.breakLines);
-
-            // Load planned projects if available
-            if (existingSubmission.planned_projects) {
-              try {
-                const plannedProjectsArray = typeof existingSubmission.planned_projects === 'string'
-                  ? JSON.parse(existingSubmission.planned_projects)
-                  : existingSubmission.planned_projects;
-                if (Array.isArray(plannedProjectsArray) && plannedProjectsArray.length > 0) {
-                  setSelectedProjects(plannedProjectsArray);
-                }
-              } catch (e) {
-                console.error('Failed to parse planned_projects:', e);
-              }
+            setBreakEntries(serverBreaks);
+            if (serverPlannedProjects.length > 0) {
+              setSelectedProjects(serverPlannedProjects);
+            } else {
+              setSelectedProjects([]);
             }
-
-            // Load planned work if available
-            if (existingSubmission.planned_work) {
-              setPlannedWork(existingSubmission.planned_work);
+            if (serverPlannedWork) {
+              setPlannedWork(serverPlannedWork);
+            } else {
+              setPlannedWork('');
             }
-          } else {
-            // No submission found for this date, clear check-in data
-            setForm((prev) => ({
-              ...prev,
-              check_in_time: undefined,
-            }));
-            setSelectedProjects([]);
-            setPlannedWork('');
-            setBreakEntries([]);
+            setIsOnBreak(false);
+            setBreakStartedAt(null);
           }
-        } catch (error) {
-          console.error('Failed to load check-in data for date:', error);
+        } else if (draft) {
+          setForm((prev) => ({
+            ...prev,
+            ...draft.form,
+            submission_date: currentDate,
+          }));
+          setBreakEntries(draft.breakEntries || []);
+          setSelectedProjects(draft.selectedProjects || []);
+          setPlannedWork(draft.plannedWork || '');
+          setRequestAdminApproval(draft.requestAdminApproval);
+          setRequestedExtraHours(draft.requestedExtraHours);
+          setApprovalReason(draft.approvalReason || '');
+          if (draft.isOnBreak && draft.breakStartedAtIso) {
+            setIsOnBreak(true);
+            setBreakStartedAt(new Date(draft.breakStartedAtIso));
+          } else {
+            setIsOnBreak(false);
+            setBreakStartedAt(null);
+          }
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            check_in_time: undefined,
+          }));
+          setSelectedProjects([]);
+          setPlannedWork('');
+          setBreakEntries([]);
+          setIsOnBreak(false);
+          setBreakStartedAt(null);
         }
-      })();
-    }
-  }, [form.submission_date, isEditing]);
+      } catch (error) {
+        console.error('Failed to load check-in data for date:', error);
+      } finally {
+        if (!cancelled) {
+          setDraftHydrationEpoch((e) => e + 1);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.submission_date, isEditing, currentUser?.id]);
+
+  useEffect(() => {
+    if (isEditing || !currentUser?.id || draftHydrationEpoch === 0) return;
+
+    const userId = currentUser.id;
+    const date = form.submission_date;
+    const payload: DailyWorkDraftStored = {
+      v: DAILY_WORK_DRAFT_VERSION,
+      savedAt: Date.now(),
+      submission_date: date,
+      form: { ...form },
+      breakEntries,
+      selectedProjects,
+      plannedWork,
+      requestAdminApproval,
+      requestedExtraHours,
+      approvalReason,
+      isOnBreak,
+      breakStartedAtIso: breakStartedAt ? breakStartedAt.toISOString() : null,
+    };
+
+    const t = window.setTimeout(() => {
+      try {
+        localStorage.setItem(
+          dailyWorkDraftStorageKey(userId, date),
+          JSON.stringify(payload)
+        );
+      } catch {
+        /* quota / private mode */
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [
+    isEditing,
+    currentUser?.id,
+    draftHydrationEpoch,
+    form,
+    breakEntries,
+    selectedProjects,
+    plannedWork,
+    requestAdminApproval,
+    requestedExtraHours,
+    approvalReason,
+    isOnBreak,
+    breakStartedAt,
+    form.submission_date,
+  ]);
 
   useEffect(() => {
     (async () => {

@@ -305,8 +305,9 @@ export async function deleteSubmission(arg: { id?: number; submission_date?: str
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(arg),
   });
-  if (!res.ok) throw new Error('Failed to delete submission');
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { message?: string }).message || 'Failed to delete submission');
+  return data;
 }
 
 export async function checkIn(
