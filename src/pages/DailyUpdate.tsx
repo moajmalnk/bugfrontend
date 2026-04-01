@@ -695,9 +695,9 @@ export default function DailyUpdate() {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-col items-stretch xs:items-end sm:items-start gap-2 w-full sm:w-auto shrink-0">
+              <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto shrink-0">
                 <div
-                  className="rounded-xl border border-orange-200/90 dark:border-orange-900/55 bg-orange-50/95 dark:bg-orange-950/35 px-3 py-2 text-right sm:ml-auto shadow-sm"
+                  className="rounded-xl border border-orange-200/90 dark:border-orange-900/55 bg-orange-50/95 dark:bg-orange-950/35 px-3 py-2 text-right shadow-sm"
                   title="Overtime that counts in period totals: approved or adjusted. Pending and rejected extra-hour requests count as 0."
                 >
                   <p className="text-[10px] uppercase tracking-wide text-orange-800/85 dark:text-orange-200/85 font-semibold">
@@ -706,17 +706,15 @@ export default function DailyUpdate() {
                   <p className="text-xl sm:text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-200 leading-tight">
                     {totalOtVisible.toFixed(2)}h
                   </p>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 max-w-[14rem] ml-auto leading-snug">
-                   pending/rejected requests excluded
-                  </p>
+
                 </div>
                 {currentUser?.role === 'admin' && (
-                  <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                     <Button
                       type="button"
                       variant="secondary"
                       onClick={() => navigate(`/${currentUser.role}/overtime-requests`)}
-                      className="h-10 w-full sm:w-auto justify-center px-4 rounded-xl text-xs sm:text-sm"
+                      className="h-10 w-full sm:w-auto justify-center px-4 rounded-xl text-xs sm:text-sm whitespace-nowrap"
                     >
                       <Timer className="h-4 w-4 mr-2 shrink-0" />
                       Admin requests
@@ -725,7 +723,7 @@ export default function DailyUpdate() {
                       type="button"
                       variant={showRequestsOnly ? 'default' : 'outline'}
                       onClick={() => setShowRequestsOnly((prev) => !prev)}
-                      className={`h-10 w-full sm:w-auto shrink-0 justify-center px-4 rounded-xl text-xs sm:text-sm ${
+                      className={`h-10 w-full sm:w-auto shrink-0 justify-center px-4 rounded-xl text-xs sm:text-sm whitespace-nowrap ${
                         showRequestsOnly
                           ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:from-orange-700 hover:to-amber-700'
                           : ''

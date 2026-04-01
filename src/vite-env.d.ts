@@ -1,5 +1,13 @@
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+  readonly VITE_BUGBOT_SHADOW_MODE?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 // Extend Window interface for requestIdleCallback
 interface Window {
   requestIdleCallback?: (

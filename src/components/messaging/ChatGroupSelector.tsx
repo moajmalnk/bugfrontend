@@ -43,7 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 function messagingAuthToken(): string {
   return (
@@ -168,6 +168,37 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
 
   const canEditOrDeleteGroup = () =>
     effectiveRole === "admin" || hasPermission("MESSAGING_MANAGE");
+
+  /** New chat: only projects the user belongs to (unless admin / MESSAGING_MANAGE). */
+  const projectsEligibleForNewChat = useMemo(() => {
+    if (!currentUser?.id) return projects;
+    const uid = String(currentUser.id);
+    if (effectiveRole === "admin" || hasPermission("MESSAGING_MANAGE")) {
+      return projects;
+    }
+    return projects.filter((p) => {
+      const withMembers = p as Project & { members?: string[] };
+      const memberIds = withMembers.members ?? [];
+      return (
+        memberIds.some((id) => String(id) === uid) ||
+        String(p.created_by) === uid
+      );
+    });
+  }, [projects, currentUser?.id, effectiveRole, hasPermission]);
+
+  useEffect(() => {
+    if (!isCreateDialogOpen || !createForm.projectId) return;
+    const stillValid = projectsEligibleForNewChat.some(
+      (p) => p.id === createForm.projectId
+    );
+    if (!stillValid) {
+      setCreateForm((prev) => ({ ...prev, projectId: "" }));
+    }
+  }, [
+    isCreateDialogOpen,
+    projectsEligibleForNewChat,
+    createForm.projectId,
+  ]);
 
   const handleManageMembersRef = useRef<(groupId: string) => Promise<void>>(
     async () => {}
@@ -305,11 +336,22 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
         title: "Success",
         description: "Chat group created successfully",
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error creating group:", error);
+      const ax = error as {
+        response?: { data?: { message?: string }; status?: number };
+      };
+      const msg =
+        ax.response?.data?.message ||
+        (typeof error === "object" &&
+        error !== null &&
+        "message" in error &&
+        typeof (error as Error).message === "string"
+          ? (error as Error).message
+          : null);
       toast({
         title: "Error",
-        description: "Failed to create chat group",
+        description: msg || "Failed to create chat group",
         variant: "destructive",
       });
     } finally {
@@ -555,10 +597,12 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       if (!data.success) {
         throw new Error(data.message || "Failed to load members");
       }
-      const members = data.data || [];
+      const members = (data.data || []).filter((m: any) => !isBugBotUser(m));
       setExistingMembers(members);
 
-      const users = await userService.getUsers();
+      const users = (await userService.getUsers()).filter(
+        (u: any) => !isBugBotUser(u)
+      );
       const memberIds = members.map((m: { id: string }) => m.id);
       setAvailableMembers(users.filter((u) => !memberIds.includes(u.id)));
     } catch (error) {
@@ -628,40 +672,48 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
 
       const data = await response.json();
 
-      if (data.success) {
-        const added =
-          typeof data.data?.added_count === "number"
-            ? data.data.added_count
-            : selectedMembers.length;
-        let patched: ChatGroup | undefined;
-        setGroups((prev) =>
-          prev.map((group) => {
-            if (group.id !== memberDialog.groupId) return group;
-            patched = {
-              ...group,
-              member_count: group.member_count + added,
-            };
-            return patched;
-          })
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || `Failed to add members (${response.status})`
         );
-        if (patched && selectedGroup?.id === memberDialog.groupId) {
-          onGroupSelect(patched);
-        }
-
-        await refreshMemberDialogLists(memberDialog.groupId);
-        onMembersChanged?.();
-
-        toast({
-          title: "Success",
-          description:
-            data.message ||
-            `${selectedMembers.length} member(s) added to the group`,
-        });
-
-        setSelectedMembers([]);
-      } else {
-        throw new Error(data.message || "Failed to add members");
       }
+
+      const added =
+        typeof data.data?.added_count === "number"
+          ? data.data.added_count
+          : selectedMembers.length;
+      if (added < 1) {
+        throw new Error(
+          data.message || "No members were added. Check that users exist and are active."
+        );
+      }
+
+      let patched: ChatGroup | undefined;
+      setGroups((prev) =>
+        prev.map((group) => {
+          if (group.id !== memberDialog.groupId) return group;
+          patched = {
+            ...group,
+            member_count: group.member_count + added,
+          };
+          return patched;
+        })
+      );
+      if (patched && selectedGroup?.id === memberDialog.groupId) {
+        onGroupSelect(patched);
+      }
+
+      await refreshMemberDialogLists(memberDialog.groupId);
+      onMembersChanged?.();
+
+      toast({
+        title: "Success",
+        description:
+          data.message ||
+          `${added} member(s) added to the group`,
+      });
+
+      setSelectedMembers([]);
     } catch (error) {
       console.error("Error adding members:", error);
       toast({
@@ -786,6 +838,23 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     return MessagingService.formatMessageTime(timestamp);
   };
 
+  const isBugBotIdentity = (value?: string | null) => {
+    if (!value) return false;
+    const normalized = String(value).trim().toLowerCase();
+    return normalized === "bugbot" || normalized.includes("bugbot");
+  };
+
+  const isBugBotUser = (user: {
+    id?: string;
+    username?: string;
+    name?: string;
+    email?: string;
+  }) =>
+    isBugBotIdentity(user.id) ||
+    isBugBotIdentity(user.username) ||
+    isBugBotIdentity(user.name) ||
+    isBugBotIdentity(user.email);
+
   const formatChatListSubtitle = (group: ChatGroup) => {
     const preview = group.last_message_preview?.trim();
     const sid = group.last_message_sender_id;
@@ -794,7 +863,9 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       const who =
         currentUser?.id && sid && String(sid) === String(currentUser.id)
           ? "You"
-          : sname || "Member";
+          : isBugBotIdentity(sname)
+            ? "Member"
+            : sname || "Member";
       return `${who}: ${preview}`;
     }
     if (group.last_message_at) return "Open to view messages";
@@ -1300,13 +1371,20 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                     <SelectValue placeholder="Choose a project" />
                   </SelectTrigger>
                   <SelectContent>
-                    {projects.map((project) => (
+                    {projectsEligibleForNewChat.map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {projectsEligibleForNewChat.length === 0 ? (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    You are not a member of any project. Ask an admin to add you
+                    to a project, or use an account with messaging management
+                    access.
+                  </p>
+                ) : null}
               </div>
               <div className="flex justify-end space-x-2">
                 <Button

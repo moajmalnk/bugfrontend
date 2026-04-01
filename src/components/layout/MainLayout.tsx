@@ -5,12 +5,14 @@ import { useTheme } from "@/context/ThemeContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Menu, Bug } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import FirebaseListener from "../messaging/FirebaseListener";
 import AnnouncementPopup from "../ui/AnnouncementPopup";
 import { ImpersonateBanner } from "../ui/ImpersonateBanner";
 import { Sidebar } from "./Sidebar";
 import FeedbackWidget from "../feedback/FeedbackWidget";
+import { BugBotFab } from "@/components/bugbot/BugBotFab";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
 
 interface MainLayoutProps {
@@ -21,6 +23,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const { currentUser, isLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  /** BugMessage: fill viewport; scroll only inside chat panes (not the app shell). */
+  const isMessagesPage = /\/messages\/?$/.test(pathname);
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(
@@ -125,22 +130,41 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           </div>
           
           {/* Main content area */}
-          <main className="flex-1 overflow-y-auto min-w-0 bg-background custom-scrollbar">
-            <div className="h-full p-4 md:p-6 lg:p-8">
-              <div className="max-w-7xl mx-auto">
-                {children}
-              </div>
-              <footer className="max-w-7xl mx-auto mt-8 mb-8 border-t pt-4 pb-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3 text-xs text-muted-foreground">
-                  <p className="order-2 sm:order-none justify-self-center sm:justify-self-start text-center sm:text-left">© {new Date().getFullYear()} BugRicer. All rights reserved.</p>
-                  <div className="order-3 sm:order-none justify-self-center flex items-center gap-3">
-                    <a href="mailto:support@bugricer.com" className="hover:text-foreground transition-colors" aria-label="Contact support">support@bugricer.com</a>
-                    <span className="hidden sm:inline text-border">|</span>
-                    <a href="https://bugricer.com" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors" aria-label="Visit website">bugricer.com</a>
-                  </div>
-                  <p className="order-1 sm:order-none justify-self-center sm:justify-self-end text-center sm:text-right text-[11px] text-muted-foreground/80">Built with care for testers & developers</p>
+          <main
+            className={cn(
+              "flex-1 min-w-0 bg-background",
+              isMessagesPage
+                ? "overflow-hidden flex flex-col min-h-0"
+                : "overflow-y-auto custom-scrollbar"
+            )}
+          >
+            <div
+              className={cn(
+                isMessagesPage
+                  ? "flex-1 flex flex-col min-h-0 p-0 overflow-hidden"
+                  : "h-full p-4 md:p-6 lg:p-8"
+              )}
+            >
+              {isMessagesPage ? (
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col w-full max-w-[100vw]">
+                  {children}
                 </div>
-              </footer>
+              ) : (
+                <>
+                  <div className="max-w-7xl mx-auto">{children}</div>
+                  <footer className="max-w-7xl mx-auto mt-8 mb-8 border-t pt-4 pb-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3 text-xs text-muted-foreground">
+                      <p className="order-2 sm:order-none justify-self-center sm:justify-self-start text-center sm:text-left">© {new Date().getFullYear()} BugRicer. All rights reserved.</p>
+                      <div className="order-3 sm:order-none justify-self-center flex items-center gap-3">
+                        <a href="mailto:support@bugricer.com" className="hover:text-foreground transition-colors" aria-label="Contact support">support@bugricer.com</a>
+                        <span className="hidden sm:inline text-border">|</span>
+                        <a href="https://bugricer.com" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors" aria-label="Visit website">bugricer.com</a>
+                      </div>
+                      <p className="order-1 sm:order-none justify-self-center sm:justify-self-end text-center sm:text-right text-[11px] text-muted-foreground/80">Built with care for testers & developers</p>
+                    </div>
+                  </footer>
+                </>
+              )}
             </div>
           </main>
         </div>
@@ -148,6 +172,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       <AnnouncementPopup />
       <FirebaseListener />
       <FeedbackWidget />
+      <BugBotFab />
     </NotificationProvider>
   );
 };

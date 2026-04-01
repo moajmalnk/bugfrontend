@@ -122,9 +122,10 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
     return (
       <div
         className={cn(
-          "flex items-center gap-1 mt-1 min-h-[28px] transition-opacity duration-150",
-          "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
-          addPickerOpen && "opacity-100 pointer-events-auto relative z-[100]"
+          "items-center gap-1 mt-0 transition-opacity duration-150",
+          addPickerOpen
+            ? "flex relative z-[100]"
+            : "hidden group-hover:flex"
         )}
       >
         <Popover open={addPickerOpen} onOpenChange={setAddPickerOpen} modal={false}>
@@ -168,7 +169,7 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
   }
 
   return (
-    <div className="flex items-center gap-1 mt-1">
+    <div className="flex items-center gap-1 mt-0.5">
       {Object.values(groupedReactions).map((group) => (
         <Button
           type="button"

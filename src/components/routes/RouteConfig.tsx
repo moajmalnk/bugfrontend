@@ -179,6 +179,8 @@ const BugSheetsPage = lazy(() => import("@/pages/BugSheetsPage"));
 const ProjectDocumentsPage = lazy(() => import("@/pages/ProjectDocumentsPage"));
 const UserPermissions = lazy(() => import("@/pages/UserPermissions"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
+const UserDetails = lazy(() => import("@/pages/UserDetails"));
+const UserWorkStatsPeriod = lazy(() => import("@/pages/UserWorkStatsPeriod"));
 
 // Component to handle role-neutral bug redirects
 const BugRedirect = () => {
@@ -286,6 +288,8 @@ const RouteConfig = () => {
           <Route path="bugs/:bugId" element={<BugDetails />} />
           <Route path="activity" element={<Activity />} />
           <Route path="users" element={<Users />} />
+          <Route path="users/:userId" element={<UserDetails />} />
+          <Route path="users/:userId/work-stats/:periodStart" element={<UserWorkStatsPeriod />} />
           <Route path="users/:userId/permissions" element={<UserPermissions />} />
           <Route path="fixes" element={<Fixes />} />
           <Route path="settings" element={<Settings />} />

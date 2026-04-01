@@ -16,9 +16,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { MessagingService } from "@/services/messagingService";
 import { projectService } from "@/services/projectService";
 import type { ChatGroup, ChatMessage, TypingIndicator } from "@/types";
@@ -27,7 +34,9 @@ import {
   CheckCheck,
   Clock,
   Copy,
+  Download,
   Edit,
+  Eye,
   FileText,
   Forward,
   Image as ImageIcon,
@@ -49,6 +58,7 @@ import {
   Filter,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { AudioWaveform } from "./AudioWaveform";
@@ -62,6 +72,123 @@ import { MessageSearch } from "./MessageSearch";
 import { MessageStatus } from "./MessageStatus";
 import { PinnedMessages } from "./PinnedMessages";
 import { StarredMessages } from "./StarredMessages";
+
+type DocumentPreviewKind = "pdf" | "image" | "video" | "audio" | "text" | "none";
+
+const MAX_CHAT_IMAGE_DROP_BYTES = 100 * 1024 * 1024;
+
+function documentPreviewKind(fileName: string): DocumentPreviewKind {
+  const ext = fileName.includes(".")
+    ? fileName.split(".").pop()!.toLowerCase()
+    : "";
+  if (ext === "pdf") return "pdf";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext))
+    return "image";
+  if (["mp4", "webm", "mov"].includes(ext)) return "video";
+  if (["mp3", "wav", "ogg", "m4a"].includes(ext)) return "audio";
+  if (["txt", "csv", "log", "md", "json", "xml"].includes(ext)) return "text";
+  return "none";
+}
+
+function DocumentTextPreview({ url }: { url: string }) {
+  const [text, setText] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setText(null);
+    setFailed(false);
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error("bad response");
+        return r.text();
+      })
+      .then((t) => {
+        if (!cancelled) setText(t);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  if (failed) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-8 px-4">
+        Could not load a text preview. Use “Open in new tab” or Download.
+      </p>
+    );
+  }
+  if (text === null) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-8">Loading…</p>
+    );
+  }
+  return (
+    <pre className="text-xs sm:text-sm overflow-auto max-h-[70vh] p-4 whitespace-pre-wrap font-mono bg-muted/40 rounded-md m-3 border">
+      {text}
+    </pre>
+  );
+}
+
+function DocumentPreviewBody({
+  url,
+  fileName,
+}: {
+  url: string;
+  fileName: string;
+}) {
+  const kind = documentPreviewKind(fileName);
+  if (kind === "pdf") {
+    return (
+      <iframe
+        title={fileName}
+        src={`${url}#navpanes=0`}
+        className="w-full min-h-[70vh] border-0 bg-background"
+      />
+    );
+  }
+  if (kind === "image") {
+    return (
+      <div className="flex justify-center p-3">
+        <img
+          src={url}
+          alt={fileName}
+          className="max-w-full max-h-[70vh] object-contain rounded-md"
+        />
+      </div>
+    );
+  }
+  if (kind === "video") {
+    return (
+      <div className="p-3 flex justify-center">
+        <video
+          src={url}
+          controls
+          className="max-w-full max-h-[70vh] rounded-md bg-black"
+        />
+      </div>
+    );
+  }
+  if (kind === "audio") {
+    return (
+      <div className="p-6 flex justify-center">
+        <audio src={url} controls className="w-full max-w-md" />
+      </div>
+    );
+  }
+  if (kind === "text") {
+    return <DocumentTextPreview url={url} />;
+  }
+  return (
+    <div className="text-center py-10 px-4 space-y-3">
+      <FileText className="h-12 w-12 mx-auto text-muted-foreground opacity-60" />
+      <p className="text-sm text-muted-foreground">
+        No inline preview for this file type. Open in a new tab or download.
+      </p>
+    </div>
+  );
+}
 
 interface ChatInterfaceProps {
   selectedGroup: ChatGroup | null;
@@ -104,6 +231,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isDeletingMessage, setIsDeletingMessage] = useState(false);
   const [availableGroups, setAvailableGroups] = useState<ChatGroup[]>([]);
   const [pinnedMessagesKey, setPinnedMessagesKey] = useState(0);
+  const [documentPreview, setDocumentPreview] = useState<{
+    url: string;
+    fileName: string;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -114,8 +245,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const pollingCleanupRef = useRef<(() => void) | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sidebarBumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const imageDropDepthRef = useRef(0);
 
   const isAdmin = currentUser?.role === "admin";
+  const [isImageDropActive, setIsImageDropActive] = useState(false);
+  const [isImageDropUploading, setIsImageDropUploading] = useState(false);
 
   const scheduleSidebarListRefresh = () => {
     if (!onChatActivity) return;
@@ -134,6 +268,17 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!name || name === "0") return "Member";
     return name;
   };
+
+  const isBugBotIdentity = (value?: string | null) => {
+    if (!value) return false;
+    const normalized = String(value).trim().toLowerCase();
+    return normalized === "bugbot" || normalized.includes("bugbot");
+  };
+
+  const isBugBotMessage = (message: ChatMessage) =>
+    isBugBotIdentity(message.sender_name) ||
+    isBugBotIdentity(message.sender_email) ||
+    isBugBotIdentity(message.sender_id);
 
   const normalizeDeliveryStatus = (
     s: ChatMessage["delivery_status"]
@@ -220,10 +365,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       console.log("📨 Loaded messages:", response.messages);
       console.log("📨 First message sender_name:", response.messages[0]?.sender_name);
 
+      const visibleMessages = response.messages.filter((m) => !isBugBotMessage(m));
+
       if (append) {
-        setMessages((prev) => [...response.messages, ...prev]);
+        setMessages((prev) => [...visibleMessages, ...prev]);
       } else {
-        setMessages(response.messages);
+        setMessages(visibleMessages);
       }
 
       setHasMoreMessages(response.pagination.page < response.pagination.pages);
@@ -249,6 +396,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         console.log("🔔 New message from polling:", newMessage);
         console.log("🔔 New message sender_name:", newMessage.sender_name);
         setMessages((prev) => {
+          if (isBugBotMessage(newMessage)) {
+            return prev;
+          }
+
           // Check if message already exists
           if (prev.find((m) => m.id === newMessage.id)) {
             return prev;
@@ -617,11 +768,142 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  const handleMessageInputDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.dataTransfer.types.includes("Files")) return;
+    imageDropDepthRef.current += 1;
+    setIsImageDropActive(true);
+  };
+
+  const handleMessageInputDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    imageDropDepthRef.current = Math.max(0, imageDropDepthRef.current - 1);
+    if (imageDropDepthRef.current === 0) setIsImageDropActive(false);
+  };
+
+  const handleMessageInputDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes("Files")) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+  };
+
+  const handleMessageInputDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    imageDropDepthRef.current = 0;
+    setIsImageDropActive(false);
+    if (!selectedGroup || isImageDropUploading) return;
+
+    const files = Array.from(e.dataTransfer.files).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (files.length === 0) {
+      toast({
+        title: "No images to send",
+        description:
+          "Drop image files (for example PNG or JPEG) on the message box.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const caption = newMessage.trim() || undefined;
+    setIsImageDropUploading(true);
+    try {
+      let sentAny = false;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > MAX_CHAT_IMAGE_DROP_BYTES) {
+          toast({
+            title: "File too large",
+            description: `${file.name} exceeds the 100MB limit.`,
+            variant: "destructive",
+          });
+          continue;
+        }
+        const upload = await MessagingService.uploadMedia(file, selectedGroup.id);
+        const messageData = {
+          group_id: selectedGroup.id,
+          message_type: "image" as const,
+          content: i === 0 ? caption : undefined,
+          media_type: "image" as const,
+          media_file_path: upload.file_url,
+          media_file_name: file.name,
+          media_file_size: file.size,
+          media_thumbnail: upload.thumbnail_url,
+        };
+        const sentMessage = await MessagingService.sendMessage(messageData);
+        setMessages((prev) => [...prev, sentMessage]);
+        sentAny = true;
+      }
+      if (caption && sentAny) {
+        setNewMessage("");
+        setIsTyping(false);
+        MessagingService.updateTyping(selectedGroup.id, false);
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = null;
+        }
+        if (textareaRef.current) textareaRef.current.style.height = "auto";
+      }
+      if (sentAny) {
+        refreshSidebarListNow();
+        toast({
+          title: files.length > 1 ? "Images sent" : "Image sent",
+          description:
+            files.length > 1 ? `${files.length} images uploaded.` : undefined,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Upload failed",
+        description:
+          err instanceof Error ? err.message : "Could not send dropped image(s).",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImageDropUploading(false);
+    }
+  };
+
   const formatFileSize = (bytes?: number) => {
     if (!bytes) return "Unknown size";
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const openDocumentPreview = (message: ChatMessage) => {
+    const url = MessagingService.resolveMediaUrl(message.media_file_path);
+    if (!url) {
+      toast({
+        title: "Cannot preview",
+        description: "This attachment has no file URL.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setDocumentPreview({
+      url,
+      fileName: message.media_file_name || "Attachment",
+    });
+  };
+
+  const downloadDocumentPreview = () => {
+    if (!documentPreview) return;
+    const a = document.createElement("a");
+    a.href = documentPreview.url;
+    a.download = documentPreview.fileName;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   if (!selectedGroup) {
@@ -713,7 +995,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Messages Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-2 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-0.5 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar">
         {hasMoreMessages && (
           <div className="flex justify-center mb-3">
             <Button
@@ -757,7 +1039,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   </Avatar>
                 )}
                 <div
-                  className={`space-y-1 ${
+                  className={`space-y-0 ${
                     isOwnMessage ? "mr-2 items-end" : "ml-2 items-start"
                   } flex flex-col w-full min-w-0`}
                 >
@@ -837,7 +1119,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             )}
                           </div>
                         ) : message.message_type === "document" ? (
-                          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg shadow-sm">
+                          <button
+                            type="button"
+                            onClick={() => openDocumentPreview(message)}
+                            className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg shadow-sm w-full text-left hover:bg-muted/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
                             <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-primary flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">
@@ -847,20 +1133,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                 {formatFileSize(message.media_file_size)}
                               </p>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                window.open(
-                                  MessagingService.resolveMediaUrl(message.media_file_path),
-                                  '_blank'
-                                )
-                              }
-                              className="flex-shrink-0 h-8 w-8 p-0 rounded-lg"
+                            <span
+                              className="flex-shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-lg text-muted-foreground"
+                              title="View"
+                              aria-hidden
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            </Button>
-                          </div>
+                              <Eye className="h-4 w-4" />
+                            </span>
+                          </button>
                         ) : message.is_forwarded ? (
                           <div>
                             <div className="flex items-center gap-1 mb-1 text-xs text-muted-foreground italic">
@@ -891,7 +1171,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         )}
                         {!isDeleted && (
                           <div
-                            className={`flex items-center gap-1.5 mt-1.5 pt-1 border-t border-black/[0.06] dark:border-white/[0.08] ${
+                            className={`flex items-center gap-1.5 mt-1 pt-0.5 border-t border-black/[0.06] dark:border-white/[0.08] ${
                               isOwnMessage ? "justify-end" : "justify-end"
                             } text-[11px] text-[#667781] dark:text-[#8696a0] shrink-0`}
                           >
@@ -929,7 +1209,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       />
                     ) : (
                       <div
-                        className={`w-full mt-0.5 flex ${
+                        className={`w-full mt-0 flex ${
                           isOwnMessage ? "justify-end" : "justify-start"
                         }`}
                       >
@@ -950,7 +1230,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     ))}
 
                   <div
-                    className={`flex items-center gap-1 mt-0.5 px-1 ${
+                    className={`flex items-center gap-1 mt-0 px-1 ${
                       isOwnMessage ? "justify-end" : "justify-start"
                     }`}
                   >
@@ -1087,16 +1367,32 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         {/* Input Area */}
         <div className="px-2 sm:px-3 md:px-4 py-2 sm:py-3">
           <div className="flex items-end gap-2">
-            <div className="flex-1 min-w-0">
+            <div
+              className={cn(
+                "flex-1 min-w-0 relative rounded-2xl transition-[box-shadow,background-color]",
+                isImageDropActive &&
+                  "ring-2 ring-[#00a884] ring-offset-2 ring-offset-[#202c33]"
+              )}
+              onDragEnter={handleMessageInputDragEnter}
+              onDragLeave={handleMessageInputDragLeave}
+              onDragOver={handleMessageInputDragOver}
+              onDrop={handleMessageInputDrop}
+            >
               <Textarea
                 ref={textareaRef}
                 value={newMessage}
                 onChange={(e) => handleTyping(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type a message..."
-                className="min-h-[40px] sm:min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-[#3b4a54] bg-[#2a3942] dark:bg-[#2a3942] text-[#e9edef] placeholder:text-[#8696a0] focus:bg-[#2a3942] focus:border-[#00a884] transition-colors text-sm"
+                disabled={isImageDropUploading}
+                className="min-h-[40px] sm:min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-[#3b4a54] bg-[#2a3942] dark:bg-[#2a3942] text-[#e9edef] placeholder:text-[#8696a0] focus:bg-[#2a3942] focus:border-[#00a884] transition-colors text-sm disabled:opacity-60"
                 rows={1}
               />
+              {isImageDropActive && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-[#00a884]/20 text-[11px] sm:text-xs font-semibold text-[#e9edef]">
+                  Drop image to send
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
               {/* Emoji Picker */}
@@ -1183,6 +1479,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {editMessage && (
         <MessageEditor
           message={editMessage}
+          open={!!editMessage}
+          hideTrigger
+          onOpenChange={(open) => {
+            if (!open) setEditMessage(null);
+          }}
           onEditSuccess={(updatedContent) => {
             setMessages((prev) =>
               prev.map((m) =>
@@ -1205,8 +1506,72 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <MessageInfo
           message={messageInfo}
           groupMemberCount={selectedGroup.member_count}
+          open={!!messageInfo}
+          hideTrigger
+          onOpenChange={(open) => {
+            if (!open) setMessageInfo(null);
+          }}
         />
       )}
+
+      <Dialog
+        open={!!documentPreview}
+        onOpenChange={(open) => {
+          if (!open) setDocumentPreview(null);
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="max-w-4xl w-[calc(100vw-1.5rem)] sm:max-w-4xl max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden"
+        >
+          {documentPreview ? (
+            <>
+              <DialogHeader className="relative z-10 flex flex-row items-center gap-2 space-y-0 border-b bg-background px-4 py-3 pr-3 text-left shrink-0">
+                <DialogTitle className="text-base truncate leading-tight flex-1 min-w-0">
+                  {documentPreview.fileName}
+                </DialogTitle>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 h-9 w-9 rounded-md text-foreground hover:bg-muted"
+                  aria-label="Close preview"
+                  onClick={() => setDocumentPreview(null)}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </DialogHeader>
+              <div className="flex-1 min-h-[200px] overflow-auto bg-muted/20">
+                <DocumentPreviewBody
+                  url={documentPreview.url}
+                  fileName={documentPreview.fileName}
+                />
+              </div>
+              <div className="px-4 py-3 border-t shrink-0 flex flex-wrap items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    window.open(documentPreview.url, "_blank", "noopener,noreferrer")
+                  }
+                >
+                  Open in new tab
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => downloadDocumentPreview()}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={!!messagePendingDelete}

@@ -10,21 +10,38 @@ import { useToast } from "@/hooks/use-toast";
 import { MessagingService } from "@/services/messagingService";
 import type { ChatMessage } from "@/types";
 import { Edit, Save, X, MessageCircle } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface MessageEditorProps {
   message: ChatMessage;
   onEditSuccess: (updatedContent: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 export const MessageEditor: React.FC<MessageEditorProps> = ({
   message,
   onEditSuccess,
+  open,
+  onOpenChange,
+  hideTrigger = false,
 }) => {
   const { toast } = useToast();
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [editedContent, setEditedContent] = useState(message.content || "");
   const [isSaving, setIsSaving] = useState(false);
+  const isControlled = typeof open === "boolean";
+  const isOpen = isControlled ? open : internalOpen;
+
+  const setOpen = (nextOpen: boolean) => {
+    if (!isControlled) setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  };
+
+  useEffect(() => {
+    setEditedContent(message.content || "");
+  }, [message.id, message.content]);
 
   const handleSave = async () => {
     if (!editedContent.trim()) {
@@ -37,7 +54,7 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
     }
 
     if (editedContent.trim() === message.content?.trim()) {
-      setIsOpen(false);
+      setOpen(false);
       return;
     }
 
@@ -46,7 +63,7 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
       await MessagingService.editMessage(message.id, editedContent.trim());
       
       onEditSuccess(editedContent.trim());
-      setIsOpen(false);
+      setOpen(false);
 
       toast({
         title: "Message edited",
@@ -54,9 +71,13 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
       });
     } catch (error) {
       console.error("Error editing message:", error);
+      const errorMessage =
+        (error as any)?.response?.data?.message ||
+        (error as Error)?.message ||
+        "Failed to edit message";
       toast({
         title: "Edit failed",
-        description: "Failed to edit message",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -71,19 +92,21 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsOpen(true)}
-        className="gap-2"
-        title="Edit message"
-      >
-        <Edit className="h-4 w-4" />
-      </Button>
+      {!hideTrigger && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setOpen(true)}
+          className="gap-2"
+          title="Edit message"
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+      )}
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isOpen} onOpenChange={setOpen}>
         <DialogContent 
-          className="sm:max-w-lg max-w-[95vw] max-h-[90vh] overflow-y-auto custom-scrollbar"
+          className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2.5rem)] lg:w-[min(1100px,calc(100vw-6rem))] max-w-none max-h-[90vh] overflow-y-auto custom-scrollbar"
           aria-describedby="message-editor-description"
         >
           <DialogHeader>
@@ -150,7 +173,7 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
                 variant="outline"
                 onClick={() => {
                   setEditedContent(message.content || "");
-                  setIsOpen(false);
+                  setOpen(false);
                 }}
                 disabled={isSaving}
                 className="w-full sm:w-auto h-11 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-all duration-200"

@@ -12,7 +12,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { AddUserDialog } from "@/components/users/AddUserDialog";
-import { UserDetailDialog } from "@/components/users/UserDetailDialog";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -23,7 +22,7 @@ import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
 import { Bug, Code2, Shield, UserRound, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 
@@ -119,10 +118,11 @@ const Users = () => {
   const { currentUser } = useAuth();
   const { hasPermission, isLoading: isLoadingPermissions } = usePermissions(null);
   const effectiveRole = getEffectiveRole(currentUser || {});
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  // User detail is now a dedicated page route; no modal state here.
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -315,14 +315,12 @@ const Users = () => {
     }
   };
 
-  /** Merge user into list after EditUserDialog / UserDetailDialog already persisted via API */
+  /** Merge user into list after EditUserDialog already persisted via API */
   const handleUpdateUser = (updatedUser: User) => {
     setUsers((prev) =>
       prev.map((u) => (u.id === updatedUser.id ? { ...u, ...updatedUser } : u))
     );
-    setSelectedUser((prev) =>
-      prev && prev.id === updatedUser.id ? { ...prev, ...updatedUser } : prev
-    );
+    // User detail is now a dedicated page; keep list state only.
   };
 
   const performActualDelete = async (userId: string, force = false) => {
@@ -532,20 +530,20 @@ const Users = () => {
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
+            <div className="-mx-2 px-2 overflow-x-auto custom-scrollbar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <TabsList 
-                className="grid w-full h-14 bg-transparent p-1"
-                style={{ gridTemplateColumns: `repeat(${visibleTabs.length || 1}, minmax(0, 1fr))` }}
+                className="flex w-max min-w-full h-12 sm:h-14 bg-transparent p-1 gap-1"
               >
             {/* Conditionally render tabs only if they have users */}
             {adminCount > 0 && (
               <TabsTrigger
                 value="admins"
-                className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                className="shrink-0 px-3 sm:px-4 text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
               >
                 <Shield className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 <span className="hidden sm:inline">Admins</span>
                 <span className="sm:hidden">Admins</span>
-                <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
+                <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold tabular-nums">
                   {adminCount}
                 </span>
               </TabsTrigger>
@@ -553,12 +551,12 @@ const Users = () => {
             {developerCount > 0 && (
               <TabsTrigger
                 value="developers"
-                className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                className="shrink-0 px-3 sm:px-4 text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
               >
                 <Code2 className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 <span className="hidden sm:inline">Developers</span>
                 <span className="sm:hidden">Devs</span>
-                <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
+                <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold tabular-nums">
                   {developerCount}
                 </span>
               </TabsTrigger>
@@ -566,12 +564,12 @@ const Users = () => {
             {testerCount > 0 && (
               <TabsTrigger
                 value="testers"
-                className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                className="shrink-0 px-3 sm:px-4 text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
               >
                 <Bug className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 <span className="hidden sm:inline">Testers</span>
                 <span className="sm:hidden">Testers</span>
-                <span className="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-bold">
+                <span className="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-bold tabular-nums">
                   {testerCount}
                 </span>
               </TabsTrigger>
@@ -579,17 +577,18 @@ const Users = () => {
             {othersCount > 0 && (
               <TabsTrigger
                 value="others"
-                className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                className="shrink-0 px-3 sm:px-4 text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
               >
                 <UserRound className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 <span className="hidden sm:inline">Others</span>
                 <span className="sm:hidden">Others</span>
-                <span className="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold">
+                <span className="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold tabular-nums">
                   {othersCount}
                 </span>
               </TabsTrigger>
             )}
-            </TabsList>
+              </TabsList>
+            </div>
           </div>
         </div>
 
@@ -995,7 +994,7 @@ const Users = () => {
                               )}
                               <button
                                 className="h-9 px-4 py-2 rounded-lg text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-                                onClick={() => setSelectedUser(user)}
+                                onClick={() => navigate(`/${effectiveRole}/users/${user.id}`)}
                               >
                                 View
                               </button>
@@ -1069,7 +1068,7 @@ const Users = () => {
                     ) : (
                       <button
                         className="w-full h-10 px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200"
-                        onClick={() => setSelectedUser(user)}
+                        onClick={() => navigate(`/${effectiveRole}/users/${user.id}`)}
                       >
                         View
                       </button>
@@ -1080,34 +1079,7 @@ const Users = () => {
           </div>
         </div>
 
-        {selectedUser && (
-        <UserDetailDialog
-          user={selectedUser}
-          open={!!selectedUser}
-          onOpenChange={(open) => !open && setSelectedUser(null)}
-          onUserUpdate={handleUpdateUser}
-          onUserDelete={async (userId: string, force = false) => {
-            try {
-              await performActualDelete(userId, force);
-              // Close dialog after successful deletion
-              setSelectedUser(null);
-            } catch (error: any) {
-              // Errors are already handled in performActualDelete, just re-throw for dialog to handle
-              throw error;
-            }
-          }}
-          onPasswordChange={async (userId: string, newPassword: string) => {
-            // You may want to implement this or pass a real handler
-            // For now, just show a toast or do nothing
-            toast({
-              title: "Password Change",
-              description: "Password change handler not implemented.",
-              variant: "destructive",
-            });
-          }}
-          loggedInUserRole={effectiveRole}
-        />
-        )}
+        {/* User details now use route: /:role/users/:userId */}
       </>
     );
   }
@@ -1253,25 +1225,7 @@ const Users = () => {
         </Tabs>
       </section>
 
-      {selectedUser && (
-        <UserDetailDialog
-          user={selectedUser}
-          open={!!selectedUser}
-          onOpenChange={(open) => !open && setSelectedUser(null)}
-          onUserUpdate={handleUpdateUser}
-          onUserDelete={performActualDelete}
-          onPasswordChange={async (userId: string, newPassword: string) => {
-            // You may want to implement this or pass a real handler
-            // For now, just show a toast or do nothing
-            toast({
-              title: "Password Change",
-              description: "Password change handler not implemented.",
-              variant: "destructive",
-            });
-          }}
-          loggedInUserRole={effectiveRole}
-        />
-      )}
+      {/* User details now use route: /:role/users/:userId */}
       </main>
     </TooltipProvider>
   );

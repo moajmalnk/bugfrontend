@@ -127,7 +127,7 @@ export default function AdminOvertimeRequests() {
                     <Timer className="h-5 w-5 text-white" aria-hidden />
                   </div>
                   <div className="text-center sm:text-left min-w-0">
-                    <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80">Pending reviews</div>
+                    <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80"> </div>
                     <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">{pendingTotal}</div>
                     <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
                       {byUser.length} {byUser.length === 1 ? 'user' : 'users'} with requests

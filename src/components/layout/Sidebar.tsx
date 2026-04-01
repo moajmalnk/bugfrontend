@@ -27,7 +27,7 @@ import {
   Timer,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
 
 interface SidebarProps {
@@ -91,31 +91,36 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
         <Button
           variant="ghost"
           className={cn(
-            "w-full justify-start h-11 px-3 py-2.5 transition-all duration-200 text-sm font-medium group relative",
+            "w-full justify-start h-10 min-h-10 px-3 py-0 transition-all duration-200 text-sm font-medium group relative",
+            "inline-flex items-center",
             "hover:bg-accent/80 hover:text-accent-foreground",
             "focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-accent/20",
             active && "bg-accent text-accent-foreground shadow-sm"
           )}
         >
-          <div className="flex items-center w-full min-w-0">
-            <div className={cn(
-              "flex-shrink-0 transition-colors duration-200",
-              active ? "text-accent-foreground" : "text-muted-foreground group-hover:text-accent-foreground"
-            )}>
-              {icon}
-            </div>
-            <span className="ml-3 truncate flex-1 text-left">{label}</span>
-            {badge && (
-              <span className={cn(
-                "ml-auto px-2 py-0.5 text-xs font-medium rounded-full",
-                active 
-                  ? "bg-accent-foreground/20 text-accent-foreground" 
-                  : "bg-muted text-muted-foreground group-hover:bg-accent-foreground/20 group-hover:text-accent-foreground"
-              )}>
-                {badge}
-              </span>
+          <span
+            className={cn(
+              "flex h-5 w-5 shrink-0 items-center justify-center [&_svg]:shrink-0 transition-colors duration-200",
+              active
+                ? "text-accent-foreground"
+                : "text-muted-foreground group-hover:text-accent-foreground"
             )}
-          </div>
+          >
+            {icon}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-left leading-none pl-3">{label}</span>
+          {badge && (
+            <span
+              className={cn(
+                "ml-1 shrink-0 px-2 py-0.5 text-xs font-medium leading-none rounded-full",
+                active
+                  ? "bg-accent-foreground/20 text-accent-foreground"
+                  : "bg-muted text-muted-foreground group-hover:bg-accent-foreground/20 group-hover:text-accent-foreground"
+              )}
+            >
+              {badge}
+            </span>
+          )}
         </Button>
       </Link>
     );
@@ -247,8 +252,9 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               <>
                 <Separator className="my-4" />
                 <div className="space-y-1">
-                  <div className="px-3 py-1">
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <div className="flex items-center gap-3 px-3 py-2 min-h-10">
+                    <span className="h-5 w-5 shrink-0" aria-hidden />
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider leading-none">
                       Administration
                     </h3>
                   </div>
@@ -337,7 +343,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             closeSidebar?.();
           }}
         >
-          <div className="relative flex-shrink-0">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
             <img
               src={currentUser?.avatar || defaultAvatar}
               alt="User avatar"
@@ -345,11 +351,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             />
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-foreground truncate">
+          <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5 py-0.5">
+            <p className="text-sm font-semibold text-foreground truncate leading-tight">
               {currentUser?.username || "BugRicer"}
             </p>
-            <p className="text-xs text-muted-foreground capitalize truncate">
+            <p className="text-xs text-muted-foreground capitalize truncate leading-tight">
               {role || "BugRicer"}
             </p>
           </div>

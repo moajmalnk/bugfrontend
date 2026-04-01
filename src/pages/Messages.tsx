@@ -7,7 +7,6 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { ChatGroup } from "@/types";
 import { 
   MessageCircle, 
-  Plus,
   Clock,
   Trash2,
   ArrowLeft,
@@ -31,7 +30,6 @@ const Messages = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [triggerCreateGroup, setTriggerCreateGroup] = useState(false);
-  const [groupsCount, setGroupsCount] = useState(0);
   const [deletedGroup, setDeletedGroup] = useState<ChatGroup | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [chatListVersion, setChatListVersion] = useState(0);
@@ -87,14 +85,6 @@ const Messages = () => {
 
   const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
-  };
-
-  const handleNewChatClick = () => {
-    setTriggerCreateGroup(true);
-  };
-
-  const handleGroupsCountUpdate = (count: number) => {
-    setGroupsCount(count);
   };
 
   // Undo delete functionality
@@ -192,64 +182,16 @@ const Messages = () => {
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-        {/* Professional Header */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg">
-                    <MessageCircle className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
-                      Messages
-                    </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mt-2"></div>
-                  </div>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Send and receive messages with your team members. Stay connected and collaborate in real-time.
-                </p>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <Button
-                  onClick={handleNewChatClick}
-                  variant="default"
-                  size="lg"
-                  className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                >
-                  <Plus className="mr-2 h-5 w-5" />
-                  New Chat
-                </Button>
-                
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
-                    <div className="p-1.5 bg-blue-600 rounded-lg">
-                      <MessageCircle className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                        {groupsCount}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-
-        {/* Professional Main Content Area */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
-            <div className="flex h-[600px] sm:h-[650px] lg:h-[700px] xl:h-[750px] min-h-0">
+    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-background">
+      <section className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full px-1 py-1 sm:px-2 sm:py-2">
+        {/* Main chat layout — height fills remaining viewport; only message list scrolls inside */}
+        <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 shadow-xl">
+          <div
+            className={cn(
+              "flex flex-1 min-h-0 min-w-0 relative",
+              isMobile && "pt-14"
+            )}
+          >
               {/* Mobile Header with Navigation */}
               {isMobile && (
                 <div className="absolute top-0 left-0 right-0 z-50 bg-[#111b21] dark:bg-[#111b21] border-b border-[#2a3942] dark:border-[#2a3942] px-4 py-3 flex items-center justify-between">
@@ -294,7 +236,7 @@ const Messages = () => {
               {/* Chat Group Selector - Professional Sidebar */}
               <aside
                 className={cn(
-                  "flex flex-col h-full bg-[#111b21] dark:bg-[#111b21] border-r border-[#2a3942] dark:border-[#2a3942] transition-all duration-300 ease-in-out",
+                  "flex flex-col min-h-0 h-full bg-[#111b21] dark:bg-[#111b21] border-r border-[#2a3942] dark:border-[#2a3942] transition-all duration-300 ease-in-out",
                   // Mobile: overlay sidebar
                   isMobile
                     ? cn(
@@ -334,7 +276,6 @@ const Messages = () => {
                     }}
                     triggerCreateGroup={triggerCreateGroup}
                     onTriggerCreateGroupReset={() => setTriggerCreateGroup(false)}
-                    onGroupsCountUpdate={handleGroupsCountUpdate}
                     onGroupDelete={(group) => {
                       setDeletedGroup(group);
                       undoDelete.startCountdown();
@@ -358,14 +299,11 @@ const Messages = () => {
               {/* Chat Interface - Professional Main Chat */}
               <section
                 className={cn(
-                  "flex-1 flex flex-col h-full bg-[#0b141a] dark:bg-[#0b141a] transition-all duration-300 overflow-hidden",
-                  // Mobile: show only when group selected or when no sidebar
+                  "flex-1 min-h-0 min-w-0 flex flex-col bg-[#0b141a] dark:bg-[#0b141a] transition-all duration-300 overflow-hidden",
                   isMobile
                     ? selectedGroup || !showSidebar
-                      ? "block w-full"
+                      ? "flex w-full"
                       : "hidden"
-                    : selectedGroup
-                    ? "block"
                     : "flex"
                 )}
               >
@@ -383,8 +321,8 @@ const Messages = () => {
                   />
                 ) : (
                   // Enhanced Professional Empty State
-                  <div className="flex-1 flex flex-col bg-[#222e35] dark:bg-[#222e35] border-b-[6px] border-[#00a884] overflow-y-auto">
-                    <div className="flex-1 flex flex-col items-center justify-center w-full p-4 sm:p-6 lg:p-8">
+                  <div className="flex-1 flex flex-col min-h-0 bg-[#222e35] dark:bg-[#222e35] border-b-[6px] border-[#00a884] overflow-hidden">
+                    <div className="flex-1 flex flex-col items-center justify-center w-full min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8">
                       <div className="text-center max-w-lg w-full">
                         <div className="mb-6 sm:mb-8 relative">
                           <div className="w-[140px] h-[140px] sm:w-[180px] sm:h-[180px] mx-auto rounded-full bg-[#1f2c33] dark:bg-[#1f2c33] flex items-center justify-center shadow-2xl">
@@ -423,7 +361,6 @@ const Messages = () => {
                 )}
               </section>
             </div>
-          </div>
         </div>
 
         {/* Professional Undo Delete Countdown */}
@@ -517,7 +454,7 @@ const Messages = () => {
           </div>
         )}
       </section>
-    </main>
+    </div>
   );
 };
 

@@ -15,6 +15,9 @@ import React, { useEffect, useState } from "react";
 interface MessageInfoProps {
   message: ChatMessage;
   groupMemberCount: number;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 interface DeliveryInfo {
@@ -26,12 +29,22 @@ interface DeliveryInfo {
 export const MessageInfo: React.FC<MessageInfoProps> = ({
   message,
   groupMemberCount,
+  open,
+  onOpenChange,
+  hideTrigger = false,
 }) => {
   const isEdited = Boolean(message.is_edited);
   const { toast } = useToast();
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const isControlled = typeof open === "boolean";
+  const isOpen = isControlled ? open : internalOpen;
+
+  const setOpen = (nextOpen: boolean) => {
+    if (!isControlled) setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -58,17 +71,19 @@ export const MessageInfo: React.FC<MessageInfoProps> = ({
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsOpen(true)}
-        className="gap-2"
-        title="Message info"
-      >
-        <Info className="h-4 w-4" />
-      </Button>
+      {!hideTrigger && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setOpen(true)}
+          className="gap-2"
+          title="Message info"
+        >
+          <Info className="h-4 w-4" />
+        </Button>
+      )}
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isOpen} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl max-w-[95vw] max-h-[90vh] flex flex-col gap-0 p-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b">
             <DialogTitle className="flex items-center gap-3">

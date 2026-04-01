@@ -5,9 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { userService } from "@/services/userService";
+import { useAuth } from "@/context/AuthContext";
+import { getEffectiveRole } from "@/lib/utils";
 import { Calendar, Clock, TrendingUp, Users, X, CheckCircle2, AlertCircle, PlayCircle, CalendarDays, FileText, Loader2, PlusCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 interface TaskCounts {
   completed: number;
@@ -111,9 +114,13 @@ function sumDailyBreakdownTotals(submissions: any[]) {
 }
 
 export function UserWorkStats({ userId, compact = false, showTrend = true }: UserWorkStatsProps) {
+  const { currentUser } = useAuth();
+  const effectiveRole = getEffectiveRole(currentUser || {});
+  const navigate = useNavigate();
   const [stats, setStats] = useState<WorkStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Kept for backwards compatibility with older UI; period details are now navigated to a page.
   const [selectedPeriod, setSelectedPeriod] = useState<WorkStats['period_trend'][0] | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [periodDetails, setPeriodDetails] = useState<any>(null);
@@ -216,9 +223,9 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
 
   return (
     <div className="space-y-4">
-      {/* Current Month Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="border-0 shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm hover:shadow-md transition-all duration-200">
+      {/* Current Period Stats (12-col responsive grid) */}
+      <div className="grid grid-cols-12 gap-4">
+        <Card className="col-span-12 sm:col-span-6 border-0 shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm hover:shadow-md transition-all duration-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -237,7 +244,7 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm hover:shadow-md transition-all duration-200">
+        <Card className="col-span-12 sm:col-span-6 border-0 shadow-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm hover:shadow-md transition-all duration-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -303,55 +310,20 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
               {uniquePeriodTrend.slice(0, 6).map((period, index) => (
                 <div 
                   key={period.period} 
-                  onClick={async () => {
-                    setSelectedPeriod(period);
-                    setIsModalOpen(true);
-                    setIsLoadingDetails(true);
-                    setPeriodDetails(null);
-                    
-                    try {
-                      // Calculate period dates from period string (format: YYYY-MM-DD)
-                      const periodStart = period.period;
-                      
-                      let periodEnd: string;
-                      if (periodStart) {
-                        // Parse the period start date (6th of month)
-                        const startDate = new Date(periodStart + 'T00:00:00');
-                        // Calculate end date (5th of next month)
-                        const endDate = new Date(startDate);
-                        endDate.setMonth(endDate.getMonth() + 1);
-                        endDate.setDate(5);
-                        periodEnd = endDate.toISOString().split('T')[0];
-                      } else {
-                        // Fallback: use current period calculation
-                        const today = new Date();
-                        const day = today.getDate();
-                        const endDate = new Date(today);
-                        if (day >= 6) {
-                          endDate.setMonth(endDate.getMonth() + 1);
-                          endDate.setDate(5);
-                        } else {
-                          endDate.setDate(5);
-                        }
-                        periodEnd = endDate.toISOString().split('T')[0];
-                      }
-                      
-                      const details = await userService.getPeriodDetails(userId, periodStart, periodEnd);
-                      setPeriodDetails(details);
-                    } catch (err: any) {
-                      console.error('Failed to fetch period details:', err);
-                      setError(err.message);
-                    } finally {
-                      setIsLoadingDetails(false);
-                    }
+                  onClick={() => {
+                    if (!period.period) return;
+                    const to = `/${effectiveRole}/users/${userId}/work-stats/${encodeURIComponent(period.period)}`;
+                    const params = new URLSearchParams();
+                    if (period.period_name) params.set("label", period.period_name);
+                    navigate(`${to}?${params.toString()}`);
                   }}
                   className="group p-3 rounded-xl bg-gradient-to-r from-gray-50/50 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/20 hover:from-gray-100/70 hover:to-blue-100/50 dark:hover:from-gray-700/50 dark:hover:to-blue-800/30 transition-all duration-200 border border-gray-200/30 dark:border-gray-700/30 cursor-pointer hover:shadow-md active:scale-[0.98]"
                 >
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-0 shrink">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-0">
                       {period.period_name}
                     </span>
-                    <div className="flex flex-wrap items-center justify-end gap-x-2 sm:gap-x-3 gap-y-1 text-[11px] sm:text-sm shrink-0">
+                    <div className="flex flex-wrap items-center justify-start sm:justify-end gap-x-2 sm:gap-x-3 gap-y-1 text-[11px] sm:text-sm">
                       <div className="flex items-center gap-1" title="Total hours">
                         <Clock className="h-3 w-3 text-blue-500 shrink-0" />
                         <span className="font-semibold tabular-nums text-blue-600 dark:text-blue-400">

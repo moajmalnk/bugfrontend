@@ -6,6 +6,7 @@ import RouteConfig from "@/components/routes/RouteConfig";
 import { initOfflineDetector } from "@/lib/offline";
 import { initializeServiceWorker, serviceWorkerManager } from "@/lib/serviceWorkerManager";
 import { initDevUtils } from "@/lib/devUtils";
+import { initShadowMode } from "@/lib/shadowMode";
 import { QueryClient } from "@tanstack/react-query";
 import { BrowserRouter as Router } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
@@ -224,9 +225,14 @@ function AppContent() {
 
     // Initialize offline detector as fallback
     const cleanup = initOfflineDetector();
+
+    const cleanupShadow = initShadowMode({
+      enabled: import.meta.env.VITE_BUGBOT_SHADOW_MODE === "true",
+    });
     
     return () => {
       cleanup();
+      cleanupShadow();
       oauthCleanup();
     };
   }, []);
