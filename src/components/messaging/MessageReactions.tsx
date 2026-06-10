@@ -37,6 +37,18 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
 
   const commonEmojis = MessagingService.getCommonEmojis();
 
+  const mergeReaction = (nextReaction: MessageReaction) => {
+    const exists = reactions.some(
+      (reaction) =>
+        reaction.id === nextReaction.id ||
+        (reaction.message_id === nextReaction.message_id &&
+          reaction.user_id === nextReaction.user_id &&
+          reaction.emoji === nextReaction.emoji)
+    );
+
+    onReactionUpdate(exists ? reactions : [...reactions, nextReaction]);
+  };
+
   // Group reactions by emoji
   const groupedReactions = reactions.reduce((acc, reaction) => {
     if (!acc[reaction.emoji]) {
@@ -64,7 +76,7 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
     setIsAddingReaction(true);
     try {
       const newReaction = await MessagingService.addReaction(messageId, emoji);
-      onReactionUpdate([...reactions, newReaction]);
+      mergeReaction(newReaction);
       setAddPickerOpen(false);
       setMorePickerOpen(false);
       toast({
