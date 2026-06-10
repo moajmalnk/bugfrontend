@@ -79,10 +79,6 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
       mergeReaction(newReaction);
       setAddPickerOpen(false);
       setMorePickerOpen(false);
-      toast({
-        title: "Success",
-        description: "Reaction added"
-      });
     } catch (error) {
       console.error('Error adding reaction:', error);
       toast({
@@ -104,10 +100,6 @@ export const MessageReactions: React.FC<MessageReactionsProps> = ({
         r => !(r.emoji === emoji && r.user_id === currentUser.id)
       );
       onReactionUpdate(updatedReactions);
-      toast({
-        title: "Success",
-        description: "Reaction removed"
-      });
     } catch (error) {
       console.error('Error removing reaction:', error);
       toast({

@@ -227,10 +227,10 @@ const Messages = () => {
   }
 
   return (
-    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-background">
-      <section className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full px-1 py-1 sm:px-2 sm:py-2">
+    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-[#0b141a]">
+      <section className="flex-1 min-h-0 flex flex-col w-full">
         {/* Main chat layout — height fills remaining viewport; only message list scrolls inside */}
-        <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 shadow-xl">
+        <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden bg-[#0b141a]">
           <div
             className={cn(
               "flex flex-1 min-h-0 min-w-0 relative",
@@ -370,21 +370,21 @@ const Messages = () => {
                   <div className="flex-1 flex flex-col min-h-0 bg-[#222e35] dark:bg-[#222e35] border-b-[6px] border-[#00a884] overflow-hidden">
                     <div className="flex-1 flex flex-col items-center justify-center w-full min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8">
                       <div className="text-center max-w-lg w-full">
-                        <div className="mb-6 sm:mb-8 relative">
-                          <div className="w-[140px] h-[140px] sm:w-[180px] sm:h-[180px] mx-auto rounded-full bg-[#1f2c33] dark:bg-[#1f2c33] flex items-center justify-center shadow-2xl">
-                            <MessageCircle className="h-12 w-12 sm:h-16 sm:w-16 text-[#54656f] dark:text-[#54656f]" strokeWidth={1.5} />
+                        <div className="mb-6 relative">
+                          <div className="w-[132px] h-[132px] sm:w-[160px] sm:h-[160px] mx-auto rounded-full bg-[#1f2c33] dark:bg-[#1f2c33] flex items-center justify-center shadow-2xl">
+                            <MessageCircle className="h-12 w-12 sm:h-14 sm:w-14 text-[#54656f] dark:text-[#54656f]" strokeWidth={1.5} />
                           </div>
-                          <div className="absolute -bottom-2 sm:-bottom-3 left-1/2 -translate-x-1/2 w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-[#00a884] flex items-center justify-center shadow-xl">
-                            <MessageCircle className="h-4 w-4 sm:h-6 sm:w-6 text-white" fill="white" strokeWidth={0} />
+                          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center shadow-xl">
+                            <MessageCircle className="h-5 w-5 text-white" fill="white" strokeWidth={0} />
                           </div>
                         </div>
                         
-                        <h3 className="text-xl sm:text-2xl lg:text-3xl font-light mb-3 sm:mb-4 text-[#e9edef] dark:text-[#e9edef]">
+                        <h3 className="text-xl sm:text-2xl font-light mb-3 text-[#e9edef] dark:text-[#e9edef]">
                           BugRicer Chat
                         </h3>
                         
-                        <p className="text-sm sm:text-base text-[#8696a0] dark:text-[#8696a0] leading-relaxed mb-6 sm:mb-8 px-4">
-                          Send and receive messages with your team members. Stay connected and collaborate in real-time.
+                        <p className="text-sm sm:text-base text-[#8696a0] dark:text-[#8696a0] leading-relaxed mb-6 px-4">
+                          Pick a chat to start messaging. New messages appear automatically.
                         </p>
                         
                         <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-[#667781] dark:text-[#667781] max-w-sm mx-auto">

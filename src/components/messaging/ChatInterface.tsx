@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -42,36 +40,26 @@ import {
   Image as ImageIcon,
   Info,
   MessageCircle,
-  Mic,
-  MicOff,
   MoreVertical,
   Pause,
   Pin,
   Play,
   Reply,
-  Send,
   Star,
   Trash2,
   Video,
-  ArrowLeft,
-  Search,
-  Filter,
-  UserPlus,
-  Users,
   X,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { AudioWaveform } from "./AudioWaveform";
-import { EmojiPicker } from "./EmojiPicker";
+import { ChatHeader } from "./ChatHeader";
 import { ForwardMessage } from "./ForwardMessage";
-import { MediaUploader } from "./MediaUploader";
+import { MessageComposer } from "./MessageComposer";
 import { MessageEditor } from "./MessageEditor";
 import { MessageInfo } from "./MessageInfo";
 import { MessageReactions } from "./MessageReactions";
-import { MessageSearch } from "./MessageSearch";
 import { MessageStatus } from "./MessageStatus";
 import { PinnedMessages } from "./PinnedMessages";
-import { StarredMessages } from "./StarredMessages";
 
 type DocumentPreviewKind = "pdf" | "image" | "video" | "audio" | "text" | "none";
 
@@ -238,6 +226,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -267,6 +256,38 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const displaySenderLabel = (name?: string | null) => {
     if (!name || name === "0") return "Member";
     return name;
+  };
+
+  const messageDayKey = (timestamp: string) =>
+    new Date(timestamp).toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+
+  const formatMessageDay = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const today = messageDayKey(new Date().toISOString());
+    const yesterday = messageDayKey(
+      new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    );
+    const key = messageDayKey(timestamp);
+
+    if (key === today) return "Today";
+    if (key === yesterday) return "Yesterday";
+
+    return date.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const shouldShowDateSeparator = (message: ChatMessage, index: number) => {
+    if (index === 0) return true;
+    return messageDayKey(message.created_at) !== messageDayKey(messages[index - 1].created_at);
   };
 
   const isBugBotIdentity = (value?: string | null) => {
@@ -329,7 +350,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (shouldAutoScrollRef.current) {
+      scrollToBottom();
+    }
   }, [messages]);
 
   // Auto-resize textarea
@@ -362,14 +385,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         page
       );
 
-      console.log("📨 Loaded messages:", response.messages);
-      console.log("📨 First message sender_name:", response.messages[0]?.sender_name);
-
       const visibleMessages = response.messages.filter((m) => !isBugBotMessage(m));
 
       if (append) {
+        shouldAutoScrollRef.current = false;
         setMessages((prev) => [...visibleMessages, ...prev]);
       } else {
+        shouldAutoScrollRef.current = true;
         setMessages(visibleMessages);
       }
 
@@ -393,8 +415,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     pollingCleanupRef.current = MessagingService.startMessagePolling(
       selectedGroup.id,
       (newMessage) => {
-        console.log("🔔 New message from polling:", newMessage);
-        console.log("🔔 New message sender_name:", newMessage.sender_name);
         setMessages((prev) => {
           if (isBugBotMessage(newMessage)) {
             return prev;
@@ -404,6 +424,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           if (prev.find((m) => m.id === newMessage.id)) {
             return prev;
           }
+          shouldAutoScrollRef.current = isNearBottom();
           scheduleSidebarListRefresh();
           return [...prev, newMessage];
         });
@@ -411,8 +432,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       (typingUsers) => {
         setTypingUsers(typingUsers);
       },
-      3000
+      2500
     );
+  };
+
+  const isNearBottom = () => {
+    const el = scrollAreaRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 160;
   };
 
   const scrollToBottom = () => {
@@ -423,8 +450,39 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!selectedGroup || !newMessage.trim()) return;
 
     const messageContent = newMessage.trim();
+    const replySnapshot = replyToMessage;
+    const now = new Date().toISOString();
+    const optimisticId = `local-${Date.now()}`;
+    const optimisticMessage: ChatMessage = {
+      id: optimisticId,
+      group_id: selectedGroup.id,
+      sender_id: String(currentUser?.id ?? ""),
+      message_type: replySnapshot ? "reply" : "text",
+      content: messageContent,
+      reply_to_message_id: replySnapshot?.id,
+      reply_content: replySnapshot?.content,
+      reply_type: replySnapshot?.message_type,
+      reply_sender_name: replySnapshot?.sender_name,
+      is_deleted: false,
+      is_pinned: false,
+      delivery_status: "sent",
+      created_at: now,
+      updated_at: now,
+      sender_name:
+        (currentUser as any)?.username ||
+        (currentUser as any)?.name ||
+        currentUser?.email ||
+        "You",
+      sender_email: currentUser?.email || "",
+      sender_role: currentUser?.role || "",
+      reactions: [],
+    };
+
     setNewMessage("");
     setIsTyping(false);
+    setReplyToMessage(null);
+    shouldAutoScrollRef.current = true;
+    setMessages((prev) => [...prev, optimisticMessage]);
 
     // Reset textarea height
     if (textareaRef.current) {
@@ -438,17 +496,24 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         content: messageContent,
       };
 
-      if (replyToMessage) {
+      if (replySnapshot) {
         messageData.message_type = "reply";
-        messageData.reply_to_message_id = replyToMessage.id;
+        messageData.reply_to_message_id = replySnapshot?.id;
       }
 
       const sentMessage = await MessagingService.sendMessage(messageData);
-      setMessages((prev) => [...prev, sentMessage]);
-      setReplyToMessage(null);
+      shouldAutoScrollRef.current = true;
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === optimisticId ? sentMessage : message
+        )
+      );
       refreshSidebarListNow();
     } catch (error) {
       console.error("Error sending message:", error);
+      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+      setNewMessage(messageContent);
+      setReplyToMessage(replySnapshot);
       toast({
         title: "Error",
         description: "Failed to send message",
@@ -594,6 +659,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       };
 
       const sentMessage = await MessagingService.sendMessage(messageData);
+      shouldAutoScrollRef.current = true;
       setMessages((prev) => [...prev, sentMessage]);
       refreshSidebarListNow();
     } catch (error) {
@@ -623,10 +689,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       await MessagingService.deleteMessage(message.id);
       setMessages((prev) => prev.filter((m) => m.id !== message.id));
       setMessagePendingDelete(null);
-      toast({
-        title: "Success",
-        description: "Message deleted successfully",
-      });
     } catch (error) {
       console.error("Error deleting message:", error);
       toast({
@@ -652,10 +714,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       await MessagingService.pinMessage(message.id);
       // Trigger pinned messages refresh
       setPinnedMessagesKey(prev => prev + 1);
-      toast({
-        title: "Success",
-        description: "Message pinned successfully",
-      });
     } catch (error) {
       console.error("Error pinning message:", error);
       toast({
@@ -752,12 +810,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleMediaUploadSuccess = async (mediaData: any) => {
     try {
       const sentMessage = await MessagingService.sendMessage(mediaData);
+      shouldAutoScrollRef.current = true;
       setMessages((prev) => [...prev, sentMessage]);
       refreshSidebarListNow();
-      toast({
-        title: "Success",
-        description: "Media sent successfully",
-      });
     } catch (error) {
       console.error("Error sending media:", error);
       toast({
@@ -837,6 +892,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           media_thumbnail: upload.thumbnail_url,
         };
         const sentMessage = await MessagingService.sendMessage(messageData);
+        shouldAutoScrollRef.current = true;
         setMessages((prev) => [...prev, sentMessage]);
         sentAny = true;
       }
@@ -919,71 +975,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background hide-scrollbar">
-      <div className="flex-shrink-0 z-20 bg-[#202c33] border-b border-[#2a3942]">
-        <div className="px-3 sm:px-4 py-2.5 sm:py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-              {onBackToChatList && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onBackToChatList}
-                  className="md:hidden h-9 w-9 text-[#aebac1] hover:bg-[#2a3942] hover:text-[#e9edef] rounded-full flex-shrink-0"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              )}
-              <div className="relative flex-shrink-0">
-                <Avatar className="h-9 w-9 sm:h-10 sm:w-10">
-                  <AvatarFallback className="bg-[#6b7c85] text-white font-semibold text-sm">
-                    {selectedGroup.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-base font-medium text-[#e9edef] truncate leading-tight">
-                  {selectedGroup.name}
-                </CardTitle>
-                <div className="text-xs text-[#8696a0] mt-0.5">
-                  {typingUsers.length > 0 ? (
-                    <span className="text-[#00a884] animate-pulse font-medium">
-                      {typingUsers.map((u) => u.user_name).join(", ")} typing…
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3 w-3 shrink-0" />
-                      {selectedGroup.member_count} members
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-0.5 flex-shrink-0 text-[#aebac1]">
-              {onOpenGroupMembers && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-full text-[#aebac1] hover:bg-[#2a3942] hover:text-[#e9edef]"
-                  title="Members"
-                  aria-label="Manage members"
-                  onClick={onOpenGroupMembers}
-                >
-                  <UserPlus className="h-5 w-5" />
-                </Button>
-              )}
-              <MessageSearch
-                groupId={selectedGroup.id}
-                onMessageClick={handleMessageClick}
-              />
-              <StarredMessages
-                groupId={selectedGroup.id}
-                onMessageClick={handleMessageClick}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      <ChatHeader
+        selectedGroup={selectedGroup}
+        typingUsers={typingUsers}
+        onBackToChatList={onBackToChatList}
+        onOpenGroupMembers={onOpenGroupMembers}
+        onMessageClick={handleMessageClick}
+      />
 
       {/* Pinned Messages - Fixed below header */}
       <div className="flex-shrink-0">
@@ -995,7 +993,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Messages Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-0.5 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar">
+      <div
+        ref={scrollAreaRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-0.5 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar"
+      >
         {hasMoreMessages && (
           <div className="flex justify-center mb-3">
             <Button
@@ -1009,7 +1010,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </Button>
           </div>
         )}
-        {messages.map((message) => {
+        {messages.map((message, index) => {
           const isOwnMessage =
             String(message.sender_id) === String(currentUser?.id ?? "");
           const isDeleted = Boolean(message.is_deleted);
@@ -1019,8 +1020,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           const hasReply =
             replyToId != null && String(replyToId).trim() !== "";
           return (
+            <React.Fragment key={message.id}>
+              {shouldShowDateSeparator(message, index) && (
+                <div className="sticky top-2 z-10 flex justify-center py-2 pointer-events-none">
+                  <span className="rounded-lg bg-[#182229]/90 px-3 py-1 text-[11px] font-medium text-[#aebac1] shadow-sm">
+                    {formatMessageDay(message.created_at)}
+                  </span>
+                </div>
+              )}
             <div
-              key={message.id}
               id={`message-${message.id}`}
               className={`flex ${
                 isOwnMessage ? "justify-end" : "justify-start"
@@ -1333,132 +1341,39 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </div>
               </div>
             </div>
+            </React.Fragment>
           );
         })}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Footer - Fixed/Sticky */}
-      <div className="flex-shrink-0 z-20 bg-[#202c33] dark:bg-[#202c33] border-t border-[#2a3942] dark:border-[#2a3942]">
-        {/* Reply Preview */}
-        {replyToMessage && (
-          <div className="px-3 sm:px-4 py-2 bg-[#2a3942] dark:bg-[#2a3942] border-b border-[#3b4a54] flex items-center justify-between">
-            <div className="text-sm flex-1 min-w-0">
-              <span className="font-medium text-[#00a884]">
-                Replying to {displaySenderLabel(replyToMessage.sender_name)}
-              </span>
-              <div className="text-[#8696a0] text-xs truncate">
-                {replyToMessage.message_type === "voice"
-                  ? "🎤 Voice message"
-                  : replyToMessage.content}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setReplyToMessage(null)}
-              className="h-8 w-8 text-[#8696a0] hover:bg-[#3b4a54] rounded-lg transition-all duration-200"
-            >
-              ×
-            </Button>
-          </div>
-        )}
-
-        {/* Input Area */}
-        <div className="px-2 sm:px-3 md:px-4 py-2 sm:py-3">
-          <div className="flex items-end gap-2">
-            <div
-              className={cn(
-                "flex-1 min-w-0 relative rounded-2xl transition-[box-shadow,background-color]",
-                isImageDropActive &&
-                  "ring-2 ring-[#00a884] ring-offset-2 ring-offset-[#202c33]"
-              )}
-              onDragEnter={handleMessageInputDragEnter}
-              onDragLeave={handleMessageInputDragLeave}
-              onDragOver={handleMessageInputDragOver}
-              onDrop={handleMessageInputDrop}
-            >
-              <Textarea
-                ref={textareaRef}
-                value={newMessage}
-                onChange={(e) => handleTyping(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type a message..."
-                disabled={isImageDropUploading}
-                className="min-h-[40px] sm:min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-[#3b4a54] bg-[#2a3942] dark:bg-[#2a3942] text-[#e9edef] placeholder:text-[#8696a0] focus:bg-[#2a3942] focus:border-[#00a884] transition-colors text-sm disabled:opacity-60"
-                rows={1}
-              />
-              {isImageDropActive && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-[#00a884]/20 text-[11px] sm:text-xs font-semibold text-[#e9edef]">
-                  Drop image to send
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* Emoji Picker */}
-              <EmojiPicker
-                onEmojiSelect={(emoji) => {
-                  setNewMessage((prev) => prev + emoji);
-                  textareaRef.current?.focus();
-                }}
-                size="md"
-              />
-              
-              {/* Media Uploader */}
-              <MediaUploader
-                groupId={selectedGroup.id}
-                onUploadSuccess={handleMediaUploadSuccess}
-              />
-              
-              {/* Voice Recording Button */}
-              <Button
-                variant={isRecording ? "destructive" : "ghost"}
-                size="icon"
-                onClick={handleMicClick}
-                onMouseDown={handleMicMouseDown}
-                onMouseUp={handleMicMouseUp}
-                onTouchStart={handleMicMouseDown}
-                onTouchEnd={handleMicMouseUp}
-                className={`h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 flex-shrink-0 transition-all duration-200 rounded-xl ${
-                  isRecording
-                    ? "bg-red-500 text-white hover:bg-red-600 animate-pulse shadow-lg"
-                    : "text-[#8696a0] hover:bg-[#3b4a54] hover:text-[#aebac1]"
-                }`}
-                title={
-                  isRecording
-                    ? "Stop recording (2 min max)"
-                    : "Record voice message (tap or long press to start)"
-                }
-              >
-                {isRecording ? (
-                  <MicOff className="h-4 w-4 sm:h-5 sm:w-5" />
-                ) : (
-                  <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
-                )}
-              </Button>
-              
-              {/* Send Button */}
-              <Button
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || isLoading}
-                size="icon"
-                className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 bg-[#00a884] text-white hover:bg-[#06cf9c] flex-shrink-0 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 rounded-xl"
-                title="Send message"
-              >
-                <Send className="h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Recording Indicator */}
-          {isRecording && (
-            <div className="mt-2 flex items-center justify-center gap-2 text-xs text-red-500 animate-pulse">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
-              <span>Recording... Tap microphone to stop</span>
-            </div>
-          )}
-        </div>
-      </div>
+      <MessageComposer
+        groupId={selectedGroup.id}
+        value={newMessage}
+        isLoading={isLoading}
+        isRecording={isRecording}
+        isImageDropActive={isImageDropActive}
+        isImageDropUploading={isImageDropUploading}
+        replyToMessage={replyToMessage}
+        textareaRef={textareaRef}
+        displaySenderLabel={displaySenderLabel}
+        onChange={handleTyping}
+        onKeyPress={handleKeyPress}
+        onSend={handleSendMessage}
+        onClearReply={() => setReplyToMessage(null)}
+        onEmojiSelect={(emoji) => {
+          setNewMessage((prev) => prev + emoji);
+          textareaRef.current?.focus();
+        }}
+        onUploadSuccess={handleMediaUploadSuccess}
+        onMicClick={handleMicClick}
+        onMicMouseDown={handleMicMouseDown}
+        onMicMouseUp={handleMicMouseUp}
+        onDragEnter={handleMessageInputDragEnter}
+        onDragLeave={handleMessageInputDragLeave}
+        onDragOver={handleMessageInputDragOver}
+        onDrop={handleMessageInputDrop}
+      />
 
       {/* Forward Message Dialog */}
       {forwardMessage && (
@@ -1467,10 +1382,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           availableGroups={availableGroups}
           onForwardSuccess={() => {
             setForwardMessage(null);
-            toast({
-              title: "Success",
-              description: "Message forwarded successfully",
-            });
           }}
         />
       )}
@@ -1493,10 +1404,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               )
             );
             setEditMessage(null);
-            toast({
-              title: "Success",
-              description: "Message edited successfully",
-            });
           }}
         />
       )}

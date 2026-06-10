@@ -162,10 +162,6 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       setCaption("");
       setIsOpen(false);
 
-      toast({
-        title: "Success",
-        description: "Media uploaded successfully",
-      });
     } catch (error) {
       console.error("Upload error:", error);
       toast({

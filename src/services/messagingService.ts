@@ -227,8 +227,8 @@ export class MessagingService {
       if (!isPolling) return;
 
       try {
-        // Get latest messages (increased to 50 to catch more new messages)
-        const messageResponse = await this.getMessages(groupId, 1, 50);
+        // Keep polling lightweight; full history is loaded through pagination.
+        const messageResponse = await this.getMessages(groupId, 1, 20);
         const messages = messageResponse.messages;
         
         if (messages.length > 0) {

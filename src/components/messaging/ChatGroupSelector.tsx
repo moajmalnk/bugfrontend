@@ -43,6 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ChatListItem } from "./ChatListItem";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 function messagingAuthToken(): string {
@@ -1099,109 +1100,23 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
           <div className={isMessaging ? "" : "space-y-1 p-2"}>
             {filteredGroups.map((group) =>
               isMessaging ? (
-                <div
+                <ChatListItem
                   key={group.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onGroupSelect(group)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") onGroupSelect(group);
-                  }}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 cursor-pointer outline-none transition-colors border-b border-[#222d34]",
-                    selectedGroup?.id === group.id
-                      ? "bg-[#2a3942]"
-                      : "hover:bg-[#202c33]"
-                  )}
-                  aria-selected={selectedGroup?.id === group.id}
-                >
-                  <Avatar className="h-12 w-12 flex-shrink-0 rounded-full">
-                    <AvatarFallback className="bg-[#6b7c85] text-white text-lg font-medium">
-                      {group.name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-medium text-[#e9edef] truncate leading-tight">
-                        {group.name}
-                      </span>
-                      {group.last_message_at ? (
-                        <span className="text-[11px] text-[#8696a0] shrink-0 tabular-nums pt-0.5 max-w-[4.5rem] text-right">
-                          {formatLastMessageTime(group.last_message_at)}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="text-sm text-[#8696a0] truncate mt-0.5 leading-snug">
-                      {formatChatListSubtitle(group)}
-                    </p>
-                    <div className="flex items-center justify-between gap-2 mt-1">
-                      <span className="text-[11px] text-[#667781] truncate">
-                        {group.projectName}
-                        {typeof group.member_count === "number"
-                          ? ` · ${group.member_count} members`
-                          : ""}
-                        {!group.is_member ? " · Not a member" : ""}
-                      </span>
-                      {(canManageGroupMembers(group) || canEditOrDeleteGroup()) && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 rounded-full text-[#8696a0] hover:bg-[#3b4a54] hover:text-[#e9edef]"
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label="Chat options"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="w-48 bg-[#233138] border-[#2a3942] text-[#e9edef]"
-                          >
-                            {canManageGroupMembers(group) && (
-                              <DropdownMenuItem
-                                className="focus:bg-[#2a3942] cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleManageMembers(group.id);
-                                }}
-                              >
-                                <UserPlus className="h-4 w-4 mr-2" />
-                                Members
-                              </DropdownMenuItem>
-                            )}
-                            {canEditOrDeleteGroup() && (
-                              <>
-                                <DropdownMenuItem
-                                  className="focus:bg-[#2a3942] cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditGroup(group);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit group
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="focus:bg-[#3f1f1f] text-red-300 cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteGroup(group.id);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete group
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  group={group}
+                  isSelected={selectedGroup?.id === group.id}
+                  subtitle={formatChatListSubtitle(group)}
+                  timeLabel={
+                    group.last_message_at
+                      ? formatLastMessageTime(group.last_message_at)
+                      : null
+                  }
+                  canManageMembers={canManageGroupMembers(group)}
+                  canEditOrDelete={canEditOrDeleteGroup()}
+                  onSelect={onGroupSelect}
+                  onManageMembers={handleManageMembers}
+                  onEditGroup={handleEditGroup}
+                  onDeleteGroup={handleDeleteGroup}
+                />
               ) : (
                 <div
                   key={group.id}
