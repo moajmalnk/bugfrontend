@@ -73,7 +73,7 @@ function normalizeGroupRow(g: ChatGroup & { project_name?: string }): ChatGroup 
 
 interface ChatGroupSelectorProps {
   selectedGroup: ChatGroup | null;
-  onGroupSelect: (group: ChatGroup) => void;
+  onGroupSelect: (group: ChatGroup | null) => void;
   showAllProjects?: boolean;
   /** Dark compact list styled like common chat apps (use inside Messages sidebar) */
   variant?: "default" | "messaging";
@@ -89,6 +89,8 @@ interface ChatGroupSelectorProps {
   onMembersChanged?: () => void;
   /** Parent stores the callback to open the member dialog for a group (e.g. chat header). */
   exposeOpenMembers?: (openForGroup: (groupId: string) => void) => void;
+  /** Parent can observe the loaded list to resolve URL-selected chats. */
+  onGroupsLoaded?: (groups: ChatGroup[]) => void;
 }
 
 export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
@@ -105,6 +107,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   chatListVersion = 0,
   onMembersChanged,
   exposeOpenMembers,
+  onGroupsLoaded,
 }) => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -218,6 +221,10 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       onGroupsCountUpdate(groups.length);
     }
   }, [groups.length, onGroupsCountUpdate]);
+
+  useEffect(() => {
+    onGroupsLoaded?.(groups);
+  }, [groups, onGroupsLoaded]);
 
   // Countdown effect for undo functionality
   useEffect(() => {

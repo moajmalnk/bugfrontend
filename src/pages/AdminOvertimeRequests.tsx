@@ -102,14 +102,13 @@ export default function AdminOvertimeRequests() {
                   </div>
                   <div className="min-w-0">
                     <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
-                      Extra-hour requests
+                      OT Requests
                     </h1>
                     <div className="h-1 w-24 sm:w-28 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2" />
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl leading-relaxed">
-                  Pick a user to open their requests on a dedicated page. Pending, approved, rejected, and changed
-                  flow; uses the API server clock and a wide date range.
+                  Pick a user to open their requests on a dedicated page.
                 </p>
               </div>
 
@@ -129,9 +128,6 @@ export default function AdminOvertimeRequests() {
                   <div className="text-center sm:text-left min-w-0">
                     <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80"> </div>
                     <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">{pendingTotal}</div>
-                    <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                      {byUser.length} {byUser.length === 1 ? 'user' : 'users'} with requests
-                    </div>
                   </div>
                 </div>
               </div>

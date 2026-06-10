@@ -13,9 +13,56 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+function resolveNotificationPayload(payload) {
+  const data = payload && payload.data ? payload.data : {};
+  const notification = payload && payload.notification ? payload.notification : {};
+
+  return {
+    title: data.title || notification.title || 'BugRicer',
+    body: data.body || notification.body || 'You have a new update.',
+    url: data.click_action || data.url || '/',
+    unreadCount: Number(data.unread_count || 0),
+  };
+}
+
 messaging.onBackgroundMessage(function(payload) {
-  self.registration.showNotification(payload.notification.title, {
-    body: payload.notification.body,
-    icon: '/favicon.ico'
-  });
+  const resolved = resolveNotificationPayload(payload);
+  const options = {
+    body: resolved.body,
+    icon: '/favicon.ico',
+    badge: '/placeholder.svg',
+    tag: 'bug-update',
+    renotify: true,
+    data: { url: resolved.url },
+  };
+
+  const badgeApi = self.registration && typeof self.registration.setAppBadge === 'function';
+  if (badgeApi && resolved.unreadCount > 0) {
+    self.registration.setAppBadge(resolved.unreadCount).catch(() => {});
+  }
+
+  self.registration.showNotification(resolved.title, options);
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  const targetUrl = (event.notification && event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (let i = 0; i < windowClients.length; i += 1) {
+        const client = windowClients[i];
+        if ('focus' in client) {
+          if ('navigate' in client) {
+            return client.navigate(targetUrl).then(() => client.focus());
+          }
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+      return undefined;
+    })
+  );
 });

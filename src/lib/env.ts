@@ -29,6 +29,7 @@ const getApiUrl = () => {
 
 export const ENV = {
   API_URL: getApiUrl(),
+  FIREBASE_VAPID_KEY: import.meta.env.VITE_FIREBASE_VAPID_KEY || "",
 };
 
 // Log the current environment for debugging
@@ -43,6 +44,7 @@ export const validateEnv = () => {
   const missingVars = [];
   
   if (!ENV.API_URL) missingVars.push('API_URL');
+  if (!ENV.FIREBASE_VAPID_KEY) missingVars.push('FIREBASE_VAPID_KEY');
   
   if (missingVars.length > 0) {
     // console.error(`Missing environment variables: ${missingVars.join(', ')}`);

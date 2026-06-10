@@ -19,7 +19,7 @@ import {
   Lock
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { toast } from "sonner";
 
@@ -27,6 +27,7 @@ const Messages = () => {
   const { currentUser } = useAuth();
   const { hasPermission, isLoading: isLoadingPermissions } = usePermissions(null);
   const [selectedGroup, setSelectedGroup] = useState<ChatGroup | null>(null);
+  const [availableGroups, setAvailableGroups] = useState<ChatGroup[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [triggerCreateGroup, setTriggerCreateGroup] = useState(false);
@@ -35,6 +36,9 @@ const Messages = () => {
   const [chatListVersion, setChatListVersion] = useState(0);
   const [showSidebar, setShowSidebar] = useState(false);
   const openGroupMembersRef = useRef<((groupId: string) => void) | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedChatId = searchParams.get("chat") || "";
+  const selectedGroupId = selectedGroup?.id;
 
   const registerOpenGroupMembers = useCallback(
     (fn: (groupId: string) => void) => {
@@ -67,16 +71,57 @@ const Messages = () => {
     return () => window.removeEventListener("resize", checkResponsive);
   }, [selectedGroup]);
 
-  const handleGroupSelect = (group: ChatGroup) => {
-    setSelectedGroup(group);
-    // Hide sidebar on mobile after selection
+  const updateChatUrl = useCallback(
+    (groupId: string | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (groupId) {
+          next.set("chat", groupId);
+        } else {
+          next.delete("chat");
+        }
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
+
+  useEffect(() => {
+    if (!selectedChatId) {
+      if (selectedGroupId) {
+        setSelectedGroup(null);
+        if (isMobile) {
+          setShowSidebar(true);
+        }
+      }
+      return;
+    }
+
+    const groupFromUrl = availableGroups.find(
+      (group) => String(group.id) === selectedChatId
+    );
+
+    if (!groupFromUrl || selectedGroupId === groupFromUrl.id) {
+      return;
+    }
+
+    setSelectedGroup(groupFromUrl);
     if (isMobile) {
       setShowSidebar(false);
+    }
+  }, [availableGroups, isMobile, selectedChatId, selectedGroupId]);
+
+  const handleGroupSelect = (group: ChatGroup | null) => {
+    updateChatUrl(group?.id ?? null);
+    setSelectedGroup(group);
+    if (isMobile) {
+      setShowSidebar(!group);
     }
   };
 
   const handleBackToChatList = () => {
     setSelectedGroup(null);
+    updateChatUrl(null);
     // Show sidebar on mobile when going back
     if (isMobile) {
       setShowSidebar(true);
@@ -284,6 +329,7 @@ const Messages = () => {
                     chatListVersion={chatListVersion}
                     onMembersChanged={bumpChatList}
                     exposeOpenMembers={registerOpenGroupMembers}
+                    onGroupsLoaded={setAvailableGroups}
                   />
                 </div>
               </aside>
