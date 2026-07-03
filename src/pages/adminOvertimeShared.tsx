@@ -1,4 +1,10 @@
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
+import {
+  calendarMonthKey,
+  formatCalendarMonthRange,
+  formatCalendarMonthTitle,
+  getCalendarMonthPeriod,
+} from '@/lib/workPeriodUtils';
 import { CheckCircle2, Clock, Pencil, XCircle, CircleDashed } from 'lucide-react';
 
 export type OvertimeRow = Record<string, unknown> & {
@@ -74,31 +80,11 @@ export function getSubmissionWindow() {
 }
 
 export function codoMonthKey(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00');
-  const day = d.getDate();
-  let year = d.getFullYear();
-  let month = d.getMonth() + 1;
-  if (day <= 5) {
-    month -= 1;
-    if (month === 0) {
-      month = 12;
-      year -= 1;
-    }
-  }
-  return `${year}-${String(month).padStart(2, '0')}`;
+  return calendarMonthKey(dateStr);
 }
 
 export function getCodoPeriodForMonth(key: string) {
-  const [y, m] = key.split('-').map(Number);
-  const startDate = `${y}-${String(m).padStart(2, '0')}-06`;
-  let nextYear = y;
-  let nextMonth = m + 1;
-  if (nextMonth > 12) {
-    nextMonth = 1;
-    nextYear = y + 1;
-  }
-  const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-05`;
-  return { from: startDate, to: endDate };
+  return getCalendarMonthPeriod(key);
 }
 
 export function computeTotalsInRange(list: OvertimeRow[], from: string, to: string) {
@@ -123,14 +109,14 @@ export function formatDateForDisplay(dateStr: string) {
 }
 
 export function monthTabLinesForList(key: string, list: OvertimeRow[]) {
-  const { from, to } = getCodoPeriodForMonth(key);
+  const { from, to } = getCalendarMonthPeriod(key);
   const { days, hours } = computeTotalsInRange(list, from, to);
-  const startDisplay = formatDateForDisplay(from);
-  const endDisplay = formatDateForDisplay(to);
+  const title = formatCalendarMonthTitle(key);
+  const range = formatCalendarMonthRange(key);
   return {
-    full: `${startDisplay} to ${endDisplay} (${hours} hours) (${days} ${days === 1 ? 'day' : 'days'})`,
-    compactTitle: `${startDisplay} → ${endDisplay}`,
-    compactMeta: `${hours} h · ${days} ${days === 1 ? 'day' : 'days'}`,
+    full: `${title} · ${hours} hours · ${days} ${days === 1 ? 'day' : 'days'}`,
+    compactTitle: title,
+    compactMeta: `${range} · ${hours} h · ${days} ${days === 1 ? 'day' : 'days'}`,
   };
 }
 

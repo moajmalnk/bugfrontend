@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   listMySubmissions,
@@ -14,6 +14,15 @@ import { useAuth } from '@/context/AuthContext';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
+import {
+  calendarMonthKey,
+  computeMonthTotalsToDate,
+  formatCalendarMonthRange,
+  formatCalendarMonthTitle,
+  formatWorkingDaysPeriodLabel,
+  getCalendarMonthPeriod,
+  getCalendarMonthStart,
+} from '@/lib/workPeriodUtils';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
@@ -34,6 +43,7 @@ export default function DailyUpdate() {
   const [activeMonth, setActiveMonth] = useState<string>(searchParams.get('month') || ''); // YYYY-MM
   const [submissionToDelete, setSubmissionToDelete] = useState<any | null>(null);
   const [showRequestsOnly, setShowRequestsOnly] = useState(false);
+  const didNormalizeMonth = useRef(false);
 
   // Initialize undo delete hook
   const undoDelete = useUndoDelete({
@@ -71,48 +81,6 @@ export default function DailyUpdate() {
     }
   }
 
-  function getCodoPeriodStart(dateStr: string) {
-    const d = new Date(dateStr);
-    const day = d.getDate();
-    const since = new Date(d);
-    if (day <= 5) {
-      // previous month 6th
-      since.setMonth(since.getMonth() - 1);
-      since.setDate(6);
-    } else {
-      // current month 6th
-      since.setDate(6);
-    }
-    return since.toISOString().slice(0, 10);
-  }
-
-  function getCodoPeriodEnd(dateStr: string) {
-    const d = new Date(dateStr);
-    const day = d.getDate();
-    const end = new Date(d);
-    if (day <= 5) {
-      // current month 5th
-      end.setDate(5);
-    } else {
-      // next month 5th
-      end.setMonth(end.getMonth() + 1);
-      end.setDate(5);
-    }
-    return end.toISOString().slice(0, 10);
-  }
-
-  // Handle month tab clicks and update URL
-  const handleMonthTabClick = (monthKey: string) => {
-    setActiveMonth(monthKey);
-    const newParams = new URLSearchParams(searchParams);
-    if (monthKey) {
-      newParams.set('month', monthKey);
-    } else {
-      newParams.delete('month');
-    }
-    setSearchParams(newParams);
-  };
-
   function computeTotalsInRange(list: any[], from: string, to: string) {
     // Compare YYYY-MM-DD strings directly to avoid timezone drift
     const dateSet = new Set<string>();
@@ -127,6 +95,18 @@ export default function DailyUpdate() {
     }
     return { days: dateSet.size, hours };
   }
+
+  // Handle month tab clicks and update URL
+  const handleMonthTabClick = (monthKey: string) => {
+    setActiveMonth(monthKey);
+    const newParams = new URLSearchParams(searchParams);
+    if (monthKey) {
+      newParams.set('month', monthKey);
+    } else {
+      newParams.delete('month');
+    }
+    setSearchParams(newParams);
+  };
 
   function getMonthRange(dateStr: string) {
     const base = new Date(dateStr);
@@ -154,76 +134,23 @@ export default function DailyUpdate() {
     return { monthHours: totals.hours, monthDays: totals.days };
   }, [submissions]);
 
-  // Get CODO period key (YYYY-MM) for a given submission date
-  // CODO periods: 6th of month to 5th of next month
-  // Dates 1-5 belong to previous month's CODO period
-  // Dates 6-31 belong to current month's CODO period
-  function monthKey(dateStr: string) {
-    const d = new Date(dateStr + 'T00:00:00');
-    const day = d.getDate();
-    let year = d.getFullYear();
-    let month = d.getMonth() + 1;
-    
-    // If date is 1-5, it belongs to previous month's CODO period
-    if (day <= 5) {
-      month = month - 1;
-      if (month === 0) {
-        month = 12;
-        year = year - 1;
-      }
-    }
-    
-    return `${year}-${String(month).padStart(2, '0')}`;
-  }
-
-  // Get CODO period range for a given month (YYYY-MM format)
-  // Returns dates from 6th of that month to 5th of next month
-  function getCodoPeriodForMonth(monthKey: string) {
-    const [y, m] = monthKey.split('-').map(Number);
-    const monthIndex = m - 1;
-    
-    // Start: 6th of the given month
-    const startDate = `${y}-${String(m).padStart(2, '0')}-06`;
-    
-    // End: 5th of next month
-    let nextYear = y;
-    let nextMonth = m + 1;
-    if (nextMonth > 12) {
-      nextMonth = 1;
-      nextYear = y + 1;
-    }
-    const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-05`;
-    
-    return { from: startDate, to: endDate };
-  }
-
-  // Format date for display (e.g., "October 6" or "November 5")
-  function formatDateForDisplay(dateStr: string) {
-    const d = new Date(dateStr + 'T00:00:00');
-    const monthName = d.toLocaleDateString('en-IN', { month: 'long', timeZone: 'Asia/Kolkata' });
-    const day = d.getDate();
-    return `${monthName} ${day}`;
-  }
-
   function monthLabel(key: string, list: any[]) {
-    const { from, to } = getCodoPeriodForMonth(key);
+    const { from, to } = getCalendarMonthPeriod(key);
     const { days, hours } = computeTotalsInRange(list, from, to);
-
-    const startDisplay = formatDateForDisplay(from);
-    const endDisplay = formatDateForDisplay(to);
-
-    return `${startDisplay} to ${endDisplay} (${hours} hours) (${days} ${days === 1 ? 'day' : 'days'})`;
+    const title = formatCalendarMonthTitle(key);
+    const range = formatCalendarMonthRange(key);
+    return `${title} · ${range} · ${hours} hours · ${days} ${days === 1 ? 'day' : 'days'}`;
   }
 
   function monthTabLines(key: string, list: any[]) {
-    const { from, to } = getCodoPeriodForMonth(key);
+    const { from, to } = getCalendarMonthPeriod(key);
     const { days, hours } = computeTotalsInRange(list, from, to);
-    const startDisplay = formatDateForDisplay(from);
-    const endDisplay = formatDateForDisplay(to);
+    const title = formatCalendarMonthTitle(key);
+    const range = formatCalendarMonthRange(key);
     return {
       full: monthLabel(key, list),
-      compactTitle: `${startDisplay} → ${endDisplay}`,
-      compactMeta: `${hours} h · ${days} ${days === 1 ? 'day' : 'days'}`,
+      compactTitle: title,
+      compactMeta: `${range} · ${hours} h · ${days} ${days === 1 ? 'day' : 'days'}`,
     };
   }
 
@@ -320,12 +247,12 @@ export default function DailyUpdate() {
       body += `\n☕ Total Break Time: ${totalBreakMinutes} min`;
     }
 
-    // Totals for CODO period
-    const since = getCodoPeriodStart(s.submission_date);
+    // Totals for current calendar month
+    const since = getCalendarMonthStart(s.submission_date);
     const to = s.submission_date;
     const { days, hours } = computeTotalsInRange(submissions, since, to);
-    const sinceLabel = new Date(since).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
-    body += `\n📊 Total Working Days (Since ${sinceLabel}): ${days} ${days===1?'Day':'Days'}`;
+    const periodLabel = formatWorkingDaysPeriodLabel(s.submission_date);
+    body += `\n📊 Total Working Days (${periodLabel}): ${days} ${days===1?'Day':'Days'}`;
     body += `\n🧮 Total Hours Completed : ${hours} hours`;
 
     const sections: string[] = [];
@@ -412,7 +339,7 @@ export default function DailyUpdate() {
       // Only set default active tab if no month is specified in URL
       const monthFromUrl = searchParams.get('month');
       if (!monthFromUrl) {
-        const mk = monthKey(refDate || todayYMD());
+        const mk = calendarMonthKey(refDate || todayYMD());
         setActiveMonth(mk);
         // Update URL to reflect the default month
         const newParams = new URLSearchParams(searchParams);
@@ -456,8 +383,39 @@ export default function DailyUpdate() {
   useEffect(() => {
     const urlTab = searchParams.get("tab") || "all-submissions";
     if (urlTab !== activeTab) setActiveTab(urlTab);
+    const urlMonth = searchParams.get('month');
+    if (urlMonth && urlMonth !== activeMonth) setActiveMonth(urlMonth);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // On first load, prefer the current calendar month (fixes stale ?month= from old 6th–5th cycle)
+  useEffect(() => {
+    if (subsLoading || didNormalizeMonth.current) return;
+    const source =
+      currentUser?.role === 'admin' && showRequestsOnly
+        ? allUserRequestSubmissions
+        : submissions;
+    if (source.length === 0) return;
+    didNormalizeMonth.current = true;
+
+    const monthKeys = Array.from(
+      new Set(source.map((s) => calendarMonthKey(String(s.submission_date || ''))))
+    ).filter(Boolean);
+    const currentMonth = calendarMonthKey(todayYMD());
+    const urlMonth = searchParams.get('month');
+    const preferred =
+      (urlMonth && monthKeys.includes(urlMonth) && urlMonth) ||
+      (monthKeys.includes(currentMonth) ? currentMonth : monthKeys.sort().reverse()[0]);
+
+    if (!preferred || preferred === activeMonth) return;
+    setActiveMonth(preferred);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('month', preferred);
+      return p as any;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions, allUserRequestSubmissions, subsLoading, showRequestsOnly, currentUser?.role]);
 
   // Filter submissions based on active tab
   const filteredSubmissions = useMemo(() => {
@@ -476,11 +434,27 @@ export default function DailyUpdate() {
     const byRequest = showRequestsOnly ? filteredSubmissions.filter(hasApprovalRequest) : filteredSubmissions;
     return byRequest.filter((s) => {
       if (!activeMonth) return true;
-      const { from, to } = getCodoPeriodForMonth(activeMonth);
+      const { from, to } = getCalendarMonthPeriod(activeMonth);
       const submissionDate = String(s.submission_date || "");
       return submissionDate >= from && submissionDate <= to;
     });
   }, [filteredSubmissions, showRequestsOnly, activeMonth]);
+
+  const activeMonthSummary = useMemo(() => {
+    if (!activeMonth) return null;
+    const source =
+      currentUser?.role === 'admin' && showRequestsOnly
+        ? allUserRequestSubmissions.filter(hasApprovalRequest)
+        : submissions;
+    const { from, to } = getCalendarMonthPeriod(activeMonth);
+    const { days, hours } = computeTotalsInRange(source, from, to);
+    return {
+      title: formatCalendarMonthTitle(activeMonth),
+      range: formatCalendarMonthRange(activeMonth),
+      days,
+      hours,
+    };
+  }, [activeMonth, submissions, allUserRequestSubmissions, currentUser?.role, showRequestsOnly]);
 
   const totalOtVisible = useMemo(() => {
     let sum = 0;
@@ -747,7 +721,7 @@ export default function DailyUpdate() {
                 : filteredSubmissions;
               return (
               <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8 min-w-0">
-                    {Array.from(new Set(listForMonths.map((s) => monthKey(s.submission_date))))
+                    {Array.from(new Set(listForMonths.map((s) => calendarMonthKey(s.submission_date))))
                   .sort((a,b)=> a < b ? 1 : -1)
                   .map((key)=> {
                     const lines = monthTabLines(key, listForMonths);
@@ -778,6 +752,25 @@ export default function DailyUpdate() {
               </div>
               );
             })()}
+
+            {activeTab === 'all-submissions' && activeMonthSummary && (
+              <div className="mb-6 rounded-2xl border border-blue-200/60 dark:border-blue-800/50 bg-gradient-to-r from-blue-600/95 to-emerald-600/95 text-white shadow-lg overflow-hidden">
+                <div className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-xl font-bold tracking-tight">{activeMonthSummary.title}</p>
+                    <p className="text-sm text-white/85 mt-0.5">{activeMonthSummary.range}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm">
+                    <span className="rounded-lg bg-white/15 px-3 py-1.5 font-semibold tabular-nums">
+                      {activeMonthSummary.hours} hours
+                    </span>
+                    <span className="rounded-lg bg-white/15 px-3 py-1.5 font-semibold tabular-nums">
+                      {activeMonthSummary.days} {activeMonthSummary.days === 1 ? 'day' : 'days'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Submissions List */}
             {subsLoading ? (

@@ -27,6 +27,7 @@ interface WorkStats {
     period_start: string;
     period_end: string;
     period_name: string;
+    period_range?: string;
     days: number;
     hours: number;
     overtime_hours?: number;
@@ -38,6 +39,7 @@ interface WorkStats {
   period_trend: Array<{
     period: string;
     period_name: string;
+    period_range?: string;
     days: number;
     hours: number;
     overtime_hours?: number;
@@ -214,8 +216,11 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
           <Calendar className="h-3 w-3 text-green-600 dark:text-green-400" />
           <span className="font-semibold text-green-700 dark:text-green-300">{current_period.days}d</span>
         </div>
-        <div className="text-gray-500 dark:text-gray-400 text-xs">
-          {current_period.period_name}
+        <div className="text-gray-500 dark:text-gray-400 text-xs text-right leading-tight">
+          <div className="font-medium text-gray-600 dark:text-gray-300">{current_period.period_name}</div>
+          {current_period.period_range ? (
+            <div className="text-[10px] text-gray-500 dark:text-gray-500">{current_period.period_range}</div>
+          ) : null}
         </div>
       </div>
     );
@@ -233,9 +238,14 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {current_period.hours}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
                   {current_period.period_name}
                 </p>
+                {current_period.period_range ? (
+                  <p className="text-[11px] text-gray-500 dark:text-gray-500">
+                    {current_period.period_range}
+                  </p>
+                ) : null}
               </div>
               <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
                 <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -252,9 +262,14 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {current_period.days}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
                   {current_period.period_name}
                 </p>
+                {current_period.period_range ? (
+                  <p className="text-[11px] text-gray-500 dark:text-gray-500">
+                    {current_period.period_range}
+                  </p>
+                ) : null}
               </div>
               <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
                 <Calendar className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -320,9 +335,16 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
                   className="group p-3 rounded-xl bg-gradient-to-r from-gray-50/50 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/20 hover:from-gray-100/70 hover:to-blue-100/50 dark:hover:from-gray-700/50 dark:hover:to-blue-800/30 transition-all duration-200 border border-gray-200/30 dark:border-gray-700/30 cursor-pointer hover:shadow-md active:scale-[0.98]"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-0">
-                      {period.period_name}
-                    </span>
+                    <div className="min-w-0">
+                      <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 block">
+                        {period.period_name}
+                      </span>
+                      {period.period_range ? (
+                        <span className="text-[11px] text-gray-500 dark:text-gray-500">
+                          {period.period_range}
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="flex flex-wrap items-center justify-start sm:justify-end gap-x-2 sm:gap-x-3 gap-y-1 text-[11px] sm:text-sm">
                       <div className="flex items-center gap-1" title="Total hours">
                         <Clock className="h-3 w-3 text-blue-500 shrink-0" />

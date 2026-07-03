@@ -18,6 +18,11 @@ import { useAuth } from '@/context/AuthContext';
 import { bugService } from '@/services/bugService';
 import { updateService } from '@/services/updateService';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
+import {
+  calendarMonthKey,
+  computeMonthTotalsToDate,
+  getCalendarMonthPeriod,
+} from '@/lib/workPeriodUtils';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
@@ -136,6 +141,7 @@ export default function DailyWorkUpdate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<string>('');
+  const [monthSubmissions, setMonthSubmissions] = useState<any[]>([]);
   const [isCheckInDialogOpen, setIsCheckInDialogOpen] = useState(false);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
@@ -321,20 +327,27 @@ export default function DailyWorkUpdate() {
     }, 0);
   }
 
-  function getCodoPeriodStart(dateStr: string) {
-    const d = new Date(dateStr);
-    const day = d.getDate();
-    const since = new Date(d);
-    if (day <= 5) {
-      // previous month 6th
-      since.setMonth(since.getMonth() - 1);
-      since.setDate(6);
-    } else {
-      // current month 6th
-      since.setDate(6);
+  // Load submissions for the selected calendar month (for live totals in preview)
+  useEffect(() => {
+    if (!form.submission_date) {
+      setMonthSubmissions([]);
+      return;
     }
-    return since.toISOString().slice(0, 10);
-  }
+    let cancelled = false;
+    const { from, to } = getCalendarMonthPeriod(calendarMonthKey(form.submission_date));
+    (async () => {
+      try {
+        const res = await listMySubmissions({ from, to });
+        const items: any[] = res && (res as any).data ? (res as any).data : Array.isArray(res) ? res : [];
+        if (!cancelled) setMonthSubmissions(items);
+      } catch {
+        if (!cancelled) setMonthSubmissions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [form.submission_date]);
 
   async function onSubmit() {
     try {
@@ -561,11 +574,25 @@ export default function DailyWorkUpdate() {
       header += `\n☕ Total Break Time: ${getBreakMinutes(breakEntries)} min`;
     }
 
-    // Compute totals for current CODO period up to selected date
-    const since = getCodoPeriodStart(form.submission_date);
-    const sinceLabel = new Date(since).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
-    header += `\n📊 Total Working Days (Since ${sinceLabel}): 0 Days`;
-    header += `\n🧮 Total Hours Completed : 0 hours`;
+    // Compute totals for current calendar month up to selected date
+    const subsForTotals = monthSubmissions.map((s) => ({ ...s }));
+    const existingIdx = subsForTotals.findIndex(
+      (s) => String(s.submission_date) === String(form.submission_date)
+    );
+    if (existingIdx >= 0) {
+      subsForTotals[existingIdx] = {
+        ...subsForTotals[existingIdx],
+        hours_today: form.hours_today,
+      };
+    } else if (form.submission_date) {
+      subsForTotals.push({
+        submission_date: form.submission_date,
+        hours_today: form.hours_today,
+      });
+    }
+    const monthTotals = computeMonthTotalsToDate(subsForTotals, form.submission_date);
+    header += `\n📊 Total Working Days (${monthTotals.periodLabel}): ${monthTotals.days} ${monthTotals.days === 1 ? 'Day' : 'Days'}`;
+    header += `\n🧮 Total Hours Completed : ${monthTotals.hours} hours`;
 
     const sec: string[] = [];
 
@@ -620,7 +647,7 @@ export default function DailyWorkUpdate() {
 
     const text = sec.length ? header + `\n\n` + sec.join(`\n\n`) : header;
     setTemplate(text);
-  }, [form.submission_date, form.check_in_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes, form.planned_work_notes, form.planned_work_status, selectedProjects, plannedWork, projects, requestAdminApproval, requestedExtraHours, approvalReason, overtimeHours, regularHours, breakEntries]);
+  }, [form.submission_date, form.check_in_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes, form.planned_work_notes, form.planned_work_status, selectedProjects, plannedWork, projects, requestAdminApproval, requestedExtraHours, approvalReason, overtimeHours, regularHours, breakEntries, monthSubmissions]);
 
   // Load projects when check-in dialog opens or when we need them for preview
   useEffect(() => {

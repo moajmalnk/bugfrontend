@@ -263,7 +263,7 @@ export default function AdminOvertimeUserDetail() {
                     <Clock className="h-6 w-6 text-white" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Requests by CODO month</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Requests by month</h2>
                     <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 leading-relaxed">
                       Choose a period, then approve, reject, or set approved overtime hours.
                     </p>

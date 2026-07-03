@@ -145,7 +145,7 @@ export default function AdminOvertimeRequests() {
               <div className="min-w-0 pt-0.5 flex-1">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Users</h2>
                 <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 leading-snug max-w-3xl">
-                  Each card summarizes extra-hour activity. Click a user to review and act on submissions by CODO month.
+                  Each card summarizes extra-hour activity. Click a user to review and act on submissions by month.
                 </p>
               </div>
             </div>
@@ -200,7 +200,7 @@ export default function AdminOvertimeRequests() {
                           {g.list.length} submission{g.list.length === 1 ? '' : 's'}
                         </span>
                         <span className="inline-flex items-center rounded-lg bg-gray-100 dark:bg-gray-900/80 px-2.5 py-1 font-medium text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
-                          {monthCount} CODO month{monthCount === 1 ? '' : 's'}
+                          {monthCount} month{monthCount === 1 ? '' : 's'}
                         </span>
                         {g.pending > 0 ? (
                           <span className="inline-flex items-center rounded-lg bg-amber-100 dark:bg-amber-950/80 px-2.5 py-1 font-semibold text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-amber-800/50">

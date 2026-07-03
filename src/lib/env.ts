@@ -54,11 +54,7 @@ export const validateEnv = () => {
   return true;
 };
 
-// Local: http://localhost/BugRicer/backend/api/auth
-// Production: https://bugsbackend.moajmalnk.in/api/auth
-export const API_BASE_URL = isLocalhost
-  ? "http://localhost/BugRicer/backend/api/auth"
-  : "https://bugbackend.bugricer.com/api/auth";
+export const API_BASE_URL = `${ENV.API_URL.replace(/\/$/, "")}/auth`;
 
 // WebSocket URL configuration
 export const getWebSocketUrl = () => {
@@ -67,6 +63,11 @@ export const getWebSocketUrl = () => {
     return import.meta.env.VITE_WS_URL;
   }
   
+  const apiUrl = getApiUrl();
+  if (apiUrl.includes('bugbackend.bugricer.com')) {
+    return 'wss://bugbackend.bugricer.com:8089';
+  }
+
   // Auto-detect based on current URL
   if (isLocalhost) {
     return 'ws://localhost:8089';

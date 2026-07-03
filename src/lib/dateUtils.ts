@@ -348,3 +348,11 @@ export function toLocalCalendarDateString(d: Date): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
+
+/** Extract YYYY-MM-DD from API / DB date values (date-only or datetime). */
+export function normalizeYmdDateString(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : '';
+}

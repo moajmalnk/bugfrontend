@@ -1,19 +1,21 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
+import { DailySubmissionDetailCard } from "@/components/users/DailySubmissionDetailCard";
+import { normalizeYmdDateString } from "@/lib/dateUtils";
+import { computeMonthTotalsToDate } from "@/lib/workPeriodUtils";
+import { getCalendarMonthEnd } from "@/lib/workPeriodUtils";
 import { format } from "date-fns";
 import {
   AlertCircle,
   ArrowLeft,
   Calendar,
   CalendarDays,
-  UserRound,
   CheckCircle2,
   Clock,
   FileText,
@@ -22,22 +24,17 @@ import {
   PlusCircle,
   TrendingUp,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 function computePeriodEnd(periodStart: string): string {
-  const startDate = new Date(`${periodStart}T00:00:00`);
-  if (Number.isNaN(startDate.getTime())) return periodStart;
-  const endDate = new Date(startDate);
-  endDate.setMonth(endDate.getMonth() + 1);
-  endDate.setDate(5);
-  return endDate.toISOString().split("T")[0];
+  return getCalendarMonthEnd(periodStart);
 }
 
 function parseYmdDate(value: unknown): Date | null {
-  const s = String(value ?? "").trim();
-  if (!s) return null;
-  const d = new Date(`${s}T00:00:00`);
+  const ymd = normalizeYmdDateString(value);
+  if (!ymd) return null;
+  const d = new Date(`${ymd}T00:00:00`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -106,6 +103,72 @@ function formatDailySubmittedAt(
   return null;
 }
 
+function submissionDayKey(submission: Record<string, unknown>): string {
+  return normalizeYmdDateString(submission.date ?? submission.submission_date);
+}
+
+function formatSubmissionDay(submission: Record<string, unknown>): string | null {
+  const key = submissionDayKey(submission);
+  if (!key) return null;
+  const d = parseYmdDate(key);
+  return d ? format(d, "MMM dd, yyyy") : key;
+}
+
+function tasksForDay(
+  tasks: Array<{ date?: string; task?: string }> | undefined,
+  date: string
+) {
+  if (!Array.isArray(tasks) || !date) return [];
+  return tasks.filter((t) => String(t.date ?? "") === date);
+}
+
+function TaskListSection({
+  title,
+  icon,
+  colorClass,
+  badgeClass,
+  items,
+}: {
+  title: string;
+  icon: ReactNode;
+  colorClass: string;
+  badgeClass: string;
+  items: Array<{ date?: string; task?: string }>;
+}) {
+  if (!items.length) return null;
+  return (
+    <div>
+      <h3 className={`text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2 ${colorClass}`}>
+        {icon}
+        {title} ({items.length})
+      </h3>
+      <Card className="border-border/60 bg-card/60 backdrop-blur">
+        <CardContent className="p-4">
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {items.map((item, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-3 p-3 rounded-xl border border-border/50 bg-background/40"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap break-words">
+                    {item.task}
+                  </p>
+                  {item.date ? (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {format(new Date(`${item.date}T00:00:00`), "MMM dd, yyyy")}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function UserWorkStatsPeriod() {
   const { userId, periodStart } = useParams();
   const [searchParams] = useSearchParams();
@@ -115,6 +178,12 @@ export default function UserWorkStatsPeriod() {
   const effectiveRole = getEffectiveRole(currentUser || {});
 
   const label = searchParams.get("label") || "";
+  const initialScope = searchParams.get("scope") === "team" ? "team" : "user";
+  const [viewScope, setViewScope] = useState<"user" | "team">(initialScope);
+  const canViewTeam =
+    effectiveRole === "admin" ||
+    effectiveRole === "super_admin" ||
+    currentUser?.role === "admin";
   const end = useMemo(
     () => (periodStart ? computePeriodEnd(periodStart) : ""),
     [periodStart]
@@ -128,26 +197,38 @@ export default function UserWorkStatsPeriod() {
 
   useEffect(() => {
     const run = async () => {
-      if (!userId || !periodStart) return;
+      if (!periodStart) return;
       setError(null);
       setIsLoadingStats(true);
       setIsLoadingDetails(true);
       setSelectedPeriod(null);
       setPeriodDetails(null);
-      try {
-        const stats = await userService.getUserWorkStats(userId);
-        const match =
-          stats?.period_trend?.find((p: any) => String(p.period) === String(periodStart)) ||
-          null;
-        setSelectedPeriod(match);
-      } catch (err: any) {
-        setError(err?.message || "Failed to load work stats");
-      } finally {
+
+      const teamMode = viewScope === "team" && canViewTeam;
+
+      if (!teamMode && userId) {
+        try {
+          const stats = await userService.getUserWorkStats(userId);
+          const match =
+            stats?.period_trend?.find((p: any) => String(p.period) === String(periodStart)) ||
+            null;
+          setSelectedPeriod(match);
+        } catch (err: any) {
+          setError(err?.message || "Failed to load work stats");
+        } finally {
+          setIsLoadingStats(false);
+        }
+      } else {
         setIsLoadingStats(false);
       }
 
       try {
-        const details = await userService.getPeriodDetails(userId, periodStart, end);
+        const details = teamMode
+          ? await userService.getTeamPeriodDetails(periodStart, end)
+          : userId
+            ? await userService.getPeriodDetails(userId, periodStart, end)
+            : null;
+        if (!details) throw new Error("Missing user for period details");
         setPeriodDetails(details);
       } catch (err: any) {
         setError(err?.message || "Failed to load period details");
@@ -156,13 +237,100 @@ export default function UserWorkStatsPeriod() {
       }
     };
     void run();
-  }, [userId, periodStart, end]);
+  }, [userId, periodStart, end, viewScope, canViewTeam]);
 
   const headerTitle = useMemo(() => {
     if (label.trim()) return label.trim();
     if (selectedPeriod?.period_name) return selectedPeriod.period_name;
     return periodStart ? periodStart : "Period Details";
   }, [label, selectedPeriod?.period_name, periodStart]);
+
+  const headerSubtitle = useMemo(() => {
+    if (selectedPeriod?.period_range) return selectedPeriod.period_range;
+    if (periodDetails?.period_start && periodDetails?.period_end) {
+      return `${periodDetails.period_start} – ${periodDetails.period_end}`;
+    }
+    return null;
+  }, [selectedPeriod?.period_range, periodDetails?.period_start, periodDetails?.period_end]);
+
+  const periodSummary = useMemo(() => {
+    if (viewScope === "team" && periodDetails?.scope === "team") {
+      const subs = Array.isArray(periodDetails.submissions) ? periodDetails.submissions : [];
+      const tasks = periodDetails.tasks || {};
+      const uniqueDays = new Set(
+        subs.map((s: any) => normalizeYmdDateString(s.date ?? s.submission_date)).filter(Boolean)
+      );
+      return {
+        hours: subs.reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
+        days: uniqueDays.size,
+        overtime_hours: periodDetails.summary?.overtime_hours ?? 0,
+        requested_extra_hours: periodDetails.summary?.requested_extra_hours ?? 0,
+        break_minutes: periodDetails.summary?.break_minutes ?? 0,
+        task_counts: {
+          completed: tasks.completed?.length ?? 0,
+          pending: tasks.pending?.length ?? 0,
+          ongoing: tasks.ongoing?.length ?? 0,
+          upcoming: tasks.upcoming?.length ?? 0,
+        },
+      };
+    }
+    if (selectedPeriod) return selectedPeriod;
+    if (!periodDetails) return null;
+    const subs = Array.isArray(periodDetails.submissions) ? periodDetails.submissions : [];
+    const tasks = periodDetails.tasks || {};
+    return {
+      hours: subs.reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
+      days: subs.length,
+      overtime_hours: periodDetails.summary?.overtime_hours ?? 0,
+      requested_extra_hours: periodDetails.summary?.requested_extra_hours ?? 0,
+      break_minutes: periodDetails.summary?.break_minutes ?? 0,
+      task_counts: {
+        completed: tasks.completed?.length ?? 0,
+        pending: tasks.pending?.length ?? 0,
+        ongoing: tasks.ongoing?.length ?? 0,
+        upcoming: tasks.upcoming?.length ?? 0,
+      },
+    };
+  }, [selectedPeriod, periodDetails, viewScope]);
+
+  const groupedSubmissionsByDate = useMemo(() => {
+    const subs = Array.isArray(periodDetails?.submissions) ? periodDetails.submissions : [];
+    const map = new Map<string, any[]>();
+    for (const s of subs) {
+      const key = normalizeYmdDateString(s.date ?? s.submission_date);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(s);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [periodDetails]);
+
+  const userMonthToDateMap = useMemo(() => {
+    if (viewScope === "team") return new Map<string, { days: number; hours: number }>();
+    const subs = Array.isArray(periodDetails?.submissions) ? periodDetails.submissions : [];
+    const map = new Map<string, { days: number; hours: number }>();
+    for (const s of subs) {
+      const day = normalizeYmdDateString(s.date ?? s.submission_date);
+      if (!day) continue;
+      const totals = computeMonthTotalsToDate(subs, day);
+      map.set(day, { days: totals.days, hours: totals.hours });
+    }
+    return map;
+  }, [periodDetails, viewScope]);
+
+  const setScope = (scope: "user" | "team") => {
+    setViewScope(scope);
+    const params = new URLSearchParams(searchParams);
+    if (scope === "team") params.set("scope", "team");
+    else params.delete("scope");
+    navigate(
+      {
+        pathname: window.location.pathname,
+        search: params.toString() ? `?${params.toString()}` : "",
+      },
+      { replace: true }
+    );
+  };
 
   const dailyBreakdownTotals = useMemo(() => {
     const subs = periodDetails?.submissions;
@@ -203,10 +371,41 @@ export default function UserWorkStatsPeriod() {
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
                   Work Statistics & Task Breakdown
+                  {headerSubtitle ? (
+                    <span className="block text-sm text-gray-500 dark:text-gray-500 mt-1">
+                      {headerSubtitle}
+                    </span>
+                  ) : null}
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                {canViewTeam ? (
+                  <div className="inline-flex rounded-xl border border-gray-200/60 dark:border-gray-700/60 p-1 bg-white/60 dark:bg-gray-900/40">
+                    <button
+                      type="button"
+                      onClick={() => setScope("user")}
+                      className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                        viewScope === "user"
+                          ? "bg-gradient-to-r from-blue-600 to-emerald-600 text-white shadow"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      This user
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScope("team")}
+                      className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                        viewScope === "team"
+                          ? "bg-gradient-to-r from-blue-600 to-emerald-600 text-white shadow"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      All team members
+                    </button>
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   className="h-11 rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-900/40 backdrop-blur hover:bg-white/80 dark:hover:bg-gray-900/60 inline-flex items-center justify-center px-4 text-sm font-medium text-foreground transition-colors"
@@ -243,7 +442,7 @@ export default function UserWorkStatsPeriod() {
           </Card>
         )}
 
-        {!isLoadingDetails && selectedPeriod && (
+        {!isLoadingDetails && periodSummary && (
           <div className="space-y-6">
             {/* Summary Cards */}
             <div className="grid grid-cols-12 gap-4">
@@ -255,7 +454,7 @@ export default function UserWorkStatsPeriod() {
                         Total Hours
                       </p>
                       <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">
-                        {Number(selectedPeriod.hours || 0).toFixed(1)}h
+                        {Number(periodSummary.hours || 0).toFixed(1)}h
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                         Worked during this period
@@ -276,7 +475,7 @@ export default function UserWorkStatsPeriod() {
                         Active Days
                       </p>
                       <p className="text-3xl font-bold text-green-700 dark:text-green-300">
-                        {Number(selectedPeriod.days || 0)}d
+                        {Number(periodSummary.days || 0)}d
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                         Days with work submissions
@@ -298,8 +497,8 @@ export default function UserWorkStatsPeriod() {
                       </p>
                       <p className="text-3xl font-bold text-violet-700 dark:text-violet-300 tabular-nums">
                         {(
-                          Number(selectedPeriod.hours || 0) +
-                          Number(selectedPeriod.overtime_hours || 0)
+                          Number(periodSummary.hours || 0) +
+                          Number(periodSummary.overtime_hours || 0)
                         ).toFixed(1)}
                         h
                       </p>
@@ -322,7 +521,7 @@ export default function UserWorkStatsPeriod() {
                     Overtime Hours
                   </p>
                   <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                    {Number(selectedPeriod.overtime_hours || 0).toFixed(1)}h
+                    {Number(periodSummary.overtime_hours || 0).toFixed(1)}h
                   </p>
                 </CardContent>
               </Card>
@@ -332,7 +531,7 @@ export default function UserWorkStatsPeriod() {
                     OT Requested
                   </p>
                   <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-                    {Number(selectedPeriod.requested_extra_hours || 0).toFixed(1)}h
+                    {Number(periodSummary.requested_extra_hours || 0).toFixed(1)}h
                   </p>
                 </CardContent>
               </Card>
@@ -342,7 +541,7 @@ export default function UserWorkStatsPeriod() {
                     Break Time
                   </p>
                   <p className="text-2xl font-bold text-cyan-700 dark:text-cyan-300">
-                    {Math.max(0, Number(selectedPeriod.break_minutes || 0))}m
+                    {Math.max(0, Number(periodSummary.break_minutes || 0))}m
                   </p>
                 </CardContent>
               </Card>
@@ -369,7 +568,7 @@ export default function UserWorkStatsPeriod() {
                         </span>
                       </div>
                       <Badge className="bg-red-600 text-white text-lg px-3 py-1">
-                        {selectedPeriod.task_counts.completed}
+                        {periodSummary.task_counts.completed}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -390,7 +589,7 @@ export default function UserWorkStatsPeriod() {
                         </span>
                       </div>
                       <Badge className="bg-yellow-600 text-white text-lg px-3 py-1">
-                        {selectedPeriod.task_counts.pending}
+                        {periodSummary.task_counts.pending}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -411,7 +610,7 @@ export default function UserWorkStatsPeriod() {
                         </span>
                       </div>
                       <Badge className="bg-blue-600 text-white text-lg px-3 py-1">
-                        {selectedPeriod.task_counts.ongoing}
+                        {periodSummary.task_counts.ongoing}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -432,7 +631,7 @@ export default function UserWorkStatsPeriod() {
                         </span>
                       </div>
                       <Badge className="bg-purple-600 text-white text-lg px-3 py-1">
-                        {selectedPeriod.task_counts.upcoming}
+                        {periodSummary.task_counts.upcoming}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -443,6 +642,50 @@ export default function UserWorkStatsPeriod() {
               </div>
             </div>
 
+            <Separator />
+
+            {/* Additional Statistics */}
+            <div className="grid grid-cols-12 gap-4">
+              <Card className="col-span-12 sm:col-span-4 border-border/60 bg-card/60 backdrop-blur">
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {periodSummary.task_counts.completed +
+                      periodSummary.task_counts.pending +
+                      periodSummary.task_counts.ongoing +
+                      periodSummary.task_counts.upcoming}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Total Tasks</p>
+                </CardContent>
+              </Card>
+              <Card className="col-span-12 sm:col-span-4 border-border/60 bg-card/60 backdrop-blur">
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                    {periodSummary.days > 0
+                      ? (Number(periodSummary.hours || 0) / periodSummary.days).toFixed(1)
+                      : "0.0"}
+                    h
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Avg Hours/Day</p>
+                </CardContent>
+              </Card>
+              <Card className="col-span-12 sm:col-span-4 border-border/60 bg-card/60 backdrop-blur">
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {periodSummary.days > 0
+                      ? Math.round(
+                          (periodSummary.task_counts.completed +
+                            periodSummary.task_counts.pending +
+                            periodSummary.task_counts.ongoing +
+                            periodSummary.task_counts.upcoming) /
+                            periodSummary.days
+                        )
+                      : 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Avg Tasks/Day</p>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Details lists */}
             <Separator />
             <div className="space-y-6">
@@ -451,9 +694,37 @@ export default function UserWorkStatsPeriod() {
                   <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                 </div>
               ) : (
-                <ScrollArea className="max-h-[70vh] pr-4">
-                  <div className="space-y-6">
-                    {periodDetails?.notes?.length > 0 && (
+                <div className="space-y-6">
+                  <TaskListSection
+                    title="Completed Tasks"
+                    icon={<CheckCircle2 className="h-5 w-5 text-red-600 dark:text-red-400" />}
+                    colorClass=""
+                    badgeClass="bg-red-600"
+                    items={periodDetails?.tasks?.completed ?? []}
+                  />
+                  <TaskListSection
+                    title="Pending Tasks"
+                    icon={<AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />}
+                    colorClass=""
+                    badgeClass="bg-yellow-600"
+                    items={periodDetails?.tasks?.pending ?? []}
+                  />
+                  <TaskListSection
+                    title="Ongoing Tasks"
+                    icon={<PlayCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
+                    colorClass=""
+                    badgeClass="bg-blue-600"
+                    items={periodDetails?.tasks?.ongoing ?? []}
+                  />
+                  <TaskListSection
+                    title="Upcoming Tasks"
+                    icon={<CalendarDays className="h-5 w-5 text-purple-600 dark:text-purple-400" />}
+                    colorClass=""
+                    badgeClass="bg-purple-600"
+                    items={periodDetails?.tasks?.upcoming ?? []}
+                  />
+
+                  {periodDetails?.notes?.length > 0 && (
                       <Card className="border-border/60 bg-card/60 backdrop-blur">
                         <CardContent className="p-5 sm:p-6 space-y-4">
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -502,146 +773,118 @@ export default function UserWorkStatsPeriod() {
                       </Card>
                     )}
 
-                    {Array.isArray(periodDetails?.submissions) &&
-                      periodDetails.submissions.length > 0 && (
+                    {groupedSubmissionsByDate.length > 0 && (
                         <Card className="border-border/60 bg-card/60 backdrop-blur">
-                          <CardContent className="p-5 sm:p-6 space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <div className="min-w-0">
-                              <h4 className="text-sm sm:text-base font-semibold leading-none">
-                                Daily Breakdown
-                              </h4>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {periodDetails.submissions.length} days summary
-                              </p>
+                          <CardContent className="p-5 sm:p-6 space-y-5">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div className="min-w-0">
+                                <h4 className="text-sm sm:text-base font-semibold leading-none">
+                                  Daily Breakdown
+                                </h4>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {viewScope === "team"
+                                    ? `${periodDetails?.summary?.submissions ?? periodDetails.submissions.length} submissions · ${groupedSubmissionsByDate.length} days · ${periodDetails?.summary?.users ?? "—"} users`
+                                    : `${groupedSubmissionsByDate.length} days · full work update details`}
+                                </p>
+                              </div>
+                              <Badge className="w-fit bg-emerald-600/90 text-white px-3 py-1 rounded-full">
+                                {groupedSubmissionsByDate.length} days
+                              </Badge>
                             </div>
-                            <Badge className="w-fit bg-emerald-600/90 text-white px-3 py-1 rounded-full">
-                              {periodDetails.submissions.length} days
-                            </Badge>
-                          </div>
-                          {dailyBreakdownTotals && (
-                            <div className="grid grid-cols-12 gap-3">
-                              <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border-border/50 bg-background/40">
-                                <CardContent className="p-4 flex items-center justify-between gap-3">
-                                  <div>
-                                    <div className="text-[11px] text-muted-foreground">Total hours</div>
-                                    <div className="text-xl font-bold tabular-nums">
-                                      {dailyBreakdownTotals.hours.toFixed(1)}h
-                                    </div>
-                                  </div>
-                                  <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                                    <Clock className="h-5 w-5" />
-                                  </div>
-                                </CardContent>
-                              </Card>
-                              <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border-border/50 bg-background/40">
-                                <CardContent className="p-4 flex items-center justify-between gap-3">
-                                  <div>
-                                    <div className="text-[11px] text-muted-foreground">Approved OT</div>
-                                    <div className="text-xl font-bold tabular-nums">
-                                      {dailyBreakdownTotals.ot.toFixed(1)}h
-                                    </div>
-                                  </div>
-                                  <div className="p-2 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold">
-                                    OT
-                                  </div>
-                                </CardContent>
-                              </Card>
-                              <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border-border/50 bg-background/40">
-                                <CardContent className="p-4 flex items-center justify-between gap-3">
-                                  <div>
-                                    <div className="text-[11px] text-muted-foreground">OT requested</div>
-                                    <div className="text-xl font-bold tabular-nums">
-                                      {dailyBreakdownTotals.requested.toFixed(1)}h
-                                    </div>
-                                  </div>
-                                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                    <PlusCircle className="h-5 w-5" />
-                                  </div>
-                                </CardContent>
-                              </Card>
-                              <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border-border/50 bg-background/40">
-                                <CardContent className="p-4 flex items-center justify-between gap-3">
-                                  <div>
-                                    <div className="text-[11px] text-muted-foreground">Break minutes</div>
-                                    <div className="text-xl font-bold tabular-nums">
-                                      {dailyBreakdownTotals.breakMin}m
-                                    </div>
-                                  </div>
-                                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                                    <Calendar className="h-5 w-5" />
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </div>
-                          )}
-                          <div className="space-y-2">
-                            {periodDetails.submissions.map((submission: any, idx: number) => {
-                              const submittedAt = formatDailySubmittedAt(
-                                submission.submission_date,
-                                submission.created_at,
-                                submission.check_in_time
-                              );
-                              const date = parseYmdDate(submission.submission_date);
-                              return (
-                                <div
-                                  key={idx}
-                                  className="rounded-2xl border border-border/60 bg-background/40 hover:bg-background/60 transition-colors"
-                                >
-                                  <div className="p-4 sm:p-5">
-                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <div className="font-semibold">
-                                          {date ? format(date, "MMM dd, yyyy") : "—"}
-                                        </div>
-                                        {submittedAt ? (
-                                          <div className="text-xs text-muted-foreground mt-1">
-                                            Submitted: {submittedAt}
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                        <div className="text-right">
-                                          <div className="font-semibold tabular-nums text-foreground">
-                                            {Number(submission.hours || 0).toFixed(1)}h
-                                          </div>
-                                          <div className="tabular-nums">
-                                            OT {Number(submission.overtime_hours || 0).toFixed(1)}h
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
 
-                                    {submission.tasks ? (
-                                      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                                        <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-2 flex items-center justify-between">
-                                          <span className="text-muted-foreground">Completed</span>
-                                          <span className="font-semibold">{submission.tasks.completed ?? 0}</span>
-                                        </div>
-                                        <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-2 flex items-center justify-between">
-                                          <span className="text-muted-foreground">Pending</span>
-                                          <span className="font-semibold">{submission.tasks.pending ?? 0}</span>
-                                        </div>
-                                        <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-2 flex items-center justify-between">
-                                          <span className="text-muted-foreground">Ongoing</span>
-                                          <span className="font-semibold">{submission.tasks.ongoing ?? 0}</span>
-                                        </div>
-                                        <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-2 flex items-center justify-between">
-                                          <span className="text-muted-foreground">Upcoming</span>
-                                          <span className="font-semibold">{submission.tasks.upcoming ?? 0}</span>
-                                        </div>
+                            {dailyBreakdownTotals && (
+                              <div className="grid grid-cols-12 gap-3">
+                                <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border-border/50 bg-background/40">
+                                  <CardContent className="p-4 flex items-center justify-between gap-3">
+                                    <div>
+                                      <div className="text-[11px] text-muted-foreground">Total hours</div>
+                                      <div className="text-xl font-bold tabular-nums">
+                                        {dailyBreakdownTotals.hours.toFixed(1)}h
                                       </div>
-                                    ) : null}
+                                    </div>
+                                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                      <Clock className="h-5 w-5" />
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                                <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border-border/50 bg-background/40">
+                                  <CardContent className="p-4 flex items-center justify-between gap-3">
+                                    <div>
+                                      <div className="text-[11px] text-muted-foreground">Approved OT</div>
+                                      <div className="text-xl font-bold tabular-nums">
+                                        {dailyBreakdownTotals.ot.toFixed(1)}h
+                                      </div>
+                                    </div>
+                                    <div className="p-2 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold">
+                                      OT
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                                <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border-border/50 bg-background/40">
+                                  <CardContent className="p-4 flex items-center justify-between gap-3">
+                                    <div>
+                                      <div className="text-[11px] text-muted-foreground">OT requested</div>
+                                      <div className="text-xl font-bold tabular-nums">
+                                        {dailyBreakdownTotals.requested.toFixed(1)}h
+                                      </div>
+                                    </div>
+                                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                      <PlusCircle className="h-5 w-5" />
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                                <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border-border/50 bg-background/40">
+                                  <CardContent className="p-4 flex items-center justify-between gap-3">
+                                    <div>
+                                      <div className="text-[11px] text-muted-foreground">Break minutes</div>
+                                      <div className="text-xl font-bold tabular-nums">
+                                        {dailyBreakdownTotals.breakMin}m
+                                      </div>
+                                    </div>
+                                    <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                                      <Calendar className="h-5 w-5" />
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+                            )}
+
+                            <div className="space-y-6">
+                              {groupedSubmissionsByDate.map(([day, daySubmissions]) => (
+                                <div key={day} className="space-y-3">
+                                  <div className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+                                    <h5 className="text-sm font-semibold text-foreground">
+                                      {format(new Date(`${day}T00:00:00`), "EEEE, MMM dd, yyyy")}
+                                    </h5>
+                                    <Badge variant="secondary" className="tabular-nums">
+                                      {daySubmissions.length}{" "}
+                                      {daySubmissions.length === 1 ? "update" : "updates"}
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {daySubmissions.map((submission: any, idx: number) => (
+                                      <DailySubmissionDetailCard
+                                        key={`${day}-${submission.user_id ?? "u"}-${idx}`}
+                                        submission={submission}
+                                        showUser={viewScope === "team"}
+                                        monthToDate={
+                                          viewScope === "user"
+                                            ? {
+                                                ...userMonthToDateMap.get(day)!,
+                                                date: day,
+                                              }
+                                            : null
+                                        }
+                                      />
+                                    ))}
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
+                              ))}
+                            </div>
                           </CardContent>
                         </Card>
                       )}
-                  </div>
-                </ScrollArea>
+                </div>
               )}
             </div>
           </div>
