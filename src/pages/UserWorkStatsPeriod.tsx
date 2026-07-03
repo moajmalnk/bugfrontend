@@ -869,10 +869,12 @@ export default function UserWorkStatsPeriod() {
                                         showUser={viewScope === "team"}
                                         monthToDate={
                                           viewScope === "user"
-                                            ? {
-                                                ...userMonthToDateMap.get(day)!,
-                                                date: day,
-                                              }
+                                            ? (() => {
+                                                const mtd = userMonthToDateMap.get(day);
+                                                return mtd
+                                                  ? { ...mtd, date: day }
+                                                  : null;
+                                              })()
                                             : null
                                         }
                                       />
