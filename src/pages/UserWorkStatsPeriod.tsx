@@ -7,9 +7,24 @@ import { useToast } from "@/hooks/use-toast";
 import { getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { DailySubmissionDetailCard } from "@/components/users/DailySubmissionDetailCard";
+import {
+  EMPTY_PERIOD_FILTERS,
+  isPeriodFiltersActive,
+  PeriodDetailsFilterBar,
+  type PeriodDetailFilters,
+} from "@/components/users/PeriodDetailsFilterBar";
 import { normalizeYmdDateString } from "@/lib/dateUtils";
+import {
+  buildProjectNameLookup,
+  enrichSubmission,
+  noteMatchesFilteredSubmissions,
+  submissionMatchesFilters,
+  taskMatchesFilteredSubmissions,
+} from "@/lib/periodDetailsFilters";
+import type { Project } from "@/services/projectService";
 import { computeMonthTotalsToDate } from "@/lib/workPeriodUtils";
 import { getCalendarMonthEnd } from "@/lib/workPeriodUtils";
+import { projectService } from "@/services/projectService";
 import { format } from "date-fns";
 import {
   AlertCircle,
@@ -19,6 +34,7 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  FolderOpen,
   Loader2,
   PlayCircle,
   PlusCircle,
@@ -114,6 +130,16 @@ function formatSubmissionDay(submission: Record<string, unknown>): string | null
   return d ? format(d, "MMM dd, yyyy") : key;
 }
 
+function submissionProjectNames(submission: Record<string, unknown>): string[] {
+  if (Array.isArray(submission.project_names) && submission.project_names.length > 0) {
+    return submission.project_names
+      .map((name) => String(name).trim())
+      .filter(Boolean)
+      .filter((name) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(name));
+  }
+  return [];
+}
+
 function tasksForDay(
   tasks: Array<{ date?: string; task?: string }> | undefined,
   date: string
@@ -128,12 +154,14 @@ function TaskListSection({
   colorClass,
   badgeClass,
   items,
+  showUsername = false,
 }: {
   title: string;
   icon: ReactNode;
   colorClass: string;
   badgeClass: string;
-  items: Array<{ date?: string; task?: string }>;
+  items: Array<{ date?: string; task?: string; username?: string }>;
+  showUsername?: boolean;
 }) {
   if (!items.length) return null;
   return (
@@ -151,6 +179,11 @@ function TaskListSection({
                 className="flex items-start gap-3 p-3 rounded-xl border border-border/50 bg-background/40"
               >
                 <div className="flex-1 min-w-0">
+                  {showUsername && item.username ? (
+                    <Badge variant="outline" className="text-[10px] mb-1.5">
+                      {item.username}
+                    </Badge>
+                  ) : null}
                   <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap break-words">
                     {item.task}
                   </p>
@@ -194,6 +227,36 @@ export default function UserWorkStatsPeriod() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<any>(null);
   const [periodDetails, setPeriodDetails] = useState<any>(null);
+  const [filters, setFilters] = useState<PeriodDetailFilters>(EMPTY_PERIOD_FILTERS);
+  const [catalogProjects, setCatalogProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    setFilters(EMPTY_PERIOD_FILTERS);
+  }, [viewScope, periodStart]);
+
+  useEffect(() => {
+    let cancelled = false;
+    projectService
+      .getProjects()
+      .then((projects) => {
+        if (!cancelled) setCatalogProjects(projects);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogProjects([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const projectNameById = useMemo(
+    () =>
+      buildProjectNameLookup([
+        periodDetails?.project_name_map,
+        catalogProjects,
+      ]),
+    [periodDetails?.project_name_map, catalogProjects]
+  );
 
   useEffect(() => {
     const run = async () => {
@@ -293,21 +356,64 @@ export default function UserWorkStatsPeriod() {
     };
   }, [selectedPeriod, periodDetails, viewScope]);
 
+  const allSubmissions = useMemo(
+    () =>
+      (Array.isArray(periodDetails?.submissions) ? periodDetails.submissions : []).map((s: any) =>
+        enrichSubmission(s, projectNameById)
+      ),
+    [periodDetails, projectNameById]
+  );
+
+  const filteredSubmissions = useMemo(() => {
+    if (!isPeriodFiltersActive(filters)) return allSubmissions;
+    return allSubmissions.filter((s: any) =>
+      submissionMatchesFilters(s, filters, projectNameById)
+    );
+  }, [allSubmissions, filters, projectNameById]);
+
+  const filterOptions = useMemo(() => {
+    const userMap = new Map<string, string>();
+    const projectSet = new Set<string>();
+    const daySet = new Set<string>();
+
+    for (const submission of allSubmissions) {
+      const id = String(submission.user_id ?? "");
+      if (id && submission.username) userMap.set(id, String(submission.username));
+      submissionProjectNames(submission).forEach((name) => projectSet.add(name));
+      const day = normalizeYmdDateString(submission.date ?? submission.submission_date);
+      if (day) daySet.add(day);
+    }
+
+    return {
+      users: Array.from(userMap.entries())
+        .map(([value, label]) => ({ value, label }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+      projects: Array.from(projectSet)
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => ({ value: name, label: name })),
+      days: Array.from(daySet)
+        .sort((a, b) => b.localeCompare(a))
+        .map((day) => ({
+          value: day,
+          label: format(new Date(`${day}T00:00:00`), "EEE, MMM dd"),
+        })),
+    };
+  }, [allSubmissions]);
+
   const groupedSubmissionsByDate = useMemo(() => {
-    const subs = Array.isArray(periodDetails?.submissions) ? periodDetails.submissions : [];
     const map = new Map<string, any[]>();
-    for (const s of subs) {
+    for (const s of filteredSubmissions) {
       const key = normalizeYmdDateString(s.date ?? s.submission_date);
       if (!key) continue;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
     }
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [periodDetails]);
+  }, [filteredSubmissions]);
 
   const userMonthToDateMap = useMemo(() => {
     if (viewScope === "team") return new Map<string, { days: number; hours: number }>();
-    const subs = Array.isArray(periodDetails?.submissions) ? periodDetails.submissions : [];
+    const subs = allSubmissions;
     const map = new Map<string, { days: number; hours: number }>();
     for (const s of subs) {
       const day = normalizeYmdDateString(s.date ?? s.submission_date);
@@ -316,7 +422,34 @@ export default function UserWorkStatsPeriod() {
       map.set(day, { days: totals.days, hours: totals.hours });
     }
     return map;
-  }, [periodDetails, viewScope]);
+  }, [allSubmissions, viewScope]);
+
+  const filteredTasks = useMemo(() => {
+    const tasks = periodDetails?.tasks ?? {};
+    const hasFilters = isPeriodFiltersActive(filters);
+    const filterList = (items: any[] | undefined) => {
+      if (!Array.isArray(items)) return [];
+      if (!hasFilters) return items;
+      return items.filter((item) =>
+        taskMatchesFilteredSubmissions(item, filteredSubmissions, viewScope, filters.search)
+      );
+    };
+    return {
+      completed: filterList(tasks.completed),
+      pending: filterList(tasks.pending),
+      ongoing: filterList(tasks.ongoing),
+      upcoming: filterList(tasks.upcoming),
+    };
+  }, [periodDetails, filteredSubmissions, filters, viewScope]);
+
+  const filteredNotes = useMemo(() => {
+    const notes = periodDetails?.notes;
+    if (!Array.isArray(notes)) return [];
+    if (!isPeriodFiltersActive(filters)) return notes;
+    return notes.filter((item) =>
+      noteMatchesFilteredSubmissions(item, filteredSubmissions, viewScope, filters.search)
+    );
+  }, [periodDetails, filteredSubmissions, filters, viewScope]);
 
   const setScope = (scope: "user" | "team") => {
     setViewScope(scope);
@@ -333,9 +466,8 @@ export default function UserWorkStatsPeriod() {
   };
 
   const dailyBreakdownTotals = useMemo(() => {
-    const subs = periodDetails?.submissions;
-    if (!Array.isArray(subs) || subs.length === 0) return null;
-    return subs.reduce(
+    if (filteredSubmissions.length === 0) return null;
+    return filteredSubmissions.reduce(
       (acc: any, s: any) => {
         acc.hours += Number(s.hours ?? 0) || 0;
         acc.ot += Number(s.overtime_hours ?? 0) || 0;
@@ -345,9 +477,82 @@ export default function UserWorkStatsPeriod() {
       },
       { hours: 0, ot: 0, requested: 0, breakMin: 0 }
     );
-  }, [periodDetails]);
+  }, [filteredSubmissions]);
+
+  const projectsByUser = useMemo(() => {
+    const map = new Map<string, { username: string; role?: string; projects: Set<string> }>();
+
+    for (const submission of filteredSubmissions) {
+      const names = submissionProjectNames(submission);
+      if (!names.length) continue;
+
+      const key = String(submission.user_id ?? submission.username ?? "unknown");
+      if (!map.has(key)) {
+        map.set(key, {
+          username: String(submission.username ?? "User"),
+          role: submission.role ? String(submission.role) : undefined,
+          projects: new Set<string>(),
+        });
+      }
+      const entry = map.get(key)!;
+      names.forEach((name) => entry.projects.add(name));
+    }
+
+    return Array.from(map.values())
+      .map((entry) => ({
+        username: entry.username,
+        role: entry.role,
+        projects: Array.from(entry.projects).sort((a, b) => a.localeCompare(b)),
+      }))
+      .sort((a, b) => a.username.localeCompare(b.username));
+  }, [filteredSubmissions]);
+
+  const periodProjectNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const submission of filteredSubmissions) {
+      submissionProjectNames(submission).forEach((name) => names.add(name));
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [filteredSubmissions]);
+
+  const filteredPeriodSummary = useMemo(() => {
+    if (!isPeriodFiltersActive(filters)) return periodSummary;
+    if (!periodSummary) return null;
+
+    const uniqueDays = new Set(
+      filteredSubmissions
+        .map((s: any) => normalizeYmdDateString(s.date ?? s.submission_date))
+        .filter(Boolean)
+    );
+
+    return {
+      ...periodSummary,
+      hours: filteredSubmissions.reduce((sum: number, s: any) => sum + Number(s.hours || 0), 0),
+      days: uniqueDays.size,
+      overtime_hours: filteredSubmissions.reduce(
+        (sum: number, s: any) => sum + Number(s.overtime_hours || 0),
+        0
+      ),
+      requested_extra_hours: filteredSubmissions.reduce(
+        (sum: number, s: any) => sum + Number(s.requested_extra_hours || 0),
+        0
+      ),
+      break_minutes: filteredSubmissions.reduce(
+        (sum: number, s: any) => sum + Math.max(0, Number(s.break_minutes || 0)),
+        0
+      ),
+      task_counts: {
+        completed: filteredTasks.completed.length,
+        pending: filteredTasks.pending.length,
+        ongoing: filteredTasks.ongoing.length,
+        upcoming: filteredTasks.upcoming.length,
+      },
+    };
+  }, [periodSummary, filters, filteredSubmissions, filteredTasks]);
 
   const goBack = () => navigate(`/${effectiveRole}/users/${userId}`);
+  const displaySummary = filteredPeriodSummary ?? periodSummary;
+  const filtersActive = isPeriodFiltersActive(filters);
 
   return (
     <div className="min-h-[calc(100vh-1rem)] px-4 md:px-6 lg:px-8 py-6">
@@ -442,8 +647,28 @@ export default function UserWorkStatsPeriod() {
           </Card>
         )}
 
-        {!isLoadingDetails && periodSummary && (
+        {!isLoadingDetails && periodDetails && allSubmissions.length > 0 && (
+          <PeriodDetailsFilterBar
+            filters={filters}
+            onChange={setFilters}
+            onClear={() => setFilters(EMPTY_PERIOD_FILTERS)}
+            showUserFilter={viewScope === "team"}
+            showRoleFilter={viewScope === "team"}
+            users={filterOptions.users}
+            projects={filterOptions.projects}
+            days={filterOptions.days}
+            resultCount={filteredSubmissions.length}
+            totalCount={allSubmissions.length}
+          />
+        )}
+
+        {!isLoadingDetails && displaySummary && (
           <div className="space-y-6">
+            {filtersActive ? (
+              <div className="rounded-xl border border-blue-200/40 dark:border-blue-900/40 bg-blue-50/30 dark:bg-blue-950/20 px-4 py-2.5 text-sm text-blue-900 dark:text-blue-100">
+                Filtered view — stats and lists below reflect your current search and filters.
+              </div>
+            ) : null}
             {/* Summary Cards */}
             <div className="grid grid-cols-12 gap-4">
               <Card className="col-span-12 sm:col-span-4 border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20">
@@ -454,7 +679,7 @@ export default function UserWorkStatsPeriod() {
                         Total Hours
                       </p>
                       <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">
-                        {Number(periodSummary.hours || 0).toFixed(1)}h
+                        {Number(displaySummary.hours || 0).toFixed(1)}h
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                         Worked during this period
@@ -475,7 +700,7 @@ export default function UserWorkStatsPeriod() {
                         Active Days
                       </p>
                       <p className="text-3xl font-bold text-green-700 dark:text-green-300">
-                        {Number(periodSummary.days || 0)}d
+                        {Number(displaySummary.days || 0)}d
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                         Days with work submissions
@@ -497,8 +722,8 @@ export default function UserWorkStatsPeriod() {
                       </p>
                       <p className="text-3xl font-bold text-violet-700 dark:text-violet-300 tabular-nums">
                         {(
-                          Number(periodSummary.hours || 0) +
-                          Number(periodSummary.overtime_hours || 0)
+                          Number(displaySummary.hours || 0) +
+                          Number(displaySummary.overtime_hours || 0)
                         ).toFixed(1)}
                         h
                       </p>
@@ -521,7 +746,7 @@ export default function UserWorkStatsPeriod() {
                     Overtime Hours
                   </p>
                   <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                    {Number(periodSummary.overtime_hours || 0).toFixed(1)}h
+                    {Number(displaySummary.overtime_hours || 0).toFixed(1)}h
                   </p>
                 </CardContent>
               </Card>
@@ -531,7 +756,7 @@ export default function UserWorkStatsPeriod() {
                     OT Requested
                   </p>
                   <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-                    {Number(periodSummary.requested_extra_hours || 0).toFixed(1)}h
+                    {Number(displaySummary.requested_extra_hours || 0).toFixed(1)}h
                   </p>
                 </CardContent>
               </Card>
@@ -541,7 +766,7 @@ export default function UserWorkStatsPeriod() {
                     Break Time
                   </p>
                   <p className="text-2xl font-bold text-cyan-700 dark:text-cyan-300">
-                    {Math.max(0, Number(periodSummary.break_minutes || 0))}m
+                    {Math.max(0, Number(displaySummary.break_minutes || 0))}m
                   </p>
                 </CardContent>
               </Card>
@@ -568,7 +793,7 @@ export default function UserWorkStatsPeriod() {
                         </span>
                       </div>
                       <Badge className="bg-red-600 text-white text-lg px-3 py-1">
-                        {periodSummary.task_counts.completed}
+                        {displaySummary.task_counts.completed}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -589,7 +814,7 @@ export default function UserWorkStatsPeriod() {
                         </span>
                       </div>
                       <Badge className="bg-yellow-600 text-white text-lg px-3 py-1">
-                        {periodSummary.task_counts.pending}
+                        {displaySummary.task_counts.pending}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -610,7 +835,7 @@ export default function UserWorkStatsPeriod() {
                         </span>
                       </div>
                       <Badge className="bg-blue-600 text-white text-lg px-3 py-1">
-                        {periodSummary.task_counts.ongoing}
+                        {displaySummary.task_counts.ongoing}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -631,7 +856,7 @@ export default function UserWorkStatsPeriod() {
                         </span>
                       </div>
                       <Badge className="bg-purple-600 text-white text-lg px-3 py-1">
-                        {periodSummary.task_counts.upcoming}
+                        {displaySummary.task_counts.upcoming}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -649,10 +874,10 @@ export default function UserWorkStatsPeriod() {
               <Card className="col-span-12 sm:col-span-4 border-border/60 bg-card/60 backdrop-blur">
                 <CardContent className="p-4 text-center">
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {periodSummary.task_counts.completed +
-                      periodSummary.task_counts.pending +
-                      periodSummary.task_counts.ongoing +
-                      periodSummary.task_counts.upcoming}
+                    {displaySummary.task_counts.completed +
+                      displaySummary.task_counts.pending +
+                      displaySummary.task_counts.ongoing +
+                      displaySummary.task_counts.upcoming}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">Total Tasks</p>
                 </CardContent>
@@ -660,8 +885,8 @@ export default function UserWorkStatsPeriod() {
               <Card className="col-span-12 sm:col-span-4 border-border/60 bg-card/60 backdrop-blur">
                 <CardContent className="p-4 text-center">
                   <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                    {periodSummary.days > 0
-                      ? (Number(periodSummary.hours || 0) / periodSummary.days).toFixed(1)
+                    {displaySummary.days > 0
+                      ? (Number(displaySummary.hours || 0) / displaySummary.days).toFixed(1)
                       : "0.0"}
                     h
                   </p>
@@ -671,13 +896,13 @@ export default function UserWorkStatsPeriod() {
               <Card className="col-span-12 sm:col-span-4 border-border/60 bg-card/60 backdrop-blur">
                 <CardContent className="p-4 text-center">
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {periodSummary.days > 0
+                    {displaySummary.days > 0
                       ? Math.round(
-                          (periodSummary.task_counts.completed +
-                            periodSummary.task_counts.pending +
-                            periodSummary.task_counts.ongoing +
-                            periodSummary.task_counts.upcoming) /
-                            periodSummary.days
+                          (displaySummary.task_counts.completed +
+                            displaySummary.task_counts.pending +
+                            displaySummary.task_counts.ongoing +
+                            displaySummary.task_counts.upcoming) /
+                            displaySummary.days
                         )
                       : 0}
                   </p>
@@ -685,6 +910,64 @@ export default function UserWorkStatsPeriod() {
                 </CardContent>
               </Card>
             </div>
+
+            {(viewScope === "team" ? projectsByUser.length > 0 : periodProjectNames.length > 0) && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <FolderOpen className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    {viewScope === "team" ? "Projects by Team Member" : "Projects This Period"}
+                  </h3>
+                  {viewScope === "team" ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      {projectsByUser.map((entry) => (
+                        <Card
+                          key={entry.username}
+                          className="border-border/60 bg-card/50 backdrop-blur"
+                        >
+                          <CardContent className="p-4 space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {entry.username}
+                                {entry.role ? ` · ${entry.role.toUpperCase()}` : ""}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {entry.projects.map((name) => (
+                                <Badge
+                                  key={`${entry.username}-${name}`}
+                                  variant="secondary"
+                                  className="text-xs bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/50"
+                                >
+                                  {name}
+                                </Badge>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <Card className="border-border/60 bg-card/50 backdrop-blur">
+                      <CardContent className="p-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {periodProjectNames.map((name) => (
+                            <Badge
+                              key={name}
+                              variant="secondary"
+                              className="text-xs bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/50"
+                            >
+                              {name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Details lists */}
             <Separator />
@@ -700,31 +983,35 @@ export default function UserWorkStatsPeriod() {
                     icon={<CheckCircle2 className="h-5 w-5 text-red-600 dark:text-red-400" />}
                     colorClass=""
                     badgeClass="bg-red-600"
-                    items={periodDetails?.tasks?.completed ?? []}
+                    items={filteredTasks.completed}
+                    showUsername={viewScope === "team"}
                   />
                   <TaskListSection
                     title="Pending Tasks"
                     icon={<AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />}
                     colorClass=""
                     badgeClass="bg-yellow-600"
-                    items={periodDetails?.tasks?.pending ?? []}
+                    items={filteredTasks.pending}
+                    showUsername={viewScope === "team"}
                   />
                   <TaskListSection
                     title="Ongoing Tasks"
                     icon={<PlayCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
                     colorClass=""
                     badgeClass="bg-blue-600"
-                    items={periodDetails?.tasks?.ongoing ?? []}
+                    items={filteredTasks.ongoing}
+                    showUsername={viewScope === "team"}
                   />
                   <TaskListSection
                     title="Upcoming Tasks"
                     icon={<CalendarDays className="h-5 w-5 text-purple-600 dark:text-purple-400" />}
                     colorClass=""
                     badgeClass="bg-purple-600"
-                    items={periodDetails?.tasks?.upcoming ?? []}
+                    items={filteredTasks.upcoming}
+                    showUsername={viewScope === "team"}
                   />
 
-                  {periodDetails?.notes?.length > 0 && (
+                  {filteredNotes.length > 0 && (
                       <Card className="border-border/60 bg-card/60 backdrop-blur">
                         <CardContent className="p-5 sm:p-6 space-y-4">
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -742,12 +1029,12 @@ export default function UserWorkStatsPeriod() {
                               </div>
                             </div>
                             <Badge className="w-fit bg-blue-600/90 text-white px-3 py-1 rounded-full">
-                              {periodDetails.notes.length}
+                              {filteredNotes.length}
                             </Badge>
                           </div>
 
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                            {periodDetails.notes
+                            {filteredNotes
                               .map(normalizeNote)
                               .filter(Boolean)
                               .map((n: any, idx: number) => (
@@ -773,7 +1060,7 @@ export default function UserWorkStatsPeriod() {
                       </Card>
                     )}
 
-                    {groupedSubmissionsByDate.length > 0 && (
+                    {groupedSubmissionsByDate.length > 0 ? (
                         <Card className="border-border/60 bg-card/60 backdrop-blur">
                           <CardContent className="p-5 sm:p-6 space-y-5">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -782,9 +1069,11 @@ export default function UserWorkStatsPeriod() {
                                   Daily Breakdown
                                 </h4>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {viewScope === "team"
-                                    ? `${periodDetails?.summary?.submissions ?? periodDetails.submissions.length} submissions · ${groupedSubmissionsByDate.length} days · ${periodDetails?.summary?.users ?? "—"} users`
-                                    : `${groupedSubmissionsByDate.length} days · full work update details`}
+                                  {filtersActive
+                                    ? `${filteredSubmissions.length} matching submissions · ${groupedSubmissionsByDate.length} days`
+                                    : viewScope === "team"
+                                      ? `${periodDetails?.summary?.submissions ?? filteredSubmissions.length} submissions · ${groupedSubmissionsByDate.length} days · ${periodDetails?.summary?.users ?? "—"} users`
+                                      : `${groupedSubmissionsByDate.length} days · full work update details`}
                                 </p>
                               </div>
                               <Badge className="w-fit bg-emerald-600/90 text-white px-3 py-1 rounded-full">
@@ -885,7 +1174,16 @@ export default function UserWorkStatsPeriod() {
                             </div>
                           </CardContent>
                         </Card>
-                      )}
+                      ) : filtersActive ? (
+                        <Card className="border-border/60 bg-card/60 backdrop-blur">
+                          <CardContent className="p-8 text-center space-y-2">
+                            <p className="text-sm font-medium text-foreground">No matching submissions</p>
+                            <p className="text-xs text-muted-foreground">
+                              Try adjusting your search or filters to see daily work updates.
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ) : null}
                 </div>
               )}
             </div>

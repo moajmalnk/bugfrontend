@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types";
 import { Mic, MicOff, Send, X } from "lucide-react";
 import { memo } from "react";
-import type { DragEvent, KeyboardEvent, RefObject } from "react";
+import type { ClipboardEvent, KeyboardEvent, RefObject } from "react";
 import { EmojiPicker } from "./EmojiPicker";
 import { MediaUploader } from "./MediaUploader";
 
@@ -13,7 +13,6 @@ interface MessageComposerProps {
   value: string;
   isLoading: boolean;
   isRecording: boolean;
-  isImageDropActive: boolean;
   isImageDropUploading: boolean;
   replyToMessage: ChatMessage | null;
   textareaRef: RefObject<HTMLTextAreaElement>;
@@ -27,10 +26,7 @@ interface MessageComposerProps {
   onMicClick: () => void;
   onMicMouseDown: () => void;
   onMicMouseUp: () => void;
-  onDragEnter: (event: DragEvent<HTMLDivElement>) => void;
-  onDragLeave: (event: DragEvent<HTMLDivElement>) => void;
-  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onDrop: (event: DragEvent<HTMLDivElement>) => void;
+  onPaste: (event: ClipboardEvent) => void;
 }
 
 export const MessageComposer = memo(function MessageComposer({
@@ -38,7 +34,6 @@ export const MessageComposer = memo(function MessageComposer({
   value,
   isLoading,
   isRecording,
-  isImageDropActive,
   isImageDropUploading,
   replyToMessage,
   textareaRef,
@@ -52,10 +47,7 @@ export const MessageComposer = memo(function MessageComposer({
   onMicClick,
   onMicMouseDown,
   onMicMouseUp,
-  onDragEnter,
-  onDragLeave,
-  onDragOver,
-  onDrop,
+  onPaste,
 }: MessageComposerProps) {
   return (
     <div className="flex-shrink-0 z-20 bg-[#202c33] border-t border-[#2a3942]">
@@ -85,31 +77,18 @@ export const MessageComposer = memo(function MessageComposer({
 
       <div className="px-2 sm:px-3 md:px-4 py-2 sm:py-3">
         <div className="flex items-end gap-2">
-          <div
-            className={cn(
-              "flex-1 min-w-0 relative rounded-2xl transition-[box-shadow,background-color]",
-              isImageDropActive && "ring-2 ring-[#00a884] ring-offset-2 ring-offset-[#202c33]"
-            )}
-            onDragEnter={onDragEnter}
-            onDragLeave={onDragLeave}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
-          >
+          <div className="flex-1 min-w-0 relative rounded-2xl">
             <Textarea
               ref={textareaRef}
               value={value}
               onChange={(event) => onChange(event.target.value)}
               onKeyPress={onKeyPress}
+              onPaste={onPaste}
               placeholder="Type a message"
               disabled={isImageDropUploading}
               className="min-h-[40px] sm:min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-[#3b4a54] bg-[#2a3942] text-[#e9edef] placeholder:text-[#8696a0] focus:bg-[#2a3942] focus:border-[#00a884] transition-colors text-sm disabled:opacity-60"
               rows={1}
             />
-            {isImageDropActive && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-[#00a884]/20 text-[11px] sm:text-xs font-semibold text-[#e9edef]">
-                Drop image to send
-              </div>
-            )}
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">

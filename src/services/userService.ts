@@ -181,6 +181,19 @@ class UserService {
     return response.data;
   }
 
+  async getActiveHours(
+    userId: string,
+    period: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'daily'
+  ): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `${this.baseUrl}/active_hours.php?id=${userId}&period=${period}`
+    );
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch active hours');
+    }
+    return response.data;
+  }
+
   async deleteUser(userId: string, force = false): Promise<boolean> {
     const token = localStorage.getItem('token');
     const url = `${this.baseUrl}/delete.php?id=${userId}${force ? '&force=true' : ''}`;

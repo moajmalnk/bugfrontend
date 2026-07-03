@@ -50,9 +50,10 @@ import {
   Video,
   X,
 } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AudioWaveform } from "./AudioWaveform";
 import { ChatHeader } from "./ChatHeader";
+import { ChatMessageImage } from "./ChatMessageImage";
 import { ForwardMessage } from "./ForwardMessage";
 import { MessageComposer } from "./MessageComposer";
 import { MessageEditor } from "./MessageEditor";
@@ -235,6 +236,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sidebarBumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const imageDropDepthRef = useRef(0);
+  const chatDropZoneRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = currentUser?.role === "admin";
   const [isImageDropActive, setIsImageDropActive] = useState(false);
@@ -809,7 +811,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const handleMediaUploadSuccess = async (mediaData: any) => {
     try {
-      const sentMessage = await MessagingService.sendMessage(mediaData);
+      const sentMessage = MessagingService.mergeMediaMessage(
+        await MessagingService.sendMessage(mediaData),
+        mediaData
+      );
       shouldAutoScrollRef.current = true;
       setMessages((prev) => [...prev, sentMessage]);
       refreshSidebarListNow();
@@ -823,44 +828,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
-  const handleMessageInputDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!e.dataTransfer.types.includes("Files")) return;
-    imageDropDepthRef.current += 1;
-    setIsImageDropActive(true);
-  };
-
-  const handleMessageInputDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    imageDropDepthRef.current = Math.max(0, imageDropDepthRef.current - 1);
-    if (imageDropDepthRef.current === 0) setIsImageDropActive(false);
-  };
-
-  const handleMessageInputDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.types.includes("Files")) {
-      e.dataTransfer.dropEffect = "copy";
-    }
-  };
-
-  const handleMessageInputDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    imageDropDepthRef.current = 0;
-    setIsImageDropActive(false);
+  const sendImageFiles = useCallback(async (files: File[]) => {
     if (!selectedGroup || isImageDropUploading) return;
 
-    const files = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type.startsWith("image/")
-    );
-    if (files.length === 0) {
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) {
       toast({
         title: "No images to send",
         description:
-          "Drop image files (for example PNG or JPEG) on the message box.",
+          "Drop or paste image files (for example PNG or JPEG) in the chat.",
         variant: "destructive",
       });
       return;
@@ -870,8 +846,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setIsImageDropUploading(true);
     try {
       let sentAny = false;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
         if (file.size > MAX_CHAT_IMAGE_DROP_BYTES) {
           toast({
             title: "File too large",
@@ -891,7 +867,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           media_file_size: file.size,
           media_thumbnail: upload.thumbnail_url,
         };
-        const sentMessage = await MessagingService.sendMessage(messageData);
+        const sentMessage = MessagingService.mergeMediaMessage(
+          await MessagingService.sendMessage(messageData),
+          messageData
+        );
         shouldAutoScrollRef.current = true;
         setMessages((prev) => [...prev, sentMessage]);
         sentAny = true;
@@ -909,9 +888,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       if (sentAny) {
         refreshSidebarListNow();
         toast({
-          title: files.length > 1 ? "Images sent" : "Image sent",
+          title: imageFiles.length > 1 ? "Images sent" : "Image sent",
           description:
-            files.length > 1 ? `${files.length} images uploaded.` : undefined,
+            imageFiles.length > 1
+              ? `${imageFiles.length} images uploaded.`
+              : undefined,
         });
       }
     } catch (err) {
@@ -919,13 +900,92 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       toast({
         title: "Upload failed",
         description:
-          err instanceof Error ? err.message : "Could not send dropped image(s).",
+          err instanceof Error ? err.message : "Could not send image(s).",
         variant: "destructive",
       });
     } finally {
       setIsImageDropUploading(false);
     }
+  }, [isImageDropUploading, newMessage, selectedGroup, toast]);
+
+  const handleChatImageDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.dataTransfer.types.includes("Files")) return;
+    imageDropDepthRef.current += 1;
+    setIsImageDropActive(true);
   };
+
+  const handleChatImageDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    imageDropDepthRef.current = Math.max(0, imageDropDepthRef.current - 1);
+    if (imageDropDepthRef.current === 0) setIsImageDropActive(false);
+  };
+
+  const handleChatImageDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes("Files")) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+  };
+
+  const handleChatImageDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    imageDropDepthRef.current = 0;
+    setIsImageDropActive(false);
+    await sendImageFiles(Array.from(e.dataTransfer.files));
+  };
+
+  const handleChatImagePaste = (e: React.ClipboardEvent) => {
+    const files: File[] = [];
+    for (let i = 0; i < e.clipboardData.items.length; i++) {
+      const item = e.clipboardData.items[i];
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+    }
+    if (files.length === 0) return;
+    e.preventDefault();
+    void sendImageFiles(files);
+  };
+
+  useEffect(() => {
+    if (!selectedGroup) return;
+
+    const handleDocumentPaste = (e: ClipboardEvent) => {
+      if (isImageDropUploading) return;
+      if (textareaRef.current && e.target === textareaRef.current) return;
+
+      const target = e.target as HTMLElement | null;
+      const zone = chatDropZoneRef.current;
+      if (zone && target && !zone.contains(target)) return;
+
+      if (target) {
+        const foreignField = target.closest(
+          'input, textarea, [contenteditable="true"]'
+        );
+        if (foreignField && foreignField !== textareaRef.current) return;
+      }
+
+      const files: File[] = [];
+      for (const item of Array.from(e.clipboardData?.items ?? [])) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      if (files.length === 0) return;
+      e.preventDefault();
+      void sendImageFiles(files);
+    };
+
+    document.addEventListener("paste", handleDocumentPaste);
+    return () => document.removeEventListener("paste", handleDocumentPaste);
+  }, [selectedGroup, isImageDropUploading, sendImageFiles]);
 
   const formatFileSize = (bytes?: number) => {
     if (!bytes) return "Unknown size";
@@ -980,7 +1040,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         typingUsers={typingUsers}
         onBackToChatList={onBackToChatList}
         onOpenGroupMembers={onOpenGroupMembers}
-        onMessageClick={handleMessageClick}
+        onMessageClick={(message) => handleMessageClick(message.id)}
       />
 
       {/* Pinned Messages - Fixed below header */}
@@ -991,6 +1051,36 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           onMessageClick={handleMessageClick}
         />
       </div>
+
+      <div
+        ref={chatDropZoneRef}
+        data-chat-drop-zone
+        tabIndex={-1}
+        className="relative flex flex-1 flex-col min-h-0 overflow-hidden outline-none"
+        onMouseDown={(e) => {
+          const target = e.target as HTMLElement;
+          if (
+            target.closest(
+              'textarea, input, button, a, [role="button"], [data-radix-collection-item]'
+            )
+          ) {
+            return;
+          }
+          chatDropZoneRef.current?.focus({ preventScroll: true });
+        }}
+        onDragEnter={handleChatImageDragEnter}
+        onDragLeave={handleChatImageDragLeave}
+        onDragOver={handleChatImageDragOver}
+        onDrop={handleChatImageDrop}
+        onPaste={handleChatImagePaste}
+      >
+        {isImageDropActive && (
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#00a884]/15">
+            <span className="rounded-xl bg-[#182229]/90 px-4 py-2 text-sm font-semibold text-[#e9edef] shadow-lg">
+              Drop image to send
+            </span>
+          </div>
+        )}
 
       {/* Messages Area - Scrollable */}
       <div
@@ -1105,12 +1195,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                           />
                         ) : message.message_type === "image" ? (
                           <div>
-                            <img
-                              src={MessagingService.resolveMediaUrl(message.media_file_path)}
-                              alt={message.media_file_name || "Image"}
-                              className="max-w-full rounded-lg max-h-80 sm:max-h-96 object-contain shadow-sm"
-                              loading="lazy"
-                            />
+                            <ChatMessageImage message={message} />
                             {Boolean(message.content) && (
                               <div className="mt-2 text-sm leading-relaxed">{message.content}</div>
                             )}
@@ -1352,7 +1437,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         value={newMessage}
         isLoading={isLoading}
         isRecording={isRecording}
-        isImageDropActive={isImageDropActive}
         isImageDropUploading={isImageDropUploading}
         replyToMessage={replyToMessage}
         textareaRef={textareaRef}
@@ -1369,11 +1453,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         onMicClick={handleMicClick}
         onMicMouseDown={handleMicMouseDown}
         onMicMouseUp={handleMicMouseUp}
-        onDragEnter={handleMessageInputDragEnter}
-        onDragLeave={handleMessageInputDragLeave}
-        onDragOver={handleMessageInputDragOver}
-        onDrop={handleMessageInputDrop}
+        onPaste={handleChatImagePaste}
       />
+      </div>
 
       {/* Forward Message Dialog */}
       {forwardMessage && (

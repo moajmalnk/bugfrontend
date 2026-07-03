@@ -356,3 +356,60 @@ export function normalizeYmdDateString(value: unknown): string {
   const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   return match ? match[1] : '';
 }
+
+/** Format when a daily work report was submitted (IST), with date and time. */
+export function formatWorkSubmissionSubmittedAt(
+  submissionDate: string,
+  submittedAt?: string | null,
+  createdAt?: string | null,
+  checkInTime?: string | null
+): { label: string; text: string } | null {
+  const datePart = normalizeYmdDateString(submissionDate);
+  if (!datePart) return null;
+
+  const formatInstant = (d: Date): string | null => {
+    if (Number.isNaN(d.getTime())) return null;
+    const dStr = d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    });
+    const tStr = d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    });
+    return `${dStr} - ${tStr}`;
+  };
+
+  const rawSubmitted =
+    submittedAt != null && String(submittedAt).trim() !== ''
+      ? String(submittedAt).trim()
+      : createdAt != null && String(createdAt).trim() !== ''
+        ? String(createdAt).trim()
+        : '';
+
+  if (rawSubmitted) {
+    const text = formatInstant(safeParseDate(rawSubmitted));
+    if (text) {
+      const created = createdAt ? safeParseDate(String(createdAt)).getTime() : 0;
+      const updated = submittedAt ? safeParseDate(String(submittedAt)).getTime() : created;
+      const label =
+        created > 0 && updated - created > 60_000 ? 'Last submitted' : 'Submitted';
+      return { label, text };
+    }
+  }
+
+  const ci = checkInTime != null ? String(checkInTime).trim() : '';
+  if (ci) {
+    const timeOnly = ci.includes(' ') ? (ci.split(/\s+/).pop() as string) : ci;
+    if (/^\d{1,2}:\d{2}/.test(timeOnly)) {
+      const text = formatInstant(safeParseDate(`${datePart} ${timeOnly}`));
+      if (text) return { label: 'Submitted', text };
+    }
+  }
+
+  return null;
+}

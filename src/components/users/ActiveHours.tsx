@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ENV } from "@/lib/env";
+import { userService } from "@/services/userService";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { Activity, Calendar, Clock, TrendingUp, Users } from "lucide-react";
@@ -36,27 +36,7 @@ export function ActiveHours({ userId, userName }: ActiveHoursProps) {
 
   const { data: activeHoursData, isLoading, error } = useQuery<ActiveHoursData>({
     queryKey: ['activeHours', userId, selectedPeriod],
-    queryFn: async () => {
-      const response = await fetch(
-        `${ENV.API_URL}/users/active_hours.php?id=${userId}&period=${selectedPeriod}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch active hours');
-      }
-
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to fetch active hours');
-      }
-
-      return data.data;
-    },
+    queryFn: () => userService.getActiveHours(userId, selectedPeriod),
     enabled: !!userId,
     refetchInterval: 30000, // Refetch every 30 seconds to keep data fresh
   });

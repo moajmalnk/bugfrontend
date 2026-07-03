@@ -29,14 +29,23 @@ export class MessagingService {
    */
   static resolveMediaUrl(url: string | null | undefined): string {
     if (!url) return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+
     const apiBase = ENV.API_URL.replace(/\/$/, '');
     const messagingTarget = `${apiBase}/messaging/get_media.php`;
+
+    // Stored as a bare filename or thumbnails/... path
+    if (!trimmed.includes('://') && !trimmed.startsWith('/')) {
+      return `${messagingTarget}?file=${encodeURIComponent(trimmed)}`;
+    }
+
     try {
       const baseOrigin =
         typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
-      const u = new URL(url, baseOrigin);
-      if (u.pathname.includes('get_media.php')) {
-        const file = u.searchParams.get('file');
+      const parsed = new URL(trimmed, baseOrigin);
+      if (parsed.pathname.includes('get_media.php')) {
+        const file = parsed.searchParams.get('file');
         if (file) {
           return `${messagingTarget}?file=${encodeURIComponent(file)}`;
         }
@@ -44,7 +53,33 @@ export class MessagingService {
     } catch {
       /* ignore */
     }
-    return url;
+
+    return trimmed;
+  }
+
+  static mergeMediaMessage(
+    fromApi: ChatMessage,
+    payload: {
+      message_type?: ChatMessage['message_type'];
+      content?: string;
+      media_type?: ChatMessage['media_type'];
+      media_file_path?: string;
+      media_file_name?: string;
+      media_file_size?: number;
+      media_thumbnail?: string | null;
+    }
+  ): ChatMessage {
+    return {
+      ...fromApi,
+      message_type: payload.message_type ?? fromApi.message_type,
+      content: fromApi.content ?? payload.content,
+      media_type: fromApi.media_type || payload.media_type,
+      media_file_path: fromApi.media_file_path || payload.media_file_path,
+      media_file_name: fromApi.media_file_name || payload.media_file_name,
+      media_file_size: fromApi.media_file_size ?? payload.media_file_size,
+      media_thumbnail:
+        fromApi.media_thumbnail || payload.media_thumbnail || undefined,
+    };
   }
 
   // Chat Groups
@@ -114,11 +149,17 @@ export class MessagingService {
   // Messages
   static async sendMessage(data: {
     group_id: string;
-    message_type: 'text' | 'voice' | 'reply';
+    message_type: 'text' | 'voice' | 'reply' | 'image' | 'video' | 'document' | 'audio';
     content?: string;
     voice_file_path?: string;
     voice_duration?: number;
     reply_to_message_id?: string;
+    media_type?: string;
+    media_file_path?: string;
+    media_file_name?: string;
+    media_file_size?: number;
+    media_thumbnail?: string | null;
+    media_duration?: number;
   }): Promise<ChatMessage> {
     const response = await axiosInstance.post<{ data: ChatMessage }>(`${MESSAGING_API_BASE}/send_message.php`, data);
     return response.data.data;

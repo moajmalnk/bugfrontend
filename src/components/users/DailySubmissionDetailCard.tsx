@@ -1,8 +1,9 @@
 import { Badge } from "@/components/ui/badge";
-import { normalizeYmdDateString } from "@/lib/dateUtils";
+import { formatWorkSubmissionSubmittedAt, normalizeYmdDateString } from "@/lib/dateUtils";
+import { lookupProjectName, parsePlannedProjectIds, resolveSubmissionProjectNames } from "@/lib/periodDetailsFilters";
 import { formatWorkingDaysPeriodLabel } from "@/lib/workPeriodUtils";
 import { format } from "date-fns";
-import { Calendar, Clock, UserRound } from "lucide-react";
+import { Calendar, Clock, FolderOpen, UserRound } from "lucide-react";
 
 function splitLines(text?: string | null): string[] {
   if (!text) return [];
@@ -17,6 +18,28 @@ function formatDayLabel(value: unknown): string {
   if (!ymd) return "—";
   const d = new Date(`${ymd}T00:00:00`);
   return Number.isNaN(d.getTime()) ? ymd : format(d, "MMM dd, yyyy");
+}
+
+function parseProjectNames(
+  submission: Record<string, any>,
+  projectNameById?: Map<string, string>
+): string[] {
+  if (projectNameById && projectNameById.size > 0) {
+    return resolveSubmissionProjectNames(submission, projectNameById);
+  }
+  if (Array.isArray(submission.project_names) && submission.project_names.length > 0) {
+    return submission.project_names
+      .map((name: unknown) => String(name).trim())
+      .filter(Boolean)
+      .filter(
+        (name) =>
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(name)
+      );
+  }
+  const ids = parsePlannedProjectIds(submission);
+  return ids
+    .map((id) => (projectNameById ? lookupProjectName(id, projectNameById) : id))
+    .filter((name) => name && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(name));
 }
 
 function TaskBlock({
@@ -72,8 +95,15 @@ export function DailySubmissionDetailCard({
   const upcoming =
     submission.tasks?.upcoming ?? splitLines(submission.upcoming_tasks ?? submission.notes);
 
+  const projectNames = parseProjectNames(submission);
   const periodLabel = dayKey ? formatWorkingDaysPeriodLabel(dayKey) : "";
   const mtd = monthToDate ?? null;
+  const submittedAt = formatWorkSubmissionSubmittedAt(
+    dayKey,
+    submission.submitted_at ?? submission.updated_at,
+    submission.created_at,
+    submission.check_in_time
+  );
 
   return (
     <div className="rounded-2xl border border-border/60 bg-background/50 p-4 sm:p-5 space-y-4">
@@ -92,6 +122,15 @@ export function DailySubmissionDetailCard({
               </Badge>
             ) : null}
           </div>
+          {submittedAt ? (
+            <div className="flex items-start gap-2 text-xs text-muted-foreground ml-6">
+              <Clock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                {submittedAt.label} ·{" "}
+                <span className="tabular-nums text-foreground/80">{submittedAt.text}</span>
+              </span>
+            </div>
+          ) : null}
           {submission.start_time || submission.check_in_time ? (
             <p className="text-xs text-muted-foreground ml-6">
               {submission.check_in_time
@@ -142,6 +181,26 @@ export function DailySubmissionDetailCard({
           <span className="font-medium">Month to date ({periodLabel}):</span>{" "}
           <span className="tabular-nums">{mtd.days} days</span> ·{" "}
           <span className="tabular-nums">{mtd.hours} hours</span>
+        </div>
+      ) : null}
+
+      {projectNames.length > 0 ? (
+        <div className="rounded-xl border border-emerald-200/40 dark:border-emerald-900/40 bg-emerald-50/30 dark:bg-emerald-950/20 px-3 py-2.5 space-y-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+            <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+            Projects
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {projectNames.map((name, idx) => (
+              <Badge
+                key={`${name}-${idx}`}
+                variant="secondary"
+                className="text-xs bg-white/70 dark:bg-gray-900/50 border border-emerald-200/50 dark:border-emerald-800/50"
+              >
+                {name}
+              </Badge>
+            ))}
+          </div>
         </div>
       ) : null}
 

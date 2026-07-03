@@ -1,23 +1,33 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -28,6 +38,8 @@ import { projectService } from "@/services/projectService";
 import { userService } from "@/services/userService";
 import type { ChatGroup, Project } from "@/types";
 import {
+  Check,
+  ChevronsUpDown,
   Edit,
   MessageCircle,
   MoreVertical,
@@ -70,6 +82,192 @@ function normalizeGroupRow(g: ChatGroup & { project_name?: string }): ChatGroup 
     member_count: memberCount,
     projectName: g.projectName ?? g.project_name,
   };
+}
+
+type MemberRow = {
+  id: string;
+  username?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+};
+
+function filterMemberList(
+  members: MemberRow[],
+  query: string,
+  nameKey: "username" | "name"
+) {
+  const q = query.trim().toLowerCase();
+  if (!q) return members;
+  return members.filter((member) => {
+    const display = (
+      member[nameKey] ||
+      member.username ||
+      member.name ||
+      member.email ||
+      ""
+    ).toLowerCase();
+    const email = (member.email || "").toLowerCase();
+    const role = (member.role || "").toLowerCase();
+    return display.includes(q) || email.includes(q) || role.includes(q);
+  });
+}
+
+interface MemberManagementPanelProps {
+  title: string;
+  icon: React.ReactNode;
+  count: number;
+  members: MemberRow[];
+  nameKey: "username" | "name";
+  search: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder: string;
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  selectedTone: "destructive" | "primary";
+  actionLabel?: string;
+  onAction?: () => void;
+  isActionLoading?: boolean;
+  isLoading: boolean;
+  loadingMessage: string;
+  emptyMessage: string;
+  filteredEmptyMessage: string;
+  listClassName?: string;
+}
+
+function MemberManagementPanel({
+  title,
+  icon,
+  count,
+  members,
+  nameKey,
+  search,
+  onSearchChange,
+  searchPlaceholder,
+  selectedIds,
+  onToggle,
+  selectedTone,
+  actionLabel,
+  onAction,
+  isActionLoading = false,
+  isLoading,
+  loadingMessage,
+  emptyMessage,
+  filteredEmptyMessage,
+  listClassName,
+}: MemberManagementPanelProps) {
+  const filteredMembers = useMemo(
+    () => filterMemberList(members, search, nameKey),
+    [members, search, nameKey]
+  );
+
+  const selectedStyles =
+    selectedTone === "destructive"
+      ? "bg-destructive/10 border-destructive/30"
+      : "bg-primary/10 border-primary/30";
+
+  return (
+    <div className={cn("flex min-h-0 flex-col gap-3", listClassName)}>
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+          {icon}
+          <span className="truncate">
+            {title} ({count})
+          </span>
+        </h3>
+        {actionLabel && onAction && selectedIds.length > 0 ? (
+          <Button
+            variant={selectedTone === "destructive" ? "destructive" : "default"}
+            size="sm"
+            onClick={onAction}
+            disabled={isActionLoading}
+            className="h-8 shrink-0 px-3 text-xs"
+          >
+            {isActionLoading ? (
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              `${actionLabel} ${selectedIds.length}`
+            )}
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="relative shrink-0">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder={searchPlaceholder}
+          className="h-9 pl-9"
+          aria-label={searchPlaceholder}
+        />
+      </div>
+
+      <ScrollArea className="min-h-[220px] flex-1 rounded-xl border bg-muted/20 sm:min-h-[280px]">
+        <div className="space-y-1.5 p-2">
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              {loadingMessage}
+            </div>
+          ) : members.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              {emptyMessage}
+            </div>
+          ) : filteredMembers.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              {filteredEmptyMessage}
+            </div>
+          ) : (
+            filteredMembers.map((member) => {
+              const displayName =
+                member[nameKey] || member.username || member.name || member.email;
+              const isSelected = selectedIds.includes(member.id);
+              return (
+                <label
+                  key={member.id}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 transition-colors",
+                    isSelected ? selectedStyles : "border-border hover:bg-muted/50"
+                  )}
+                >
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => onToggle(member.id)}
+                    aria-label={`Select ${displayName}`}
+                  />
+                  <Avatar className="h-9 w-9 shrink-0">
+                    <AvatarFallback className="text-xs font-medium">
+                      {displayName?.charAt(0)?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium">{displayName}</p>
+                      {member.role ? (
+                        <Badge
+                          variant="secondary"
+                          className="hidden shrink-0 text-[10px] uppercase tracking-wide sm:inline-flex"
+                        >
+                          {member.role}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {member.role ? (
+                        <span className="sm:hidden">{member.role} • </span>
+                      ) : null}
+                      {member.email}
+                    </p>
+                  </div>
+                </label>
+              );
+            })
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
 }
 
 interface ChatGroupSelectorProps {
@@ -123,6 +321,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     description: "",
     projectId: "",
   });
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
     groupId: string;
@@ -148,6 +347,8 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   const [selectedExistingMembers, setSelectedExistingMembers] = useState<
     string[]
   >([]);
+  const [currentMembersSearch, setCurrentMembersSearch] = useState("");
+  const [availableMembersSearch, setAvailableMembersSearch] = useState("");
   const [editDialog, setEditDialog] = useState<{
     isOpen: boolean;
     groupId: string;
@@ -640,6 +841,8 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     });
     setSelectedMembers([]);
     setSelectedExistingMembers([]);
+    setCurrentMembersSearch("");
+    setAvailableMembersSearch("");
     await refreshMemberDialogLists(groupId);
   };
 
@@ -743,6 +946,8 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     setSelectedExistingMembers([]);
     setExistingMembers([]);
     setAvailableMembers([]);
+    setCurrentMembersSearch("");
+    setAvailableMembersSearch("");
   };
 
   const toggleMemberSelection = (userId: string) => {
@@ -1246,7 +1451,13 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       </div>
       {/* Create Group Dialog with project dropdown inside */}
       {isAdmin && (
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog
+          open={isCreateDialogOpen}
+          onOpenChange={(open) => {
+            setIsCreateDialogOpen(open);
+            if (!open) setProjectPickerOpen(false);
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Chat Group</DialogTitle>
@@ -1283,23 +1494,64 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
               </div>
               <div>
                 <Label htmlFor="project-select">Select Project *</Label>
-                <Select
-                  value={createForm.projectId}
-                  onValueChange={(val) =>
-                    setCreateForm((prev) => ({ ...prev, projectId: val }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projectsEligibleForNewChat.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="project-select"
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={projectPickerOpen}
+                      disabled={projectsEligibleForNewChat.length === 0}
+                      className="mt-1 w-full justify-between font-normal"
+                    >
+                      <span className="truncate">
+                        {createForm.projectId
+                          ? projectsEligibleForNewChat.find(
+                              (p) => p.id === createForm.projectId
+                            )?.name ?? "Choose a project"
+                          : "Choose a project"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[--radix-popover-trigger-width] p-0 z-[70]"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput placeholder="Search project..." />
+                      <CommandList>
+                        <CommandEmpty>No project found.</CommandEmpty>
+                        <CommandGroup>
+                          {projectsEligibleForNewChat.map((project) => (
+                            <CommandItem
+                              key={project.id}
+                              value={`${project.name} ${project.id}`}
+                              onSelect={() => {
+                                setCreateForm((prev) => ({
+                                  ...prev,
+                                  projectId: project.id,
+                                }));
+                                setProjectPickerOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  createForm.projectId === project.id
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              {project.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 {projectsEligibleForNewChat.length === 0 ? (
                   <p className="text-sm text-muted-foreground mt-2">
                     You are not a member of any project. Ask an admin to add you
@@ -1398,199 +1650,159 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       {memberDialog && (
         <Dialog
           open={memberDialog.isOpen}
-          onOpenChange={() => setMemberDialog(null)}
+          onOpenChange={(open) => {
+            if (!open) cancelMemberDialog();
+          }}
         >
-          <DialogContent className="sm:max-w-2xl max-h-[80vh]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+          <DialogContent className="flex max-h-[min(92vh,820px)] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:w-full">
+            <DialogHeader className="shrink-0 space-y-1 border-b px-4 pb-4 pt-5 sm:px-6">
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
                   <UserPlus className="h-4 w-4 text-primary" />
                 </div>
                 Manage Group Members
               </DialogTitle>
               <DialogDescription>
-                Add or remove members from this chat group. Changes will be applied immediately.
+                Add or remove members from this chat group. Changes apply
+                immediately.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="text-center space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Manage members for this chat group
+
+            <div className="shrink-0 border-b bg-muted/30 px-4 py-3 sm:px-6">
+              <div className="rounded-xl border bg-background/80 px-4 py-3">
+                <p className="truncate text-base font-semibold">
+                  {memberDialog.groupName}
                 </p>
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="font-semibold text-base">
-                    {memberDialog.groupName}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {existingMembers.length} current members •{" "}
-                    {availableMembers.length} available to add
-                  </p>
-                </div>
-              </div>
-
-              {/* Tabs for Existing and Available Members */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Existing Members Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Current Members ({existingMembers.length})
-                    </h3>
-                    {selectedExistingMembers.length > 0 && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleDeleteMembers}
-                        disabled={isLoadingExistingMembers}
-                        className="h-7 px-2 text-xs"
-                      >
-                        {isLoadingExistingMembers ? (
-                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          `Remove ${selectedExistingMembers.length}`
-                        )}
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="max-h-60 overflow-y-auto space-y-2 border rounded-lg p-2">
-                    {isLoadingExistingMembers ? (
-                      <div className="flex items-center justify-center py-4">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          Loading members...
-                        </span>
-                      </div>
-                    ) : existingMembers.length === 0 ? (
-                      <div className="text-center py-4 text-sm text-muted-foreground">
-                        No members in this group
-                      </div>
-                    ) : (
-                      existingMembers.map((member: any) => (
-                        <div
-                          key={member.id}
-                          className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors ${
-                            selectedExistingMembers.includes(member.id)
-                              ? "bg-destructive/10 border-destructive/30"
-                              : "hover:bg-muted/50 border-border"
-                          }`}
-                          onClick={() =>
-                            toggleExistingMemberSelection(member.id)
-                          }
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedExistingMembers.includes(
-                              member.id
-                            )}
-                            onChange={() =>
-                              toggleExistingMemberSelection(member.id)
-                            }
-                            className="rounded"
-                          />
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs">
-                              {member.username?.charAt(0)?.toUpperCase() || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {member.username || member.email}
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {member.role} • {member.email}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Available Members Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <UserPlus className="h-4 w-4" />
-                      Available to Add ({availableMembers.length})
-                    </h3>
-                    {selectedMembers.length > 0 && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleAddMembers}
-                        disabled={isLoadingMembers}
-                        className="h-7 px-2 text-xs"
-                      >
-                        {isLoadingMembers ? (
-                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          `Add ${selectedMembers.length}`
-                        )}
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="max-h-60 overflow-y-auto space-y-2 border rounded-lg p-2">
-                    {isLoadingMembers ? (
-                      <div className="flex items-center justify-center py-4">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          Loading users...
-                        </span>
-                      </div>
-                    ) : availableMembers.length === 0 ? (
-                      <div className="text-center py-4 text-sm text-muted-foreground">
-                        No users available to add
-                      </div>
-                    ) : (
-                      availableMembers.map((user: any) => (
-                        <div
-                          key={user.id}
-                          className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors ${
-                            selectedMembers.includes(user.id)
-                              ? "bg-primary/10 border-primary/30"
-                              : "hover:bg-muted/50 border-border"
-                          }`}
-                          onClick={() => toggleMemberSelection(user.id)}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedMembers.includes(user.id)}
-                            onChange={() => toggleMemberSelection(user.id)}
-                            className="rounded"
-                          />
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs">
-                              {user.name?.charAt(0)?.toUpperCase() || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {user.name || user.email}
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {user.role} • {user.email}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  onClick={cancelMemberDialog}
-                  disabled={isLoadingMembers || isLoadingExistingMembers}
-                >
-                  Close
-                </Button>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {existingMembers.length} current member
+                  {existingMembers.length === 1 ? "" : "s"} •{" "}
+                  {availableMembers.length} available to add
+                </p>
               </div>
             </div>
+
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-6">
+              <div className="flex min-h-0 flex-1 flex-col md:hidden">
+                <Tabs defaultValue="current" className="flex min-h-0 flex-1 flex-col">
+                  <TabsList className="grid h-10 w-full shrink-0 grid-cols-2">
+                    <TabsTrigger value="current" className="text-xs sm:text-sm">
+                      Current ({existingMembers.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="available" className="text-xs sm:text-sm">
+                      Add ({availableMembers.length})
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent
+                    value="current"
+                    className="mt-3 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+                  >
+                    <MemberManagementPanel
+                      title="Current Members"
+                      icon={<Users className="h-4 w-4" />}
+                      count={existingMembers.length}
+                      members={existingMembers}
+                      nameKey="username"
+                      search={currentMembersSearch}
+                      onSearchChange={setCurrentMembersSearch}
+                      searchPlaceholder="Search current members..."
+                      selectedIds={selectedExistingMembers}
+                      onToggle={toggleExistingMemberSelection}
+                      selectedTone="destructive"
+                      actionLabel="Remove"
+                      onAction={handleDeleteMembers}
+                      isActionLoading={isLoadingExistingMembers}
+                      isLoading={isLoadingExistingMembers}
+                      loadingMessage="Loading members..."
+                      emptyMessage="No members in this group"
+                      filteredEmptyMessage="No members match your search"
+                      listClassName="min-h-[min(42vh,360px)]"
+                    />
+                  </TabsContent>
+                  <TabsContent
+                    value="available"
+                    className="mt-3 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+                  >
+                    <MemberManagementPanel
+                      title="Available to Add"
+                      icon={<UserPlus className="h-4 w-4" />}
+                      count={availableMembers.length}
+                      members={availableMembers}
+                      nameKey="name"
+                      search={availableMembersSearch}
+                      onSearchChange={setAvailableMembersSearch}
+                      searchPlaceholder="Search users to add..."
+                      selectedIds={selectedMembers}
+                      onToggle={toggleMemberSelection}
+                      selectedTone="primary"
+                      actionLabel="Add"
+                      onAction={handleAddMembers}
+                      isActionLoading={isLoadingMembers}
+                      isLoading={isLoadingMembers}
+                      loadingMessage="Loading users..."
+                      emptyMessage="No users available to add"
+                      filteredEmptyMessage="No users match your search"
+                      listClassName="min-h-[min(42vh,360px)]"
+                    />
+                  </TabsContent>
+                </Tabs>
+              </div>
+
+              <div className="hidden min-h-0 flex-1 gap-5 md:grid md:grid-cols-2">
+                <MemberManagementPanel
+                  title="Current Members"
+                  icon={<Users className="h-4 w-4" />}
+                  count={existingMembers.length}
+                  members={existingMembers}
+                  nameKey="username"
+                  search={currentMembersSearch}
+                  onSearchChange={setCurrentMembersSearch}
+                  searchPlaceholder="Search current members..."
+                  selectedIds={selectedExistingMembers}
+                  onToggle={toggleExistingMemberSelection}
+                  selectedTone="destructive"
+                  actionLabel="Remove"
+                  onAction={handleDeleteMembers}
+                  isActionLoading={isLoadingExistingMembers}
+                  isLoading={isLoadingExistingMembers}
+                  loadingMessage="Loading members..."
+                  emptyMessage="No members in this group"
+                  filteredEmptyMessage="No members match your search"
+                  listClassName="h-[min(48vh,420px)]"
+                />
+                <MemberManagementPanel
+                  title="Available to Add"
+                  icon={<UserPlus className="h-4 w-4" />}
+                  count={availableMembers.length}
+                  members={availableMembers}
+                  nameKey="name"
+                  search={availableMembersSearch}
+                  onSearchChange={setAvailableMembersSearch}
+                  searchPlaceholder="Search users to add..."
+                  selectedIds={selectedMembers}
+                  onToggle={toggleMemberSelection}
+                  selectedTone="primary"
+                  actionLabel="Add"
+                  onAction={handleAddMembers}
+                  isActionLoading={isLoadingMembers}
+                  isLoading={isLoadingMembers}
+                  loadingMessage="Loading users..."
+                  emptyMessage="No users available to add"
+                  filteredEmptyMessage="No users match your search"
+                  listClassName="h-[min(48vh,420px)]"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="shrink-0 border-t px-4 py-3 sm:px-6">
+              <Button
+                variant="outline"
+                onClick={cancelMemberDialog}
+                disabled={isLoadingMembers || isLoadingExistingMembers}
+                className="w-full sm:w-auto"
+              >
+                Close
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

@@ -674,9 +674,6 @@ export default function DailyUpdate() {
                   className="rounded-xl border border-orange-200/90 dark:border-orange-900/55 bg-orange-50/95 dark:bg-orange-950/35 px-3 py-2 text-right shadow-sm"
                   title="Overtime that counts in period totals: approved or adjusted. Pending and rejected extra-hour requests count as 0."
                 >
-                  <p className="text-[10px] uppercase tracking-wide text-orange-800/85 dark:text-orange-200/85 font-semibold">
-                    Total OT
-                  </p>
                   <p className="text-xl sm:text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-200 leading-tight">
                     {totalOtVisible.toFixed(2)}h
                   </p>

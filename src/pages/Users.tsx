@@ -236,6 +236,18 @@ const Users = () => {
     setCurrentPage(1);
   }, [searchTerm, tabFromUrl]);
 
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value);
+    setCurrentPage(1);
+  };
+
+  // Keep page in range when result count or page size changes
+  useEffect(() => {
+    if (filteredUsers.length === 0) return;
+    const maxPage = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+    setCurrentPage((page) => Math.min(page, maxPage));
+  }, [filteredUsers.length, itemsPerPage]);
+
   // Apply all filters (search and role)
   const applyFilters = () => {
     if (users.length === 0) {
@@ -246,27 +258,30 @@ const Users = () => {
     let filtered = users;
 
     // Filter by search query
-    if (searchTerm) {
+    const query = searchTerm.trim().toLowerCase();
+    if (query) {
       filtered = filtered.filter(
         (user) =>
-          user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchTerm.toLowerCase())
+          user.username.toLowerCase().includes(query) ||
+          user.email.toLowerCase().includes(query)
       );
     }
 
-    // Filter by role for admin tabs
-    if (tabFromUrl === "developers") {
-      filtered = filtered.filter(user => user.role === "developer");
-    } else if (tabFromUrl === "testers") {
-      filtered = filtered.filter(user => user.role === "tester");
-    } else if (tabFromUrl === "admins") {
-      filtered = filtered.filter(user => user.role === "admin");
-    } else if (tabFromUrl === "others") {
-      // Show users with custom roles (role_id not 1, 2, or 3)
-      filtered = filtered.filter(user => {
-        const hasCustomRole = user.role_id && ![1, 2, 3].includes(user.role_id);
-        return hasCustomRole;
-      });
+    // Role tabs apply only when not searching (search spans all users)
+    if (!query) {
+      if (tabFromUrl === "developers") {
+        filtered = filtered.filter(user => user.role === "developer");
+      } else if (tabFromUrl === "testers") {
+        filtered = filtered.filter(user => user.role === "tester");
+      } else if (tabFromUrl === "admins") {
+        filtered = filtered.filter(user => user.role === "admin");
+      } else if (tabFromUrl === "others") {
+        // Show users with custom roles (role_id not 1, 2, or 3)
+        filtered = filtered.filter(user => {
+          const hasCustomRole = user.role_id && ![1, 2, 3].includes(user.role_id);
+          return hasCustomRole;
+        });
+      }
     }
 
     setFilteredUsers(filtered);
@@ -434,11 +449,13 @@ const Users = () => {
   }, [isValidTab, visibleTabs.length, defaultTab, tabFromUrl, setSearchParams]);
 
   const totalFiltered = filteredUsers.length;
+  const totalPages = totalFiltered > 0 ? Math.ceil(totalFiltered / itemsPerPage) : 0;
+  const activePage =
+    totalPages > 0 ? Math.min(Math.max(1, currentPage), totalPages) : 1;
   const paginatedUsers = filteredUsers.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    (activePage - 1) * itemsPerPage,
+    activePage * itemsPerPage
   );
-  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
 
   // Check for USERS_VIEW permission OR admin role
   if (isLoadingPermissions) {
@@ -626,17 +643,22 @@ const Users = () => {
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-xl"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/40 dark:border-gray-700/40 rounded-xl p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-4 w-full">
               <div className="p-2 bg-blue-600 rounded-lg">
                 <UserRound className="h-4 w-4 text-white" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search Users</h3>
+              {searchTerm.trim() ? (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Searching all roles
+                </span>
+              ) : null}
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  placeholder="Search by username or email..."
+                  placeholder="Search all users by username or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-4 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
@@ -657,11 +679,11 @@ const Users = () => {
               <span className="text-sm sm:text-base text-foreground font-semibold">
                 Showing{" "}
                 <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {(currentPage - 1) * itemsPerPage + 1}
+                  {(activePage - 1) * itemsPerPage + 1}
                 </span>
                 -
                 <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {Math.min(currentPage * itemsPerPage, totalFiltered)}
+                  {Math.min(activePage * itemsPerPage, totalFiltered)}
                 </span>{" "}
                 of{" "}
                 <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
@@ -677,7 +699,7 @@ const Users = () => {
               <ItemsPerPageSelect
                 id="items-per-page"
                 value={itemsPerPage}
-                onChange={setItemsPerPage}
+                onChange={handleItemsPerPageChange}
               />
             </div>
           </div>
@@ -689,7 +711,7 @@ const Users = () => {
               <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
               Page{" "}
               <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                {currentPage}
+                {activePage}
               </span>{" "}
               of{" "}
               <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
@@ -702,7 +724,7 @@ const Users = () => {
               {/* Previous Button */}
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
+                disabled={activePage === 1}
                 className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border border-border/60 hover:border-primary/50 hover:bg-primary/5 rounded-lg bg-background/80 hover:bg-background/90 disabled:cursor-not-allowed"
               >
                 <svg
@@ -728,7 +750,7 @@ const Users = () => {
                 <button
                   onClick={() => setCurrentPage(1)}
                   className={`h-10 w-10 p-0 hidden md:flex items-center justify-center font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border border-border/60 hover:border-primary/50 hover:bg-primary/5 rounded-lg ${
-                    currentPage === 1
+                    activePage === 1
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-background/80 hover:bg-background/90"
                   }`}
@@ -737,7 +759,7 @@ const Users = () => {
                 </button>
 
                 {/* Show ellipsis if needed on larger screens */}
-                {currentPage > 4 && (
+                {activePage > 4 && (
                   <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
                     •••
                   </span>
@@ -746,8 +768,8 @@ const Users = () => {
                 {/* Dynamic page numbers based on current page - show more on larger screens */}
                 {(() => {
                   const pages = [];
-                  const start = Math.max(2, currentPage - 1);
-                  const end = Math.min(totalPages - 1, currentPage + 1);
+                  const start = Math.max(2, activePage - 1);
+                  const end = Math.min(totalPages - 1, activePage + 1);
 
                   for (let i = start; i <= end; i++) {
                     if (i > 1 && i < totalPages) {
@@ -760,7 +782,7 @@ const Users = () => {
                       key={page}
                       onClick={() => setCurrentPage(page)}
                       className={`h-10 w-10 p-0 hidden md:flex items-center justify-center font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border border-border/60 hover:border-primary/50 hover:bg-primary/5 rounded-lg ${
-                        currentPage === page
+                        activePage === page
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-background/80 hover:bg-background/90"
                       }`}
@@ -771,7 +793,7 @@ const Users = () => {
                 })()}
 
                 {/* Show ellipsis if needed on larger screens */}
-                {currentPage < totalPages - 3 && (
+                {activePage < totalPages - 3 && (
                   <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
                     •••
                   </span>
@@ -782,7 +804,7 @@ const Users = () => {
                   <button
                     onClick={() => setCurrentPage(totalPages)}
                     className={`h-10 w-10 p-0 hidden md:flex items-center justify-center font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border border-border/60 hover:border-primary/50 hover:bg-primary/5 rounded-lg ${
-                      currentPage === totalPages
+                      activePage === totalPages
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background/80 hover:bg-background/90"
                     }`}
@@ -794,7 +816,7 @@ const Users = () => {
                 {/* Mobile-friendly page selector */}
                 <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
                   <select
-                    value={currentPage}
+                    value={activePage}
                     onChange={(e) => setCurrentPage(Number(e.target.value))}
                     className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
                     aria-label="Go to page"
@@ -818,7 +840,7 @@ const Users = () => {
                 onClick={() =>
                   setCurrentPage((p) => Math.min(totalPages, p + 1))
                 }
-                disabled={currentPage === totalPages}
+                disabled={activePage === totalPages}
                 className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border border-border/60 hover:border-primary/50 hover:bg-primary/5 rounded-lg bg-background/80 hover:bg-background/90 disabled:cursor-not-allowed"
               >
                 <span className="hidden sm:inline">Next</span>
@@ -844,7 +866,7 @@ const Users = () => {
               <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
               Page{" "}
               <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                {currentPage}
+                {activePage}
               </span>{" "}
               of{" "}
               <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
@@ -875,7 +897,7 @@ const Users = () => {
             <ItemsPerPageSelect
               id="items-per-page-simple"
               value={itemsPerPage}
-              onChange={setItemsPerPage}
+              onChange={handleItemsPerPageChange}
             />
           </div>
         </div>
