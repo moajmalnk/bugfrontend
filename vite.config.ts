@@ -1,9 +1,15 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const apiProxyTarget =
+    env.VITE_API_PROXY_TARGET?.replace(/\/$/, "") ||
+    "https://bugbackend.bugricer.com";
+
+  return {
   server: {
     host: "::",
     port: 8080,
@@ -21,6 +27,14 @@ export default defineConfig(({ mode }) => ({
     // Improve chunk loading reliability
     middlewareMode: false,
     cors: true,
+    // Proxy API in dev so localhost avoids cross-origin CORS against remote backend
+    proxy: {
+      "/api": {
+        target: apiProxyTarget,
+        changeOrigin: true,
+        secure: true,
+      },
+    },
     // Better handling of dynamic imports
     watch: {
       usePolling: false,
@@ -132,4 +146,5 @@ export default defineConfig(({ mode }) => ({
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
-}));
+};
+});

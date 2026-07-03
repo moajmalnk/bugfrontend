@@ -5,9 +5,23 @@ const isLocalhost = typeof window !== 'undefined' &&
    window.location.hostname.includes('localhost'));
 
 const getApiUrl = () => {
+  const configured = import.meta.env.VITE_API_URL as string | undefined;
+
+  // Local dev against a remote API: route through Vite proxy (/api) to avoid CORS
+  if (
+    import.meta.env.DEV &&
+    isLocalhost &&
+    configured &&
+    /^https?:\/\//.test(configured) &&
+    !configured.includes('localhost') &&
+    !configured.includes('127.0.0.1')
+  ) {
+    return '/api';
+  }
+
   // Check for environment variable first
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+  if (configured) {
+    return configured;
   }
   
   // Auto-detect based on current URL
