@@ -41,18 +41,38 @@ function resolveNotificationPayload(payload) {
 }
 
 function buildActions(data) {
-  // Android Chrome supports action buttons on web push
-  const actions = [
-    { action: 'view', title: 'View' },
+  const entity = (data && (data.entity_type || data.type) || '').toLowerCase();
+  const labels = {
+    bug: 'View Bug',
+    bug_created: 'View Bug',
+    new_bug: 'View Bug',
+    fix: 'View Bug',
+    bug_fixed: 'View Bug',
+    update: 'View Update',
+    update_created: 'View Update',
+    new_update: 'View Update',
+    project: 'View Project',
+    project_created: 'View Project',
+    task: 'View Task',
+    task_created: 'View Task',
+    meet: 'Join Meet',
+    meet_created: 'Join Meet',
+    doc: 'Open Doc',
+    doc_created: 'Open Doc',
+    sheet: 'Open Sheet',
+    sheet_created: 'Open Sheet',
+    work_update: 'Open',
+    overtime: 'Review OT',
+    feedback: 'View Feedback',
+    message: 'Open Chat',
+    user: 'View User',
+    user_registered: 'View User',
+  };
+
+  return [
+    { action: 'view', title: labels[entity] || 'Open' },
     { action: 'dismiss', title: 'Dismiss' },
   ];
-
-  // Prefer "View Bug" when this notification is about a bug
-  if (data && data.bug_id) {
-    actions[0] = { action: 'view', title: 'View Bug' };
-  }
-
-  return actions;
 }
 
 messaging.onBackgroundMessage(function (payload) {

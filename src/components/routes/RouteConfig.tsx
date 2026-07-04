@@ -221,6 +221,26 @@ const ProjectRedirect = () => {
   return <Navigate to={`/${role}/projects/${projectId}`} replace />;
 };
 
+/** Redirect push/deep links like /messages → /{role}/messages */
+const RolePathRedirect = ({ suffix }: { suffix: string }) => {
+  const params = useParams();
+  const { isAuthenticated, currentUser } = useAuth();
+  const role = currentUser?.role;
+
+  if (!isAuthenticated || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  let path = suffix;
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) {
+      path = path.replace(`:${key}`, value);
+    }
+  });
+
+  return <Navigate to={`/${role}/${path.replace(/^\//, "")}`} replace />;
+};
+
 const RouteConfig = () => {
   const { isLoading, isAuthenticated, currentUser } = useAuth();
   const role = currentUser?.role;
@@ -266,14 +286,27 @@ const RouteConfig = () => {
         }
       />
 
-      {/* Role-neutral bug routes - redirect to role-based URLs */}
+      {/* Role-neutral deep links for push notifications */}
       <Route path="/bugs/:bugId" element={<BugRedirect />} />
-
-      {/* Role-neutral update routes - redirect to role-based URLs */}
       <Route path="/updates/:updateId" element={<UpdateRedirect />} />
-
-      {/* Role-neutral project routes - redirect to role-based URLs */}
       <Route path="/projects/:projectId" element={<ProjectRedirect />} />
+      <Route path="/tasks/:taskId" element={<RolePathRedirect suffix="my-tasks" />} />
+      <Route path="/my-tasks" element={<RolePathRedirect suffix="my-tasks" />} />
+      <Route path="/meet" element={<RolePathRedirect suffix="meet" />} />
+      <Route path="/meet/:code" element={<RolePathRedirect suffix="meet/:code" />} />
+      <Route path="/bugdocs" element={<RolePathRedirect suffix="bugdocs" />} />
+      <Route path="/bugdocs/project/:projectId" element={<RolePathRedirect suffix="bugdocs/project/:projectId" />} />
+      <Route path="/bugsheets" element={<RolePathRedirect suffix="bugsheets" />} />
+      <Route path="/bugsheets/project/:projectId" element={<RolePathRedirect suffix="bugsheets/project/:projectId" />} />
+      <Route path="/messages" element={<RolePathRedirect suffix="messages" />} />
+      <Route path="/admin/notifications" element={<RolePathRedirect suffix="notifications" />} />
+      <Route path="/admin/daily-work-update" element={<RolePathRedirect suffix="daily-work-update" />} />
+      <Route path="/admin/overtime-requests" element={<RolePathRedirect suffix="overtime-requests" />} />
+      <Route path="/admin/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
+      <Route path="/admin/users" element={<RolePathRedirect suffix="users" />} />
+      <Route path="/admin/users/:userId" element={<RolePathRedirect suffix="users/:userId" />} />
+      <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
+      <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
 
       {/* Protected Routes with role prefix */}
       {isAuthenticated && role && (
