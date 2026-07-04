@@ -27,11 +27,12 @@ function resolveNotificationPayload(payload) {
 
 messaging.onBackgroundMessage(function(payload) {
   const resolved = resolveNotificationPayload(payload);
+  const data = payload && payload.data ? payload.data : {};
   const options = {
     body: resolved.body,
-    icon: '/favicon.ico',
-    badge: '/placeholder.svg',
-    tag: 'bug-update',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag || ('bugricer-' + (data.bug_id || data.notification_id || 'update')),
     renotify: true,
     data: { url: resolved.url },
   };
@@ -41,7 +42,7 @@ messaging.onBackgroundMessage(function(payload) {
     self.registration.setAppBadge(resolved.unreadCount).catch(() => {});
   }
 
-  self.registration.showNotification(resolved.title, options);
+  return self.registration.showNotification(resolved.title, options);
 });
 
 self.addEventListener('notificationclick', function(event) {
