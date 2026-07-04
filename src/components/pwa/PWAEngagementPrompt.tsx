@@ -8,21 +8,12 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
+const INSTALLED_KEY = "bugricer_pwa_installed";
 const INSTALL_DISMISS_KEY = "bugricer_pwa_install_dismissed_at";
 const NOTIF_DISMISS_KEY = "bugricer_pwa_notif_dismissed_at";
-/** Legacy key from the first prompt version — clear so users are not stuck for 7 days */
 const LEGACY_DISMISS_KEY = "bugricer_pwa_prompt_dismissed_at";
 const INSTALL_DISMISS_DAYS = 7;
-/** Short cooldown only — notifications should be asked again soon if still default */
 const NOTIF_DISMISS_HOURS = 12;
-
-function clearLegacyDismiss() {
-  try {
-    localStorage.removeItem(LEGACY_DISMISS_KEY);
-  } catch {
-    // ignore
-  }
-}
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -31,9 +22,26 @@ type BeforeInstallPromptEvent = Event & {
 
 function isStandaloneDisplay(): boolean {
   if (typeof window === "undefined") return false;
-  const media = window.matchMedia("(display-mode: standalone)").matches;
+  const modes = ["standalone", "fullscreen", "minimal-ui"] as const;
+  const displayMode = modes.some((mode) => window.matchMedia(`(display-mode: ${mode})`).matches);
   const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
-  return media || iosStandalone;
+  return displayMode || iosStandalone;
+}
+
+function hasInstalledFlag(): boolean {
+  try {
+    return localStorage.getItem(INSTALLED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markInstalled() {
+  try {
+    localStorage.setItem(INSTALLED_KEY, "1");
+  } catch {
+    // ignore
+  }
 }
 
 function isIosDevice(): boolean {
@@ -57,10 +65,18 @@ function clearDismissed(key: string) {
   localStorage.removeItem(key);
 }
 
+function clearLegacyDismiss() {
+  try {
+    localStorage.removeItem(LEGACY_DISMISS_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 /**
- * Custom install + notification prompt.
- * Install and notifications are tracked separately so installing the app
- * never blocks the notification permission ask.
+ * Install prompt only when not installed.
+ * Notification prompt only when permission is still "default".
+ * Once installed + notifications allowed, nothing is shown.
  */
 export function PWAEngagementPrompt() {
   const { currentUser } = useAuth();
@@ -71,14 +87,21 @@ export function PWAEngagementPrompt() {
   const [notificationState, setNotificationState] = useState<NotificationPermission | "unsupported">(
     () => getNotificationPermissionState()
   );
-  const [installDone, setInstallDone] = useState(() => isStandaloneDisplay());
+  const [installDone, setInstallDone] = useState(
+    () => isStandaloneDisplay() || hasInstalledFlag()
+  );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [forceNotifPrompt, setForceNotifPrompt] = useState(false);
 
   const ios = useMemo(() => isIosDevice(), []);
   const canInstall = Boolean(deferredPrompt) && !installDone;
   const needsNotifications = notificationState === "default";
-  const notificationsBlocked = notificationState === "denied";
+
+  const setInstalled = useCallback(() => {
+    markInstalled();
+    setInstallDone(true);
+    setDeferredPrompt(null);
+  }, []);
 
   const refreshPermission = useCallback(() => {
     const permission = getNotificationPermissionState();
@@ -87,6 +110,7 @@ export function PWAEngagementPrompt() {
   }, []);
 
   const openNotificationPrompt = useCallback(() => {
+    if (getNotificationPermissionState() !== "default") return;
     clearDismissed(NOTIF_DISMISS_KEY);
     setForceNotifPrompt(true);
     refreshPermission();
@@ -94,20 +118,29 @@ export function PWAEngagementPrompt() {
   }, [refreshPermission]);
 
   useEffect(() => {
+    if (isStandaloneDisplay()) {
+      setInstalled();
+    }
+
     const onBeforeInstall = (event: Event) => {
+      // Browser only fires this when install is still available
       event.preventDefault();
+      if (hasInstalledFlag() || isStandaloneDisplay()) {
+        return;
+      }
       setDeferredPrompt(event as BeforeInstallPromptEvent);
+      setInstallDone(false);
     };
 
     const onInstalled = () => {
-      setInstallDone(true);
-      setDeferredPrompt(null);
+      setInstalled();
       setStatusMessage("App installed. Enable notifications to get bug alerts.");
-      // Always ask for notifications right after install
       clearDismissed(NOTIF_DISMISS_KEY);
-      setForceNotifPrompt(true);
       if (getNotificationPermissionState() === "default") {
+        setForceNotifPrompt(true);
         setOpen(true);
+      } else {
+        setOpen(false);
       }
     };
 
@@ -118,7 +151,26 @@ export function PWAEngagementPrompt() {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
     };
-  }, []);
+  }, [setInstalled]);
+
+  // Detect related installed apps (Chrome) and persist flag
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      getInstalledRelatedApps?: () => Promise<Array<{ id?: string; platform?: string }>>;
+    };
+    if (typeof nav.getInstalledRelatedApps !== "function") return;
+
+    nav
+      .getInstalledRelatedApps()
+      .then((apps) => {
+        if (apps && apps.length > 0) {
+          setInstalled();
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+  }, [setInstalled]);
 
   // Decide when to show the modal
   useEffect(() => {
@@ -131,32 +183,46 @@ export function PWAEngagementPrompt() {
 
     const timer = window.setTimeout(() => {
       const standalone = isStandaloneDisplay();
-      setInstallDone(standalone);
+      if (standalone || hasInstalledFlag()) {
+        setInstalled();
+      }
+
+      const installed = standalone || hasInstalledFlag();
       const permission = refreshPermission();
 
+      // Fully set up — never show install/notification modal
+      if (installed && permission !== "default") {
+        setOpen(false);
+        return;
+      }
+
+      // Notifications already decided (granted/denied/unsupported) and no install needed
+      if (permission !== "default" && installed) {
+        setOpen(false);
+        return;
+      }
+
       const showInstall =
-        !standalone &&
+        !installed &&
+        (Boolean(deferredPrompt) || ios) &&
         !wasDismissed(INSTALL_DISMISS_KEY, INSTALL_DISMISS_DAYS * 24 * 60 * 60 * 1000);
 
       const showNotifications =
         permission === "default" &&
         (forceNotifPrompt ||
-          standalone ||
+          installed ||
           !wasDismissed(NOTIF_DISMISS_KEY, NOTIF_DISMISS_HOURS * 60 * 60 * 1000));
 
-      // Installed PWA with no permission yet → always prioritize notifications
-      if (standalone && permission === "default") {
+      // Only open when there is something useful to do
+      if (showNotifications || showInstall) {
         setOpen(true);
-        return;
+      } else {
+        setOpen(false);
       }
-
-      if (showInstall || showNotifications) {
-        setOpen(true);
-      }
-    }, 1500);
+    }, 1200);
 
     return () => window.clearTimeout(timer);
-  }, [currentUser, deferredPrompt, forceNotifPrompt, refreshPermission]);
+  }, [currentUser, deferredPrompt, forceNotifPrompt, ios, refreshPermission, setInstalled]);
 
   // Quietly refresh FCM token when already granted
   useEffect(() => {
@@ -175,7 +241,6 @@ export function PWAEngagementPrompt() {
       if (!installDone) {
         markDismissed(INSTALL_DISMISS_KEY);
       }
-      // Only snooze notifications if still default (user chose "Not now")
       if (getNotificationPermissionState() === "default") {
         markDismissed(NOTIF_DISMISS_KEY);
       }
@@ -191,12 +256,15 @@ export function PWAEngagementPrompt() {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
       if (choice.outcome === "accepted") {
-        setInstallDone(true);
+        setInstalled();
         setStatusMessage("App installed. Next: enable notifications.");
         clearDismissed(NOTIF_DISMISS_KEY);
-        setForceNotifPrompt(true);
-        // Keep dialog open for notifications
-        setOpen(true);
+        if (getNotificationPermissionState() === "default") {
+          setForceNotifPrompt(true);
+          setOpen(true);
+        } else {
+          setOpen(false);
+        }
       } else {
         setStatusMessage("Install cancelled. You can try again anytime.");
       }
@@ -217,27 +285,29 @@ export function PWAEngagementPrompt() {
       if (result === "granted" || permission === "granted") {
         clearDismissed(NOTIF_DISMISS_KEY);
         setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
-        // Close shortly after success
         window.setTimeout(() => {
           setOpen(false);
           setForceNotifPrompt(false);
-        }, 1800);
+        }, 1200);
       } else if (result === "denied" || permission === "denied") {
         setStatusMessage(
-          "Notifications are blocked. Open site settings and allow notifications for BugRicer, then tap Enable again."
+          "Notifications are blocked. Open site settings and allow notifications for BugRicer."
         );
       } else {
-        setStatusMessage("Could not enable notifications on this device. Try again from the bell button.");
+        setStatusMessage("Could not enable notifications on this device.");
       }
     } finally {
       setEnablingNotifications(false);
     }
   };
 
-  const showFloatingBell =
-    Boolean(currentUser) &&
-    !open &&
-    (needsNotifications || notificationsBlocked);
+  // Floating bell only when permission still needs a decision
+  const showFloatingBell = Boolean(currentUser) && !open && needsNotifications;
+
+  // Nothing useful to show in the modal
+  const showInstallSection = !installDone && (canInstall || ios);
+  const showNotifSection = needsNotifications;
+  const shouldRenderModal = open && currentUser && (showInstallSection || showNotifSection);
 
   return (
     <>
@@ -257,7 +327,7 @@ export function PWAEngagementPrompt() {
         </button>
       )}
 
-      {open && currentUser && (
+      {shouldRenderModal && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center p-4 bg-black/70 backdrop-blur-sm">
           <div
             role="dialog"
@@ -299,7 +369,7 @@ export function PWAEngagementPrompt() {
             </div>
 
             <div className="space-y-3 px-5 pb-5">
-              {!installDone && (
+              {showInstallSection && (
                 <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3.5">
                   <div className="flex items-center gap-2 text-sm font-medium text-slate-100">
                     <Download className="h-4 w-4 text-blue-400" />
@@ -313,36 +383,28 @@ export function PWAEngagementPrompt() {
                     >
                       {installing ? "Opening install…" : "Install BugRicer"}
                     </Button>
-                  ) : ios ? (
+                  ) : (
                     <div className="mt-2 space-y-2 text-sm text-slate-400">
                       <p className="flex items-start gap-2">
                         <Share className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
                         <span>
                           Tap the <strong className="text-slate-200">Share</strong> button in Safari,
                           then choose <strong className="text-slate-200">Add to Home Screen</strong>.
-                          Open the installed app, then enable notifications.
                         </span>
                       </p>
                     </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-slate-400">
-                      Use your browser menu (<strong className="text-slate-200">Install app</strong> /
-                      Add to Home screen).
-                    </p>
                   )}
                 </div>
               )}
 
-              {(needsNotifications || notificationsBlocked) && (
+              {showNotifSection && (
                 <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-3.5">
                   <div className="flex items-center gap-2 text-sm font-medium text-slate-100">
                     <Bell className="h-4 w-4 text-violet-400" />
                     Push notifications
                   </div>
                   <p className="mt-1.5 text-sm text-slate-400">
-                    {notificationsBlocked
-                      ? "Notifications are blocked for this site. Allow them in browser/app settings, then tap the button below."
-                      : "Get alerts for bugs and important project updates. Tap the button to allow."}
+                    Get alerts for bugs and important project updates. Tap the button to allow.
                   </p>
                   <Button
                     className="mt-3 w-full bg-violet-600 hover:bg-violet-500"
@@ -368,11 +430,6 @@ export function PWAEngagementPrompt() {
                 >
                   Not now
                 </Button>
-                {notificationState === "granted" && (
-                  <Button className="flex-1" onClick={() => closePrompt(false)}>
-                    Done
-                  </Button>
-                )}
               </div>
             </div>
           </div>
