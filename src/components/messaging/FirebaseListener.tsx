@@ -33,8 +33,8 @@ function showSystemNotification(
   try {
     const options: NotificationOptions & { image?: string } = {
       body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
+      icon: "/notification-icon.png",
+      badge: "/notification-badge.png",
       tag: `bugricer-${url}`,
       renotify: true,
       data: { url },

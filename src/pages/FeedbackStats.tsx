@@ -447,43 +447,51 @@ export default function FeedbackStats() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {recent_feedback.map((feedback, index) => (
-                    <div key={feedback.id} className="group relative overflow-hidden rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm hover:shadow-lg transition-all duration-300 p-5">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
+                  {recent_feedback.map((feedback) => (
+                    <div
+                      key={feedback.id}
+                      className="group relative rounded-xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm hover:shadow-lg transition-all duration-300 p-4 sm:p-5"
+                    >
+                      <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 shrink-0">
                             <span className="text-2xl">{RATING_EMOJIS[feedback.rating - 1]}</span>
                             {getRatingIcon(feedback.rating)}
                           </div>
-                          <div>
-                            <div className="font-semibold text-gray-900 dark:text-white">{feedback.username}</div>
-                            <Badge 
-                              variant="secondary" 
-                              className="text-xs px-2 py-1 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700"
+                          <div className="min-w-0">
+                            <div className="font-semibold text-gray-900 dark:text-white truncate">
+                              {feedback.username}
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className="mt-1 text-xs px-2 py-1 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700"
                             >
                               {feedback.role}
                             </Badge>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+
+                        <div className="flex items-center justify-between gap-3 w-full sm:w-auto sm:shrink-0 sm:justify-end">
+                          <div className="text-sm text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">
                             {new Date(feedback.submitted_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleDeleteClick(feedback.id)}
-                            className="h-8 px-3 text-xs font-medium bg-white dark:bg-gray-800 border-red-200 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 hover:shadow-md"
+                            className="h-8 px-3 text-xs font-medium shrink-0 bg-white dark:bg-gray-800 border-red-200 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 hover:shadow-md"
                           >
                             <Trash2 className="h-3 w-3 mr-1" />
                             Delete
                           </Button>
                         </div>
                       </div>
-                      
+
                       {feedback.feedback_text && (
                         <div className="bg-gradient-to-r from-gray-50/50 to-indigo-50/30 dark:from-gray-700/30 dark:to-indigo-900/20 rounded-lg p-4 border border-gray-200/30 dark:border-gray-600/30">
-                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{feedback.feedback_text}</p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed break-words">
+                            {feedback.feedback_text}
+                          </p>
                         </div>
                       )}
                     </div>

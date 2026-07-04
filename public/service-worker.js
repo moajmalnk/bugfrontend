@@ -13,6 +13,10 @@ const CRITICAL_RESOURCES = [
   '/favicon.ico',
   '/icon-192.png',
   '/icon-512.png',
+  '/notification-icon.png',
+  '/notification-badge.png',
+  '/notification-icon-96.png',
+  '/notification-badge-96.png',
   '/apple-touch-icon.png',
 ];
 
