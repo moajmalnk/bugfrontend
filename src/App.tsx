@@ -10,7 +10,7 @@ import { initShadowMode } from "@/lib/shadowMode";
 import { QueryClient } from "@tanstack/react-query";
 import { BrowserRouter as Router } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
-import { requestNotificationPermission } from "./firebase-messaging-sw";
+import { PWAEngagementPrompt } from "@/components/pwa/PWAEngagementPrompt";
 import ContextMenu from "./components/ContextMenu";
 import { MainLayout } from "@/components/layout/MainLayout";
 import Fixes from "@/pages/Fixes";
@@ -253,11 +253,6 @@ function AppContent() {
     localStorage.setItem("privacyMode", privacy ? "true" : "false");
   }, [privacy]);
 
-  // Enable notification permission request
-  useEffect(() => {
-    requestNotificationPermission();
-  }, []);
-
   const [contextMenu, setContextMenu] = useState<{ mouseX: number | null; mouseY: number | null }>({ mouseX: null, mouseY: null });
 
   // Native event handlers for document
@@ -377,6 +372,7 @@ function AppContent() {
           onAccept={handleUpdateAccept}
           onDismiss={handleUpdateDismiss}
         />
+        <PWAEngagementPrompt />
         <TimezoneDebug />
         {networkError && <NetworkError />}
         <PerformanceMonitor enabled={process.env.NODE_ENV === 'development'} />
