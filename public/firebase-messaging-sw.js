@@ -13,6 +13,16 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+function toAbsoluteUrl(url) {
+  if (!url) {
+    return self.location.origin + '/';
+  }
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+  return self.location.origin + (url.charAt(0) === '/' ? url : '/' + url);
+}
+
 function resolveNotificationPayload(payload) {
   const data = payload && payload.data ? payload.data : {};
   const notification = payload && payload.notification ? payload.notification : {};
@@ -20,50 +30,105 @@ function resolveNotificationPayload(payload) {
   return {
     title: data.title || notification.title || 'BugRicer',
     body: data.body || notification.body || 'You have a new update.',
-    url: data.click_action || data.url || '/',
+    url: toAbsoluteUrl(data.click_action || data.url || '/admin/notifications'),
+    image: data.image || notification.image || '',
+    icon: data.icon || toAbsoluteUrl('/icon-192.png'),
+    badge: data.badge || toAbsoluteUrl('/icon-192.png'),
+    tag: data.tag || ('bugricer-' + (data.bug_id || data.notification_id || Date.now())),
     unreadCount: Number(data.unread_count || 0),
+    bugId: data.bug_id || '',
   };
 }
 
-messaging.onBackgroundMessage(function(payload) {
+function buildActions(data) {
+  // Android Chrome supports action buttons on web push
+  const actions = [
+    { action: 'view', title: 'View' },
+    { action: 'dismiss', title: 'Dismiss' },
+  ];
+
+  // Prefer "View Bug" when this notification is about a bug
+  if (data && data.bug_id) {
+    actions[0] = { action: 'view', title: 'View Bug' };
+  }
+
+  return actions;
+}
+
+messaging.onBackgroundMessage(function (payload) {
   const resolved = resolveNotificationPayload(payload);
   const data = payload && payload.data ? payload.data : {};
+
   const options = {
     body: resolved.body,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    tag: data.tag || ('bugricer-' + (data.bug_id || data.notification_id || 'update')),
+    icon: resolved.icon,
+    badge: resolved.badge,
+    tag: resolved.tag,
     renotify: true,
-    data: { url: resolved.url },
+    requireInteraction: true,
+    vibrate: [120, 60, 120],
+    data: {
+      url: resolved.url,
+      bugId: resolved.bugId,
+    },
+    actions: buildActions(data),
   };
+
+  // Large image (Flipkart/Amazon style expanded notification)
+  if (resolved.image) {
+    options.image = resolved.image;
+  }
 
   const badgeApi = self.registration && typeof self.registration.setAppBadge === 'function';
   if (badgeApi && resolved.unreadCount > 0) {
-    self.registration.setAppBadge(resolved.unreadCount).catch(() => {});
+    self.registration.setAppBadge(resolved.unreadCount).catch(function () {});
   }
 
   return self.registration.showNotification(resolved.title, options);
 });
 
-self.addEventListener('notificationclick', function(event) {
-  event.notification.close();
-  const targetUrl = (event.notification && event.notification.data && event.notification.data.url) || '/';
+function openTargetUrl(targetUrl) {
+  const absoluteUrl = toAbsoluteUrl(targetUrl);
 
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (let i = 0; i < windowClients.length; i += 1) {
-        const client = windowClients[i];
-        if ('focus' in client) {
-          if ('navigate' in client) {
-            return client.navigate(targetUrl).then(() => client.focus());
-          }
-          return client.focus();
+  return clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (windowClients) {
+    for (let i = 0; i < windowClients.length; i += 1) {
+      const client = windowClients[i];
+      // Reuse an existing BugRicer tab/window when possible
+      if (client.url && client.url.indexOf(self.location.origin) === 0 && 'focus' in client) {
+        if ('navigate' in client) {
+          return client.navigate(absoluteUrl).then(function (navigated) {
+            return (navigated || client).focus();
+          });
         }
+        return client.focus().then(function () {
+          client.postMessage({ type: 'BUGRICER_NOTIFICATION_NAV', url: absoluteUrl });
+          return client;
+        });
       }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
-      return undefined;
-    })
-  );
+    }
+
+    if (clients.openWindow) {
+      return clients.openWindow(absoluteUrl);
+    }
+    return undefined;
+  });
+}
+
+self.addEventListener('notificationclick', function (event) {
+  const action = event.action || 'view';
+  const notificationData = (event.notification && event.notification.data) || {};
+  const targetUrl = notificationData.url || '/admin/notifications';
+
+  event.notification.close();
+
+  if (action === 'dismiss') {
+    return;
+  }
+
+  // Default tap or "View" / "View Bug"
+  event.waitUntil(openTargetUrl(targetUrl));
+});
+
+self.addEventListener('notificationclose', function () {
+  // no-op — reserved for analytics later
 });

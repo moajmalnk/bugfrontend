@@ -12,11 +12,17 @@ function resolvePayload(payload: MessagePayload) {
     title: data.title || notification.title || "BugRicer",
     body: data.body || notification.body || "You have a new update.",
     url: data.click_action || data.url || "/admin/notifications",
+    image: data.image || notification.image || "",
     type: data.type || "",
   };
 }
 
-function showSystemNotification(title: string, body: string, url: string) {
+function showSystemNotification(
+  title: string,
+  body: string,
+  url: string,
+  image?: string
+) {
   if (typeof window === "undefined" || !("Notification" in window)) {
     return;
   }
@@ -25,19 +31,26 @@ function showSystemNotification(title: string, body: string, url: string) {
   }
 
   try {
-    const notification = new Notification(title, {
+    const options: NotificationOptions & { image?: string } = {
       body,
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       tag: `bugricer-${url}`,
       renotify: true,
       data: { url },
-    });
+    };
+    if (image) {
+      options.image = image;
+    }
+
+    const notification = new Notification(title, options);
 
     notification.onclick = () => {
       window.focus();
       if (url) {
-        window.location.href = url;
+        window.location.href = url.startsWith("http")
+          ? url
+          : `${window.location.origin}${url.startsWith("/") ? url : `/${url}`}`;
       }
       notification.close();
     };
@@ -74,7 +87,12 @@ const FirebaseListener = () => {
         });
 
         // Also try a system notification (helps when toast is easy to miss)
-        showSystemNotification(resolved.title, resolved.body, resolved.url);
+        showSystemNotification(
+          resolved.title,
+          resolved.body,
+          resolved.url,
+          resolved.image || undefined
+        );
 
         // Refresh notification UIs listening for this event
         window.dispatchEvent(
@@ -87,8 +105,16 @@ const FirebaseListener = () => {
       // Messaging unsupported in this browser/context
     }
 
+    const onSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === "BUGRICER_NOTIFICATION_NAV" && event.data.url) {
+        window.location.href = event.data.url;
+      }
+    };
+    navigator.serviceWorker?.addEventListener("message", onSwMessage);
+
     return () => {
       unsubscribe();
+      navigator.serviceWorker?.removeEventListener("message", onSwMessage);
     };
   }, [currentUser]);
 
