@@ -11,7 +11,7 @@ function resolvePayload(payload: MessagePayload) {
   return {
     title: data.title || notification.title || "BugRicer",
     body: data.body || notification.body || "You have a new update.",
-    url: data.click_action || data.url || "/admin/notifications",
+    url: data.click_action || data.url || "/notifications",
     image: data.image || notification.image || "",
     type: data.type || "",
   };

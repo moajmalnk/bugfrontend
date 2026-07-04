@@ -299,12 +299,12 @@ const RouteConfig = () => {
       <Route path="/bugsheets" element={<RolePathRedirect suffix="bugsheets" />} />
       <Route path="/bugsheets/project/:projectId" element={<RolePathRedirect suffix="bugsheets/project/:projectId" />} />
       <Route path="/messages" element={<RolePathRedirect suffix="messages" />} />
-      <Route path="/admin/notifications" element={<RolePathRedirect suffix="notifications" />} />
-      <Route path="/admin/daily-work-update" element={<RolePathRedirect suffix="daily-work-update" />} />
-      <Route path="/admin/overtime-requests" element={<RolePathRedirect suffix="overtime-requests" />} />
-      <Route path="/admin/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
-      <Route path="/admin/users" element={<RolePathRedirect suffix="users" />} />
-      <Route path="/admin/users/:userId" element={<RolePathRedirect suffix="users/:userId" />} />
+      <Route path="/notifications" element={<RolePathRedirect suffix="notifications" />} />
+      <Route path="/daily-work-update" element={<RolePathRedirect suffix="daily-work-update" />} />
+      <Route path="/overtime-requests" element={<RolePathRedirect suffix="overtime-requests" />} />
+      <Route path="/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
+      <Route path="/users/:userId" element={<RolePathRedirect suffix="users/:userId" />} />
+      <Route path="/users" element={<RolePathRedirect suffix="users" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
       <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
 

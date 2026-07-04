@@ -30,7 +30,7 @@ function resolveNotificationPayload(payload) {
   return {
     title: data.title || notification.title || 'BugRicer',
     body: data.body || notification.body || 'You have a new update.',
-    url: toAbsoluteUrl(data.click_action || data.url || '/admin/notifications'),
+    url: toAbsoluteUrl(data.click_action || data.url || '/notifications'),
     image: data.image || notification.image || '',
     icon: data.icon || toAbsoluteUrl('/icon-192.png'),
     badge: data.badge || toAbsoluteUrl('/icon-192.png'),
@@ -137,7 +137,7 @@ function openTargetUrl(targetUrl) {
 self.addEventListener('notificationclick', function (event) {
   const action = event.action || 'view';
   const notificationData = (event.notification && event.notification.data) || {};
-  const targetUrl = notificationData.url || '/admin/notifications';
+  const targetUrl = notificationData.url || '/notifications';
 
   event.notification.close();
 
