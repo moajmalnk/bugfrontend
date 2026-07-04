@@ -29,6 +29,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import { canReportBug } from "@/lib/utils";
 
 const Bugs = () => {
   const { currentUser } = useAuth();
@@ -295,8 +296,7 @@ const Bugs = () => {
               </div>
               
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                {(currentUser?.role === "admin" ||
-                  currentUser?.role === "tester") && (
+                {canReportBug(currentUser?.role) && (
                   <Link
                     to={
                       currentUser?.role

@@ -60,6 +60,10 @@ export const getEffectiveRole = (user: { role?: string; role_id?: number | null 
 export const showBugMessageInMainNav = (role: string | undefined | null): boolean =>
   role === "admin" || role === "developer";
 
+/** Who may report a new bug (on projects they are assigned to). */
+export const canReportBug = (role: string | undefined | null): boolean =>
+  role === "admin" || role === "developer" || role === "tester";
+
 /**
  * Who may open the Messages (BugMessage) page: admins, developers, or anyone with MESSAGING_VIEW.
  */

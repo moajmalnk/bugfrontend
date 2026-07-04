@@ -1,5 +1,6 @@
 import { toast } from "@/components/ui/use-toast";
 import { ENV } from "@/lib/env";
+import { requestNotificationPermission } from "@/firebase-messaging-sw";
 import { User } from "@/types";
 import {
   createContext,
@@ -135,6 +136,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   };
+
+  // Refresh FCM token whenever a user session is active and permission is granted
+  useEffect(() => {
+    if (!currentUser) return;
+    void requestNotificationPermission({ interactive: false });
+  }, [currentUser?.id]);
 
   // Run auth check on mount and token change
   useEffect(() => {

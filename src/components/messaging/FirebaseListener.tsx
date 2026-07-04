@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { getMessaging, onMessage, type MessagePayload } from "firebase/messaging";
-import { app } from "@/firebase-config";
+import { onMessage, type MessagePayload } from "firebase/messaging";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { getFirebaseMessagingInstance } from "@/firebase-messaging-sw";
 
 function resolvePayload(payload: MessagePayload) {
   const data = payload.data ?? {};
@@ -69,8 +69,10 @@ const FirebaseListener = () => {
 
     let unsubscribe = () => {};
 
-    try {
-      const messaging = getMessaging(app);
+    void getFirebaseMessagingInstance().then((messaging) => {
+      if (!messaging) {
+        return;
+      }
 
       unsubscribe = onMessage(messaging, (payload) => {
         const resolved = resolvePayload(payload);
@@ -101,9 +103,9 @@ const FirebaseListener = () => {
           })
         );
       });
-    } catch {
+    }).catch(() => {
       // Messaging unsupported in this browser/context
-    }
+    });
 
     const onSwMessage = (event: MessageEvent) => {
       if (event.data?.type === "BUGRICER_NOTIFICATION_NAV" && event.data.url) {

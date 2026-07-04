@@ -40,11 +40,13 @@ import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { ENV } from "@/lib/env";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
+import { canReportBug } from "@/lib/utils";
 import { bugService } from "@/services/bugService";
 import { Project, projectService } from "@/services/projectService";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
+  Bug,
   Calendar,
   Clock,
   Code,
@@ -1315,6 +1317,32 @@ const Projects = () => {
                         }
                       >
                         View
+                      </Link>
+                    </Button>
+                  )}
+                  {canReportBug(currentUser?.role) &&
+                    ((currentUser?.role === "developer" && activeTab === "my-projects") ||
+                      currentUser?.role === "admin" ||
+                      currentUser?.role === "tester") && (
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full sm:flex-1 min-w-0 h-11 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20 text-orange-700 dark:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                    >
+                      <Link
+                        to={
+                          currentUser?.role
+                            ? `/${currentUser.role}/bugs/new?projectId=${project.id}`
+                            : `/bugs/new?projectId=${project.id}`
+                        }
+                        state={{
+                          from: currentUser?.role
+                            ? `/${currentUser.role}/projects`
+                            : "/projects",
+                        }}
+                      >
+                        <Bug className="mr-2 h-4 w-4" />
+                        Report Bug
                       </Link>
                     </Button>
                   )}

@@ -173,6 +173,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
             ];
         } else if (role === 'developer') {
             return [
+                { label: 'New Bug', action: () => safeNavigate(`/${role}/bugs/new`), shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
                 { label: 'Fixes', action: () => safeNavigate(`/${role}/fixes`), icon: <CheckSquare className="h-4 w-4" /> },
                 { label: 'Fix Bugs', action: () => safeNavigate(`/${role}/bugs`), shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
                 { label: 'New Update', action: () => safeNavigate(`/${role}/new-update`), shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },

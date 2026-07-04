@@ -3,6 +3,8 @@ import { app } from "@/firebase-config";
 import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
 const TOKEN_CACHE_KEY = "fcm_registration_signature";
+const FCM_SW_URL = "/firebase-messaging-sw.js";
+const FCM_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
 
 export type NotificationPermissionResult =
   | "granted"
@@ -52,6 +54,29 @@ function detectDeviceType(): "android" | "ios" | "desktop" {
 
 function getRegistrationSignature(userToken: string, fcmToken: string, deviceType: string) {
   return `${userToken.slice(0, 16)}:${deviceType}:${fcmToken}`;
+}
+
+export async function getFirebaseServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !navigator?.serviceWorker) {
+    return null;
+  }
+  try {
+    return await navigator.serviceWorker.register(FCM_SW_URL, { scope: FCM_SW_SCOPE });
+  } catch {
+    return null;
+  }
+}
+
+export async function getFirebaseMessagingInstance() {
+  const messagingSupported = await isSupported().catch(() => false);
+  if (!messagingSupported) {
+    return null;
+  }
+  const registration = await getFirebaseServiceWorkerRegistration();
+  if (!registration) {
+    return null;
+  }
+  return getMessaging(app, { serviceWorkerRegistration: registration });
 }
 
 export function getNotificationPermissionState(): NotificationPermission | "unsupported" {
@@ -143,11 +168,11 @@ export async function requestNotificationPermission(options?: {
   }
 
   try {
-    const messaging = getMessaging(app);
-    // Use the FCM-specific worker so background push handlers are present
-    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
-      scope: "/firebase-cloud-messaging-push-scope",
-    });
+    const registration = await getFirebaseServiceWorkerRegistration();
+    if (!registration) {
+      return "skipped";
+    }
+    const messaging = getMessaging(app, { serviceWorkerRegistration: registration });
     const token = await getToken(messaging, {
       vapidKey,
       serviceWorkerRegistration: registration,

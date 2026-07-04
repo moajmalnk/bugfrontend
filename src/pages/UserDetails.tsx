@@ -117,7 +117,9 @@ async function handlePasswordChange(
   );
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || `Request failed (${res.status})`);
-  if (!data?.success) throw new Error(data?.message || "Failed to change password");
+  if (data?.success === false) {
+    throw new Error(data?.message || "Failed to change password");
+  }
 }
 
 export default function UserDetails() {
@@ -288,10 +290,10 @@ export default function UserDetails() {
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-br from-muted/50 via-muted/20 to-transparent" />
                 <CardContent className="relative p-5 sm:p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-5">
-                    {/* Avatar */}
-                    <div className="flex items-center gap-4">
-                      <div className="relative shrink-0">
+                  <div className="space-y-5">
+                    {/* Avatar + identity */}
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                      <div className="relative shrink-0 self-start">
                         <img
                           src={user.avatar}
                           alt={`${user.name}'s avatar`}
@@ -311,22 +313,22 @@ export default function UserDetails() {
                         </div>
                       </div>
 
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-xl sm:text-2xl font-bold truncate">
+                          <h2 className="text-xl sm:text-2xl font-bold break-words">
                             {user.name}
                           </h2>
                           <span
                             className={cn(
-                              "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-white",
+                              "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-white shrink-0",
                               statusConfig.color
                             )}
                           >
                             {statusConfig.label}
                           </span>
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-muted/50 border border-border/40">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-muted/50 border border-border/40 shrink-0">
                             {getRoleIcon(user.role)}
                             <span className="capitalize font-semibold">
                               {user.role}
@@ -334,7 +336,7 @@ export default function UserDetails() {
                           </span>
                           <span
                             className={cn(
-                              "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold",
+                              "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shrink-0",
                               isAccountDeactivated
                                 ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
                                 : "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20"
@@ -355,13 +357,13 @@ export default function UserDetails() {
                       </div>
                     </div>
 
-                    {/* Contact grid */}
-                    <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40">
+                    {/* Contact grid — full width so items never overlap */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 w-full">
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
                         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                           <AtSign className="h-5 w-5 text-primary" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="text-xs text-muted-foreground">
                             Username
                           </div>
@@ -370,11 +372,11 @@ export default function UserDetails() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40">
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
                         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                           <Phone className="h-5 w-5 text-primary" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="text-xs text-muted-foreground">
                             Phone
                           </div>
@@ -383,11 +385,11 @@ export default function UserDetails() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40">
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
                         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                           <Mail className="h-5 w-5 text-primary" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="text-xs text-muted-foreground">
                             Email
                           </div>
@@ -396,11 +398,11 @@ export default function UserDetails() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40">
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
                         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                           <Calendar className="h-5 w-5 text-primary" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="text-xs text-muted-foreground">
                             Joined
                           </div>
@@ -414,78 +416,90 @@ export default function UserDetails() {
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="mt-5 grid grid-cols-2 lg:grid-cols-6 gap-3">
-                    <EditUserDialog
-                      user={user}
-                      onUserUpdate={handleUserUpdate}
-                      loggedInUserRole={effectiveRole}
-                      trigger={
-                        <Button
-                          variant="outline"
-                          className="h-10 rounded-xl"
-                        >
-                          Edit User
-                        </Button>
-                      }
-                    />
+                  {/* Actions — 12-col grid: 1 per row mobile, 2 per row sm, 6 per row lg */}
+                  <div className="mt-5 grid grid-cols-12 gap-2 sm:gap-3">
+                    <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                      <EditUserDialog
+                        user={user}
+                        onUserUpdate={handleUserUpdate}
+                        loggedInUserRole={effectiveRole}
+                        trigger={
+                          <Button
+                            variant="outline"
+                            className="h-10 rounded-xl w-full inline-flex items-center justify-center"
+                          >
+                            Edit User
+                          </Button>
+                        }
+                      />
+                    </div>
 
-                    <ChangePasswordDialog
-                      user={user}
-                      onPasswordChange={handlePasswordChange}
-                      trigger={
-                        <Button variant="outline" className="h-10 rounded-xl">
-                          Password
-                        </Button>
-                      }
-                    />
+                    <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                      <ChangePasswordDialog
+                        user={user}
+                        onPasswordChange={handlePasswordChange}
+                        trigger={
+                          <Button
+                            variant="outline"
+                            className="h-10 rounded-xl w-full inline-flex items-center justify-center"
+                          >
+                            Password
+                          </Button>
+                        }
+                      />
+                    </div>
 
                     {hasPermission("USERS_MANAGE_PERMISSIONS") && (
-                      <Button
-                        variant="outline"
-                        className="h-10 rounded-xl"
-                        onClick={() =>
-                          navigate(`/${effectiveRole}/users/${user.id}/permissions`)
-                        }
-                      >
-                        <Key className="h-4 w-4 mr-2" />
-                        Permissions
-                      </Button>
+                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                        <Button
+                          variant="outline"
+                          className="h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                          onClick={() =>
+                            navigate(`/${effectiveRole}/users/${user.id}/permissions`)
+                          }
+                        >
+                          <Key className="h-4 w-4 shrink-0" />
+                          Permissions
+                        </Button>
+                      </div>
                     )}
 
                     {effectiveRole === "admin" && currentUser?.id !== user.id && (
-                      <Button
-                        variant="outline"
-                        className="h-10 rounded-xl"
-                        onClick={handleGenerateDashboardLink}
-                        disabled={isGeneratingLink}
-                        title="Open user's dashboard in a new tab"
-                      >
-                        {isGeneratingLink ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                        )}
-                        Dashboard
-                      </Button>
+                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                        <Button
+                          variant="outline"
+                          className="h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                          onClick={handleGenerateDashboardLink}
+                          disabled={isGeneratingLink}
+                          title="Open user's dashboard in a new tab"
+                        >
+                          {isGeneratingLink ? (
+                            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                          ) : (
+                            <ExternalLink className="h-4 w-4 shrink-0" />
+                          )}
+                          Dashboard
+                        </Button>
+                      </div>
                     )}
 
                     {canAdminManageAccount && !isAccountDeactivated && user.role !== "admin" && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            className="h-10 rounded-xl"
-                            disabled={isAccountToggleLoading}
-                          >
-                            {isAccountToggleLoading ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <UserX className="h-4 w-4 mr-2" />
-                            )}
-                            Deactivate
-                          </Button>
-                        </AlertDialogTrigger>
+                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              className="h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                              disabled={isAccountToggleLoading}
+                            >
+                              {isAccountToggleLoading ? (
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                              ) : (
+                                <UserX className="h-4 w-4 shrink-0" />
+                              )}
+                              Deactivate
+                            </Button>
+                          </AlertDialogTrigger>
                         <AlertDialogContent className="sm:max-w-md">
                           <AlertDialogHeader>
                             <AlertDialogTitle>Deactivate this account?</AlertDialogTitle>
@@ -510,24 +524,26 @@ export default function UserDetails() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
+                      </div>
                     )}
 
                     {canAdminManageAccount && isAccountDeactivated && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            className="h-10 rounded-xl"
-                            disabled={isAccountToggleLoading}
-                          >
-                            {isAccountToggleLoading ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <UserCheck className="h-4 w-4 mr-2" />
-                            )}
-                            Activate
-                          </Button>
-                        </AlertDialogTrigger>
+                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              className="h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                              disabled={isAccountToggleLoading}
+                            >
+                              {isAccountToggleLoading ? (
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                              ) : (
+                                <UserCheck className="h-4 w-4 shrink-0" />
+                              )}
+                              Activate
+                            </Button>
+                          </AlertDialogTrigger>
                         <AlertDialogContent className="sm:max-w-md">
                           <AlertDialogHeader>
                             <AlertDialogTitle>Activate this account?</AlertDialogTitle>
@@ -548,21 +564,24 @@ export default function UserDetails() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
+                      </div>
                     )}
 
                     {effectiveRole === "admin" && currentUser?.id !== user.id && (
-                      <DeleteUserDialog
-                        user={user}
-                        onUserDelete={handleUserDelete}
-                        trigger={
-                          <Button
-                            variant="destructive"
-                            className="h-10 rounded-xl col-span-2 lg:col-span-1"
-                          >
-                            Delete User
-                          </Button>
-                        }
-                      />
+                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                        <DeleteUserDialog
+                          user={user}
+                          onUserDelete={handleUserDelete}
+                          trigger={
+                            <Button
+                              variant="destructive"
+                              className="h-10 rounded-xl w-full inline-flex items-center justify-center"
+                            >
+                              Delete User
+                            </Button>
+                          }
+                        />
+                      </div>
                     )}
                   </div>
                 </CardContent>

@@ -51,6 +51,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import { ENV } from "@/lib/env";
+import { canReportBug } from "@/lib/utils";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import {
   Project,
@@ -688,6 +689,30 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
             </div>
             
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              {canReportBug(currentUser?.role) && projectId && (
+                <Button
+                  asChild
+                  variant="default"
+                  size="lg"
+                  className="h-12 px-6 bg-gradient-to-r from-orange-600 to-red-700 hover:from-orange-700 hover:to-red-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  <Link
+                    to={
+                      currentUser?.role
+                        ? `/${currentUser.role}/bugs/new?projectId=${projectId}`
+                        : `/bugs/new?projectId=${projectId}`
+                    }
+                    state={{
+                      from: currentUser?.role
+                        ? `/${currentUser.role}/projects/${projectId}`
+                        : `/projects/${projectId}`,
+                    }}
+                  >
+                    <Plus className="mr-2 h-5 w-5" />
+                    Report Bug
+                  </Link>
+                </Button>
+              )}
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
                   <div className="p-1.5 bg-orange-500 rounded-lg">
