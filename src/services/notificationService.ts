@@ -209,11 +209,28 @@ class NotificationService {
   }
 
   // API methods for fetching and managing notifications
-  async getUserNotifications(limit: number = 50, offset: number = 0): Promise<any[]> {
+  async getUserNotifications(
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{
+    notifications: any[];
+    total: number;
+    unreadCount: number;
+    readCount: number;
+    hasMore: boolean;
+  }> {
+    const empty = {
+      notifications: [] as any[],
+      total: 0,
+      unreadCount: 0,
+      readCount: 0,
+      hasMore: false,
+    };
+
     try {
       // Skip API calls when offline to avoid noisy network errors
       if (typeof navigator !== "undefined" && !navigator.onLine) {
-        return [];
+        return empty;
       }
 
       const { token, headers } = this.getTokenAndImpersonationHeaders();
@@ -221,7 +238,7 @@ class NotificationService {
         if (import.meta.env.DEV) {
           console.warn('NotificationService: No token found');
         }
-        return [];
+        return empty;
       }
 
       const { ENV } = await import('@/lib/env');
@@ -235,64 +252,33 @@ class NotificationService {
         url = `${url}${separator}impersonate=${encodeURIComponent(headers['X-Impersonate-User'])}`;
       }
       
-      // Debug logging (only in development)
-      if (import.meta.env.DEV) {
-        console.log('NotificationService: Fetching from URL:', url);
-        console.log('NotificationService: API URL:', apiUrl);
-        console.log('NotificationService: Token exists:', !!token);
-        console.log('NotificationService: Impersonation headers:', headers['X-Impersonate-User'] || 'none');
-      }
-      
       const response = await fetch(url, {
         method: 'GET',
         headers
       });
 
       if (!response.ok) {
-        // Try to get error details
-        let errorMessage = `HTTP error! status: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-          console.error('NotificationService: API Error Response:', errorData);
-        } catch (e) {
-          const errorText = await response.text();
-          console.error('NotificationService: API Error Text:', errorText);
-        }
-        
-        if (import.meta.env.DEV) {
-          console.error('NotificationService: Request failed:', {
-            status: response.status,
-            statusText: response.statusText,
-            url: url,
-            message: errorMessage
-          });
-        }
-        
-        throw new Error(errorMessage);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      
-      // Debug successful response
-      if (import.meta.env.DEV) {
-        console.log('NotificationService: Response:', {
-          success: data.success,
-          count: data.data?.notifications?.length || 0,
-          notifications: data.data?.notifications
-        });
+      if (!data.success) {
+        return empty;
       }
-      
-      return data.success ? (data.data?.notifications || []) : [];
+
+      const payload = data.data || {};
+      return {
+        notifications: payload.notifications || [],
+        total: payload.total ?? payload.notifications?.length ?? 0,
+        unreadCount: payload.unread_count ?? 0,
+        readCount: payload.read_count ?? 0,
+        hasMore: Boolean(payload.has_more),
+      };
     } catch (error: any) {
       if (import.meta.env.DEV) {
-        console.error('NotificationService: Error fetching notifications:', {
-          error: error.message,
-          stack: error.stack,
-          name: error.name
-        });
+        console.error('NotificationService: Error fetching notifications:', error);
       }
-      return [];
+      return empty;
     }
   }
 

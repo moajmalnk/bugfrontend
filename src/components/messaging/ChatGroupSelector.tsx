@@ -36,7 +36,7 @@ import { cn, getEffectiveRole } from "@/lib/utils";
 import { MessagingService } from "@/services/messagingService";
 import { projectService } from "@/services/projectService";
 import { userService } from "@/services/userService";
-import type { ChatGroup, Project } from "@/types";
+import type { ChatGroup, ChatGroupPreviewUpdate, Project } from "@/types";
 import {
   Check,
   ChevronsUpDown,
@@ -282,10 +282,8 @@ interface ChatGroupSelectorProps {
   onGroupsCountUpdate?: (count: number) => void;
   onGroupDelete?: (group: ChatGroup) => void;
   refreshTrigger?: number;
-  /** Increment when chat messages change to reload last-message previews */
-  chatListVersion?: number;
-  /** After members are added/removed, bump parent list (e.g. chatListVersion). */
-  onMembersChanged?: () => void;
+  /** Patch one group's last-message preview without reloading the whole list. */
+  groupPreviewUpdate?: (ChatGroupPreviewUpdate & { nonce?: number }) | null;
   /** Parent stores the callback to open the member dialog for a group (e.g. chat header). */
   exposeOpenMembers?: (openForGroup: (groupId: string) => void) => void;
   /** Parent can observe the loaded list to resolve URL-selected chats. */
@@ -303,8 +301,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
   onGroupsCountUpdate,
   onGroupDelete,
   refreshTrigger,
-  chatListVersion = 0,
-  onMembersChanged,
+  groupPreviewUpdate,
   exposeOpenMembers,
   onGroupsLoaded,
 }) => {
@@ -471,8 +468,22 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     };
   }, [deletedGroups]);
 
-  const loadGroups = async () => {
-    setIsLoading(true);
+  const sortGroupsByActivity = (list: ChatGroup[]) =>
+    [...list].sort((a, b) => {
+      const ta = a.last_message_at
+        ? new Date(a.last_message_at).getTime()
+        : 0;
+      const tb = b.last_message_at
+        ? new Date(b.last_message_at).getTime()
+        : 0;
+      return tb - ta;
+    });
+
+  const loadGroups = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    if (!silent || groups.length === 0) {
+      setIsLoading(true);
+    }
     try {
       const allProjects = await projectService.getProjects();
       setProjects(allProjects as unknown as Project[]);
@@ -480,8 +491,10 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       if (variant === "messaging") {
         const my = await MessagingService.getMyChatGroups();
         setGroups(
-          my.map((g) =>
-            normalizeGroupRow(g as ChatGroup & { project_name?: string })
+          sortGroupsByActivity(
+            my.map((g) =>
+              normalizeGroupRow(g as ChatGroup & { project_name?: string })
+            )
           )
         );
       } else {
@@ -497,7 +510,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
             )
           );
         }
-        setGroups(allGroups);
+        setGroups(sortGroupsByActivity(allGroups));
       }
     } catch (error) {
       toast({
@@ -512,7 +525,30 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
 
   useEffect(() => {
     loadGroups();
-  }, [refreshTrigger, chatListVersion, variant]);
+  }, [refreshTrigger, variant]);
+
+  useEffect(() => {
+    if (!groupPreviewUpdate?.groupId) return;
+
+    setGroups((prev) => {
+      const index = prev.findIndex(
+        (g) => String(g.id) === String(groupPreviewUpdate.groupId)
+      );
+      if (index === -1) return prev;
+
+      const updated: ChatGroup = {
+        ...prev[index],
+        last_message_preview: groupPreviewUpdate.preview,
+        last_message_sender_id: groupPreviewUpdate.senderId,
+        last_message_sender_name: groupPreviewUpdate.senderName,
+        last_message_at: groupPreviewUpdate.lastMessageAt,
+      };
+
+      const next = [...prev];
+      next[index] = updated;
+      return sortGroupsByActivity(next);
+    });
+  }, [groupPreviewUpdate]);
 
   const handleCreateGroup = async () => {
     if (!createForm.projectId || !createForm.name.trim()) {
@@ -915,7 +951,6 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       }
 
       await refreshMemberDialogLists(memberDialog.groupId);
-      onMembersChanged?.();
 
       toast({
         title: "Success",
@@ -1010,7 +1045,6 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
         }
 
         await refreshMemberDialogLists(memberDialog.groupId);
-        onMembersChanged?.();
 
         toast({
           title: "Success",

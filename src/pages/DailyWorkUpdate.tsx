@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn } from '@/services/todoService';
+import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn, notifyWorkActivity } from '@/services/todoService';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
@@ -272,6 +272,11 @@ export default function DailyWorkUpdate() {
         title: 'Break started',
         description: `Started at ${to12hTime(now)}`,
       });
+      void notifyWorkActivity({
+        action: 'break_start',
+        submission_date: form.submission_date,
+        started_at: to12hTime(now),
+      });
       return;
     }
 
@@ -288,6 +293,12 @@ export default function DailyWorkUpdate() {
     toast({
       title: 'Break ended',
       description: `Break recorded (${durationMins} min).`,
+    });
+    void notifyWorkActivity({
+      action: 'break_end',
+      submission_date: form.submission_date,
+      started_at: to12hTime(startedAt),
+      duration_minutes: durationMins,
     });
   }
 

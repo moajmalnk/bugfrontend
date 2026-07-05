@@ -11,7 +11,6 @@ import { MediaUploader } from "./MediaUploader";
 interface MessageComposerProps {
   groupId: string;
   value: string;
-  isLoading: boolean;
   isRecording: boolean;
   isImageDropUploading: boolean;
   replyToMessage: ChatMessage | null;
@@ -32,7 +31,6 @@ interface MessageComposerProps {
 export const MessageComposer = memo(function MessageComposer({
   groupId,
   value,
-  isLoading,
   isRecording,
   isImageDropUploading,
   replyToMessage,
@@ -118,7 +116,7 @@ export const MessageComposer = memo(function MessageComposer({
             </Button>
             <Button
               onClick={onSend}
-              disabled={!value.trim() || isLoading}
+              disabled={!value.trim()}
               size="icon"
               className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 bg-[#00a884] text-white hover:bg-[#06cf9c] flex-shrink-0 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 rounded-xl"
               title="Send message"

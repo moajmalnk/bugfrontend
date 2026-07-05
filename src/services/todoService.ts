@@ -356,4 +356,23 @@ export async function checkIn(
   };
 }
 
+export type WorkActivityPayload = {
+  action: 'break_start' | 'break_end';
+  submission_date: string;
+  started_at?: string;
+  duration_minutes?: number;
+};
+
+export async function notifyWorkActivity(payload: WorkActivityPayload): Promise<void> {
+  try {
+    await fetch(`${API}/tasks/work_activity.php`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // Fire-and-forget: break notifications must not block the UI
+  }
+}
+
 

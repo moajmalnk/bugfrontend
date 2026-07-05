@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { canOpenMessagesPage, cn, getEffectiveRole } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
-import { ChatGroup } from "@/types";
+import { ChatGroup, ChatGroupPreviewUpdate } from "@/types";
 import { 
   MessageCircle, 
   Clock,
@@ -33,7 +33,9 @@ const Messages = () => {
   const [triggerCreateGroup, setTriggerCreateGroup] = useState(false);
   const [deletedGroup, setDeletedGroup] = useState<ChatGroup | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [chatListVersion, setChatListVersion] = useState(0);
+  const [groupPreviewUpdate, setGroupPreviewUpdate] = useState<
+    (ChatGroupPreviewUpdate & { nonce: number }) | null
+  >(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const openGroupMembersRef = useRef<((groupId: string) => void) | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,7 +49,9 @@ const Messages = () => {
     []
   );
 
-  const bumpChatList = () => setChatListVersion((v) => v + 1);
+  const handleChatActivity = useCallback((update: ChatGroupPreviewUpdate) => {
+    setGroupPreviewUpdate({ ...update, nonce: Date.now() });
+  }, []);
   const effectiveRole = getEffectiveRole(currentUser || {});
 
   // Handle responsive behavior
@@ -326,8 +330,7 @@ const Messages = () => {
                       undoDelete.startCountdown();
                     }}
                     refreshTrigger={refreshTrigger}
-                    chatListVersion={chatListVersion}
-                    onMembersChanged={bumpChatList}
+                    groupPreviewUpdate={groupPreviewUpdate}
                     exposeOpenMembers={registerOpenGroupMembers}
                     onGroupsLoaded={setAvailableGroups}
                   />
@@ -357,7 +360,7 @@ const Messages = () => {
                   <ChatInterface
                     selectedGroup={selectedGroup}
                     onBackToChatList={handleBackToChatList}
-                    onChatActivity={bumpChatList}
+                    onChatActivity={handleChatActivity}
                     onOpenGroupMembers={
                       canManageMembersOnSelected
                         ? () =>

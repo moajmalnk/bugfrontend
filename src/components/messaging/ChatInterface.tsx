@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { MessagingService } from "@/services/messagingService";
 import { projectService } from "@/services/projectService";
-import type { ChatGroup, ChatMessage, TypingIndicator } from "@/types";
+import type { ChatGroup, ChatMessage, ChatGroupPreviewUpdate, TypingIndicator } from "@/types";
 import {
   Check,
   CheckCheck,
@@ -182,10 +182,27 @@ function DocumentPreviewBody({
 interface ChatInterfaceProps {
   selectedGroup: ChatGroup | null;
   onBackToChatList?: () => void;
-  /** Bump when messages change so the sidebar can refresh last-message previews */
-  onChatActivity?: () => void;
+  /** Update sidebar preview locally — no full group list reload. */
+  onChatActivity?: (update: ChatGroupPreviewUpdate) => void;
   /** Open the same member-management dialog as the sidebar (group managers only). */
   onOpenGroupMembers?: () => void;
+}
+
+function getMessagePreview(message: Pick<ChatMessage, "message_type" | "content">): string {
+  switch (message.message_type) {
+    case "voice":
+      return "Voice message";
+    case "image":
+      return "Photo";
+    case "video":
+      return "Video";
+    case "document":
+      return "Document";
+    case "audio":
+      return "Audio";
+    default:
+      return message.content?.trim() || "Message";
+  }
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -198,7 +215,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<TypingIndicator[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -242,17 +259,24 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isImageDropActive, setIsImageDropActive] = useState(false);
   const [isImageDropUploading, setIsImageDropUploading] = useState(false);
 
-  const scheduleSidebarListRefresh = () => {
+  const updateSidebarPreview = (message: ChatMessage) => {
+    if (!selectedGroup || !onChatActivity) return;
+    onChatActivity({
+      groupId: selectedGroup.id,
+      preview: getMessagePreview(message),
+      senderId: String(message.sender_id),
+      senderName: message.sender_name || "You",
+      lastMessageAt: message.created_at,
+    });
+  };
+
+  const scheduleSidebarPreview = (message: ChatMessage) => {
     if (!onChatActivity) return;
     if (sidebarBumpTimerRef.current) clearTimeout(sidebarBumpTimerRef.current);
     sidebarBumpTimerRef.current = setTimeout(() => {
-      onChatActivity();
+      updateSidebarPreview(message);
       sidebarBumpTimerRef.current = null;
-    }, 800);
-  };
-
-  const refreshSidebarListNow = () => {
-    onChatActivity?.();
+    }, 400);
   };
 
   const displaySenderLabel = (name?: string | null) => {
@@ -380,7 +404,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const loadMessages = async (page: number = 1, append: boolean = false) => {
     if (!selectedGroup) return;
 
-    setIsLoading(true);
+    if (append) {
+      setIsLoadingMore(true);
+    }
     try {
       const response = await MessagingService.getMessages(
         selectedGroup.id,
@@ -407,7 +433,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      if (append) {
+        setIsLoadingMore(false);
+      }
     }
   };
 
@@ -427,7 +455,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             return prev;
           }
           shouldAutoScrollRef.current = isNearBottom();
-          scheduleSidebarListRefresh();
+          scheduleSidebarPreview(newMessage);
           return [...prev, newMessage];
         });
       },
@@ -485,6 +513,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setReplyToMessage(null);
     shouldAutoScrollRef.current = true;
     setMessages((prev) => [...prev, optimisticMessage]);
+    updateSidebarPreview(optimisticMessage);
 
     // Reset textarea height
     if (textareaRef.current) {
@@ -510,7 +539,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           message.id === optimisticId ? sentMessage : message
         )
       );
-      refreshSidebarListNow();
+      updateSidebarPreview(sentMessage);
     } catch (error) {
       console.error("Error sending message:", error);
       setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
@@ -663,7 +692,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const sentMessage = await MessagingService.sendMessage(messageData);
       shouldAutoScrollRef.current = true;
       setMessages((prev) => [...prev, sentMessage]);
-      refreshSidebarListNow();
+      updateSidebarPreview(sentMessage);
     } catch (error) {
       console.error("Error sending voice message:", error);
       toast({
@@ -817,7 +846,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       );
       shouldAutoScrollRef.current = true;
       setMessages((prev) => [...prev, sentMessage]);
-      refreshSidebarListNow();
+      updateSidebarPreview(sentMessage);
     } catch (error) {
       console.error("Error sending media:", error);
       toast({
@@ -846,6 +875,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setIsImageDropUploading(true);
     try {
       let sentAny = false;
+      let lastSentMessage: ChatMessage | null = null;
       for (let i = 0; i < imageFiles.length; i++) {
         const file = imageFiles[i];
         if (file.size > MAX_CHAT_IMAGE_DROP_BYTES) {
@@ -873,6 +903,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         );
         shouldAutoScrollRef.current = true;
         setMessages((prev) => [...prev, sentMessage]);
+        lastSentMessage = sentMessage;
         sentAny = true;
       }
       if (caption && sentAny) {
@@ -885,8 +916,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }
         if (textareaRef.current) textareaRef.current.style.height = "auto";
       }
-      if (sentAny) {
-        refreshSidebarListNow();
+      if (sentAny && lastSentMessage) {
+        updateSidebarPreview(lastSentMessage);
         toast({
           title: imageFiles.length > 1 ? "Images sent" : "Image sent",
           description:
@@ -1093,7 +1124,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               variant="outline"
               size="sm"
               onClick={() => loadMessages(currentPage + 1, true)}
-              disabled={isLoading}
+              disabled={isLoadingMore}
               className="text-xs px-3 py-1.5 h-8 bg-white/80 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
             >
               Load More Messages
@@ -1435,7 +1466,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <MessageComposer
         groupId={selectedGroup.id}
         value={newMessage}
-        isLoading={isLoading}
         isRecording={isRecording}
         isImageDropUploading={isImageDropUploading}
         replyToMessage={replyToMessage}

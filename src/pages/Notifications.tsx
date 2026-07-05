@@ -16,11 +16,24 @@ import { useNotifications } from '@/context/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 
 export default function Notifications() {
-  const { notifications, unreadCount, isLoading, markAsRead, markAllAsRead, clearNotifications } = useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    readCount,
+    totalCount,
+    hasMoreNotifications,
+    isLoading,
+    isLoadingMore,
+    markAsRead,
+    markAllAsRead,
+    clearNotifications,
+    loadAllNotifications,
+    loadMoreNotifications,
+  } = useNotifications();
   const { currentUser } = useAuth();
   const role = currentUser?.role;
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -28,6 +41,10 @@ export default function Notifications() {
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [activeTab, setActiveTab] = useState('unread');
+
+  useEffect(() => {
+    void loadAllNotifications();
+  }, [loadAllNotifications]);
 
   const unreadNotifications = notifications.filter(n => !n.read);
   const readNotifications = notifications.filter(n => n.read);
@@ -102,7 +119,13 @@ export default function Notifications() {
     // Navigate based on entity type
     if (notification.entity_type && notification.entity_id && role) {
       let path = '';
-      if (notification.entity_type === 'bug') {
+      const workActivityTypes = ['work_check_in', 'work_break', 'work_update', 'overtime'];
+      if (workActivityTypes.includes(notification.entity_type)) {
+        const userId = String(notification.entity_id).split(':')[0];
+        if (userId) {
+          path = `/${role}/users/${userId}`;
+        }
+      } else if (notification.entity_type === 'bug') {
         path = `/${role}/bugs/${notification.entity_id}`;
       } else if (notification.entity_type === 'update') {
         path = `/${role}/updates/${notification.entity_id}`;
@@ -358,7 +381,7 @@ export default function Notifications() {
                       <BellRing className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                       <span>Unread</span>
                       <Badge className="min-w-[1.5rem] justify-center px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold border-0">
-                        {unreadNotifications.length}
+                        {unreadCount}
                       </Badge>
                     </TabsTrigger>
                     <TabsTrigger
@@ -368,7 +391,7 @@ export default function Notifications() {
                       <Check className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                       <span>Read</span>
                       <Badge className="min-w-[1.5rem] justify-center px-2 py-0.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 rounded-full text-xs font-bold border-0">
-                        {readNotifications.length}
+                        {readCount}
                       </Badge>
                     </TabsTrigger>
                   </TabsList>
@@ -417,6 +440,26 @@ export default function Notifications() {
                     )}
                   </div>
                 </TabsContent>
+
+                {hasMoreNotifications && (
+                  <div className="p-4 border-t border-gray-100 dark:border-gray-800">
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => void loadMoreNotifications()}
+                      disabled={isLoadingMore}
+                    >
+                      {isLoadingMore ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        `Load more (${notifications.length} of ${totalCount})`
+                      )}
+                    </Button>
+                  </div>
+                )}
               </Tabs>
             )}
           </div>

@@ -62,6 +62,8 @@ function buildActions(data) {
     sheet: 'Open Sheet',
     sheet_created: 'Open Sheet',
     work_update: 'Open',
+    work_check_in: 'View User',
+    work_break: 'View User',
     overtime: 'Review OT',
     feedback: 'View Feedback',
     message: 'Open Chat',

@@ -115,6 +115,15 @@ export interface ChatGroup {
   archived_at?: string;
 }
 
+/** Local sidebar patch when a chat receives a new message (no full list reload). */
+export interface ChatGroupPreviewUpdate {
+  groupId: string;
+  preview: string;
+  senderId: string;
+  senderName: string;
+  lastMessageAt: string;
+}
+
 export interface ChatMessage {
   id: string;
   group_id: string;
