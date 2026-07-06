@@ -1,4 +1,5 @@
 import { ENV } from "@/lib/env";
+import { bugMetaEmailRows } from "@/lib/bugMetaUtils";
 import { notificationService } from "./notificationService";
 
 // Helper function to get role-neutral URL for sharing
@@ -168,6 +169,7 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Previous Status:</strong> <span style="font-weight: normal; text-transform: capitalize;">Pending</span></p>
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>New Status:</strong> <span style="font-weight: normal; text-transform: capitalize; color: #65a30d;">Fixed</span></p>
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
+                ${bugMetaEmailRows(bug)}
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated By:</strong> <span style="font-weight: normal;">${bug.updated_by_name || 'BugRicer User'}</span></p>
                 <p style="margin-top: 18px; text-align: center;">
@@ -286,6 +288,7 @@ export const sendNewBugNotification = async (bug: any) => {
                 
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Status:</strong> <span style="font-weight: normal; text-transform: capitalize; color: #dc2626;">Pending</span></p>
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
+                ${bugMetaEmailRows(bug)}
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Reported On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Reported By:</strong> <span style="font-weight: normal;">${bug.reported_by_name || 'BugRicer User'}</span></p>
                 <p style="margin-top: 18px; text-align: center;">
@@ -317,7 +320,10 @@ export const sendNewBugNotification = async (bug: any) => {
 
     // Send browser notification if enabled
     if (settings.browserNotifications && settings.newBugNotifications) {
-      browserResult = await notificationService.sendNewBugNotification(bug.title);
+      browserResult = await notificationService.sendNewBugNotification(bug.title, {
+        bugLevel: bug.bug_level,
+        alreadyRaised: bug.already_raised,
+      });
     }
 
     return {
@@ -395,6 +401,7 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
                 
                 ${statusChangeContent}
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
+                ${bugMetaEmailRows(bug)}
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></p>
                 <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated By:</strong> <span style="font-weight: normal;">${bug.updated_by_name || 'BugRicer User'}</span></p>
                 <p style="margin-top: 18px; text-align: center;">

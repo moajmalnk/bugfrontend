@@ -876,6 +876,8 @@ const BugDetails = () => {
               priority: bug.priority,
               updatedBy: currentUser?.name || "BugRicer User",
               projectName: bug.project_name || bug.project_id,
+              bugLevel: bug.bug_level,
+              alreadyRaised: bug.already_raised,
             });
             // console.log("WhatsApp share opened for status change");
           }
@@ -946,9 +948,9 @@ const BugDetails = () => {
       <nav className="w-full mt-8">
         <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/40 to-orange-50/40 dark:from-gray-800/20 dark:to-orange-900/20" />
-          <div className="relative w-full flex justify-center items-center gap-6 py-4 px-4">
+          <div className="relative w-full flex justify-center items-center gap-3 sm:gap-6 py-4 px-4">
             <button
-              className={`flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-all duration-200 ${
+              className={`flex items-center px-3 sm:px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-all duration-200 ${
                 isNavigating ? 'cursor-wait' : ''
               }`}
               onClick={(e) => {
@@ -1010,12 +1012,13 @@ const BugDetails = () => {
             >
               {isNavigating && navigatingToBugIdRef.current === prevBugId ? (
                 <>
-                  <div className="mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Loading...
+                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin sm:mr-2" />
+                  <span className="hidden sm:inline">Loading...</span>
                 </>
               ) : (
                 <>
-                  <ArrowLeft className="mr-2 h-5 w-5" /> Previous
+                  <ArrowLeft className="h-5 w-5 sm:mr-2" />
+                  <span className="hidden sm:inline">Previous</span>
                 </>
               )}
             </button>
@@ -1029,7 +1032,7 @@ const BugDetails = () => {
                   : "No bugs"}
             </span>
             <button
-              className={`flex items-center px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-all duration-200 ${
+              className={`flex items-center px-3 sm:px-4 py-2 rounded bg-muted hover:bg-muted/80 disabled:opacity-50 transition-all duration-200 ${
                 isNavigating ? 'cursor-wait' : ''
               }`}
               onClick={(e) => {
@@ -1091,12 +1094,13 @@ const BugDetails = () => {
             >
               {isNavigating && navigatingToBugIdRef.current === nextBugId ? (
                 <>
-                  <div className="ml-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Loading...
+                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin sm:ml-2" />
+                  <span className="hidden sm:inline">Loading...</span>
                 </>
               ) : (
                 <>
-                  Next <ArrowRight className="ml-2 h-5 w-5" />
+                  <span className="hidden sm:inline">Next</span>
+                  <ArrowRight className="h-5 w-5 sm:ml-2" />
                 </>
               )}
             </button>

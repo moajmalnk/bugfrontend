@@ -390,6 +390,8 @@ export const BugHeader = ({
                 description: bug.description,
                 reportedBy: bug.reporter_name || bug.reported_by,
                 projectName: bug.project_name || bug.project_id,
+                bugLevel: bug.bug_level,
+                alreadyRaised: bug.already_raised,
               }}
               type={bug.status === "fixed" ? "status_update" : "new_bug"}
               variant="outline"

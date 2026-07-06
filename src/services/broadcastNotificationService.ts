@@ -1,3 +1,4 @@
+import { bugMetaTextLines } from "@/lib/bugMetaUtils";
 import { ENV } from "@/lib/env";
 import { notificationService } from "./notificationService";
 
@@ -283,12 +284,26 @@ class BroadcastNotificationService {
   }
 
   // Broadcast new bug notification
-  async broadcastNewBug(bugTitle: string, bugId: string, createdBy: string): Promise<void> {
-    // console.log('Broadcasting new bug notification:', bugTitle);
+  async broadcastNewBug(
+    bugTitle: string,
+    bugId: string,
+    createdBy: string,
+    extras?: { bugLevel?: string; alreadyRaised?: boolean | number | string | null }
+  ): Promise<void> {
+    const metaLine = extras
+      ? bugMetaTextLines({
+          bug_level: extras.bugLevel,
+          already_raised: extras.alreadyRaised,
+        })
+      : "";
+    const message = metaLine
+      ? `A new bug has been reported: ${bugTitle}\n${metaLine}`
+      : `A new bug has been reported: ${bugTitle}`;
+
     await this.broadcastNotification({
       type: 'new_bug',
       title: 'New Bug Reported',
-      message: `A new bug has been reported: ${bugTitle}`,
+      message,
       bugId,
       bugTitle,
       createdBy

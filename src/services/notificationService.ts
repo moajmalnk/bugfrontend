@@ -1,3 +1,5 @@
+import { bugMetaTextLines } from "@/lib/bugMetaUtils";
+
 class NotificationService {
   private readonly STORAGE_KEY = 'notification_settings';
 
@@ -164,12 +166,21 @@ class NotificationService {
     return true;
   }
 
-  async sendNewBugNotification(bugTitle: string): Promise<boolean> {
-    return this.sendBugNotification(
-      'New Bug Reported',
-      `A new bug has been reported: ${bugTitle}`,
-      'new'
-    );
+  async sendNewBugNotification(
+    bugTitle: string,
+    extras?: { bugLevel?: string; alreadyRaised?: boolean | number | string | null }
+  ): Promise<boolean> {
+    const metaLine = extras
+      ? bugMetaTextLines({
+          bug_level: extras.bugLevel,
+          already_raised: extras.alreadyRaised,
+        })
+      : "";
+    const body = metaLine
+      ? `A new bug has been reported: ${bugTitle}\n${metaLine}`
+      : `A new bug has been reported: ${bugTitle}`;
+
+    return this.sendBugNotification('New Bug Reported', body, 'new');
   }
 
   async sendBugStatusNotification(bugTitle: string, status: string): Promise<boolean> {

@@ -15,6 +15,13 @@ import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { notificationService } from "@/services/notificationService";
 import { whatsappService } from "@/services/whatsappService";
 import { Bug, BugStatus, Project } from "@/types";
+import {
+  alreadyRaisedBadgeClass,
+  bugLevelBadgeClass,
+  formatAlreadyRaisedLabel,
+  formatBugLevelLabel,
+} from "@/lib/bugMetaUtils";
+import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { GoogleDocsButton } from "./GoogleDocsButton";
@@ -107,6 +114,8 @@ export const BugDetailsCard = ({
             priority: updatedBug.priority,
             updatedBy: currentUser?.name || "BugRicer User",
             projectName: updatedBug.project_name || updatedBug.project_id,
+            bugLevel: updatedBug.bug_level,
+            alreadyRaised: updatedBug.already_raised,
           });
           //.log("WhatsApp share opened for status change");
         }
@@ -200,6 +209,30 @@ export const BugDetailsCard = ({
                 <span className="capitalize break-words">{bug.priority}</span>
               </div>
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs sm:text-sm">Bug Level</Label>
+            <div className="p-2 border rounded-md text-xs sm:text-sm bg-muted/30 w-full">
+              <Badge
+                variant="outline"
+                className={bugLevelBadgeClass(bug.bug_level)}
+              >
+                {formatBugLevelLabel(bug.bug_level)}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs sm:text-sm">Already Raised</Label>
+            <div className="p-2 border rounded-md text-xs sm:text-sm bg-muted/30 w-full">
+              <Badge
+                variant="outline"
+                className={alreadyRaisedBadgeClass(bug.already_raised)}
+              >
+                {formatAlreadyRaisedLabel(bug.already_raised)}
+              </Badge>
+            </div>
           </div>
 
           {/* Last Updated and Updated By Section */}

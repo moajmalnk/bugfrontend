@@ -1,4 +1,6 @@
 
+import { bugMetaTextLines } from "@/lib/bugMetaUtils";
+
 interface WhatsAppMessageData {
   bugTitle?: string;
   bugId?: string;
@@ -10,6 +12,8 @@ interface WhatsAppMessageData {
   reportedBy?: string;
   updatedBy?: string;
   projectName?: string;
+  bugLevel?: string;
+  alreadyRaised?: boolean | number | string | null;
   // For general updates
   updateTitle?: string;
   updateId?: string;
@@ -125,6 +129,11 @@ class WhatsAppService {
     if (data.reportedBy) {
       message += `👤 *Reported by:* ${data.reportedBy}\n`;
     }
+
+    message += `\n${bugMetaTextLines({
+      bug_level: data.bugLevel,
+      already_raised: data.alreadyRaised,
+    })}\n`;
     
     if (data.description && data.description.length > 0) {
       const shortDescription = data.description.length > 100 
@@ -171,6 +180,13 @@ class WhatsAppService {
     
     if (data.updatedBy) {
       message += `👤 *Updated by:* ${data.updatedBy}\n`;
+    }
+
+    if (data.bugLevel || data.alreadyRaised) {
+      message += `\n${bugMetaTextLines({
+        bug_level: data.bugLevel,
+        already_raised: data.alreadyRaised,
+      })}\n`;
     }
     
     message += `\n🔗 *View Bug:* ${bugUrl}`;

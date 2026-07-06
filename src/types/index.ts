@@ -22,6 +22,8 @@ export type Bug = {
   created_at: string;
   updated_at: string;
   fix_description?: string | null;
+  already_raised?: boolean;
+  bug_level?: BugLevel;
   screenshots?: Array<{
     id: string;
     name: string;
@@ -47,6 +49,7 @@ export type Bug = {
 };
 
 export type BugPriority = 'low' | 'medium' | 'high';
+export type BugLevel = 'normal' | 'floap' | 'utter_floap';
 export type BugStatus = 'pending' | 'in_progress' | 'fixed' | 'rejected' | 'declined';
 
 export type UserRole = 'admin' | 'developer' | 'tester';

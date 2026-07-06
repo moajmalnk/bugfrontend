@@ -30,9 +30,10 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useBugs } from "@/context/BugContext";
 import { ENV } from "@/lib/env";
+import { cn } from "@/lib/utils";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { sendNewBugNotification } from "@/services/emailService";
-import { BugPriority, Project } from "@/types";
+import { BugLevel, BugPriority, Project } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { apiClient } from "@/lib/axios";
@@ -81,6 +82,32 @@ interface ApiResponse<T> {
   message?: string;
 }
 
+const BUG_LEVEL_OPTIONS: {
+  value: BugLevel;
+  label: string;
+  hint: string;
+  selectedClass: string;
+}[] = [
+  {
+    value: "normal",
+    label: "Normal",
+    hint: "Low impact",
+    selectedClass: "border-emerald-500 bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400/50",
+  },
+  {
+    value: "floap",
+    label: "Floap",
+    hint: "Notable issue",
+    selectedClass: "border-amber-500 bg-amber-600 text-white shadow-sm ring-2 ring-amber-400/50",
+  },
+  {
+    value: "utter_floap",
+    label: "Utter Floap",
+    hint: "Critical breakdown",
+    selectedClass: "border-red-500 bg-red-600 text-white shadow-sm ring-2 ring-red-400/50",
+  },
+];
+
 const NewBug = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -99,6 +126,8 @@ const NewBug = () => {
   const [actualResult, setActualResult] = useState("");
   const [projectId, setProjectId] = useState(preSelectedProjectId || "");
   const [priority, setPriority] = useState<BugPriority>("medium");
+  const [alreadyRaised, setAlreadyRaised] = useState(false);
+  const [bugLevel, setBugLevel] = useState<BugLevel>("normal");
   const TITLE_MAX = 120;
   const DESCRIPTION_MAX = 2000;
   const EXPECTED_RESULT_MAX = 1000;
@@ -205,6 +234,8 @@ const NewBug = () => {
       formData.append("reporter_id", currentUser.id);
       formData.append("priority", priority);
       formData.append("status", "pending");
+      formData.append("already_raised", alreadyRaised ? "1" : "0");
+      formData.append("bug_level", bugLevel);
 
       // Add screenshots
       screenshots.forEach((file, index) => {
@@ -295,7 +326,8 @@ const NewBug = () => {
               await broadcastNotificationService.broadcastNewBug(
                 name,
                 String(bugId),
-                currentUser?.name || "BugRicer"
+                currentUser?.name || "BugRicer",
+                { bugLevel, alreadyRaised }
               );
             }
           } catch (error) {
@@ -456,7 +488,7 @@ const NewBug = () => {
       <section className="max-w mx-auto space-y-6 sm:space-y-8">
         {/* Professional Header */}
         <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
               <div className="space-y-3">
@@ -503,26 +535,28 @@ const NewBug = () => {
 
         {/* Professional Form Card */}
         <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
           <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
             <Card className="border-0 shadow-none bg-transparent">
-              <CardHeader className="p-6 sm:p-8 pb-4">
+              <CardHeader className="p-6 sm:p-8 pb-2">
                 <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shrink-0">
                     <File className="h-5 w-5 text-white" />
                   </div>
                   Bug Report Form
                 </CardTitle>
-                <CardDescription className="text-gray-600 dark:text-gray-400 text-base">
+                <CardDescription className="text-gray-600 dark:text-gray-400 text-base mt-2">
                   Provide comprehensive details to help developers understand and fix the issue
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleSubmit}>
-                <CardContent className="space-y-8 p-6 sm:p-8">
+                <CardContent className="space-y-8 p-6 sm:p-8 pt-4">
+
+
                   {/* Bug Name Section */}
                   <div className="space-y-3">
                     <Label htmlFor="name" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                      <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-red-600 rounded-full"></div>
+                      <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-orange-500 to-red-600 rounded-full" />
                       Bug Title
                     </Label>
                     <Input
@@ -541,11 +575,12 @@ const NewBug = () => {
                       </span>
                     </div>
                   </div>
+                  
 
                   {/* Description Section */}
                   <div className="space-y-3">
                     <Label htmlFor="description" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                      <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"></div>
+                      <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full" />
                       Description
                     </Label>
                     <Textarea
@@ -568,7 +603,7 @@ const NewBug = () => {
                   {/* Expected Result Section */}
                   <div className="space-y-3">
                     <Label htmlFor="expectedResult" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                      <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full"></div>
+                      <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full" />
                       Expected Result
                       <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(Optional)</span>
                     </Label>
@@ -591,7 +626,7 @@ const NewBug = () => {
                   {/* Actual Result Section */}
                   <div className="space-y-3">
                     <Label htmlFor="actualResult" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                      <div className="w-2 h-2 bg-gradient-to-r from-red-500 to-pink-600 rounded-full"></div>
+                      <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-red-500 to-pink-600 rounded-full" />
                       Actual Result
                       <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(Optional)</span>
                     </Label>
@@ -615,7 +650,7 @@ const NewBug = () => {
                   {!preSelectedProjectId && (
                     <div className="space-y-3">
                       <Label htmlFor="project" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-violet-600 rounded-full"></div>
+                        <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-purple-500 to-violet-600 rounded-full" />
                         Project
                       </Label>
                       <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
@@ -684,7 +719,7 @@ const NewBug = () => {
                   {/* Priority Selection */}
                   <div className="space-y-3">
                     <Label htmlFor="priority" className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                      <div className="w-2 h-2 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full"></div>
+                      <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full" />
                       Priority Level
                     </Label>
                     <Select
@@ -717,11 +752,107 @@ const NewBug = () => {
                     </Select>
                   </div>
 
+                  {/* Already Raised */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full" />
+                      Is this bug already raised?
+                    </Label>
+                    <div className="rounded-xl border border-blue-200/60 dark:border-blue-800/50 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-950/15 dark:to-indigo-950/10 p-4 shadow-sm">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        Mark <span className="font-medium text-gray-700 dark:text-gray-300">Yes</span> if the same issue was reported before
+                      </p>
+                      <div
+                        className="grid w-full grid-cols-2 gap-2"
+                        role="radiogroup"
+                        aria-label="Is this bug already raised?"
+                      >
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={!alreadyRaised}
+                          onClick={() => setAlreadyRaised(false)}
+                          className={cn(
+                            "h-11 w-full cursor-pointer rounded-lg border text-sm font-semibold transition-all",
+                            !alreadyRaised
+                              ? "border-emerald-500 bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400/50"
+                              : "border-gray-200/80 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
+                          )}
+                        >
+                          No
+                        </button>
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={alreadyRaised}
+                          onClick={() => setAlreadyRaised(true)}
+                          className={cn(
+                            "h-11 w-full cursor-pointer rounded-lg border text-sm font-semibold transition-all",
+                            alreadyRaised
+                              ? "border-amber-500 bg-amber-600 text-white shadow-sm ring-2 ring-amber-400/50"
+                              : "border-gray-200/80 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
+                          )}
+                        >
+                          Yes
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  
+
+                  {/* Bug Level Rating */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-violet-500 to-purple-600 rounded-full" />
+                      Bug Level
+                    </Label>
+                    <div className="rounded-xl border border-violet-200/60 dark:border-violet-800/50 bg-gradient-to-br from-violet-50/50 to-purple-50/30 dark:from-violet-950/15 dark:to-purple-950/10 p-4 shadow-sm">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        Rate how severe the impact feels — from normal workflow issues to utter floap
+                      </p>
+                      <div
+                        className="grid w-full grid-cols-1 sm:grid-cols-3 gap-2"
+                        role="radiogroup"
+                        aria-label="Bug level rating"
+                      >
+                        {BUG_LEVEL_OPTIONS.map((option) => {
+                          const selected = bugLevel === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              onClick={() => setBugLevel(option.value)}
+                              className={cn(
+                                "min-h-12 w-full cursor-pointer flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all",
+                                selected
+                                  ? option.selectedClass
+                                  : "border-gray-200/80 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
+                              )}
+                            >
+                              <span>{option.label}</span>
+                              <span
+                                className={cn(
+                                  "text-[10px] font-normal",
+                                  selected ? "text-white/90" : "opacity-70"
+                                )}
+                              >
+                                {option.hint}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Attachments Section */}
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"></div>
+                        <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full" />
                         Attachments
                       </Label>
                     </div>

@@ -54,9 +54,6 @@ export function ScreenshotViewer({
   bug_id,
   onScreenshotDelete,
 }: ScreenshotViewerProps) {
-  // Early return before any hooks to avoid "Rendered fewer hooks than expected" error
-  if (screenshots.length === 0) return null;
-
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [zoomLevel, setZoomLevel] = useState(100); // 100% default zoom
   const [rotation, setRotation] = useState(0);
@@ -108,9 +105,9 @@ export function ScreenshotViewer({
     const updateContainerDimensions = () => {
       if (imageDisplayAreaRef.current) {
         const rect = imageDisplayAreaRef.current.getBoundingClientRect();
-        setContainerDimensions({
-          width: rect.width,
-          height: rect.height,
+        setContainerDimensions((prev) => {
+          if (prev.width === rect.width && prev.height === rect.height) return prev;
+          return { width: rect.width, height: rect.height };
         });
       }
     };
@@ -143,8 +140,13 @@ export function ScreenshotViewer({
   }, []);
 
 
-  const currentScreenshot = screenshots[currentIndex];
-  const imageUrl = `${import.meta.env.VITE_API_URL}/image.php?path=${encodeURIComponent(currentScreenshot.file_path)}`;
+  const currentScreenshot =
+    screenshots.length > 0
+      ? screenshots[Math.min(currentIndex, screenshots.length - 1)]
+      : null;
+  const imageUrl = currentScreenshot
+    ? `${import.meta.env.VITE_API_URL}/image.php?path=${encodeURIComponent(currentScreenshot.file_path)}`
+    : "";
 
   // Reset image dimensions when screenshot changes
   useEffect(() => {
@@ -693,11 +695,12 @@ export function ScreenshotViewer({
       if (constrainedPosition.x !== imagePosition.x || constrainedPosition.y !== imagePosition.y) {
         setImagePosition(constrainedPosition);
       }
-    } else if (zoomLevel <= 100) {
-      // Reset position when zoom is reset
+    } else if (zoomLevel <= 100 && (imagePosition.x !== 0 || imagePosition.y !== 0)) {
       setImagePosition({ x: 0, y: 0 });
     }
-  }, [zoomLevel, rotation, open, constrainImagePosition, imagePosition]);
+  }, [zoomLevel, rotation, open, constrainImagePosition, imagePosition.x, imagePosition.y]);
+
+  if (screenshots.length === 0) return null;
 
   return (
     <Dialog open={open} onOpenChange={handleClose} >

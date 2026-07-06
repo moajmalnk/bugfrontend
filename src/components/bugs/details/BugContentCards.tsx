@@ -8,6 +8,13 @@ import {
 } from "@/components/ui/dialog";
 import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
 import { formatDetailedDate } from "@/lib/dateUtils";
+import {
+  alreadyRaisedBadgeClass,
+  bugLevelBadgeClass,
+  formatAlreadyRaisedLabel,
+  formatBugLevelLabel,
+} from "@/lib/bugMetaUtils";
+import { Badge } from "@/components/ui/badge";
 import { MalayalamDateToggle, MalayalamBadge } from "@/components/ui/DateDisplay";
 import { useMalayalamToggle } from "@/hooks/useMalayalamToggle";
 import { Bug } from "@/types";
@@ -408,21 +415,23 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
       )}
 
       {/* Screenshot Viewer */}
-      <ScreenshotViewer
-        screenshots={screenshots}
-        open={screenshotViewerOpen}
-        onOpenChange={setScreenshotViewerOpen}
-        initialIndex={selectedScreenshotIndex}
-        bug_id={bug.id}
-        onScreenshotDelete={(deletedId) => {
-          // Update the bug's attachments to remove the deleted screenshot
-          if (bug.attachments) {
-            bug.attachments = bug.attachments.filter(
-              (att) => att.id !== deletedId
-            );
-          }
-        }}
-      />
+      {screenshots.length > 0 && (
+        <ScreenshotViewer
+          screenshots={screenshots}
+          open={screenshotViewerOpen}
+          onOpenChange={setScreenshotViewerOpen}
+          initialIndex={selectedScreenshotIndex}
+          bug_id={bug.id}
+          onScreenshotDelete={(deletedId) => {
+            // Update the bug's attachments to remove the deleted screenshot
+            if (bug.attachments) {
+              bug.attachments = bug.attachments.filter(
+                (att) => att.id !== deletedId
+              );
+            }
+          }}
+        />
+      )}
 
       {/* Voice Notes Card */}
       {voiceNotes.length > 0 && (
@@ -627,6 +636,18 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
                 <span className="text-sm text-muted-foreground">
                   {bug.project_name || "Unknown"}
                 </span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium">Bug Level:</span>
+                <Badge variant="outline" className={bugLevelBadgeClass(bug.bug_level)}>
+                  {formatBugLevelLabel(bug.bug_level)}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium">Already Raised:</span>
+                <Badge variant="outline" className={alreadyRaisedBadgeClass(bug.already_raised)}>
+                  {formatAlreadyRaisedLabel(bug.already_raised)}
+                </Badge>
               </div>
             </div>
             <div className="space-y-3">
