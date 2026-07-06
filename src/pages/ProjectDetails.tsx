@@ -3872,18 +3872,11 @@ const ProjectDetails = () => {
   const [admins, setAdmins] = useState<ProjectUser[]>([]);
   const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | "developer" | "tester">(
+  const [roleFilter, setRoleFilter] = useState<"all" | "developer" | "tester" | "admin">(
     "all"
   );
   const [isAdding, setIsAdding] = useState(false);
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
-  // Member tab state management
-  const [activeMemberTab, setActiveMemberTab] = useState<"developers" | "testers" | "admins">(() => {
-    if (currentUser?.role === "admin") return "developers";
-    if (currentUser?.role === "developer") return "admins";
-    if (currentUser?.role === "tester") return "admins";
-    return "developers";
-  });
   // Task tab state management
   const [activeTaskTab, setActiveTaskTab] = useState<"all-tasks" | "my-tasks">("all-tasks");
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
@@ -4353,11 +4346,13 @@ const ProjectDetails = () => {
     : [];
 
   const filteredAdmins = Array.isArray(admins)
-    ? admins.filter(
-        (admin) =>
-          admin?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          admin?.email?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? admins
+        .filter(
+          (admin) =>
+            admin?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            admin?.email?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        .filter(() => roleFilter === "all" || roleFilter === "admin")
     : [];
 
   const memberStats = useMemo(() => {
@@ -4376,21 +4371,38 @@ const ProjectDetails = () => {
     return stats;
   }, [bugs, members, admins]);
 
-  const getRoleStats = (role: "developer" | "tester" | "admin") => {
-    const roleMembers =
-      role === "admin"
-        ? admins
-        : members.filter((m) => m.role === role);
-    return roleMembers.reduce(
-      (acc, m) => {
-        const s = memberStats[m.id] ?? { bugs: 0, fixes: 0 };
-        acc.bugs += s.bugs;
-        acc.fixes += s.fixes;
-        return acc;
-      },
-      { bugs: 0, fixes: 0 }
-    );
-  };
+  const allDisplayMembers = useMemo(() => {
+    const roleOrder: Record<string, number> = { admin: 0, developer: 1, tester: 2 };
+    const adminEntries = filteredAdmins.map((admin) => ({
+      ...admin,
+      isAdmin: true as const,
+    }));
+    const memberEntries = filteredMembers.map((member) => ({
+      ...member,
+      isAdmin: false as const,
+    }));
+    return [...adminEntries, ...memberEntries].sort((a, b) => {
+      const roleA = a.isAdmin ? "admin" : a.role;
+      const roleB = b.isAdmin ? "admin" : b.role;
+      const orderDiff = (roleOrder[roleA] ?? 3) - (roleOrder[roleB] ?? 3);
+      if (orderDiff !== 0) return orderDiff;
+      return (a.username || "").localeCompare(b.username || "");
+    });
+  }, [filteredAdmins, filteredMembers]);
+
+  const totalDisplayStats = useMemo(
+    () =>
+      allDisplayMembers.reduce(
+        (acc, m) => {
+          const s = memberStats[m.id] ?? { bugs: 0, fixes: 0 };
+          acc.bugs += s.bugs;
+          acc.fixes += s.fixes;
+          return acc;
+        },
+        { bugs: 0, fixes: 0 }
+      ),
+    [allDisplayMembers, memberStats]
+  );
 
   // Task filtering helper function
   const getFilteredTasks = () => {
@@ -5192,140 +5204,6 @@ const ProjectDetails = () => {
                         </div>
                       </div>
 
-            {/* Internal Tabs - Role-based visibility with state management */}
-            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-purple-50/30 dark:from-gray-800/30 dark:to-purple-900/30"></div>
-              <div className="relative p-2">
-                <div className="flex gap-1">
-                  {/* Admins see: Developers and Testers */}
-                  {currentUser?.role === "admin" && (
-                    <>
-                      <button 
-                        onClick={() => setActiveMemberTab("developers")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
-                          activeMemberTab === "developers" 
-                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        <Code className="h-4 w-4 sm:h-5 sm:w-5" />
-                        Developers
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                          activeMemberTab === "developers"
-                            ? "bg-white/20 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                        }`}>
-                          {members.filter(m => m.role === "developer").length}
-                                </span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveMemberTab("testers")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
-                          activeMemberTab === "testers" 
-                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        <TestTube className="h-4 w-4 sm:h-5 sm:w-5" />
-                        Testers
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                          activeMemberTab === "testers"
-                            ? "bg-white/20 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                        }`}>
-                          {members.filter(m => m.role === "tester").length}
-                              </span>
-                      </button>
-                    </>
-                  )}
-
-                  {/* Developers see: Admins and Testers */}
-                  {currentUser?.role === "developer" && (
-                    <>
-                      <button 
-                        onClick={() => setActiveMemberTab("admins")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
-                          activeMemberTab === "admins" 
-                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
-                        Admins
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                          activeMemberTab === "admins"
-                            ? "bg-white/20 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                        }`}>
-                          {admins.length}
-                            </span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveMemberTab("testers")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
-                          activeMemberTab === "testers" 
-                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        <TestTube className="h-4 w-4 sm:h-5 sm:w-5" />
-                        Testers
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                          activeMemberTab === "testers"
-                            ? "bg-white/20 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                        }`}>
-                          {members.filter(m => m.role === "tester").length}
-                            </span>
-                      </button>
-                    </>
-                  )}
-
-                  {/* Testers see: Admins and Developers */}
-                  {currentUser?.role === "tester" && (
-                    <>
-                      <button 
-                        onClick={() => setActiveMemberTab("admins")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
-                          activeMemberTab === "admins" 
-                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
-                        Admins
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                          activeMemberTab === "admins"
-                            ? "bg-white/20 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                        }`}>
-                          {admins.length}
-                              </span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveMemberTab("developers")}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 ${
-                          activeMemberTab === "developers" 
-                            ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" 
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        <Code className="h-4 w-4 sm:h-5 sm:w-5" />
-                        Developers
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                          activeMemberTab === "developers"
-                            ? "bg-white/20 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                        }`}>
-                          {members.filter(m => m.role === "developer").length}
-                        </span>
-                      </button>
-                    </>
-                          )}
-                        </div>
-                      </div>
-                </div>
-
             {/* Search & Filter */}
             <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-purple-50/30 dark:from-gray-800/30 dark:to-purple-900/30"></div>
@@ -5362,7 +5240,7 @@ const ProjectDetails = () => {
                       <Select
                         value={roleFilter}
                         onValueChange={(value) =>
-                          setRoleFilter(value as "all" | "developer" | "tester")
+                          setRoleFilter(value as "all" | "developer" | "tester" | "admin")
                         }
                       >
                         <SelectTrigger className="w-full h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200">
@@ -5370,6 +5248,7 @@ const ProjectDetails = () => {
                         </SelectTrigger>
                         <SelectContent position="popper" className="z-[80]">
                           <SelectItem value="all">All Roles</SelectItem>
+                          <SelectItem value="admin">Admins</SelectItem>
                           <SelectItem value="developer">Developers</SelectItem>
                           <SelectItem value="tester">Testers</SelectItem>
                         </SelectContent>
@@ -5555,198 +5434,85 @@ const ProjectDetails = () => {
                 </div>
               )}
 
-            {/* Members List - Professional tab-based content */}
-            <div className="space-y-6">
-              {/* Developers Tab Content */}
-              {activeMemberTab === "developers" && (
-                <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/30 to-indigo-50/30 dark:from-blue-900/30 dark:to-indigo-900/30"></div>
-                  <div className="relative p-4 sm:p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                          <Code className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Developers</h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Team members responsible for development</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {members.filter(m => m.role === "developer").length}
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">Total Developers</div>
-                        {members.filter(m => m.role === "developer").length > 0 && (
-                          <div className="flex items-center justify-end gap-2 mt-1.5">
-                            <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                              <Bug className="h-3 w-3" />
-                              {getRoleStats("developer").bugs}
-                            </span>
-                            <span className="text-gray-300 dark:text-gray-600">·</span>
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                              <CheckCircle2 className="h-3 w-3" />
-                              {getRoleStats("developer").fixes}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+            {/* All Members List */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-purple-50/30 via-transparent to-pink-50/30 dark:from-purple-900/20 dark:via-transparent dark:to-pink-900/20"></div>
+              <div className="relative p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <Users className="h-5 w-5 text-white" />
                     </div>
-
-                    {members.filter(m => m.role === "developer").length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Code className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Developers Found</h4>
-                        <p className="text-gray-600 dark:text-gray-400">
-                          {searchQuery ? "No developers match your search criteria." : "No developers have been assigned to this project yet."}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {members.filter(m => m.role === "developer").map((developer) => (
-                          <MemberCard
-                            key={developer.id}
-                            member={developer}
-                            onRemove={handleRemoveMember}
-                            bugCount={memberStats[developer.id]?.bugs ?? 0}
-                            fixCount={memberStats[developer.id]?.fixes ?? 0}
-                          />
-                        ))}
-                  </div>
-                    )}
-                  </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">All Members</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Admins, developers, and testers on this project</p>
                     </div>
-                  )}
-
-              {/* Testers Tab Content */}
-              {activeMemberTab === "testers" && (
-                <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-green-900/30 dark:to-emerald-900/30"></div>
-                  <div className="relative p-4 sm:p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                          <TestTube className="h-5 w-5 text-white" />
-                </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Testers</h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Team members responsible for quality assurance</p>
                   </div>
-                </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {members.filter(m => m.role === "tester").length}
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">Total Testers</div>
-                        {members.filter(m => m.role === "tester").length > 0 && (
-                          <div className="flex items-center justify-end gap-2 mt-1.5">
-                            <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                              <Bug className="h-3 w-3" />
-                              {getRoleStats("tester").bugs}
-                            </span>
-                            <span className="text-gray-300 dark:text-gray-600">·</span>
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                              <CheckCircle2 className="h-3 w-3" />
-                              {getRoleStats("tester").fixes}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-              </div>
-
-                    {members.filter(m => m.role === "tester").length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <TestTube className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Testers Found</h4>
-                        <p className="text-gray-600 dark:text-gray-400">
-                          {searchQuery ? "No testers match your search criteria." : "No testers have been assigned to this project yet."}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {members.filter(m => m.role === "tester").map((tester) => (
-                          <MemberCard
-                            key={tester.id}
-                            member={tester}
-                            onRemove={handleRemoveMember}
-                            bugCount={memberStats[tester.id]?.bugs ?? 0}
-                            fixCount={memberStats[tester.id]?.fixes ?? 0}
-                          />
-                        ))}
+                  <div className="text-left sm:text-right">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {allDisplayMembers.length}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Showing</div>
+                    {allDisplayMembers.length > 0 && (
+                      <div className="flex items-center sm:justify-end gap-2 mt-1.5">
+                        <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                          <Bug className="h-3 w-3" />
+                          {totalDisplayStats.bugs} bugs
+                        </span>
+                        <span className="text-gray-300 dark:text-gray-600">·</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          <CheckCircle2 className="h-3 w-3" />
+                          {totalDisplayStats.fixes} fixes
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
-              )}
 
-              {/* Admins Tab Content */}
-              {activeMemberTab === "admins" && (
-                <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-purple-50/30 to-indigo-50/30 dark:from-purple-900/30 dark:to-indigo-900/30"></div>
-                  <div className="relative p-4 sm:p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                          <Shield className="h-5 w-5 text-white" />
-                        </div>
-              <div>
-                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Administrators</h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Project administrators with full access</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {filteredAdmins.length}
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">Total Admins</div>
-                        {filteredAdmins.length > 0 && (
-                          <div className="flex items-center justify-end gap-2 mt-1.5">
-                            <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                              <Bug className="h-3 w-3" />
-                              {getRoleStats("admin").bugs}
-                            </span>
-                            <span className="text-gray-300 dark:text-gray-600">·</span>
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                              <CheckCircle2 className="h-3 w-3" />
-                              {getRoleStats("admin").fixes}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">
+                    <Shield className="h-3 w-3" />
+                    {admins.length} Admins
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/50">
+                    <Code className="h-3 w-3" />
+                    {members.filter((m) => m.role === "developer").length} Developers
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-purple-500/10 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50">
+                    <TestTube className="h-3 w-3" />
+                    {members.filter((m) => m.role === "tester").length} Testers
+                  </span>
+                </div>
+
+                {allDisplayMembers.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Users className="h-8 w-8 text-gray-400" />
                     </div>
-
-                    {filteredAdmins.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Shield className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Administrators Found</h4>
-                        <p className="text-gray-600 dark:text-gray-400">
-                          {searchQuery ? "No administrators match your search criteria." : "No administrators have been assigned to this project yet."}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredAdmins.map((admin) => (
-                    <MemberCard
-                      key={admin.id}
-                      member={admin}
-                      isAdmin={true}
-                      bugCount={memberStats[admin.id]?.bugs ?? 0}
-                      fixCount={memberStats[admin.id]?.fixes ?? 0}
-                    />
-                  ))}
-                </div>
-                    )}
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Members Found</h4>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {searchQuery || roleFilter !== "all"
+                        ? "No members match your search or filter criteria."
+                        : "No team members have been assigned to this project yet."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {allDisplayMembers.map((person) => (
+                      <MemberCard
+                        key={person.id}
+                        member={person}
+                        isAdmin={person.isAdmin}
+                        onRemove={person.isAdmin ? undefined : handleRemoveMember}
+                        bugCount={memberStats[person.id]?.bugs ?? 0}
+                        fixCount={memberStats[person.id]?.fixes ?? 0}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-                </div>
-              )}
-                </div>
-              </div>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 

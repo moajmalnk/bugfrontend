@@ -53,7 +53,6 @@ export default defineConfig(({ mode }) => {
     },
   },
   optimizeDeps: {
-    force: mode === 'development',
     include: [
       'react',
       'react-dom',
