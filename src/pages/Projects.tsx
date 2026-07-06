@@ -1218,7 +1218,7 @@ const Projects = () => {
                       {project.name}
                     </Link>
                   </CardTitle>
-                  <CardDescription className="break-words text-xs sm:text-sm lg:text-base mt-1 sm:mt-2 text-muted-foreground">
+                  <CardDescription className="break-all text-xs sm:text-sm lg:text-base mt-1 sm:mt-2 text-muted-foreground line-clamp-4">
                     {project.description}
                   </CardDescription>
                 </CardHeader>
@@ -1226,7 +1226,7 @@ const Projects = () => {
                   <div className="flex flex-col gap-3">
                     {/* Enhanced Bug Stats */}
                     <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-2">
-                      <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 transition-colors duration-200">
+                      <div className="flex flex-col items-center justify-center min-h-[5.25rem] p-2 sm:p-3 rounded-lg bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 transition-colors duration-200 text-center">
                         <span className="text-xs sm:text-sm text-muted-foreground">
                           Total
                         </span>
@@ -1237,7 +1237,7 @@ const Projects = () => {
                           Bugs
                         </span>
                       </div>
-                      <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-yellow-50/70 dark:bg-yellow-900/20 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/30 transition-colors duration-200">
+                      <div className="flex flex-col items-center justify-center min-h-[5.25rem] p-2 sm:p-3 rounded-lg bg-yellow-50/70 dark:bg-yellow-900/20 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/30 transition-colors duration-200 text-center">
                         <span className="text-xs sm:text-sm text-muted-foreground">
                           Open
                         </span>
@@ -1248,7 +1248,7 @@ const Projects = () => {
                           Bugs
                         </span>
                       </div>
-                      <div className="flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg bg-green-50/70 dark:bg-green-900/20 hover:bg-green-100/80 dark:hover:bg-green-900/30 transition-colors duration-200">
+                      <div className="flex flex-col items-center justify-center min-h-[5.25rem] p-2 sm:p-3 rounded-lg bg-green-50/70 dark:bg-green-900/20 hover:bg-green-100/80 dark:hover:bg-green-900/30 transition-colors duration-200 text-center">
                         <span className="text-xs sm:text-sm text-muted-foreground">
                           Fixed
                         </span>
@@ -1299,7 +1299,7 @@ const Projects = () => {
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="flex flex-col gap-2 sm:gap-3 sm:flex-row pt-2 mt-auto p-4 sm:p-5">
+                <CardFooter className="relative grid grid-cols-2 gap-2 pt-2 mt-auto p-4 sm:p-5">
                   {/* Show View button only for assigned projects (my-projects tab) or for admins */}
                   {((currentUser?.role === "developer" && activeTab === "my-projects") || 
                     (currentUser?.role === "admin") || 
@@ -1307,7 +1307,7 @@ const Projects = () => {
                     <Button
                       asChild
                       variant="default"
-                      className="w-full sm:flex-1 min-w-0 h-11 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                      className="col-span-1 w-full h-11 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                     >
                       <Link
                         to={
@@ -1327,7 +1327,7 @@ const Projects = () => {
                     <Button
                       asChild
                       variant="outline"
-                      className="w-full sm:flex-1 min-w-0 h-11 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20 text-orange-700 dark:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                      className="col-span-1 w-full h-11 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20 text-orange-700 dark:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 whitespace-nowrap"
                     >
                       <Link
                         to={
@@ -1340,9 +1340,10 @@ const Projects = () => {
                             ? `/${currentUser.role}/projects`
                             : "/projects",
                         }}
+                        className="inline-flex w-full items-center justify-center gap-2"
                       >
-                        <Bug className="mr-2 h-4 w-4" />
-                        Report Bug
+                        <Bug className="h-4 w-4 shrink-0" />
+                        <span>Report Bug</span>
                       </Link>
                     </Button>
                   )}
@@ -1352,7 +1353,7 @@ const Projects = () => {
                         <TooltipTrigger asChild>
                           <Button
                             variant="destructive"
-                            className="w-full sm:flex-1 min-w-0 h-11 shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                            className="col-span-2 w-full h-11 shadow-sm hover:shadow-md transition-all duration-200"
                             onClick={() => {
                               console.log("Delete button clicked for project:", project.id);
                               setProjectToDelete(project.id);
