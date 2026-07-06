@@ -180,74 +180,126 @@ function isValidUUID(uuid: string): boolean {
   );
 }
 
-// Member card component for cleaner JSX
+// Member card component with per-member bug & fix stats
 const MemberCard = ({
   member,
   isAdmin = false,
   onRemove,
+  bugCount = 0,
+  fixCount = 0,
 }: {
   member: ProjectUser;
   isAdmin?: boolean;
   onRemove?: (id: string) => void;
+  bugCount?: number;
+  fixCount?: number;
 }) => {
   const { currentUser } = useAuth();
   const canRemove = currentUser?.role === "admin" && !isAdmin;
 
-  // Determine icon based on role
   const RoleIcon = isAdmin
     ? Shield
     : member.role === "developer"
     ? Code
     : TestTube;
 
-  // Determine color scheme based on role
-  const colorScheme = isAdmin
-    ? "bg-blue-50 text-blue-700 border-blue-200"
+  const theme = isAdmin
+    ? {
+        avatar: "from-blue-500 to-indigo-600",
+        badge: "bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border-blue-200/60 dark:border-blue-800/60",
+        statBug: "text-red-600 dark:text-red-400",
+        statFix: "text-emerald-600 dark:text-emerald-400",
+      }
     : member.role === "developer"
-    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-    : "bg-purple-50 text-purple-700 border-purple-200";
+    ? {
+        avatar: "from-emerald-500 to-teal-600",
+        badge: "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60",
+        statBug: "text-red-600 dark:text-red-400",
+        statFix: "text-emerald-600 dark:text-emerald-400",
+      }
+    : {
+        avatar: "from-purple-500 to-violet-600",
+        badge: "bg-purple-500/10 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 border-purple-200/60 dark:border-purple-800/60",
+        statBug: "text-red-600 dark:text-red-400",
+        statFix: "text-emerald-600 dark:text-emerald-400",
+      };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      className="h-full"
     >
-      <Card className="shadow-sm hover:shadow transition-shadow duration-200 border h-full">
-        <CardContent className="p-3 sm:p-4 h-full">
-          <div className="flex justify-between items-start h-full">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-              <div
-                className={`p-1.5 sm:p-2 rounded-full ${colorScheme} flex-shrink-0`}
-              >
-                <RoleIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="font-medium text-sm sm:text-base truncate">
-                  {member.username}
-                </h4>
-                <p className="text-xs text-muted-foreground truncate">
-                  {member.email}
-                </p>
-                <span
-                  className={`inline-block mt-1 sm:mt-1.5 px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${colorScheme} border`}
+      <Card className="group h-full overflow-hidden border border-gray-200/70 dark:border-gray-800/70 bg-white/90 dark:bg-gray-950/60 shadow-sm hover:shadow-md hover:border-gray-300/80 dark:hover:border-gray-700/80 transition-all duration-200">
+        <CardContent className="p-0 h-full flex flex-col">
+          <div className="p-4 pb-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div
+                  className={`flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br ${theme.avatar} flex items-center justify-center shadow-md`}
                 >
-                  {isAdmin ? "Admin" : member.role}
-                </span>
+                  <RoleIcon className="h-5 w-5 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white truncate">
+                    {member.username}
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                    {member.email}
+                  </p>
+                </div>
               </div>
+
+              {canRemove && onRemove && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-gray-400 hover:text-destructive hover:bg-destructive/10 rounded-lg flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => onRemove(member.id)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span className="sr-only">Remove</span>
+                </Button>
+              )}
             </div>
 
-            {canRemove && onRemove && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-destructive rounded-full flex-shrink-0 ml-2"
-                onClick={() => onRemove(member.id)}
-              >
-                <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="sr-only">Remove</span>
-              </Button>
-            )}
+            <span
+              className={`inline-flex items-center mt-2.5 px-2 py-0.5 text-[11px] font-medium rounded-md border capitalize ${theme.badge}`}
+            >
+              {isAdmin ? "Admin" : member.role}
+            </span>
+          </div>
+
+          <div className="mt-auto border-t border-gray-100 dark:border-gray-800/80 bg-gray-50/60 dark:bg-gray-900/40 px-4 py-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-red-500/10 dark:bg-red-500/15 flex items-center justify-center">
+                  <Bug className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium">
+                    Bugs
+                  </p>
+                  <p className={`text-lg font-bold leading-tight ${theme.statBug}`}>
+                    {bugCount}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15 flex items-center justify-center">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium">
+                    Fixes
+                  </p>
+                  <p className={`text-lg font-bold leading-tight ${theme.statFix}`}>
+                    {fixCount}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -4308,6 +4360,38 @@ const ProjectDetails = () => {
       )
     : [];
 
+  const memberStats = useMemo(() => {
+    const stats: Record<string, { bugs: number; fixes: number }> = {};
+    [...members, ...admins].forEach((member) => {
+      stats[member.id] = { bugs: 0, fixes: 0 };
+    });
+    bugs.forEach((bug) => {
+      if (bug.reported_by && stats[bug.reported_by]) {
+        stats[bug.reported_by].bugs += 1;
+      }
+      if (bug.updated_by && bug.status === "fixed" && stats[bug.updated_by]) {
+        stats[bug.updated_by].fixes += 1;
+      }
+    });
+    return stats;
+  }, [bugs, members, admins]);
+
+  const getRoleStats = (role: "developer" | "tester" | "admin") => {
+    const roleMembers =
+      role === "admin"
+        ? admins
+        : members.filter((m) => m.role === role);
+    return roleMembers.reduce(
+      (acc, m) => {
+        const s = memberStats[m.id] ?? { bugs: 0, fixes: 0 };
+        acc.bugs += s.bugs;
+        acc.fixes += s.fixes;
+        return acc;
+      },
+      { bugs: 0, fixes: 0 }
+    );
+  };
+
   // Task filtering helper function
   const getFilteredTasks = () => {
     return sharedTasks.filter((task) => {
@@ -5493,6 +5577,19 @@ const ProjectDetails = () => {
                           {members.filter(m => m.role === "developer").length}
                         </div>
                         <div className="text-xs text-gray-600 dark:text-gray-400">Total Developers</div>
+                        {members.filter(m => m.role === "developer").length > 0 && (
+                          <div className="flex items-center justify-end gap-2 mt-1.5">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                              <Bug className="h-3 w-3" />
+                              {getRoleStats("developer").bugs}
+                            </span>
+                            <span className="text-gray-300 dark:text-gray-600">·</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              <CheckCircle2 className="h-3 w-3" />
+                              {getRoleStats("developer").fixes}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -5507,12 +5604,14 @@ const ProjectDetails = () => {
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {members.filter(m => m.role === "developer").map((developer) => (
                           <MemberCard
                             key={developer.id}
                             member={developer}
                             onRemove={handleRemoveMember}
+                            bugCount={memberStats[developer.id]?.bugs ?? 0}
+                            fixCount={memberStats[developer.id]?.fixes ?? 0}
                           />
                         ))}
                   </div>
@@ -5541,7 +5640,20 @@ const ProjectDetails = () => {
                           {members.filter(m => m.role === "tester").length}
                         </div>
                         <div className="text-xs text-gray-600 dark:text-gray-400">Total Testers</div>
-                </div>
+                        {members.filter(m => m.role === "tester").length > 0 && (
+                          <div className="flex items-center justify-end gap-2 mt-1.5">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                              <Bug className="h-3 w-3" />
+                              {getRoleStats("tester").bugs}
+                            </span>
+                            <span className="text-gray-300 dark:text-gray-600">·</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              <CheckCircle2 className="h-3 w-3" />
+                              {getRoleStats("tester").fixes}
+                            </span>
+                          </div>
+                        )}
+                      </div>
               </div>
 
                     {members.filter(m => m.role === "tester").length === 0 ? (
@@ -5555,12 +5667,14 @@ const ProjectDetails = () => {
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {members.filter(m => m.role === "tester").map((tester) => (
                           <MemberCard
                             key={tester.id}
                             member={tester}
                             onRemove={handleRemoveMember}
+                            bugCount={memberStats[tester.id]?.bugs ?? 0}
+                            fixCount={memberStats[tester.id]?.fixes ?? 0}
                           />
                         ))}
                       </div>
@@ -5589,6 +5703,19 @@ const ProjectDetails = () => {
                     {filteredAdmins.length}
                         </div>
                         <div className="text-xs text-gray-600 dark:text-gray-400">Total Admins</div>
+                        {filteredAdmins.length > 0 && (
+                          <div className="flex items-center justify-end gap-2 mt-1.5">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                              <Bug className="h-3 w-3" />
+                              {getRoleStats("admin").bugs}
+                            </span>
+                            <span className="text-gray-300 dark:text-gray-600">·</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              <CheckCircle2 className="h-3 w-3" />
+                              {getRoleStats("admin").fixes}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -5603,9 +5730,15 @@ const ProjectDetails = () => {
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredAdmins.map((admin) => (
-                    <MemberCard key={admin.id} member={admin} isAdmin={true} />
+                    <MemberCard
+                      key={admin.id}
+                      member={admin}
+                      isAdmin={true}
+                      bugCount={memberStats[admin.id]?.bugs ?? 0}
+                      fixCount={memberStats[admin.id]?.fixes ?? 0}
+                    />
                   ))}
                 </div>
                     )}
