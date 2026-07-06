@@ -306,6 +306,39 @@ export function formatDetailedDate(dateString: string): string {
 }
 
 /**
+ * Malayalam equivalent of formatDetailedDate for bug detail views.
+ */
+export function formatDetailedDateMalayalam(dateString: string): string {
+  const date = safeParseDate(dateString);
+  if (!isValid(date)) return 'അസാധുവായ തീയതി';
+
+  const now = new Date();
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+  const diffInHours = Math.floor(diffInMinutes / 60);
+
+  const timeStr = date.toLocaleTimeString('ml-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata',
+  });
+
+  if (diffInMinutes < 1) return 'ഇപ്പോൾ';
+  if (diffInMinutes < 60) return `${diffInMinutes} മിനിറ്റ് മുമ്പ്`;
+  if (diffInHours < 24 && isToday(date)) return `${diffInHours} മണിക്കൂർ മുമ്പ്`;
+  if (isYesterday(date)) return `ഇന്നലെ ${timeStr} ന്`;
+
+  const dateStr = date.toLocaleDateString('ml-IN', {
+    month: 'short',
+    day: 'numeric',
+    ...(isThisYear(date) ? {} : { year: 'numeric' }),
+    timeZone: 'Asia/Kolkata',
+  });
+
+  return `${dateStr} ${timeStr} ന്`;
+}
+
+/**
  * Format for tooltips and hover states
  */
 export function formatTooltipDate(dateString: string): string {

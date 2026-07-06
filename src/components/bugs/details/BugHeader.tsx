@@ -2,17 +2,18 @@ import EditBugDialog from "@/components/bugs/EditBugDialog";
 import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MalayalamDateToggle, MalayalamTextToggle } from "@/components/ui/DateDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { generateShareableUrl } from "@/lib/utils";
+import { generateShareableUrl, getEffectiveRole } from "@/lib/utils";
 import { bugService } from "@/services/bugService";
 import { Bug } from "@/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { CheckSquare, ChevronLeft, Edit2, Share2, Trash2, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 // Add getStatusColor function
 const getStatusColor = (status: string) => {
@@ -58,12 +59,39 @@ export const BugHeader = ({
     location.state?.from === "project" ||
     fromParam === "project" ||
     referrerIsProject;
+  const isFromFixes = fromParam === "fixes";
 
+  const role = getEffectiveRole(authUser || {});
   const backLink = isFromProject
-    ? `/${authUser?.role || "tester"}/projects/${bug.project_id}?tab=bugs`
-    : `/${authUser?.role || "tester"}/bugs`;
+    ? `/${role}/projects/${bug.project_id}?tab=bugs`
+    : isFromFixes
+      ? `/${role}/fixes`
+      : `/${role}/bugs`;
 
-  const backText = isFromProject ? "Back to Project Bugs" : "Back to Bugs";
+  const backText = isFromProject
+    ? "Back to Project Bugs"
+    : isFromFixes
+      ? "Back to Fixes"
+      : "Back to Bugs";
+
+  const handleBackNavigation = () => {
+    const target = backLink;
+
+    try {
+      navigate(target, { replace: false });
+    } catch {
+      window.location.replace(target);
+      return;
+    }
+
+    // If SPA navigation hangs (known on lazy-loaded routes), force a hard redirect.
+    window.setTimeout(() => {
+      const stillOnThisBug = window.location.pathname.includes(`/bugs/${bug.id}`);
+      if (stillOnThisBug) {
+        window.location.replace(target);
+      }
+    }, 200);
+  };
 
   // Permission check: admin can delete any bug, or user can delete their own bug
   const canDelete =
@@ -109,7 +137,7 @@ export const BugHeader = ({
         });
 
         // Navigate back to the appropriate page
-        navigate(backLink, { replace: true });
+        handleBackNavigation();
       } catch (error) {
         // console.error('Error deleting bug:', error);
         toast({
@@ -298,24 +326,32 @@ export const BugHeader = ({
   return (
     <>
       <div className="space-y-3 sm:space-y-4">
-        <Link
-          to={backLink}
+        <button
+          type="button"
+          onClick={handleBackNavigation}
           className="inline-flex items-center text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" />
           {backText}
-        </Link>
+        </button>
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div className="space-y-1">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words">
-              {bug.title}
+              <MalayalamTextToggle
+                text={bug.title}
+                className="text-xl sm:text-2xl font-bold tracking-tight break-words"
+              />
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
               Project Name: {bug.project_name}
             </p>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Bug ID: {bug.id} • Reported on {formattedCreatedDate}
+              Bug ID: {bug.id} • Reported on{" "}
+              <MalayalamDateToggle
+                date={bug.created_at}
+                englishText={formattedCreatedDate}
+              />
             </p>
           </div>
 
@@ -381,20 +417,17 @@ export const BugHeader = ({
                   className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap"
                   onClick={() => {
                     // Preserve the from parameter when navigating to fix page
-                    const fixUrl = `/${authUser?.role || "tester"}/bugs/${bug.id}/fix`;
-                    const redirectUrl = isFromProject ? `${fixUrl}?from=project` : fixUrl;
-                    
-                    // In production, React Router navigation may fail due to code splitting
-                    // Use window.location as reliable fallback for production
-                    if (import.meta.env.PROD) {
-                      window.location.href = redirectUrl;
-                    } else {
-                      // Try React Router navigation in development
-                      try {
-                        navigate(redirectUrl, { replace: false });
-                      } catch (error) {
-                        window.location.href = redirectUrl;
-                      }
+                    const fixUrl = `/${role}/bugs/${bug.id}/fix`;
+                    const redirectUrl = isFromProject
+                      ? `${fixUrl}?from=project`
+                      : isFromFixes
+                        ? `${fixUrl}?from=fixes`
+                        : fixUrl;
+
+                    try {
+                      navigate(redirectUrl, { replace: false });
+                    } catch {
+                      window.location.replace(redirectUrl);
                     }
                   }}
                 >

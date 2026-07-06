@@ -25,10 +25,12 @@ import {
   Calendar,
   Database,
   Timer,
+  Search,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
+import { useGlobalSearchModal } from "@/context/GlobalSearchContext";
 
 interface SidebarProps {
   className?: string;
@@ -41,6 +43,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { currentUser } = useAuth();
   const location = useLocation();
   const { hasPermission } = usePermissions(null);
+  const { setOpen: setSearchOpen } = useGlobalSearchModal();
   const role = getEffectiveRole(currentUser || {});
 
   const isActive = (path: string) => {
@@ -334,32 +337,48 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
         </div>
       </ScrollArea>
 
-      {/* User Profile */}
+      {/* User Profile + Search */}
       <div className="flex-shrink-0 p-3 border-t border-border/50 bg-muted/30 relative z-10">
-        <Link
-          to={role ? `/${role}/profile` : "/profile"}
-          className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition-all duration-200 group relative z-10 pointer-events-auto"
-          onClick={(e) => {
-            closeSidebar?.();
-          }}
-        >
-          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
-            <img
-              src={currentUser?.avatar || defaultAvatar}
-              alt="User avatar"
-              className="h-10 w-10 rounded-xl object-cover ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200"
-            />
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
-          </div>
-          <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5 py-0.5">
-            <p className="text-sm font-semibold text-foreground truncate leading-tight">
-              {currentUser?.username || "BugRicer"}
-            </p>
-            <p className="text-xs text-muted-foreground capitalize truncate leading-tight">
-              {role || "BugRicer"}
-            </p>
-          </div>
-        </Link>
+        <div className="flex items-center gap-1">
+          <Link
+            to={role ? `/${role}/profile` : "/profile"}
+            className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition-all duration-200 group relative z-10 pointer-events-auto flex-1 min-w-0"
+            onClick={() => {
+              closeSidebar?.();
+            }}
+          >
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
+              <img
+                src={currentUser?.avatar || defaultAvatar}
+                alt="User avatar"
+                className="h-10 w-10 rounded-xl object-cover ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200"
+              />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
+            </div>
+            <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5 py-0.5">
+              <p className="text-sm font-semibold text-foreground truncate leading-tight">
+                {currentUser?.username || "BugRicer"}
+              </p>
+              <p className="text-xs text-muted-foreground capitalize truncate leading-tight">
+                {role || "BugRicer"}
+              </p>
+            </div>
+          </Link>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50"
+            onClick={() => {
+              setSearchOpen(true);
+              closeSidebar?.();
+            }}
+            aria-label="Search"
+            title="Search (⌘K)"
+          >
+            <Search className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
     </nav>
   );

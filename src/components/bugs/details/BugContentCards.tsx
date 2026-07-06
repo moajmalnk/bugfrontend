@@ -1,7 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
 import { formatDetailedDate } from "@/lib/dateUtils";
+import { MalayalamDateToggle, MalayalamBadge } from "@/components/ui/DateDisplay";
+import { useMalayalamToggle } from "@/hooks/useMalayalamToggle";
 import { Bug } from "@/types";
 import { ENV } from "@/lib/env";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
@@ -14,7 +22,9 @@ import {
   File,
   FileImage,
   User,
+  Video,
   Volume2,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -33,6 +43,19 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
 
   const [screenshotViewerOpen, setScreenshotViewerOpen] = useState(false);
   const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState(0);
+  const [videoViewerOpen, setVideoViewerOpen] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<{
+    file_name: string;
+    file_path: string;
+    file_type?: string;
+  } | null>(null);
+
+  const {
+    displayText: descriptionDisplayText,
+    toggle: toggleDescriptionMalayalam,
+    loading: descriptionTranslating,
+    showMalayalam: descriptionInMalayalam,
+  } = useMalayalamToggle(bug.description || "");
 
   // Robust media URL helpers (use PHP endpoints to avoid CORS and set headers)
   // Use ENV.API_URL from env.ts to ensure consistency with backend
@@ -137,6 +160,22 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
     document.body.removeChild(link);
   };
 
+  const isVideoAttachment = (attachment: {
+    file_type?: string;
+    file_name?: string;
+  }) =>
+    attachment.file_type?.startsWith("video/") ||
+    !!attachment.file_name?.match(/\.(mp4|webm|mov|avi|mkv|m4v)$/i);
+
+  const openVideoViewer = (attachment: {
+    file_name: string;
+    file_path: string;
+    file_type?: string;
+  }) => {
+    setSelectedVideo(attachment);
+    setVideoViewerOpen(true);
+  };
+
   const openScreenshotViewer = (index: number) => {
     setSelectedScreenshotIndex(index);
     setScreenshotViewerOpen(true);
@@ -213,14 +252,26 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
       <Card className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/30 via-transparent to-red-50/30 dark:from-orange-950/10 dark:via-transparent dark:to-red-950/10" />
         <CardHeader className="relative">
-          <CardTitle className="flex items-center gap-2">
-            <File className="w-5 h-5" />
-            Description
+          <CardTitle className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <File className="w-5 h-5" />
+              Description
+            </span>
+            <button
+              type="button"
+              onClick={toggleDescriptionMalayalam}
+              disabled={descriptionTranslating}
+              className="inline-flex items-center rounded-sm transition-colors hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:opacity-50"
+              title={descriptionInMalayalam ? 'Show in English' : 'മലയാളത്തിൽ കാണിക്കുക'}
+              aria-label={descriptionInMalayalam ? 'Show description in English' : 'Show description in Malayalam'}
+            >
+              <MalayalamBadge />
+            </button>
           </CardTitle>
         </CardHeader>
         <CardContent className="relative">
           <div className="prose prose-sm max-w-none dark:prose-invert">
-            <p className="whitespace-pre-wrap break-words">{bug.description}</p>
+            <p className="whitespace-pre-wrap break-words">{descriptionDisplayText}</p>
           </div>
         </CardContent>
       </Card>
@@ -442,33 +493,103 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
           </CardHeader>
           <CardContent className="relative">
             <div className="space-y-2">
-              {otherFiles.map((attachment) => (
+              {otherFiles.map((attachment) => {
+                const isVideo = isVideoAttachment(attachment);
+                return (
                 <div
                   key={attachment.id}
                   className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <File className="w-8 h-8 text-muted-foreground" />
-                    <div>
-                      <div className="font-medium">{attachment.file_name}</div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {isVideo ? (
+                      <Video className="w-8 h-8 text-blue-500 flex-shrink-0" />
+                    ) : (
+                      <File className="w-8 h-8 text-muted-foreground flex-shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{attachment.file_name}</div>
                       <div className="text-sm text-muted-foreground">
                         {attachment.file_type || "Unknown type"}
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => downloadAttachment(attachment)}
-                  >
-                    <Download className="w-4 h-4" />
-                  </Button>
+                  {isVideo ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openVideoViewer(attachment)}
+                      title="View video"
+                      className="flex-shrink-0 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span className="sr-only">View</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => downloadAttachment(attachment)}
+                      title="Download"
+                      className="flex-shrink-0"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span className="sr-only">Download</span>
+                    </Button>
+                  )}
                 </div>
-              ))}
+              );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Video Viewer */}
+      <Dialog
+        open={videoViewerOpen}
+        onOpenChange={(open) => {
+          setVideoViewerOpen(open);
+          if (!open) setSelectedVideo(null);
+        }}
+      >
+        <DialogContent
+          className="max-w-4xl w-[95vw] p-0 overflow-hidden gap-0"
+          showCloseButton={false}
+        >
+          <DialogHeader className="relative px-4 pt-4 pb-2">
+            <DialogTitle className="flex items-center gap-2 text-base pr-10">
+              <Video className="w-4 h-4 text-blue-500" />
+              <span className="truncate">{selectedVideo?.file_name || "Video"}</span>
+            </DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-2 top-2 h-8 w-8 p-0 rounded-full hover:bg-muted"
+              onClick={() => {
+                setVideoViewerOpen(false);
+                setSelectedVideo(null);
+              }}
+              aria-label="Close video"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogHeader>
+          {selectedVideo && (
+            <div className="bg-black">
+              <video
+                key={selectedVideo.file_path}
+                src={buildDownloadUrl(selectedVideo.file_path, selectedVideo.file_name)}
+                controls
+                autoPlay
+                playsInline
+                className="w-full max-h-[70vh] object-contain"
+              >
+                Your browser does not support video playback.
+              </video>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Bug Information Card */}
       <Card className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
@@ -485,16 +606,20 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Created:</span>
-                <span className="text-sm text-muted-foreground">
-                  {formatDetailedDate(bug.created_at)}
-                </span>
+                <MalayalamDateToggle
+                  date={bug.created_at}
+                  englishText={formatDetailedDate(bug.created_at)}
+                  className="text-sm text-muted-foreground"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Last Updated:</span>
-                <span className="text-sm text-muted-foreground">
-                  {formatDetailedDate(bug.updated_at)}
-                </span>
+                <MalayalamDateToggle
+                  date={bug.updated_at}
+                  englishText={formatDetailedDate(bug.updated_at)}
+                  className="text-sm text-muted-foreground"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-muted-foreground" />

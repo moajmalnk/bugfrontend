@@ -14,6 +14,8 @@ import { Sidebar } from "./Sidebar";
 import FeedbackWidget from "../feedback/FeedbackWidget";
 import { BugBotFab } from "@/components/bugbot/BugBotFab";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
+import { GlobalSearchProvider } from "@/context/GlobalSearchContext";
+import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -72,6 +74,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
   return (
     <NotificationProvider>
+      <GlobalSearchProvider onCloseSidebar={() => setSidebarOpen(false)}>
       <div className="flex h-screen min-w-0 bg-background">
         <ImpersonateBanner />
         {/* Sidebar for desktop */}
@@ -173,6 +176,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       <FirebaseListener />
       <FeedbackWidget />
       <BugBotFab />
+      <GlobalSearchDialog />
+      </GlobalSearchProvider>
     </NotificationProvider>
   );
 };

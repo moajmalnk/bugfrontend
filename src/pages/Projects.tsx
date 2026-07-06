@@ -29,12 +29,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { toast, useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
@@ -1348,30 +1342,17 @@ const Projects = () => {
                     </Button>
                   )}
                   {currentUser?.role === "admin" && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="destructive"
-                            className="col-span-2 w-full h-11 shadow-sm hover:shadow-md transition-all duration-200"
-                            onClick={() => {
-                              console.log("Delete button clicked for project:", project.id);
-                              setProjectToDelete(project.id);
-                              setIsDeleteDialogOpen(true);
-                              console.log("Dialog state set to open:", true);
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>
-                            You can only delete projects that have no team
-                            members or bugs
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Button
+                      variant="destructive"
+                      className="col-span-2 w-full h-11 shadow-sm hover:shadow-md transition-all duration-200"
+                      title="You can only delete projects that have no team members or bugs"
+                      onClick={() => {
+                        setProjectToDelete(project.id);
+                        setIsDeleteDialogOpen(true);
+                      }}
+                    >
+                      Delete
+                    </Button>
                   )}
                 </CardFooter>
               </Card>
