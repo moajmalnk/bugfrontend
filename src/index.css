@@ -367,4 +367,17 @@ body::-webkit-scrollbar-track,
       page-break-inside: avoid;
     }
   }
+
+  /* Malayalam translation inserts — avoid per-character vertical stacking in flex layouts */
+  [data-translated="ml"],
+  .translated-ml {
+    display: inline;
+    max-width: 100%;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    line-break: auto;
+    hyphens: none;
+    vertical-align: baseline;
+  }
 }

@@ -12,6 +12,7 @@ import {
 import { useTheme } from '@/context/ThemeContext';
 import { toast } from '@/components/ui/use-toast';
 import { translateToMalayalam } from '@/lib/malayalamUtils';
+import { getHelpContextMenuSections } from '@/lib/help/contextMenuItems';
 import {
     Moon,
     Sun,
@@ -209,7 +210,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
         translatedNode.textContent = replacement;
         translatedNode.setAttribute('data-translated', 'ml');
         translatedNode.className =
-            'bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded px-0.5 break-words [overflow-wrap:anywhere]';
+            'translated-ml bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded px-0.5';
         range.insertNode(translatedNode);
 
         range.setStartAfter(translatedNode);
@@ -322,7 +323,19 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
             ],
         };
 
-        if (role === 'admin') {
+    const helpSections: MenuSection[] = getHelpContextMenuSections(
+        role || 'user',
+        safeNavigate,
+        onClose
+    ).map((section) => ({
+        ...section,
+        items: section.items.map((item) => ({
+            ...item,
+            icon: item.icon ? <item.icon className="h-4 w-4" /> : undefined,
+        })),
+    }));
+
+    if (role === 'admin') {
             return [
                 {
                     label: 'Create',
@@ -391,6 +404,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                     ],
                 },
                 { label: 'Clipboard', items: clipboardItems },
+                ...helpSections,
                 appSection,
             ];
         }
@@ -437,6 +451,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                     ],
                 },
                 { label: 'Clipboard', items: clipboardItems },
+                ...helpSections,
                 appSection,
             ];
         }
@@ -478,11 +493,12 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                     ],
                 },
                 { label: 'Clipboard', items: clipboardItems },
+                ...helpSections,
                 appSection,
             ];
         }
 
-        return [{ label: 'Clipboard', items: clipboardItems }, appSection];
+        return [{ label: 'Clipboard', items: clipboardItems }, ...helpSections, appSection];
     };
 
     const menuSections = getMenuSections(currentUser?.role);
@@ -494,7 +510,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
         return null;
     }
 
-    const menuWidth = 272;
+    const menuWidth = 300;
     const estimatedMenuHeight = itemCount * 36 + menuSections.length * 28 + 16;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;

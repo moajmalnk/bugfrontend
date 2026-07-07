@@ -278,7 +278,7 @@ const Bugs = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3">
+              <div className="space-y-3 min-w-0 flex-1">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
                     <BugIcon className="h-6 w-6 text-white" />
@@ -290,12 +290,12 @@ const Bugs = () => {
                     <div className="h-1 w-20 bg-gradient-to-r from-orange-500 to-red-600 rounded-full mt-2"></div>
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl min-w-0 break-words">
                   Track pending bugs across your projects
                 </p>
               </div>
               
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
                 {canReportBug(currentUser?.role) && (
                   <Link
                     to={

@@ -36,8 +36,25 @@ export function useMalayalamToggle(text: string) {
     }
   }, [showMalayalam, malayalamText, text]);
 
+  const getMalayalamText = useCallback(async () => {
+    if (malayalamText) {
+      return malayalamText;
+    }
+    const translated = await translateToMalayalam(text);
+    setMalayalamText(translated);
+    return translated;
+  }, [malayalamText, text]);
+
   const displayText =
     loading ? '…' : showMalayalam && malayalamText ? malayalamText : text;
 
-  return { showMalayalam, loading, displayText, toggle };
+  return {
+    showMalayalam,
+    loading,
+    displayText,
+    toggle,
+    malayalamText,
+    getMalayalamText,
+    englishText: text,
+  };
 }

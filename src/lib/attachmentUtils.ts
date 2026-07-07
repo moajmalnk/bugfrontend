@@ -28,8 +28,8 @@ export function documentPreviewKind(fileName: string): DocumentPreviewKind {
   const ext = fileName.includes('.') ? fileName.split('.').pop()!.toLowerCase() : '';
   if (ext === 'pdf') return 'pdf';
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'image';
-  if (['mp4', 'webm', 'mov'].includes(ext)) return 'video';
+  if (['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v'].includes(ext)) return 'video';
   if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return 'audio';
-  if (['txt', 'csv', 'log', 'md', 'json', 'xml'].includes(ext)) return 'text';
+  if (['txt', 'csv', 'log', 'md', 'json', 'xml', 'html', 'yaml', 'yml', 'js', 'ts', 'tsx', 'jsx', 'css', 'sql'].includes(ext)) return 'text';
   return 'none';
 }

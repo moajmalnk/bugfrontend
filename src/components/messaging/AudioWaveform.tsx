@@ -33,12 +33,10 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
   const [audioData, setAudioData] = useState<number[]>([]);
 
   useEffect(() => {
-    console.log("🎵 Loading audio from URL:", audioUrl);
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
 
     audio.addEventListener("loadedmetadata", () => {
-      console.log("✅ Audio loaded successfully, duration:", audio.duration);
       let d = safeSeconds(audio.duration);
       if (d <= 0) {
         d = fallbackDuration;
@@ -57,14 +55,10 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
       if (onPlayPause) onPlayPause();
     });
 
-    audio.addEventListener("error", (e) => {
-      console.error("❌ Audio loading error:", e);
-      console.error("Audio URL:", audioUrl);
-      console.error("Audio error details:", audio.error);
+    audio.addEventListener("error", () => {
       setIsLoading(false);
     });
 
-    // Try to preload the audio
     audio.preload = "metadata";
     audio.load();
 
@@ -72,7 +66,13 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
       audio.pause();
       audio.remove();
     };
-  }, [audioUrl, fallbackDuration]);
+  }, [audioUrl]);
+
+  useEffect(() => {
+    if (fallbackDuration > 0) {
+      setAudioDuration((prev) => (prev > 0 ? prev : fallbackDuration));
+    }
+  }, [fallbackDuration]);
 
   const generateWaveformData = async (audio: HTMLAudioElement) => {
     // Generate mock waveform data (bars)

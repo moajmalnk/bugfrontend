@@ -60,6 +60,13 @@ export function KeyboardShortcuts() {
         e.preventDefault();
         safeNavigate(`/${currentUser?.role}/profile`);
       }
+      // Shortcut for Help Center: F1
+      if (e.key === "F1") {
+        e.preventDefault();
+        if (currentUser?.role) {
+          safeNavigate(`/${currentUser.role}/help`);
+        }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);

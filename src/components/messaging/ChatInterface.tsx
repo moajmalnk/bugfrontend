@@ -1320,7 +1320,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         {/* Message content */}
                         {message.message_type === "voice" ? (
                           <AudioWaveform
-                            audioUrl={message.voice_file_path || ""}
+                            audioUrl={MessagingService.resolveVoiceUrl(message.voice_file_path)}
                             duration={message.voice_duration}
                             isPlaying={isPlaying === message.id}
                             onPlayPause={() => playVoiceMessage(message)}

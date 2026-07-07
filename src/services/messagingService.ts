@@ -57,6 +57,35 @@ export class MessagingService {
     return trimmed;
   }
 
+  /** Rewrites stored audio.php voice URLs to the configured API base (dev proxy / production). */
+  static resolveVoiceUrl(url: string | null | undefined): string {
+    if (!url) return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+
+    const apiBase = ENV.API_URL.replace(/\/$/, '');
+
+    if (trimmed.includes('audio.php')) {
+      try {
+        const baseOrigin =
+          typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+        const parsed = new URL(trimmed, baseOrigin);
+        const path = parsed.searchParams.get('path');
+        if (path) {
+          return `${apiBase}/audio.php?path=${encodeURIComponent(path)}`;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!trimmed.includes('://') && !trimmed.startsWith('/')) {
+      return `${apiBase}/audio.php?path=${encodeURIComponent(trimmed)}`;
+    }
+
+    return trimmed;
+  }
+
   static mergeMediaMessage(
     fromApi: ChatMessage,
     payload: {

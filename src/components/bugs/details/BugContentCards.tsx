@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DocumentPreviewBody } from "@/components/attachments/DocumentPreviewBody";
 import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import {
@@ -15,7 +16,8 @@ import {
   formatBugLevelLabel,
 } from "@/lib/bugMetaUtils";
 import { Badge } from "@/components/ui/badge";
-import { MalayalamDateToggle, MalayalamBadge } from "@/components/ui/DateDisplay";
+import { MalayalamDateToggle } from "@/components/ui/DateDisplay";
+import { MalayalamVoiceToolbar } from "@/components/ui/MalayalamVoiceToolbar";
 import { useMalayalamToggle } from "@/hooks/useMalayalamToggle";
 import { Bug } from "@/types";
 import { ENV } from "@/lib/env";
@@ -33,7 +35,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface BugContentCardsProps {
   bug: Bug;
@@ -50,11 +52,10 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
 
   const [screenshotViewerOpen, setScreenshotViewerOpen] = useState(false);
   const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState(0);
-  const [videoViewerOpen, setVideoViewerOpen] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<{
+  const [attachmentPreview, setAttachmentPreview] = useState<{
+    url: string;
     file_name: string;
     file_path: string;
-    file_type?: string;
   } | null>(null);
 
   const {
@@ -62,6 +63,8 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
     toggle: toggleDescriptionMalayalam,
     loading: descriptionTranslating,
     showMalayalam: descriptionInMalayalam,
+    getMalayalamText: getDescriptionMalayalamText,
+    englishText: descriptionEnglishText,
   } = useMalayalamToggle(bug.description || "");
 
   // Robust media URL helpers (use PHP endpoints to avoid CORS and set headers)
@@ -158,7 +161,10 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
     extractDurations();
   }, [bug.attachments]);
 
-  const downloadAttachment = (attachment: any) => {
+  const downloadAttachment = (attachment: {
+    file_path: string;
+    file_name?: string;
+  }) => {
     const link = document.createElement("a");
     link.href = buildDownloadUrl(attachment.file_path, attachment.file_name);
     link.download = attachment.file_name || "attachment";
@@ -167,21 +173,24 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
     document.body.removeChild(link);
   };
 
+  const openAttachmentPreview = (attachment: {
+    file_name: string;
+    file_path: string;
+    file_type?: string;
+  }) => {
+    setAttachmentPreview({
+      url: buildDownloadUrl(attachment.file_path, attachment.file_name),
+      file_name: attachment.file_name,
+      file_path: attachment.file_path,
+    });
+  };
+
   const isVideoAttachment = (attachment: {
     file_type?: string;
     file_name?: string;
   }) =>
     attachment.file_type?.startsWith("video/") ||
     !!attachment.file_name?.match(/\.(mp4|webm|mov|avi|mkv|m4v)$/i);
-
-  const openVideoViewer = (attachment: {
-    file_name: string;
-    file_path: string;
-    file_type?: string;
-  }) => {
-    setSelectedVideo(attachment);
-    setVideoViewerOpen(true);
-  };
 
   const openScreenshotViewer = (index: number) => {
     setSelectedScreenshotIndex(index);
@@ -264,16 +273,13 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
               <File className="w-5 h-5" />
               Description
             </span>
-            <button
-              type="button"
-              onClick={toggleDescriptionMalayalam}
-              disabled={descriptionTranslating}
-              className="inline-flex items-center rounded-sm transition-colors hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:opacity-50"
-              title={descriptionInMalayalam ? 'Show in English' : 'മലയാളത്തിൽ കാണിക്കുക'}
-              aria-label={descriptionInMalayalam ? 'Show description in English' : 'Show description in Malayalam'}
-            >
-              <MalayalamBadge />
-            </button>
+            <MalayalamVoiceToolbar
+              englishText={descriptionEnglishText}
+              showMalayalam={descriptionInMalayalam}
+              translating={descriptionTranslating}
+              onToggleMalayalam={toggleDescriptionMalayalam}
+              getMalayalamText={getDescriptionMalayalamText}
+            />
           </CardTitle>
         </CardHeader>
         <CardContent className="relative">
@@ -522,29 +528,27 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
                       </div>
                     </div>
                   </div>
-                  {isVideo ? (
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => openVideoViewer(attachment)}
-                      title="View video"
-                      className="flex-shrink-0 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                      onClick={() => openAttachmentPreview(attachment)}
+                      title="View attachment"
+                      className="hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
                     >
                       <Eye className="w-4 h-4" />
                       <span className="sr-only">View</span>
                     </Button>
-                  ) : (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => downloadAttachment(attachment)}
-                      title="Download"
-                      className="flex-shrink-0"
+                      title="Download attachment"
                     >
                       <Download className="w-4 h-4" />
                       <span className="sr-only">Download</span>
                     </Button>
-                  )}
+                  </div>
                 </div>
               );
               })}
@@ -553,49 +557,71 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
         </Card>
       )}
 
-      {/* Video Viewer */}
+      {/* Attachment Preview */}
       <Dialog
-        open={videoViewerOpen}
+        open={!!attachmentPreview}
         onOpenChange={(open) => {
-          setVideoViewerOpen(open);
-          if (!open) setSelectedVideo(null);
+          if (!open) setAttachmentPreview(null);
         }}
       >
         <DialogContent
-          className="max-w-4xl w-[95vw] p-0 overflow-hidden gap-0"
+          className="max-w-4xl w-[calc(100vw-1.5rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden"
           showCloseButton={false}
         >
-          <DialogHeader className="relative px-4 pt-4 pb-2">
-            <DialogTitle className="flex items-center gap-2 text-base pr-10">
-              <Video className="w-4 h-4 text-blue-500" />
-              <span className="truncate">{selectedVideo?.file_name || "Video"}</span>
-            </DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-2 top-2 h-8 w-8 p-0 rounded-full hover:bg-muted"
-              onClick={() => {
-                setVideoViewerOpen(false);
-                setSelectedVideo(null);
-              }}
-              aria-label="Close video"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogHeader>
-          {selectedVideo && (
-            <div className="bg-black">
-              <video
-                key={selectedVideo.file_path}
-                src={buildDownloadUrl(selectedVideo.file_path, selectedVideo.file_name)}
-                controls
-                autoPlay
-                playsInline
-                className="w-full max-h-[70vh] object-contain"
-              >
-                Your browser does not support video playback.
-              </video>
-            </div>
+          {attachmentPreview && (
+            <>
+              <DialogHeader className="relative flex flex-row items-center gap-2 space-y-0 border-b bg-background px-4 py-3 pr-3 text-left shrink-0">
+                <DialogTitle className="text-base truncate leading-tight flex-1 min-w-0">
+                  {attachmentPreview.file_name}
+                </DialogTitle>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-2 h-8 w-8 p-0 rounded-full hover:bg-muted"
+                  onClick={() => setAttachmentPreview(null)}
+                  aria-label="Close preview"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogHeader>
+              <div className="flex-1 min-h-[200px] overflow-auto bg-muted/20">
+                <DocumentPreviewBody
+                  url={attachmentPreview.url}
+                  fileName={attachmentPreview.file_name}
+                />
+              </div>
+              <div className="px-4 py-3 border-t shrink-0 flex flex-wrap items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    window.open(
+                      attachmentPreview.url,
+                      "_blank",
+                      "noopener,noreferrer"
+                    )
+                  }
+                >
+                  Open in new tab
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    downloadAttachment({
+                      file_path: attachmentPreview.file_path,
+                      file_name: attachmentPreview.file_name,
+                    })
+                  }
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>

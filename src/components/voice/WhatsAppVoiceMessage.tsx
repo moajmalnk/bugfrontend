@@ -46,7 +46,7 @@ export function WhatsAppVoiceMessage({
   useEffect(() => {
     let cancelled = false;
 
-    const cleanupSource = () => {
+    const cleanupDerivedUrl = () => {
       if (derivedUrlRef.current) {
         URL.revokeObjectURL(derivedUrlRef.current);
         derivedUrlRef.current = null;
@@ -54,19 +54,17 @@ export function WhatsAppVoiceMessage({
     };
 
     const resolveSource = async () => {
-      cleanupSource();
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setLoadError(null);
-      setMediaDuration(duration || 0);
-      setSourceLoading(false);
-
       if (audioSource instanceof Blob) {
+        cleanupDerivedUrl();
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setLoadError(null);
+        setAudioUrl(null);
+
         const url = URL.createObjectURL(audioSource);
         if (!cancelled) {
           derivedUrlRef.current = url;
           setAudioUrl(url);
-          setSourceLoading(false);
         } else {
           URL.revokeObjectURL(url);
         }
@@ -74,86 +72,52 @@ export function WhatsAppVoiceMessage({
       }
 
       if (typeof audioSource === "string") {
-        if (audioSource.startsWith("blob:") || audioSource.startsWith("data:")) {
-          setAudioUrl(audioSource);
-          setSourceLoading(false);
+        if (!audioSource.trim()) {
+          cleanupDerivedUrl();
+          setAudioUrl(null);
+          if (!cancelled) {
+            setLoadError("Unable to load voice note");
+          }
           return;
         }
 
-        try {
-          setSourceLoading(true);
-          // Audio files are served with permissive CORS (Access-Control-Allow-Origin: *)
-          // and don't require cookies or auth headers, so we explicitly avoid sending
-          // credentials here to prevent CORS errors in production.
-          const response = await fetch(audioSource, {
-            cache: "no-store",
-            credentials: "omit",
-          });
-          if (!response.ok) {
-            const errorText = await response.text().catch(() => 'Unknown error');
-            console.error(`Failed to fetch audio: HTTP ${response.status}`, {
-              url: audioSource,
-              status: response.status,
-              statusText: response.statusText,
-              error: errorText
-            });
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-          
-          // Check if response is actually an audio file
-          const contentType = response.headers.get('content-type') || '';
-          if (!contentType.startsWith('audio/') && contentType !== 'application/octet-stream') {
-            const errorText = await response.text().catch(() => 'Unknown error');
-            console.error('Response is not an audio file', {
-              url: audioSource,
-              contentType,
-              responsePreview: errorText.substring(0, 200)
-            });
-            throw new Error(`Invalid content type: ${contentType}`);
-          }
-          
-          const blob = await response.blob();
-          if (cancelled) {
-            return;
-          }
-          
-          // Verify blob is not empty
-          if (blob.size === 0) {
-            console.error('Audio blob is empty', { url: audioSource });
-            throw new Error('Audio file is empty');
-          }
-          
-          const url = URL.createObjectURL(blob);
-          derivedUrlRef.current = url;
-          setAudioUrl(url);
-        } catch (error) {
-          console.error("Failed to resolve audio source", {
-            url: audioSource,
-            error: error instanceof Error ? error.message : String(error)
-          });
+        cleanupDerivedUrl();
+        setLoadError(null);
+
+        if (
+          audioSource.startsWith("blob:") ||
+          audioSource.startsWith("data:") ||
+          audioSource.startsWith("http://") ||
+          audioSource.startsWith("https://") ||
+          audioSource.startsWith("/")
+        ) {
           if (!cancelled) {
-            setLoadError("Unable to load voice note");
-            setAudioUrl(null);
+            setAudioUrl(audioSource);
           }
-        } finally {
-          if (!cancelled) {
-            setSourceLoading(false);
-          }
+          return;
+        }
+
+        setAudioUrl(null);
+        if (!cancelled) {
+          setLoadError("Unsupported audio source");
         }
         return;
       }
 
+      cleanupDerivedUrl();
       setAudioUrl(null);
-      setLoadError("Unsupported audio source");
+      if (!cancelled) {
+        setLoadError("Unsupported audio source");
+      }
     };
 
-    resolveSource();
+    void resolveSource();
 
     return () => {
       cancelled = true;
-      cleanupSource();
+      cleanupDerivedUrl();
     };
-  }, [audioSource, duration]);
+  }, [audioSource]);
 
   useEffect(() => {
     if (typeof duration === "number" && duration > 0) {
@@ -200,7 +164,7 @@ export function WhatsAppVoiceMessage({
       audio.removeEventListener("error", handleError);
       audioRef.current = null;
     };
-  }, [audioUrl, id, onPause, speedIndex]);
+  }, [audioUrl, id, onPause]);
 
   useEffect(() => {
     if (!audioRef.current) return;
