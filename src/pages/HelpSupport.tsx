@@ -239,7 +239,7 @@ export default function HelpSupport() {
               <Link key={article.id} to={`/${role}/help/${article.id}`}>
                 <div
                   className={cn(
-                    helpInnerCard,
+                    helpInnerC  ard,
                     "h-full p-4 transition-all hover:shadow-md hover:border-blue-300/40 dark:hover:border-blue-700/40 group"
                   )}
                 >
