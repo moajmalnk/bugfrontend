@@ -281,31 +281,43 @@ export async function listAllRequestSubmissions(
 export function normalizeAllRequestSubmissionsResponse(
   res: unknown,
   fallbackWindow: { from: string; to: string }
-): { submissions: Record<string, unknown>[]; window: { from: string; to: string } } {
+): {
+  submissions: Record<string, unknown>[];
+  adminHoursSubmissions: Record<string, unknown>[];
+  window: { from: string; to: string };
+} {
   if (!res || typeof res !== 'object') {
-    return { submissions: [], window: fallbackWindow };
+    return { submissions: [], adminHoursSubmissions: [], window: fallbackWindow };
   }
   const root = res as { data?: unknown };
   const payload = root.data;
 
   if (Array.isArray(payload)) {
-    return { submissions: payload, window: fallbackWindow };
+    return { submissions: payload, adminHoursSubmissions: [], window: fallbackWindow };
   }
 
   if (payload && typeof payload === 'object') {
     const bundle = payload as {
       submissions?: unknown;
+      admin_hours_submissions?: unknown;
       window?: { from?: string; to?: string };
     };
     const list = Array.isArray(bundle.submissions) ? bundle.submissions : [];
+    const adminList = Array.isArray(bundle.admin_hours_submissions)
+      ? bundle.admin_hours_submissions
+      : [];
     const w =
       bundle.window?.from && bundle.window?.to
         ? { from: bundle.window.from, to: bundle.window.to }
         : fallbackWindow;
-    return { submissions: list as Record<string, unknown>[], window: w };
+    return {
+      submissions: list as Record<string, unknown>[],
+      adminHoursSubmissions: adminList as Record<string, unknown>[],
+      window: w,
+    };
   }
 
-  return { submissions: [], window: fallbackWindow };
+  return { submissions: [], adminHoursSubmissions: [], window: fallbackWindow };
 }
 
 export async function reviewOvertimeRequest(body: {
@@ -333,6 +345,23 @@ export async function deleteSubmission(arg: { id?: number; submission_date?: str
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { message?: string }).message || 'Failed to delete submission');
   return data;
+}
+
+export async function adminUpsertWorkSubmission(body: {
+  user_id: string;
+  submission_date: string;
+  hours_today: number;
+  admin_note: string;
+  work_note?: string;
+}) {
+  const res = await fetch(`${API}/tasks/admin_upsert_work_submission.php`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { message?: string }).message || 'Failed to save work hours');
+  return data as { success?: boolean; message?: string; data?: Record<string, unknown> };
 }
 
 export async function checkIn(

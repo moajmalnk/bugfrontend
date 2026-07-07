@@ -11,6 +11,7 @@ import {
   codoMonthKey,
   getSubmissionWindow,
   groupRowsByUser,
+  groupAdminHoursByUser,
   type OvertimeRow,
 } from '@/pages/adminOvertimeShared';
 import { ArrowLeft, ChevronRight, FileText, Timer, User, Users } from 'lucide-react';
@@ -23,9 +24,11 @@ function userSubmissionDateRange(g: UserRequestGroup): { min: string; max: strin
 
 function UserRequestCard({
   group,
+  adminHoursCount = 0,
   onOpen,
 }: {
   group: UserRequestGroup;
+  adminHoursCount?: number;
   onOpen: () => void;
 }) {
   const range = userSubmissionDateRange(group);
@@ -75,6 +78,11 @@ function UserRequestCard({
               {group.pending} pending
             </span>
           )}
+          {adminHoursCount > 0 && (
+            <span className="inline-flex items-center rounded-lg bg-indigo-100 dark:bg-indigo-950/50 px-2.5 py-1 text-xs font-semibold text-indigo-900 dark:text-indigo-200 border border-indigo-200/80 dark:border-indigo-800/50">
+              {adminHoursCount} admin h
+            </span>
+          )}
         </div>
 
         {range && (
@@ -104,6 +112,7 @@ export default function AdminOvertimeRequests() {
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<OvertimeRow[]>([]);
+  const [adminHoursRows, setAdminHoursRows] = useState<OvertimeRow[]>([]);
   const [queryWindow, setQueryWindow] = useState<{ from: string; to: string }>(() => getSubmissionWindow());
 
   const load = useCallback(async () => {
@@ -111,8 +120,9 @@ export default function AdminOvertimeRequests() {
     try {
       const fallback = getSubmissionWindow();
       const res = await listAllRequestSubmissions({});
-      const { submissions, window } = normalizeAllRequestSubmissionsResponse(res, fallback);
+      const { submissions, adminHoursSubmissions, window } = normalizeAllRequestSubmissionsResponse(res, fallback);
       setRows(submissions as OvertimeRow[]);
+      setAdminHoursRows(adminHoursSubmissions as OvertimeRow[]);
       setQueryWindow(window);
     } catch (e) {
       toast({
@@ -121,6 +131,7 @@ export default function AdminOvertimeRequests() {
         variant: 'destructive',
       });
       setRows([]);
+      setAdminHoursRows([]);
     } finally {
       setLoading(false);
     }
@@ -134,6 +145,32 @@ export default function AdminOvertimeRequests() {
   }, [isAdmin, load]);
 
   const byUser = useMemo(() => groupRowsByUser(rows), [rows]);
+  const adminByUser = useMemo(() => groupAdminHoursByUser(adminHoursRows), [adminHoursRows]);
+
+  const displayUsers = useMemo(() => {
+    const map = new Map<string, UserRequestGroup & { adminHoursCount: number }>();
+    for (const g of byUser) {
+      map.set(g.userId, { ...g, adminHoursCount: 0 });
+    }
+    for (const g of adminByUser) {
+      const existing = map.get(g.userId);
+      if (existing) {
+        existing.adminHoursCount = g.list.length;
+      } else {
+        map.set(g.userId, {
+          userId: g.userId,
+          username: g.username,
+          role: g.role,
+          list: [],
+          pending: 0,
+          adminHoursCount: g.list.length,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })
+    );
+  }, [byUser, adminByUser]);
 
   const pendingTotal = useMemo(
     () => rows.filter((r) => String(r.extra_hours_approval_status || '').toLowerCase() === 'pending').length,
@@ -237,10 +274,10 @@ export default function AdminOvertimeRequests() {
                   <Skeleton key={i} className="h-56 w-full rounded-2xl" />
                 ))}
               </div>
-            ) : byUser.length === 0 ? (
+            ) : displayUsers.length === 0 ? (
               <div className="text-center py-12 sm:py-16 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/30 px-4">
                 <FileText className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-                <p className="text-base font-medium text-gray-700 dark:text-gray-300">No extra-hour requests in this window.</p>
+                <p className="text-base font-medium text-gray-700 dark:text-gray-300">No extra-hour or admin hours entries in this window.</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 max-w-lg mx-auto leading-relaxed break-words">
                   API range: {queryWindow.from} → {queryWindow.to}. Endpoint{' '}
                   <span className="font-mono">{ENV.API_URL}/tasks/all_request_submissions.php</span>
@@ -248,8 +285,13 @@ export default function AdminOvertimeRequests() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-                {byUser.map((g) => (
-                  <UserRequestCard key={g.userId} group={g} onOpen={() => openUser(g.userId)} />
+                {displayUsers.map((g) => (
+                  <UserRequestCard
+                    key={g.userId}
+                    group={g}
+                    adminHoursCount={g.adminHoursCount}
+                    onOpen={() => openUser(g.userId)}
+                  />
                 ))}
               </div>
             )}

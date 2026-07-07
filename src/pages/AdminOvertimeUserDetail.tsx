@@ -31,8 +31,12 @@ import {
   monthTabLinesForList,
   formatSubmissionRequestedAt,
   statusPill,
+  parseAdminHoursNote,
+  adminHoursStatusPill,
+  groupAdminHoursByUser,
 } from '@/pages/adminOvertimeShared';
-import { ArrowLeft, Check, Clock, FileText, Pencil, Timer, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, Clock, FileText, Pencil, Shield, Timer, Trash2, X } from 'lucide-react';
+import { buildAdminAddHoursPath } from '@/pages/adminOvertimeShared';
 
 export default function AdminOvertimeUserDetail() {
   const { userId: userIdParam } = useParams<{ userId: string }>();
@@ -45,6 +49,7 @@ export default function AdminOvertimeUserDetail() {
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<OvertimeRow[]>([]);
+  const [adminHoursRows, setAdminHoursRows] = useState<OvertimeRow[]>([]);
   const [changeRow, setChangeRow] = useState<OvertimeRow | null>(null);
   const [changeHours, setChangeHours] = useState('1');
   const [rejectRow, setRejectRow] = useState<OvertimeRow | null>(null);
@@ -59,8 +64,9 @@ export default function AdminOvertimeUserDetail() {
     try {
       const fallback = getSubmissionWindow();
       const res = await listAllRequestSubmissions({});
-      const { submissions } = normalizeAllRequestSubmissionsResponse(res, fallback);
+      const { submissions, adminHoursSubmissions } = normalizeAllRequestSubmissionsResponse(res, fallback);
       setRows(submissions as OvertimeRow[]);
+      setAdminHoursRows(adminHoursSubmissions as OvertimeRow[]);
     } catch (e) {
       toast({
         title: 'Failed to load requests',
@@ -68,6 +74,7 @@ export default function AdminOvertimeUserDetail() {
         variant: 'destructive',
       });
       setRows([]);
+      setAdminHoursRows([]);
     } finally {
       setLoading(false);
     }
@@ -82,16 +89,21 @@ export default function AdminOvertimeUserDetail() {
 
   const byUser = useMemo(() => groupRowsByUser(rows), [rows]);
   const selectedGroup = byUser.find((g) => g.userId === routeUserId);
+  const adminByUser = useMemo(() => groupAdminHoursByUser(adminHoursRows), [adminHoursRows]);
+  const selectedAdminGroup = adminByUser.find((g) => g.userId === routeUserId);
 
   const monthKeys = useMemo(() => {
-    if (!selectedGroup) return [];
     const keys = new Set<string>();
-    for (const r of selectedGroup.list) {
+    for (const r of selectedGroup?.list ?? []) {
+      const d = String(r.submission_date || '');
+      if (d) keys.add(codoMonthKey(d));
+    }
+    for (const r of selectedAdminGroup?.list ?? []) {
       const d = String(r.submission_date || '');
       if (d) keys.add(codoMonthKey(d));
     }
     return Array.from(keys).sort((a, b) => (a < b ? 1 : -1));
-  }, [selectedGroup]);
+  }, [selectedGroup, selectedAdminGroup]);
 
   const activeMonth = monthParam && monthKeys.includes(monthParam) ? monthParam : monthKeys[0] || '';
 
@@ -105,6 +117,17 @@ export default function AdminOvertimeUserDetail() {
       })
       .sort((a, b) => String(b.submission_date).localeCompare(String(a.submission_date)));
   }, [selectedGroup, activeMonth]);
+
+  const visibleAdminRows = useMemo(() => {
+    if (!selectedAdminGroup || !activeMonth) return [];
+    const { from, to } = getCodoPeriodForMonth(activeMonth);
+    return selectedAdminGroup.list
+      .filter((r) => {
+        const d = String(r.submission_date || '');
+        return d >= from && d <= to;
+      })
+      .sort((a, b) => String(b.submission_date).localeCompare(String(a.submission_date)));
+  }, [selectedAdminGroup, activeMonth]);
 
   const setMonth = (mk: string) => {
     const p = new URLSearchParams(searchParams);
@@ -214,28 +237,50 @@ export default function AdminOvertimeUserDetail() {
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
-                    {loading ? 'Loading…' : selectedGroup ? selectedGroup.username : 'User not found'}
+                    {loading ? 'Loading…' : selectedGroup?.username ?? selectedAdminGroup?.username ?? 'User not found'}
                   </h1>
                   <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2" />
-                  {selectedGroup ? (
+                  {selectedGroup || selectedAdminGroup ? (
                     <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
-                      <span className="font-medium text-gray-800 dark:text-gray-200">{selectedGroup.role.toUpperCase()}</span>
+                      <span className="font-medium text-gray-800 dark:text-gray-200">
+                        {(selectedGroup?.role ?? selectedAdminGroup?.role ?? '').toUpperCase()}
+                      </span>
                       <span className="mx-2 text-gray-400">·</span>
-                      <span className="font-mono text-xs [overflow-wrap:anywhere] break-all">{selectedGroup.userId}</span>
+                      <span className="font-mono text-xs [overflow-wrap:anywhere] break-all">{routeUserId}</span>
                     </p>
                   ) : !loading ? (
                     <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">No extra-hour rows for this user in the current API window.</p>
                   ) : null}
                 </div>
               </div>
-              <Button
-                type="button"
-                onClick={backToList}
-                className="h-11 w-full sm:w-auto shrink-0 px-5 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg rounded-xl"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4 shrink-0" />
-                All users
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+                {routeUserId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full sm:w-auto rounded-xl border-blue-200 dark:border-blue-800"
+                    onClick={() =>
+                      navigate(
+                        buildAdminAddHoursPath(currentUser?.role || 'admin', routeUserId, {
+                          month: activeMonth,
+                          from: 'ot',
+                        })
+                      )
+                    }
+                  >
+                    <Timer className="mr-2 h-4 w-4 shrink-0" />
+                    Add / fix hours
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  onClick={backToList}
+                  className="h-11 w-full sm:w-auto shrink-0 px-5 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg rounded-xl"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4 shrink-0" />
+                  All users
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -248,32 +293,29 @@ export default function AdminOvertimeUserDetail() {
                 <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
                 <div className="h-40 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
               </div>
-            ) : !selectedGroup ? (
+            ) : !selectedGroup && !selectedAdminGroup ? (
               <div className="text-center py-12 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/30 px-3">
                 <FileText className="h-10 w-10 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-                <p className="text-gray-700 dark:text-gray-300 font-medium">This user has no extra-hour requests in the loaded window.</p>
+                <p className="text-gray-700 dark:text-gray-300 font-medium">This user has no OT requests or admin hours in the loaded window.</p>
                 <Button type="button" variant="outline" className="mt-5 rounded-xl" onClick={backToList}>
                   Back to users
                 </Button>
               </div>
             ) : (
-              <div className="space-y-5 sm:space-y-6 min-w-0">
-                <div className="flex items-start gap-3 min-w-0">
-                  <div className="p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20 shrink-0 self-start">
-                    <Clock className="h-6 w-6 text-white" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Requests by month</h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 leading-relaxed">
-                      Choose a period, then approve, reject, or set approved overtime hours.
-                    </p>
-                  </div>
-                </div>
-
+              <div className="space-y-6 sm:space-y-8 min-w-0">
                 {monthKeys.length > 0 && (
                   <div className="flex flex-col xs:flex-row xs:flex-wrap gap-2">
                     {monthKeys.map((mk) => {
-                      const lines = monthTabLinesForList(mk, selectedGroup.list);
+                      const { from, to } = getCodoPeriodForMonth(mk);
+                      const monthOt = (selectedGroup?.list ?? []).filter((r) => {
+                        const d = String(r.submission_date || '');
+                        return d >= from && d <= to;
+                      });
+                      const monthAdmin = (selectedAdminGroup?.list ?? []).filter((r) => {
+                        const d = String(r.submission_date || '');
+                        return d >= from && d <= to;
+                      });
+                      const lines = monthTabLinesForList(mk, [...monthOt, ...monthAdmin]);
                       return (
                         <button
                           key={mk}
@@ -308,10 +350,106 @@ export default function AdminOvertimeUserDetail() {
                   </div>
                 )}
 
+                {visibleAdminRows.length > 0 ? (
+                  <div className="space-y-4 min-w-0">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="p-3 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-2xl shadow-lg ring-4 ring-indigo-600/20 shrink-0 self-start">
+                        <Shield className="h-6 w-6 text-white" aria-hidden />
+                      </div>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                          Admin-added work hours
+                        </h2>
+                        <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 leading-relaxed">
+                          Regular hours added by admin when the developer forgot to check out — separate from OT requests.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                      {visibleAdminRows.map((r) => {
+                        const id = r.id as number;
+                        const hours = Number(r.hours_today || 0);
+                        const adminNote = parseAdminHoursNote(r.notes);
+                        return (
+                          <div
+                            key={`admin-${id || String(r.submission_date)}`}
+                            className="rounded-xl border-2 border-indigo-200/80 dark:border-indigo-800/60 bg-indigo-50/30 dark:bg-indigo-950/20 p-3.5 sm:p-5 shadow-sm min-w-0"
+                          >
+                            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3 mb-3 min-w-0">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span className="font-semibold text-sm text-gray-900 dark:text-white tabular-nums">
+                                    {formatSubmissionRequestedAt(String(r.submission_date || ''), r.created_at, r.check_in_time)}
+                                  </span>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums bg-indigo-100 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 border border-indigo-200/80 dark:border-indigo-800/50">
+                                    Admin +{hours}h
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1.5">
+                                  Regular work hours · not overtime
+                                </div>
+                              </div>
+                              <div className="shrink-0">{adminHoursStatusPill()}</div>
+                            </div>
+                            {(r.completed_tasks || '').toString().trim() ? (
+                              <div className="rounded-lg bg-white/70 dark:bg-gray-900/50 p-3 border border-indigo-200/50 dark:border-indigo-800/40 mb-3">
+                                <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                  Work summary
+                                </span>
+                                <p className="mt-1.5 text-xs sm:text-sm whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200">
+                                  {String(r.completed_tasks)}
+                                </p>
+                              </div>
+                            ) : null}
+                            {adminNote?.reason ? (
+                              <div className="rounded-lg bg-white/70 dark:bg-gray-900/50 p-3 border border-indigo-200/50 dark:border-indigo-800/40 mb-3">
+                                <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                  Admin reason
+                                </span>
+                                <p className="mt-1.5 text-xs sm:text-sm whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200">
+                                  {adminNote.reason}
+                                </p>
+                                {adminNote.stamp ? (
+                                  <p className="mt-2 text-[10px] text-muted-foreground font-mono">{adminNote.stamp}</p>
+                                ) : null}
+                              </div>
+                            ) : null}
+                            <div className="pt-3 border-t border-indigo-200/50 dark:border-indigo-800/40">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={busyId === id || deleting || !id}
+                                onClick={() => setDeleteRow(r)}
+                                className="w-full sm:w-auto h-10 rounded-xl border-2 border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2 shrink-0" />
+                                Delete entry
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="space-y-4 min-w-0">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20 shrink-0 self-start">
+                    <Clock className="h-6 w-6 text-white" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">OT extra-hour requests</h2>
+                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 leading-relaxed">
+                      Choose a period, then approve, reject, or set approved overtime hours.
+                    </p>
+                  </div>
+                </div>
+
                 {visibleRows.length === 0 ? (
                   <div className="text-center py-8 sm:py-10 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/30 px-3">
                     <FileText className="h-9 w-9 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 dark:text-gray-400">No submissions for this month.</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">No OT requests for this month.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 sm:gap-4">
@@ -433,6 +571,7 @@ export default function AdminOvertimeUserDetail() {
                     })}
                   </div>
                 )}
+                </div>
               </div>
             )}
           </div>

@@ -176,6 +176,7 @@ const MyTasks = lazy(() =>
 const DailyUpdate = lazy(() => import("@/pages/DailyUpdate"));
 const AdminOvertimeRequests = lazy(() => import("@/pages/AdminOvertimeRequests"));
 const AdminOvertimeUserDetail = lazy(() => import("@/pages/AdminOvertimeUserDetail"));
+const AdminAddWorkHours = lazy(() => import("@/pages/AdminAddWorkHours"));
 const DailyWorkUpdate = lazy(() => import("@/pages/DailyWorkUpdate"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const CommonBugs = lazy(() => import("@/pages/CommonBugs"));
@@ -338,6 +339,7 @@ const RouteConfig = () => {
           <Route path="activity" element={<Activity />} />
           <Route path="users" element={<Users />} />
           <Route path="users/:userId" element={<UserDetails />} />
+          <Route path="users/:userId/add-hours" element={<AdminAddWorkHours />} />
           <Route path="users/:userId/work-stats/:periodStart" element={<UserWorkStatsPeriod />} />
           <Route path="users/:userId/permissions" element={<UserPermissions />} />
           <Route path="fixes" element={<Fixes />} />
@@ -356,6 +358,7 @@ const RouteConfig = () => {
           <Route path="my-tasks" element={<MyTasks />} />
           <Route path="daily-update" element={<DailyUpdate />} />
           <Route path="daily-work-update" element={<DailyWorkUpdate />} />
+          <Route path="overtime-requests/:userId/add-hours" element={<AdminAddWorkHours />} />
           <Route path="overtime-requests/:userId" element={<AdminOvertimeUserDetail />} />
           <Route path="overtime-requests" element={<AdminOvertimeRequests />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />

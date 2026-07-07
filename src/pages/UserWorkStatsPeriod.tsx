@@ -42,6 +42,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { buildAdminAddHoursPath } from "@/pages/adminOvertimeShared";
+import { Button } from "@/components/ui/button";
 
 function computePeriodEnd(periodStart: string): string {
   return getCalendarMonthEnd(periodStart);
@@ -610,6 +612,24 @@ export default function UserWorkStatsPeriod() {
                       All team members
                     </button>
                   </div>
+                ) : null}
+                {canViewTeam && viewScope === "user" && userId && periodStart ? (
+                  <Button
+                    type="button"
+                    className="h-11 w-full sm:w-auto rounded-xl bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg"
+                    onClick={() =>
+                      navigate(
+                        buildAdminAddHoursPath(effectiveRole, userId, {
+                          from: "stats",
+                          periodStart,
+                          label: label || undefined,
+                        })
+                      )
+                    }
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add / fix hours
+                  </Button>
                 ) : null}
                 <button
                   type="button"

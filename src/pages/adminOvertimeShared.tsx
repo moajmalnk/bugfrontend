@@ -25,6 +25,8 @@ export type OvertimeRow = Record<string, unknown> & {
   created_at?: string;
   updated_at?: string;
   check_in_time?: string;
+  notes?: string;
+  completed_tasks?: string;
 };
 
 function formatTimeKolkata(d: Date): string | null {
@@ -169,6 +171,55 @@ export type UserRequestGroup = {
   pending: number;
 };
 
+export type AdminHoursGroup = {
+  userId: string;
+  username: string;
+  role: string;
+  list: OvertimeRow[];
+};
+
+export function parseAdminHoursNote(notes: unknown): { stamp: string; reason: string } | null {
+  const text = String(notes || '');
+  const match = text.match(/\[ADMIN HOURS ENTRY[^\]]*\]\s*\n?([\s\S]*?)(?:\n\n\[ADMIN HOURS ENTRY|$)/);
+  if (!match) return null;
+  const stampMatch = text.match(/\[ADMIN HOURS ENTRY[^\]]*\]/);
+  return {
+    stamp: stampMatch ? stampMatch[0] : '[ADMIN HOURS ENTRY]',
+    reason: match[1].trim(),
+  };
+}
+
+export function isAdminHoursEntry(row: OvertimeRow): boolean {
+  return String(row.notes || '').includes('[ADMIN HOURS ENTRY');
+}
+
+export function adminHoursStatusPill() {
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-200 border border-indigo-200/80 dark:border-indigo-800/50">
+      <Clock className="h-3 w-3" />
+      Admin entry
+    </span>
+  );
+}
+
+export function groupAdminHoursByUser(rows: OvertimeRow[]): AdminHoursGroup[] {
+  const m = new Map<string, AdminHoursGroup>();
+  for (const r of rows) {
+    if (!isAdminHoursEntry(r)) continue;
+    const uid = String(r.user_id ?? '').trim();
+    if (!uid) continue;
+    const un = String(r.username || `User ${uid}`);
+    const role = String(r.role || '');
+    if (!m.has(uid)) {
+      m.set(uid, { userId: uid, username: un, role, list: [] });
+    }
+    m.get(uid)!.list.push(r);
+  }
+  return Array.from(m.values()).sort((a, b) =>
+    a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })
+  );
+}
+
 export function groupRowsByUser(rows: OvertimeRow[]): UserRequestGroup[] {
   const m = new Map<string, UserRequestGroup>();
   for (const r of rows) {
@@ -187,4 +238,50 @@ export function groupRowsByUser(rows: OvertimeRow[]): UserRequestGroup[] {
   return Array.from(m.values()).sort((a, b) =>
     a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })
   );
+}
+
+/** URL for admin manual hours page (dedicated route, not a modal). */
+export function buildAdminAddHoursPath(
+  role: string,
+  userId: string,
+  opts?: { date?: string; returnTo?: string; month?: string; from?: 'ot' | 'stats'; periodStart?: string; label?: string }
+): string {
+  const params = new URLSearchParams();
+  if (opts?.date) params.set('date', opts.date);
+
+  const fromStats = opts?.from === 'stats' && opts.periodStart;
+  const base = fromStats
+    ? `/${role}/users/${userId}/add-hours`
+    : `/${role}/overtime-requests/${userId}/add-hours`;
+
+  if (fromStats) {
+    const labelQ = opts.label ? `?label=${encodeURIComponent(opts.label)}` : '';
+    params.set('return', `/${role}/users/${userId}/work-stats/${opts.periodStart}${labelQ}`);
+  } else {
+    if (opts?.month) params.set('month', opts.month);
+    if (opts?.returnTo) {
+      params.set('return', opts.returnTo);
+    } else {
+      const otReturn = `/${role}/overtime-requests/${userId}${opts?.month ? `?month=${opts.month}` : ''}`;
+      params.set('return', otReturn);
+    }
+  }
+
+  const query = params.toString();
+  return `${base}${query ? `?${query}` : ''}`;
+}
+
+export function resolveAdminAddHoursReturn(
+  role: string,
+  userId: string,
+  returnParam: string,
+  monthParam: string
+): string {
+  if (returnParam.startsWith('/')) {
+    return returnParam;
+  }
+  if (monthParam) {
+    return `/${role}/overtime-requests/${userId}?month=${encodeURIComponent(monthParam)}`;
+  }
+  return `/${role}/overtime-requests/${userId}`;
 }
