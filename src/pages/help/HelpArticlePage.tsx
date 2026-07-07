@@ -7,6 +7,9 @@ import {
   getArticleById,
   getCategoryById,
   getRelatedArticles,
+  articleMatchesRole,
+  filterArticlesByRole,
+  getHelpRoleFilterForUser,
 } from "@/lib/help";
 import { HelpArticleBody } from "@/components/help/HelpArticleBody";
 import { HelpCategorySidebar } from "@/components/help/HelpCategorySidebar";
@@ -29,17 +32,18 @@ export default function HelpArticlePage() {
   const { hasPermission, isLoading: permissionsLoading } = usePermissions(null);
 
   const article = articleId ? getArticleById(articleId) : undefined;
+  const helpRoleFilter = getHelpRoleFilterForUser(role);
 
   if (permissionsLoading) {
     return <HelpArticleSkeleton />;
   }
 
-  if (!article) {
+  if (!article || !articleMatchesRole(article, helpRoleFilter)) {
     return <Navigate to={`/${role}/help`} replace />;
   }
 
   const category = getCategoryById(article.categoryId);
-  const related = getRelatedArticles(article);
+  const related = filterArticlesByRole(getRelatedArticles(article), helpRoleFilter);
   const lacksPermission =
     article.permissionKey && !hasPermission(article.permissionKey);
 
@@ -76,7 +80,7 @@ export default function HelpArticlePage() {
           <div className="sticky top-6">
             <HelpCategorySidebar
               rolePrefix={role}
-              roleFilter="all"
+              roleFilter={helpRoleFilter}
               activeCategoryId={article.categoryId}
             />
           </div>

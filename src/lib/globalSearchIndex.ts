@@ -1,4 +1,4 @@
-import { ALL_HELP_ARTICLES, HELP_CATEGORIES, getCategoryById } from "@/lib/help";
+import { ALL_HELP_ARTICLES, HELP_CATEGORIES, getCategoryById, getArticlesByCategory, articleMatchesRole, getHelpRoleFilterForUser } from "@/lib/help";
 import { showBugMessageInMainNav } from "@/lib/utils";
 
 export type SearchCategory =
@@ -318,6 +318,20 @@ export function isPageVisible(
   if (entry.excludeRoles?.includes(ctx.role)) return false;
   if (entry.permission && !ctx.hasPermission(entry.permission)) return false;
   if (entry.showWhen && !entry.showWhen(ctx)) return false;
+
+  const helpRoleFilter = getHelpRoleFilterForUser(ctx.role);
+
+  if (entry.id.startsWith("help-cat-")) {
+    const categoryId = entry.id.replace("help-cat-", "");
+    return getArticlesByCategory(categoryId, helpRoleFilter).length > 0;
+  }
+
+  if (entry.id.startsWith("help-article-")) {
+    const articleId = entry.id.replace("help-article-", "");
+    const article = ALL_HELP_ARTICLES.find((item) => item.id === articleId);
+    return article ? articleMatchesRole(article, helpRoleFilter) : false;
+  }
+
   return true;
 }
 

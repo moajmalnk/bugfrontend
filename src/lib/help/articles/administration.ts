@@ -201,7 +201,7 @@ export const administrationArticles: HelpArticle[] = [
     categoryId: "administration",
     title: "Activity Log",
     description: "Browse system activity and audit trail.",
-    roles: ["all"],
+    roles: ["admin"],
     keywords: ["activity", "audit", "log", "history"],
     readMinutes: 5,
     permissionKey: "ACTIVITY_VIEW",

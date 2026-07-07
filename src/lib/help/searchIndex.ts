@@ -1,6 +1,39 @@
 import type { HelpArticle, HelpRole } from "./types";
 
-export function articleMatchesRole(article: HelpArticle, roleFilter: HelpRole | "all"): boolean {
+export type HelpRoleFilter = HelpRole | "all";
+
+export function getHelpRoleFilterForUser(effectiveRole: string): HelpRoleFilter {
+  if (effectiveRole === "admin") return "all";
+  if (effectiveRole === "developer") return "developer";
+  if (effectiveRole === "tester") return "tester";
+  return "all";
+}
+
+export function canSwitchHelpRoleFilter(effectiveRole: string): boolean {
+  return effectiveRole === "admin";
+}
+
+export const HELP_ROLE_FILTER_OPTIONS: { value: HelpRoleFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "admin", label: "Admin" },
+  { value: "developer", label: "Developer" },
+  { value: "tester", label: "Tester" },
+];
+
+export function getHelpRoleFilterOptions(effectiveRole: string) {
+  if (effectiveRole === "admin") {
+    return HELP_ROLE_FILTER_OPTIONS;
+  }
+  if (effectiveRole === "developer") {
+    return HELP_ROLE_FILTER_OPTIONS.filter((option) => option.value === "developer");
+  }
+  if (effectiveRole === "tester") {
+    return HELP_ROLE_FILTER_OPTIONS.filter((option) => option.value === "tester");
+  }
+  return HELP_ROLE_FILTER_OPTIONS.filter((option) => option.value === "all");
+}
+
+export function articleMatchesRole(article: HelpArticle, roleFilter: HelpRoleFilter): boolean {
   if (roleFilter === "all") return true;
   return article.roles.includes("all") || article.roles.includes(roleFilter);
 }
@@ -8,7 +41,7 @@ export function articleMatchesRole(article: HelpArticle, roleFilter: HelpRole | 
 export function searchArticles(
   articles: HelpArticle[],
   query: string,
-  roleFilter: HelpRole | "all" = "all"
+  roleFilter: HelpRoleFilter = "all"
 ): HelpArticle[] {
   const q = query.trim().toLowerCase();
   const filtered = articles.filter((a) => articleMatchesRole(a, roleFilter));

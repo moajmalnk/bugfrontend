@@ -14,11 +14,14 @@ import { getEffectiveRole } from "@/lib/utils";
 import {
   ALL_HELP_ARTICLES,
   HELP_CATEGORIES,
-  getArticleById,
+  filterArticlesByRole,
+  getArticleCountForRole,
+  getHelpRoleFilterForUser,
+  getHelpRoleFilterOptions,
   getPopularArticleIds,
   searchArticles,
 } from "@/lib/help";
-import type { HelpRole } from "@/lib/help/types";
+import type { HelpRoleFilter } from "@/lib/help";
 import { HelpSearch } from "@/components/help/HelpSearch";
 import { HelpCategoryGrid } from "@/components/help/HelpCategoryGrid";
 import { HelpRoleBadges } from "@/components/help/HelpRoleBadge";
@@ -32,12 +35,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const ROLE_FILTERS: { value: HelpRole | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "admin", label: "Admin" },
-  { value: "developer", label: "Developer" },
-  { value: "tester", label: "Tester" },
-];
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  admin: "Step-by-step guides for admins, developers, and testers — every BugRicer feature explained.",
+  developer: "Guides for developers — projects, bugs, collaboration, and productivity tools.",
+  tester: "Guides for testers — reporting bugs, tracking fixes, and core workflows.",
+  user: "Step-by-step guides for your BugRicer role and permissions.",
+};
 
 export default function HelpSupport() {
   const { currentUser } = useAuth();
@@ -45,10 +48,11 @@ export default function HelpSupport() {
   const [searchParams] = useSearchParams();
   const categoryFilter = searchParams.get("category");
 
+  const defaultRoleFilter = getHelpRoleFilterForUser(role);
+  const roleFilterOptions = getHelpRoleFilterOptions(role);
+
   const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<HelpRole | "all">(
-    (role as HelpRole) || "all"
-  );
+  const [roleFilter, setRoleFilter] = useState<HelpRoleFilter>(defaultRoleFilter);
 
   const filteredArticles = useMemo(() => {
     let articles = searchArticles(ALL_HELP_ARTICLES, query, roleFilter);
@@ -60,11 +64,18 @@ export default function HelpSupport() {
 
   const popularArticles = useMemo(
     () =>
-      getPopularArticleIds()
-        .map((id) => getArticleById(id))
-        .filter((a): a is NonNullable<typeof a> => !!a),
-    []
+      filterArticlesByRole(
+        getPopularArticleIds()
+          .map((id) => ALL_HELP_ARTICLES.find((article) => article.id === id))
+          .filter((article): article is NonNullable<typeof article> => !!article),
+        roleFilter
+      ),
+    [roleFilter]
   );
+
+  const articleCount = getArticleCountForRole(roleFilter);
+  const headerDescription =
+    ROLE_DESCRIPTIONS[role] ?? ROLE_DESCRIPTIONS.user;
 
   const activeCategory = HELP_CATEGORIES.find((c) => c.id === categoryFilter);
 
@@ -73,7 +84,7 @@ export default function HelpSupport() {
       <HelpPageHeader
         icon={LifeBuoy}
         title="Help & Support"
-        description="Step-by-step guides for admins, developers, and testers — every BugRicer feature explained."
+        description={headerDescription}
       >
         <div className="flex h-12 items-center gap-3 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 shadow-sm dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30">
           <div className="rounded-lg bg-blue-500 p-1.5">
@@ -84,7 +95,7 @@ export default function HelpSupport() {
               Articles
             </div>
             <div className="text-sm font-bold text-blue-700 dark:text-blue-300">
-              {ALL_HELP_ARTICLES.length} guides
+              {articleCount} guide{articleCount !== 1 ? "s" : ""}
             </div>
           </div>
         </div>
@@ -93,23 +104,25 @@ export default function HelpSupport() {
       {/* Search + role filter */}
       <div className={`${helpGlassCard} p-5 sm:p-6 space-y-5`}>
         <HelpSearch value={query} onChange={setQuery} size="large" />
-        <div className="flex flex-wrap justify-center gap-2">
-          {ROLE_FILTERS.map((rf) => (
-            <Button
-              key={rf.value}
-              variant={roleFilter === rf.value ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRoleFilter(rf.value)}
-              className={cn(
-                "rounded-full font-semibold",
-                roleFilter !== rf.value &&
-                  "border-gray-200/70 dark:border-gray-700/70 bg-white/60 dark:bg-gray-900/60"
-              )}
-            >
-              {rf.label}
-            </Button>
-          ))}
-        </div>
+        {roleFilterOptions.length > 1 && (
+          <div className="flex flex-wrap justify-center gap-2">
+            {roleFilterOptions.map((rf) => (
+              <Button
+                key={rf.value}
+                variant={roleFilter === rf.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setRoleFilter(rf.value)}
+                className={cn(
+                  "rounded-full font-semibold",
+                  roleFilter !== rf.value &&
+                    "border-gray-200/70 dark:border-gray-700/70 bg-white/60 dark:bg-gray-900/60"
+                )}
+              >
+                {rf.label}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Search results */}
@@ -189,25 +202,31 @@ export default function HelpSupport() {
       {/* Category article list */}
       {!query.trim() && categoryFilter && (
         <section className="grid gap-3 sm:grid-cols-2">
-          {filteredArticles.map((article) => (
-            <Link key={article.id} to={`/${role}/help/${article.id}`}>
-              <div
-                className={`${helpGlassCard} h-full p-5 transition-all hover:shadow-md hover:border-blue-300/40 dark:hover:border-blue-700/40`}
-              >
-                <h3 className="font-semibold text-foreground">{article.title}</h3>
-                <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2">
-                  {article.description}
-                </p>
-                <div className="mt-4 flex items-center justify-between">
-                  <HelpRoleBadges roles={article.roles} />
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {article.readMinutes} min
-                  </span>
+          {filteredArticles.length === 0 ? (
+            <div className={`${helpGlassCard} sm:col-span-2 p-8 text-center text-muted-foreground`}>
+              No guides in this topic for your role.
+            </div>
+          ) : (
+            filteredArticles.map((article) => (
+              <Link key={article.id} to={`/${role}/help/${article.id}`}>
+                <div
+                  className={`${helpGlassCard} h-full p-5 transition-all hover:shadow-md hover:border-blue-300/40 dark:hover:border-blue-700/40`}
+                >
+                  <h3 className="font-semibold text-foreground">{article.title}</h3>
+                  <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2">
+                    {article.description}
+                  </p>
+                  <div className="mt-4 flex items-center justify-between">
+                    <HelpRoleBadges roles={article.roles} />
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {article.readMinutes} min
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            ))
+          )}
         </section>
       )}
 
@@ -221,10 +240,7 @@ export default function HelpSupport() {
                 <div
                   className={cn(
                     helpInnerCard,
-                    "h-full p-4 transition-all hover:shadow-md hover:border-blue-300/40 dark:hover:border-blue-700/40 group",
-                    !article.roles.includes("all") &&
-                      !article.roles.includes(role as HelpRole) &&
-                      "opacity-60"
+                    "h-full p-4 transition-all hover:shadow-md hover:border-blue-300/40 dark:hover:border-blue-700/40 group"
                   )}
                 >
                   <h3 className="text-sm font-semibold line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">

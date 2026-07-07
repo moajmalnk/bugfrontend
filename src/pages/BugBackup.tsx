@@ -23,6 +23,7 @@ import {
   backupService,
   BackupJob,
   BackupJobStatus,
+  BackupMailStatus,
 } from '@/services/backupService';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -87,6 +88,38 @@ function statusBadge(status: BackupJobStatus) {
 
   const item = map[status];
   return <Badge className={cn('font-medium', item.className)}>{item.label}</Badge>;
+}
+
+function mailStatusBadge(status: BackupMailStatus, error?: string | null) {
+  const map: Record<BackupMailStatus, { label: string; className: string }> = {
+    pending: {
+      label: 'Pending',
+      className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    },
+    sent: {
+      label: 'Sent',
+      className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+    },
+    error_sent: {
+      label: 'Notice sent',
+      className: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+    },
+    failed: {
+      label: 'Failed',
+      className: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+    },
+  };
+
+  const item = map[status] ?? map.pending;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5"
+      title={error || undefined}
+    >
+      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+      <Badge className={cn('font-medium', item.className)}>{item.label}</Badge>
+    </span>
+  );
 }
 
 function formatDateTime(value?: string | null) {
@@ -649,6 +682,7 @@ const BugBackup = () => {
                     <TableHead>Status</TableHead>
                     <TableHead>Scope</TableHead>
                     <TableHead>Recipient</TableHead>
+                    <TableHead>Mail</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Created</TableHead>
@@ -663,6 +697,9 @@ const BugBackup = () => {
                         {componentSummary(job)}
                       </TableCell>
                       <TableCell className="max-w-[180px] truncate">{job.email}</TableCell>
+                      <TableCell>
+                        {mailStatusBadge(job.mail_status ?? 'pending', job.mail_error)}
+                      </TableCell>
                       <TableCell>{job.file_size_label || '—'}</TableCell>
                       <TableCell>
                         {job.duration_seconds ? (

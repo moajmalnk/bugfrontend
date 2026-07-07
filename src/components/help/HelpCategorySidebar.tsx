@@ -1,12 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { HELP_CATEGORIES, getArticlesByCategory } from "@/lib/help";
-import type { HelpRole } from "@/lib/help/types";
+import type { HelpRoleFilter } from "@/lib/help";
 import { helpInnerCard } from "./HelpPageShell";
 
 interface HelpCategorySidebarProps {
   rolePrefix: string;
-  roleFilter: HelpRole | "all";
+  roleFilter: HelpRoleFilter;
   activeCategoryId?: string;
 }
 

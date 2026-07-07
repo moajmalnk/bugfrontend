@@ -2,10 +2,14 @@ import { apiClient } from '@/lib/axios';
 
 export type BackupJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
+export type BackupMailStatus = 'pending' | 'sent' | 'error_sent' | 'failed';
+
 export type BackupJob = {
   id: number;
   email: string;
   status: BackupJobStatus;
+  mail_status: BackupMailStatus;
+  mail_error?: string | null;
   delivery_method: string;
   include_database: boolean;
   include_uploads: boolean;

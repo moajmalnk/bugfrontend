@@ -4,8 +4,9 @@ import { collaborationArticles } from "./articles/collaboration";
 import { productivityArticles } from "./articles/productivity";
 import { integrationsArticles } from "./articles/integrations";
 import { administrationArticles } from "./articles/administration";
-import type { HelpArticle, HelpRole } from "./types";
 import { articleMatchesRole } from "./searchIndex";
+import type { HelpArticle } from "./types";
+import type { HelpRoleFilter } from "./searchIndex";
 import { getCategoryById } from "./categories";
 
 export const ALL_HELP_ARTICLES: HelpArticle[] = [
@@ -21,10 +22,21 @@ export function getArticleById(id: string): HelpArticle | undefined {
   return ALL_HELP_ARTICLES.find((a) => a.id === id);
 }
 
-export function getArticlesByCategory(categoryId: string, roleFilter: HelpRole | "all" = "all"): HelpArticle[] {
+export function getArticlesByCategory(categoryId: string, roleFilter: HelpRoleFilter = "all"): HelpArticle[] {
   return ALL_HELP_ARTICLES.filter(
     (a) => a.categoryId === categoryId && articleMatchesRole(a, roleFilter)
   );
+}
+
+export function filterArticlesByRole(
+  articles: HelpArticle[],
+  roleFilter: HelpRoleFilter = "all"
+): HelpArticle[] {
+  return articles.filter((a) => articleMatchesRole(a, roleFilter));
+}
+
+export function getArticleCountForRole(roleFilter: HelpRoleFilter = "all"): number {
+  return filterArticlesByRole(ALL_HELP_ARTICLES, roleFilter).length;
 }
 
 export function getRelatedArticles(article: HelpArticle): HelpArticle[] {
@@ -35,5 +47,14 @@ export function getRelatedArticles(article: HelpArticle): HelpArticle[] {
 }
 
 export { HELP_CATEGORIES, getCategoryById } from "./categories";
-export { searchArticles, getPopularArticleIds, articleMatchesRole } from "./searchIndex";
+export {
+  searchArticles,
+  getPopularArticleIds,
+  articleMatchesRole,
+  getHelpRoleFilterForUser,
+  canSwitchHelpRoleFilter,
+  getHelpRoleFilterOptions,
+  HELP_ROLE_FILTER_OPTIONS,
+} from "./searchIndex";
+export type { HelpRoleFilter } from "./searchIndex";
 export type * from "./types";

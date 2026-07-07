@@ -408,8 +408,7 @@ const CommonBugs = () => {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Bugs marked as already raised or reported multiple times with
-                  the same title in a project
+                  Bugs marked as already raised or reported.
                 </p>
               </div>
 

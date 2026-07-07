@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { HelpCategory } from "@/lib/help/types";
 import { getArticlesByCategory } from "@/lib/help";
-import type { HelpRole } from "@/lib/help/types";
+import type { HelpRoleFilter } from "@/lib/help";
 import { helpGlassCard } from "./HelpPageShell";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
 interface HelpCategoryGridProps {
   categories: HelpCategory[];
   rolePrefix: string;
-  roleFilter: HelpRole | "all";
+  roleFilter: HelpRoleFilter;
 }
 
 export function HelpCategoryGrid({ categories, rolePrefix, roleFilter }: HelpCategoryGridProps) {
