@@ -1,4 +1,4 @@
-import { Link, useParams, Navigate, useNavigation } from "react-router-dom";
+import { Link, useParams, Navigate } from "react-router-dom";
 import { ChevronRight, Clock, Lock, ArrowLeft, List, BookOpen } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -34,7 +34,6 @@ import { HelpArticleSkeleton } from "@/components/help/HelpSkeletons";
 
 export default function HelpArticlePage() {
   const { articleId } = useParams<{ articleId: string }>();
-  const navigation = useNavigation();
   const { currentUser } = useAuth();
   const role = getEffectiveRole(currentUser || {});
   const { hasPermission, isLoading: permissionsLoading } = usePermissions(null);
@@ -44,11 +43,7 @@ export default function HelpArticlePage() {
   const sectionIds = article?.sections.map((s) => s.id) ?? [];
   const activeSectionId = useHelpActiveSection(sectionIds);
 
-  const isNavigating =
-    navigation.state === "loading" &&
-    navigation.location?.pathname.includes("/help/");
-
-  if (permissionsLoading || isNavigating) {
+  if (permissionsLoading) {
     return <HelpArticleSkeleton />;
   }
 
