@@ -15,6 +15,7 @@ export interface Activity {
   id: number;
   type: string;
   description: string;
+  summary?: string;
   user_id: string;
   project_id?: string;
   related_id?: string;
@@ -22,10 +23,11 @@ export interface Activity {
   email?: string;
   project_name?: string;
   related_title?: string;
+  related_entity?: string;
+  target_username?: string | null;
   metadata?: Record<string, any>;
   created_at: string;
   time_ago: string;
-  // Structured fields for frontend compatibility
   user: {
     id: string;
     username: string;
@@ -35,6 +37,18 @@ export interface Activity {
     id: string;
     name: string;
   };
+}
+
+export interface ActivityFacets {
+  types: Array<{ activity_type: string; count: number }>;
+  users: Array<{ username: string; count: number }>;
+}
+
+export interface ActivityFilters {
+  search?: string;
+  type?: string;
+  username?: string;
+  mine_only?: boolean;
 }
 
 export interface ActivityPagination {
@@ -47,6 +61,7 @@ export interface ActivityPagination {
 export interface ActivityResponse {
   activities: Activity[];
   pagination: ActivityPagination;
+  facets?: ActivityFacets;
 }
 
 export interface ActivityStats {
@@ -107,14 +122,23 @@ class ActivityService {
    * Get all activities for the current user (based on their project access)
    */
   async getUserActivities(
-    limit: number = 10,
-    offset: number = 0
+    limit: number = 20,
+    offset: number = 0,
+    filters: ActivityFilters = {}
   ): Promise<ActivityResponse> {
     try {
       const response = await apiClient.get<ActivityApiResponse<ActivityResponse>>(
         '/activities/project_activities.php',
         {
-          params: { limit, offset },
+          params: {
+            limit,
+            offset,
+            search: filters.search || undefined,
+            type: filters.type && filters.type !== 'all' ? filters.type : undefined,
+            username:
+              filters.username && filters.username !== 'all' ? filters.username : undefined,
+            mine_only: filters.mine_only ? '1' : undefined,
+          },
         }
       );
 
@@ -133,31 +157,8 @@ class ActivityService {
    */
   async getUserOwnActivityCount(): Promise<number> {
     try {
-      const response = await apiClient.get<ActivityApiResponse<ActivityResponse>>(
-        '/activities/project_activities.php',
-        {
-          params: { limit: 1000, offset: 0 },
-        }
-      );
-
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Failed to fetch activities');
-      }
-
-      const token =
-        sessionStorage.getItem('token') ||
-        localStorage.getItem('auth_token') ||
-        localStorage.getItem('token');
-      if (!token) return 0;
-
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const currentUserId = payload.user_id;
-
-      const userOwnActivities = response.data.data.activities.filter(
-        (activity: Activity) => activity.user.id === currentUserId
-      );
-
-      return userOwnActivities.length;
+      const response = await this.getUserActivities(1, 0, { mine_only: true });
+      return response.pagination.total;
     } catch (error) {
       console.error('Error fetching user own activity count:', error);
       return 0;
@@ -521,13 +522,48 @@ class ActivityService {
    * Format activity description for display
    */
   formatActivityDescription(activity: Activity): string {
-    const { type, description, related_title, user } = activity;
-    
-    if (related_title) {
-      return `${user.username} ${description} "${related_title}"`;
+    if (activity.summary?.trim()) {
+      return activity.summary.trim();
     }
-    
-    return `${user.username} ${description}`;
+
+    const { description, related_title, user } = activity;
+    const actor = user?.username || activity.username || 'Unknown user';
+    const text = (description || '').trim();
+
+    if (text && related_title && !text.includes(related_title)) {
+      return `${actor} — ${text}: ${related_title}`;
+    }
+
+    if (text) {
+      if (text.toLowerCase().startsWith(actor.toLowerCase())) {
+        return text;
+      }
+      return `${actor} — ${text}`;
+    }
+
+    return actor;
+  }
+
+  getRelatedEntityLabel(entity?: string): string {
+    const labels: Record<string, string> = {
+      bug: 'Bug',
+      task: 'Task',
+      update: 'Update',
+      fix: 'Fix',
+      project: 'Project',
+      user: 'User',
+      announcement: 'Announcement',
+      message: 'Message',
+      meeting: 'Meeting',
+      feedback: 'Feedback',
+      comment: 'Comment',
+      file: 'File',
+      settings: 'Settings',
+      member: 'Member',
+      general: 'General',
+    };
+
+    return labels[entity || 'general'] || 'Activity';
   }
 }
 

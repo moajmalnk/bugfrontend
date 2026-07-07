@@ -713,7 +713,7 @@ const Login = () => {
       <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4">Privacy Policy</h2>
       
       <div class="space-y-3 text-sm text-slate-700 dark:text-slate-300">
-        <p><strong>Last Updated:</strong> January 2025</p>
+        <p><strong>Last Updated:</strong> July 2026</p>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Company Information</h3>
@@ -727,45 +727,50 @@ const Login = () => {
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Information We Collect</h3>
           <ul class="list-disc list-inside space-y-1">
-            <li><strong>Account Information:</strong> Username, email address, phone number, role (admin, developer, tester)</li>
-            <li><strong>Authentication Data:</strong> Passwords (encrypted), OTP verification codes, JWT tokens</li>
-            <li><strong>Project Data:</strong> Bug reports, project details, status updates, priority levels</li>
-            <li><strong>Media Content:</strong> Screenshots, file attachments, voice notes, meeting recordings</li>
-            <li><strong>Communication Data:</strong> Chat messages, email notifications, WhatsApp messages</li>
-            <li><strong>Meeting Data:</strong> Video/audio streams, meeting recordings, participant information</li>
-            <li><strong>Activity Logs:</strong> User actions, system interactions, audit trails</li>
-            <li><strong>Device Information:</strong> IP addresses, browser details, device identifiers</li>
-            <li><strong>Notification Preferences:</strong> FCM tokens, notification settings, communication preferences</li>
-            <li><strong>Usage Analytics:</strong> Platform usage patterns, feature interactions, performance data</li>
+            <li><strong>Account Information:</strong> Username, email, phone, role, and custom role assignments</li>
+            <li><strong>Authentication Data:</strong> Passwords (encrypted), OTP codes, JWT tokens, sessions, and magic-link events</li>
+            <li><strong>Project & Bug Data:</strong> Bugs, fixes, updates, compliance checklists, and project phase data</li>
+            <li><strong>Work & Attendance Data:</strong> Check-in/checkout, hours, OT requests, tasks, and project progress notes</li>
+            <li><strong>Task & Documentation Data:</strong> Personal/shared tasks, BugDocs, and BugSheets content</li>
+            <li><strong>Media Content:</strong> Screenshots, attachments, voice notes, and meeting recordings</li>
+            <li><strong>Communication Data:</strong> Messages, email, WhatsApp, and announcements</li>
+            <li><strong>Activity & Audit Logs:</strong> User actions with actor, target, timestamps, and metadata</li>
+            <li><strong>Backup Data:</strong> BugBackup job history, scope, delivery email, and archive metadata</li>
+            <li><strong>Translation Requests:</strong> Text you select for Malayalam translation (sent to a third-party API)</li>
+            <li><strong>Device Information:</strong> IP addresses, browser details, and device identifiers</li>
+            <li><strong>Notification Preferences:</strong> FCM tokens and communication settings</li>
           </ul>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">How We Use Your Information</h3>
           <ul class="list-disc list-inside space-y-1">
-            <li><strong>Service Provision:</strong> Provide bug tracking, project management, and collaboration tools</li>
-            <li><strong>Authentication & Security:</strong> Verify user identity, prevent unauthorized access, secure communications</li>
-            <li><strong>Real-time Communication:</strong> Enable instant messaging, video meetings, and notifications</li>
-            <li><strong>File Management:</strong> Process, store, and deliver uploaded files, screenshots, and voice notes</li>
-            <li><strong>Notification Services:</strong> Send email, WhatsApp, and browser notifications about bug updates</li>
-            <li><strong>Meeting Features:</strong> Facilitate video conferencing, screen sharing, and meeting recordings</li>
-            <li><strong>Activity Tracking:</strong> Monitor user actions for audit purposes and system optimization</li>
-            <li><strong>Platform Improvement:</strong> Analyze usage patterns to enhance user experience and feature development</li>
-            <li><strong>Support Services:</strong> Provide customer support and troubleshoot technical issues</li>
-            <li><strong>Compliance:</strong> Meet legal obligations and maintain service quality standards</li>
+            <li><strong>Service Provision:</strong> Bug tracking, work updates, tasks, docs, messaging, and collaboration</li>
+            <li><strong>Authentication & Security:</strong> Identity verification, permissions, and access control</li>
+            <li><strong>Work Management:</strong> Attendance, check-in/checkout, hours, and project submissions</li>
+            <li><strong>Compliance:</strong> Project compliance rules and verification tracking (CODO)</li>
+            <li><strong>Backups:</strong> BugBackup archive generation and secure email delivery to admins</li>
+            <li><strong>Activity & Audit:</strong> Accountability logs across platform features</li>
+            <li><strong>Translation:</strong> Process selected text through a third-party API when you request it</li>
+            <li><strong>Notifications:</strong> Email, WhatsApp, browser, and in-app alerts</li>
+            <li><strong>Platform Improvement:</strong> Analyze usage to improve reliability and features</li>
           </ul>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Data Sharing and Disclosure</h3>
           <ul class="list-disc list-inside space-y-1">
-            <li><strong>Team Members:</strong> Share project data, bug reports, and updates with authorized team members</li>
-            <li><strong>Communication Services:</strong> Use third-party services for email delivery and WhatsApp messaging</li>
-            <li><strong>Cloud Storage:</strong> Store files and media content on secure cloud infrastructure</li>
-            <li><strong>Legal Requirements:</strong> Disclose information when required by law or legal process</li>
-            <li><strong>Service Providers:</strong> Share data with trusted third-party service providers for platform operations</li>
-            <li><strong>Emergency Situations:</strong> May disclose information to protect user safety or platform security</li>
+            <li><strong>Team Members:</strong> Share project and work data with authorized users per role permissions</li>
+            <li><strong>Administrators:</strong> Access to activity logs, backups, roles, and governance tools</li>
+            <li><strong>Communication & Translation Providers:</strong> Email, WhatsApp, and translation API services</li>
+            <li><strong>Cloud Infrastructure:</strong> Hosting and storage providers for platform operation</li>
+            <li><strong>Legal Requirements:</strong> Disclosure when required by law or valid legal process</li>
           </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">BugBackup & Data Exports</h3>
+          <p>Authorized admins may create backups (database, uploads, configuration) delivered via email. Job metadata is logged. Recipients must secure archives and limit distribution.</p>
         </div>
         
         <div>
@@ -773,9 +778,9 @@ const Login = () => {
           <ul class="list-disc list-inside space-y-1">
             <li><strong>Encryption:</strong> All data transmission encrypted using SSL/TLS protocols</li>
             <li><strong>Secure Storage:</strong> Database and file storage protected with industry-standard encryption</li>
-            <li><strong>Access Controls:</strong> Role-based access permissions and authentication requirements</li>
-            <li><strong>Regular Audits:</strong> Periodic security assessments and vulnerability testing</li>
-            <li><strong>Backup Systems:</strong> Regular data backups with secure off-site storage</li>
+            <li><strong>Access Controls:</strong> Role-based and custom permission access</li>
+            <li><strong>Activity Monitoring:</strong> Audit trails for security and accountability</li>
+            <li><strong>Backup Systems:</strong> BugBackup with job logging and secure archive delivery</li>
             <li><strong>Incident Response:</strong> Comprehensive security incident response procedures</li>
           </ul>
         </div>
@@ -788,13 +793,14 @@ const Login = () => {
             <li><strong>Deletion:</strong> Request deletion of your account and associated data</li>
             <li><strong>Portability:</strong> Export your data in a machine-readable format</li>
             <li><strong>Communication Preferences:</strong> Control notification settings and communication methods</li>
+            <li><strong>Translation Opt-out:</strong> Do not use the translation feature; no text is sent unless you initiate it</li>
             <li><strong>Data Retention:</strong> Understand our data retention policies and request data purging</li>
           </ul>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Data Retention</h3>
-          <p>We retain your data for as long as your account is active and as needed to provide our services. Project data, bug reports, and communications may be retained for extended periods for audit and compliance purposes. You may request data deletion at any time, subject to legal and operational requirements.</p>
+          <p>We retain data while your account is active. Work submissions, activity logs, compliance records, and backup job history may be retained for audit, payroll, and operational purposes. You may request deletion subject to legal requirements.</p>
         </div>
         
         <div>
@@ -823,7 +829,7 @@ const Login = () => {
       <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4">Terms of Use</h2>
       
       <div class="space-y-3 text-sm text-slate-700 dark:text-slate-300">
-        <p><strong>Last Updated:</strong> January 2025</p>
+        <p><strong>Last Updated:</strong> July 2026</p>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Company Information</h3>
@@ -835,22 +841,40 @@ const Login = () => {
         </div>
         
         <div>
-          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Company Information</h3>
-          <p><strong>BugRicer AI Innovations</strong></p>
-          <p>Website: https://bugricer.com</p>
-          <p>Email: info@bugricer.com</p>
-          <p>Phone: +91 8086995559</p>
-          <p>Address: Malappuram, Kerala, India</p>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Acceptance of Terms</h3>
+          <p>By using BugRicer (including Work Update, BugBackup, Activity, compliance tools, announcements, custom roles, and translation features), you agree to these Terms and our Privacy Policy.</p>
         </div>
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">User Accounts and Authentication</h3>
           <ul class="list-disc list-inside space-y-1">
-            <li><strong>Account Creation:</strong> You must provide accurate and complete information during registration</li>
-            <li><strong>Authentication Methods:</strong> Username/password, email/password, or OTP-based login via email/WhatsApp</li>
-            <li><strong>Account Security:</strong> You are responsible for maintaining the confidentiality of your credentials</li>
-            <li><strong>Role Assignment:</strong> User roles (Admin, Developer, Tester) determine access permissions</li>
-            <li><strong>Account Termination:</strong> We reserve the right to suspend or terminate accounts for violations</li>
+            <li><strong>Account Creation:</strong> Accurate registration information is required</li>
+            <li><strong>Authentication:</strong> Password, OTP, or magic-link sign-in may be offered</li>
+            <li><strong>Roles & Permissions:</strong> Admin, Developer, Tester, and custom roles control access</li>
+            <li><strong>Account Security:</strong> You are responsible for your credentials and sessions</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Platform Features</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Work Update:</strong> Submit truthful check-in/checkout and hours; falsifying records is prohibited</li>
+            <li><strong>BugBackup:</strong> Admin-only backups contain confidential data — secure archives and limit sharing</li>
+            <li><strong>Compliance:</strong> Complete project compliance checks accurately; authorized bypass only</li>
+            <li><strong>Activity Logs:</strong> Actions are audited; do not attempt to evade logging</li>
+            <li><strong>Translation:</strong> Selected text is sent to a third-party API; do not submit sensitive secrets</li>
+            <li><strong>Announcements:</strong> Admins may publish role-targeted announcements with optional expiry</li>
+            <li><strong>Custom Roles:</strong> Granular permissions control feature access per organization policy</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-slate-900 dark:text-white mb-2">BugBackup (Administrative Backups)</h3>
+          <ul class="list-disc list-inside space-y-1">
+            <li><strong>Authorized Use Only:</strong> Restricted to users with admin backup permissions</li>
+            <li><strong>Confidential Archives:</strong> May contain database, uploads, and configuration — treat as highly confidential</li>
+            <li><strong>Email Delivery:</strong> Secure backup files sent to designated addresses</li>
+            <li><strong>Prohibited:</strong> Sharing archives with unauthorized parties</li>
           </ul>
         </div>
         
@@ -877,7 +901,8 @@ const Login = () => {
             <li><strong>Data Violations:</strong> Unauthorized data scraping, mining, or extraction</li>
             <li><strong>Privacy Breaches:</strong> Sharing or misusing other users' personal information</li>
             <li><strong>Commercial Use:</strong> Using the platform for unauthorized commercial purposes</li>
-            <li><strong>False Reporting:</strong> Creating false bug reports or misleading information</li>
+            <li><strong>False Records:</strong> Falsifying bugs, work hours, compliance checks, or activity data</li>
+            <li><strong>Backup Misuse:</strong> Sharing BugBackup archives with unauthorized parties</li>
           </ul>
         </div>
         
@@ -942,7 +967,7 @@ const Login = () => {
         
         <div>
           <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Limitation of Liability</h3>
-          <p>BugRicer AI Innovations shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of our service, including but not limited to data loss, business interruption, or security breaches. Our total liability shall not exceed the amount you paid for the service in the 12 months preceding the claim.</p>
+          <p>BugRicer AI Innovations shall not be liable for indirect, incidental, special, consequential, or punitive damages arising from your use of our service, including data loss, inaccurate translations, failed backups, work-submission disputes, or business interruption. Our total liability shall not exceed the amount you paid for the service in the 12 months preceding the claim.</p>
         </div>
         
         <div>

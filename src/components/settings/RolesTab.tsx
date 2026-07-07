@@ -6,24 +6,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/use-toast";
 import { permissionService } from "@/services/permissionService";
 import { Permission, Role } from "@/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
-import { Plus, Shield, Users, UserCog, Pencil, Trash2, CheckSquare, Square } from "lucide-react";
+import {
+  TaskFormActions,
+  TaskFormDialogShell,
+  TaskFormField,
+  TaskFormSection,
+  taskFieldControlClass,
+  taskTextareaClass,
+} from "@/components/tasks/TaskFormDialogShell";
+import { cn } from "@/lib/utils";
+import {
+  Plus,
+  Shield,
+  Users,
+  UserCog,
+  Pencil,
+  Trash2,
+  CheckSquare,
+  Square,
+  KeyRound,
+  FileText,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function RolesTab() {
@@ -117,17 +129,15 @@ export function RolesTab() {
                 Create and manage user roles with custom permission sets
               </CardDescription>
             </div>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Custom Role
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <CreateRoleDialog onSuccess={handleRoleCreated} />
-              </DialogContent>
-            </Dialog>
+            <Button className="w-full sm:w-auto" onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Custom Role
+            </Button>
+            <CreateRoleDialog
+              open={isCreateDialogOpen}
+              onOpenChange={setIsCreateDialogOpen}
+              onSuccess={handleRoleCreated}
+            />
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-5 lg:p-6 pt-0 sm:pt-0 lg:pt-0">
@@ -261,17 +271,20 @@ function RoleCard({
                 <Trash2 className="h-4 w-4" />
               </Button>
             )}
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="font-medium">
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit Permissions
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <EditRoleDialog role={role} onSuccess={handleEditSuccess} />
-              </DialogContent>
-            </Dialog>
+            <Button
+              variant="outline"
+              className="font-medium"
+              onClick={() => setIsEditDialogOpen(true)}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Permissions
+            </Button>
+            <EditRoleDialog
+              open={isEditDialogOpen}
+              onOpenChange={setIsEditDialogOpen}
+              role={role}
+              onSuccess={handleEditSuccess}
+            />
           </div>
         </div>
       </div>
@@ -279,7 +292,182 @@ function RoleCard({
   );
 }
 
-function CreateRoleDialog({ onSuccess }: { onSuccess: () => void }) {
+function PermissionsEditor({
+  permissions,
+  onToggle,
+  onSelectAll,
+  onDeselectAll,
+  onSelectAllCategory,
+  onDeselectAllCategory,
+}: {
+  permissions: Record<string, Permission[]>;
+  onToggle: (category: string, permissionId: number) => void;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
+  onSelectAllCategory: (category: string) => void;
+  onDeselectAllCategory: (category: string) => void;
+}) {
+  const totalSelected = Object.values(permissions)
+    .flat()
+    .filter((p) => p.selected).length;
+  const totalCount = Object.values(permissions).flat().length;
+
+  return (
+    <TaskFormSection
+      title="Permissions"
+      subtitle={`${totalSelected} of ${totalCount} permissions selected`}
+      icon={<KeyRound className="h-4 w-4" />}
+      accent="blue"
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onSelectAll}
+          className="h-9 border-2 text-xs"
+        >
+          <CheckSquare className="mr-1.5 h-3.5 w-3.5" />
+          Select All
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onDeselectAll}
+          className="h-9 border-2 text-xs"
+        >
+          <Square className="mr-1.5 h-3.5 w-3.5" />
+          Deselect All
+        </Button>
+      </div>
+
+      <div className="max-h-[380px] space-y-5 overflow-y-auto rounded-lg border-2 border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-900/40 custom-scrollbar">
+        {Object.entries(permissions).map(([category, perms]) => (
+          <div key={category} className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                {category}
+                <span className="font-normal normal-case text-gray-400">
+                  ({perms.filter((p) => p.selected).length} / {perms.length})
+                </span>
+              </h4>
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onSelectAllCategory(category)}
+                  className="h-7 px-2 text-xs"
+                >
+                  All
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDeselectAllCategory(category)}
+                  className="h-7 px-2 text-xs"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {perms.map((perm) => (
+                <label
+                  key={perm.id}
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-lg border-2 p-3 transition-all',
+                    perm.selected
+                      ? 'border-indigo-300 bg-indigo-50/80 dark:border-indigo-800 dark:bg-indigo-950/30'
+                      : 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600'
+                  )}
+                >
+                  <Checkbox
+                    checked={perm.selected}
+                    onCheckedChange={() => onToggle(category, perm.id)}
+                    className="mt-0.5"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {perm.permission_name}
+                    </p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">
+                      {perm.permission_key}
+                    </p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </TaskFormSection>
+  );
+}
+
+function RoleDetailsSection({
+  roleName,
+  description,
+  onRoleNameChange,
+  onDescriptionChange,
+  roleNameDisabled,
+  roleNameHelper,
+}: {
+  roleName: string;
+  description: string;
+  onRoleNameChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
+  roleNameDisabled?: boolean;
+  roleNameHelper?: string;
+}) {
+  return (
+    <TaskFormSection
+      title="Role Details"
+      subtitle="Name and description for this role"
+      icon={<FileText className="h-4 w-4" />}
+      accent="indigo"
+    >
+      <div className="space-y-4">
+        <TaskFormField label="Role Name" required htmlFor="roleName">
+          <Input
+            id="roleName"
+            value={roleName}
+            onChange={(e) => onRoleNameChange(e.target.value)}
+            placeholder="e.g., Project Manager"
+            disabled={roleNameDisabled}
+            className={taskFieldControlClass}
+          />
+          {roleNameHelper ? (
+            <p className="text-xs text-muted-foreground">{roleNameHelper}</p>
+          ) : null}
+        </TaskFormField>
+        <TaskFormField label="Description" htmlFor="description">
+          <Textarea
+            id="description"
+            value={description}
+            onChange={(e) => onDescriptionChange(e.target.value)}
+            placeholder="Describe this role's responsibilities"
+            rows={3}
+            className={taskTextareaClass}
+          />
+        </TaskFormField>
+      </div>
+    </TaskFormSection>
+  );
+}
+
+function CreateRoleDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
   const [roleName, setRoleName] = useState("");
   const [description, setDescription] = useState("");
   const [permissions, setPermissions] = useState<Record<string, Permission[]>>({});
@@ -391,148 +579,69 @@ function CreateRoleDialog({ onSuccess }: { onSuccess: () => void }) {
 
   if (isLoadingPermissions) {
     return (
-      <>
-        <DialogHeader>
-          <DialogTitle>Create Custom Role</DialogTitle>
-          <DialogDescription>
-            Create a new role with custom permissions
-          </DialogDescription>
-        </DialogHeader>
-        <p>Loading permissions...</p>
-      </>
+      <TaskFormDialogShell
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Create Custom Role"
+        description="Create a new role with custom permissions"
+        icon={<Shield className="h-6 w-6" />}
+        headerClassName="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600"
+        maxWidthClassName="max-w-3xl"
+        footer={<div />}
+      >
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          Loading permissions…
+        </div>
+      </TaskFormDialogShell>
     );
   }
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Create Custom Role</DialogTitle>
-        <DialogDescription>
-          Create a new role with custom permissions
-        </DialogDescription>
-      </DialogHeader>
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="roleName">Role Name</Label>
-          <Input
-            id="roleName"
-            value={roleName}
-            onChange={(e) => setRoleName(e.target.value)}
-            placeholder="e.g., Project Manager"
-          />
-        </div>
-        <div>
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe this role's responsibilities"
-            rows={3}
-          />
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <Label>Permissions</Label>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleSelectAll}
-                className="text-xs"
-              >
-                <CheckSquare className="mr-1 h-3 w-3" />
-                Select All
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleDeselectAll}
-                className="text-xs"
-              >
-                <Square className="mr-1 h-3 w-3" />
-                Deselect All
-              </Button>
-            </div>
-          </div>
-          <div className="mt-2 space-y-6 border rounded-lg p-4 max-h-[400px] overflow-y-auto bg-slate-50 dark:bg-slate-950">
-            {Object.entries(permissions).map(([category, perms]) => (
-              <div key={category} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-                    <div className="h-1 w-1 rounded-full bg-primary"></div>
-                    {category}
-                    <span className="text-xs font-normal normal-case">
-                      ({perms.filter(p => p.selected).length} / {perms.length})
-                    </span>
-                  </h4>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSelectAllCategory(category)}
-                      className="text-xs h-7 px-2"
-                    >
-                      All
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeselectAllCategory(category)}
-                      className="text-xs h-7 px-2"
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {perms.map((perm) => (
-                    <label
-                      key={perm.id}
-                      className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg border transition-all ${
-                        perm.selected
-                          ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-300 dark:border-blue-800'
-                          : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={perm.selected}
-                        onChange={() => handleTogglePermission(category, perm.id)}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{perm.permission_name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{perm.permission_key}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => {}}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? "Creating..." : "Create Role"}
-          </Button>
-        </div>
+    <TaskFormDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Create Custom Role"
+      description="Create a new role with custom permissions"
+      icon={<Shield className="h-6 w-6" />}
+      headerClassName="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600"
+      maxWidthClassName="max-w-3xl"
+      footer={
+        <TaskFormActions
+          onCancel={() => onOpenChange(false)}
+          onSubmit={handleSubmit}
+          submitting={isLoading}
+          submitLabel="Create Role"
+        />
+      }
+    >
+      <div className="space-y-5">
+        <RoleDetailsSection
+          roleName={roleName}
+          description={description}
+          onRoleNameChange={setRoleName}
+          onDescriptionChange={setDescription}
+        />
+        <PermissionsEditor
+          permissions={permissions}
+          onToggle={handleTogglePermission}
+          onSelectAll={handleSelectAll}
+          onDeselectAll={handleDeselectAll}
+          onSelectAllCategory={handleSelectAllCategory}
+          onDeselectAllCategory={handleDeselectAllCategory}
+        />
       </div>
-    </>
+    </TaskFormDialogShell>
   );
 }
 
 function EditRoleDialog({
+  open,
+  onOpenChange,
   role,
   onSuccess,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   role: Role;
   onSuccess: () => void;
 }) {
@@ -658,149 +767,66 @@ function EditRoleDialog({
     }
   };
 
+  const cleanedRoleName = role.role_name.replace(/\s*0$/, '');
+
   if (isLoadingPermissions) {
     return (
-      <>
-        <DialogHeader>
-          <DialogTitle>Edit Role</DialogTitle>
-          <DialogDescription>
-            Update role permissions for {role.role_name.replace(/\s*0$/, '')}
-          </DialogDescription>
-        </DialogHeader>
-        <p>Loading permissions...</p>
-      </>
+      <TaskFormDialogShell
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Edit Role"
+        description={`Update permissions for ${cleanedRoleName}`}
+        icon={<Shield className="h-6 w-6" />}
+        headerClassName="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600"
+        maxWidthClassName="max-w-3xl"
+        footer={<div />}
+      >
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          Loading permissions…
+        </div>
+      </TaskFormDialogShell>
     );
   }
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Edit Role</DialogTitle>
-        <DialogDescription>
-          Update role permissions for {role.role_name.replace(/\s*0$/, '')}
-        </DialogDescription>
-      </DialogHeader>
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="roleName">Role Name</Label>
-          <Input
-            id="roleName"
-            value={roleName}
-            onChange={(e) => setRoleName(e.target.value)}
-            placeholder="e.g., Project Manager"
-            disabled={role.is_system_role}
-          />
-          {role.is_system_role && (
-            <p className="text-xs text-muted-foreground mt-1">
-              System roles cannot be renamed
-            </p>
-          )}
-        </div>
-        <div>
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe this role's responsibilities"
-            rows={3}
-          />
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <Label>Permissions</Label>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleSelectAll}
-                className="text-xs"
-              >
-                <CheckSquare className="mr-1 h-3 w-3" />
-                Select All
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleDeselectAll}
-                className="text-xs"
-              >
-                <Square className="mr-1 h-3 w-3" />
-                Deselect All
-              </Button>
-            </div>
-          </div>
-          <div className="mt-2 space-y-6 border rounded-lg p-4 max-h-[400px] overflow-y-auto bg-slate-50 dark:bg-slate-950">
-            {Object.entries(permissions).map(([category, perms]) => (
-              <div key={category} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-                    <div className="h-1 w-1 rounded-full bg-primary"></div>
-                    {category}
-                    <span className="text-xs font-normal normal-case">
-                      ({perms.filter(p => p.selected).length} / {perms.length})
-                    </span>
-                  </h4>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSelectAllCategory(category)}
-                      className="text-xs h-7 px-2"
-                    >
-                      All
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeselectAllCategory(category)}
-                      className="text-xs h-7 px-2"
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {perms.map((perm) => (
-                    <label
-                      key={perm.id}
-                      className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg border transition-all ${
-                        perm.selected
-                          ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-300 dark:border-blue-800'
-                          : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={perm.selected}
-                        onChange={() => handleTogglePermission(category, perm.id)}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{perm.permission_name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{perm.permission_key}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => {}}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? "Updating..." : "Update Role"}
-          </Button>
-        </div>
+    <TaskFormDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Edit Role"
+      description={`Update permissions for ${cleanedRoleName}`}
+      icon={<Shield className="h-6 w-6" />}
+      headerClassName="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600"
+      maxWidthClassName="max-w-3xl"
+      footer={
+        <TaskFormActions
+          onCancel={() => onOpenChange(false)}
+          onSubmit={handleSubmit}
+          submitting={isLoading}
+          submitLabel="Save Changes"
+        />
+      }
+    >
+      <div className="space-y-5">
+        <RoleDetailsSection
+          roleName={roleName}
+          description={description}
+          onRoleNameChange={setRoleName}
+          onDescriptionChange={setDescription}
+          roleNameDisabled={role.is_system_role}
+          roleNameHelper={
+            role.is_system_role ? 'System roles cannot be renamed' : undefined
+          }
+        />
+        <PermissionsEditor
+          permissions={permissions}
+          onToggle={handleTogglePermission}
+          onSelectAll={handleSelectAll}
+          onDeselectAll={handleDeselectAll}
+          onSelectAllCategory={handleSelectAllCategory}
+          onDeselectAllCategory={handleDeselectAllCategory}
+        />
       </div>
-    </>
+    </TaskFormDialogShell>
   );
 }
 

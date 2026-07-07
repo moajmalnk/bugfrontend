@@ -1,3 +1,5 @@
+import type { ProjectStatus } from '@/lib/utils/projectUtils';
+
 export interface DeveloperRule {
   key: string;
   number: number;
@@ -261,7 +263,7 @@ export interface ProjectComplianceData {
   tester_checks: ComplianceCheckItem[];
   project_checks: ComplianceCheckItem[];
   custom_rules?: ComplianceCustomRule[];
-  project?: { id: string; status: string; name?: string };
+  project?: { id: string; status: ProjectStatus; name?: string };
 }
 
 export function getPipelineStageLabel(stage: CompliancePipelineStage): string {

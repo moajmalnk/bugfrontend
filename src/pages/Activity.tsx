@@ -75,9 +75,16 @@ const ActivityItem: React.FC<{
       
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between mb-2">
-          <p className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2 leading-relaxed">
-            {formattedDescription}
-          </p>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2 leading-relaxed">
+              {formattedDescription}
+            </p>
+            {activity.related_title && activity.summary && !activity.summary.includes(activity.related_title) ? (
+              <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                Target: {activity.related_title}
+              </p>
+            ) : null}
+          </div>
           <div className="flex items-center gap-2 ml-4 flex-shrink-0">
             <div className="p-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg">
               <Clock className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
@@ -100,13 +107,23 @@ const ActivityItem: React.FC<{
         )}
         
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge 
               variant="secondary" 
               className={`text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm ${typeInfo.color}`}
             >
               {typeInfo.label}
             </Badge>
+            {activity.related_entity && activity.related_entity !== 'general' ? (
+              <Badge variant="outline" className="text-xs font-medium">
+                {activityService.getRelatedEntityLabel(activity.related_entity)}
+              </Badge>
+            ) : null}
+            {activity.user?.username ? (
+              <Badge variant="outline" className="text-xs font-medium">
+                @{activity.user.username}
+              </Badge>
+            ) : null}
           </div>
           
           <div className="flex items-center gap-2">
@@ -170,6 +187,11 @@ const Activity = () => {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userOwnActivityCount, setUserOwnActivityCount] = useState(0);
+  const [activityFacets, setActivityFacets] = useState<{
+    types: Array<{ activity_type: string; count: number }>;
+    users: Array<{ username: string; count: number }>;
+  }>({ types: [], users: [] });
+  const [platformActivityCount, setPlatformActivityCount] = useState(0);
   const [hasNewActivities, setHasNewActivities] = useState(false);
   const [lastActivityCount, setLastActivityCount] = useState(0);
   const [activityToDelete, setActivityToDelete] = useState<Activity | null>(null);
@@ -225,21 +247,27 @@ const Activity = () => {
       } else if (page === 1) {
         setIsLoading(true);
       } else {
-        // Show loading state when navigating to different pages
         setIsLoading(true);
       }
 
-      // For "My Activities" tab, we need to load more activities to get all user's activities
-      // For "All Activities" tab, use normal pagination
-      const limit = activeTab === "my-activities" ? 1000 : itemsPerPage; // Load more for filtering
-      const offset = activeTab === "my-activities" ? 0 : (page - 1) * itemsPerPage;
-      
-      const response: ActivityResponse = await activityService.getUserActivities(limit, offset);
+      const offset = (page - 1) * itemsPerPage;
+      const response: ActivityResponse = await activityService.getUserActivities(
+        itemsPerPage,
+        offset,
+        {
+          search: searchTerm.trim() || undefined,
+          type: typeFilter,
+          username: createdByFilter,
+          mine_only: activeTab === 'my-activities',
+        }
+      );
 
-      // Always update activities when fetching a new page
       setActivities(response.activities);
       setTotalActivities(response.pagination.total);
       setHasMore(response.pagination.hasMore);
+      if (response.facets) {
+        setActivityFacets(response.facets);
+      }
       
       // Check for new activities only on first page
       if (page === 1 && lastActivityCount > 0 && response.pagination.total > lastActivityCount) {
@@ -255,14 +283,14 @@ const Activity = () => {
       // Update last activity count for comparison
       setLastActivityCount(response.pagination.total);
       
-      // Fetch user's own activity count when loading first page
       if (page === 1) {
         try {
-          const ownCount = await activityService.getUserOwnActivityCount();
+          const ownCount = activeTab === 'my-activities'
+            ? response.pagination.total
+            : await activityService.getUserOwnActivityCount();
           setUserOwnActivityCount(ownCount);
         } catch (error) {
           console.error('Error fetching user own activity count:', error);
-          // Don't show error toast for this as it's not critical
         }
       }
       
@@ -277,24 +305,40 @@ const Activity = () => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [itemsPerPage, toast]);
+  }, [itemsPerPage, toast, activeTab, searchTerm, typeFilter, createdByFilter, lastActivityCount]);
 
-  // Initial load
   useEffect(() => {
-    fetchActivities(1);
-  }, [fetchActivities]);
+    const loadTabCounts = async () => {
+      try {
+        const [allResponse, ownCount] = await Promise.all([
+          activityService.getUserActivities(1, 0),
+          activityService.getUserOwnActivityCount(),
+        ]);
+        setPlatformActivityCount(allResponse.pagination.total);
+        setUserOwnActivityCount(ownCount);
+      } catch (error) {
+        console.error('Error loading activity tab counts:', error);
+      }
+    };
 
-  // Fetch activities when page changes (only for "All Activities" tab)
+    loadTabCounts();
+  }, []);
+
+  // Fetch activities when page changes
   useEffect(() => {
-    if (currentPage !== 1 && activeTab === "all-activities") {
+    if (currentPage !== 1) {
       fetchActivities(currentPage);
     }
-  }, [currentPage, fetchActivities, activeTab]);
+  }, [currentPage, fetchActivities]);
 
-  // Fetch activities when tab changes
+  // Fetch activities when tab or filters change
   useEffect(() => {
-    fetchActivities(1);
-  }, [activeTab, fetchActivities]);
+    const timer = window.setTimeout(() => {
+      fetchActivities(1);
+    }, searchTerm ? 300 : 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeTab, searchTerm, typeFilter, createdByFilter, itemsPerPage, fetchActivities]);
 
   // Auto refresh and visibility change detection
   useEffect(() => {
@@ -358,49 +402,34 @@ const Activity = () => {
     setCurrentPage(1);
   }, [activeTab, searchTerm, typeFilter, createdByFilter]);
 
-  // Filter activities based on active tab and search/filter criteria
-  const filteredActivities = useMemo(() => {
-    let filtered = activities;
+  const filteredActivities = activities;
 
-    // First filter by tab
-    switch (activeTab) {
-      case "all-activities":
-        filtered = activities;
-        break;
-      case "my-activities":
-        filtered = activities.filter((activity) => {
-          return activity.user_id === currentUser?.id;
-        });
-        break;
-      default:
-        filtered = activities;
-    }
-
-    // Then apply search and other filters
-    return filtered.filter((activity) => {
-      const matchesSearch = searchTerm === "" || 
-        activity.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (activity.project_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (activity.username || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesType = typeFilter === "all" || activity.type === typeFilter;
-      const matchesCreatedBy = createdByFilter === "all" || activity.username === createdByFilter;
-      return matchesSearch && matchesType && matchesCreatedBy;
-    });
-  }, [activities, activeTab, currentUser?.id, searchTerm, typeFilter, createdByFilter]);
-
-  // Get unique activity types for filter
   const uniqueTypes = useMemo(() => {
-    const types = activities
+    if (activityFacets.types.length > 0) {
+      return activityFacets.types.map((item) => item.activity_type);
+    }
+    return activities
       .map((activity) => activity.type)
-      .filter((type, index, arr) => arr.indexOf(type) === index);
-    return types.sort();
-  }, [activities]);
+      .filter((type, index, arr) => arr.indexOf(type) === index)
+      .sort();
+  }, [activityFacets.types, activities]);
+
+  const uniqueUsers = useMemo(() => {
+    if (activityFacets.users.length > 0) {
+      return activityFacets.users.map((item) => item.username);
+    }
+    return activities
+      .map((activity) => activity.username)
+      .filter((creator): creator is string => !!creator)
+      .filter((creator, index, arr) => arr.indexOf(creator) === index)
+      .sort();
+  }, [activityFacets.users, activities]);
 
   // Get tab-specific count (total filtered count, not pagination count)
   const getTabCount = (tabType: string) => {
     // For "all-activities", show the total activities from API
     if (tabType === "all-activities") {
-      return totalActivities;
+      return platformActivityCount || totalActivities;
     }
     
     // For "my-activities", use the fetched user own activity count
@@ -417,22 +446,9 @@ const Activity = () => {
     if (urlTab !== activeTab) setActiveTab(urlTab);
   }, [searchParams]);
 
-  const totalFiltered = filteredActivities.length;
-  
-  // For "All Activities": use server-side pagination (activities are already paginated)
-  // For "My Activities": use client-side pagination (filter then paginate)
-  const paginatedActivities = activeTab === "all-activities" 
-    ? filteredActivities 
-    : filteredActivities.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-      );
-  
-  // Use appropriate total count based on active tab
-  // For "all-activities": use server total count
-  // For "my-activities": use filtered count since we're doing client-side filtering
-  const totalForPagination = activeTab === "all-activities" ? totalActivities : totalFiltered;
-  const totalPages = Math.ceil(totalForPagination / itemsPerPage);
+  const totalForPagination = totalActivities;
+  const totalPages = Math.max(1, Math.ceil(totalForPagination / itemsPerPage));
+  const paginatedActivities = filteredActivities;
 
   const renderEmptyState = () => {
     return (
@@ -511,7 +527,7 @@ const Activity = () => {
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {totalActivities}
+                          {platformActivityCount || totalActivities}
                         </div>
                       </div>
                     </div>
@@ -632,15 +648,11 @@ const Activity = () => {
                               </SelectTrigger>
                               <SelectContent position="popper" className="z-[60]">
                                 <SelectItem value="all">All Users</SelectItem>
-                                {activities
-                                  .map((activity) => activity.username)
-                                  .filter((creator, index, arr) => arr.indexOf(creator) === index)
-                                  .sort()
-                                  .map((creator) => (
-                                    <SelectItem key={creator} value={creator}>
-                                      {creator}
-                                    </SelectItem>
-                                  ))}
+                                {uniqueUsers.map((creator) => (
+                                  <SelectItem key={creator} value={creator}>
+                                    {creator}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
