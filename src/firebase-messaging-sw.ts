@@ -86,6 +86,19 @@ export function getNotificationPermissionState(): NotificationPermission | "unsu
   return Notification.permission;
 }
 
+export function canRequestNotificationPermission(): boolean {
+  return getNotificationPermissionState() === "default";
+}
+
+export function isNotificationPermissionBlocked(): boolean {
+  return getNotificationPermissionState() === "denied";
+}
+
+export function needsNotificationPermission(): boolean {
+  const state = getNotificationPermissionState();
+  return state === "default" || state === "denied";
+}
+
 function getAuthToken(): string | null {
   return (
     sessionStorage.getItem("token") ||
@@ -176,6 +189,9 @@ export async function requestNotificationPermission(options?: {
       return "default";
     }
     permission = await Notification.requestPermission();
+  } else if (permission === "denied") {
+    // Browsers do not re-show the permission dialog once blocked.
+    return "denied";
   }
 
   if (permission !== "granted") {

@@ -11,9 +11,9 @@ import {
 } from '@/services/projectService';
 import { userService } from '@/services/userService';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Pencil } from 'lucide-react';
+import { ArrowLeft, FolderKanban, Pencil } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -90,12 +90,12 @@ const EditProject = () => {
 
   if (projectLoading) {
     return (
-      <div className="space-y-6 p-3 sm:p-4 md:p-6 lg:p-8 max-w-4xl mx-auto">
-        <Skeleton className="h-6 w-32" />
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </div>
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w mx-auto space-y-6">
+          <Skeleton className="h-40 w-full rounded-2xl" />
+          <Skeleton className="h-96 w-full rounded-2xl" />
+        </section>
+      </main>
     );
   }
 
@@ -144,53 +144,65 @@ const EditProject = () => {
   ];
 
   return (
-    <div className="space-y-6 p-3 sm:p-4 md:p-6 lg:p-8 max-w-4xl mx-auto">
-      <Link
-        to={`/${currentUser.role}/projects/${projectId}`}
-        className="inline-flex items-center text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        Back to Project
-      </Link>
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w mx-auto space-y-6 sm:space-y-8">
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    className="flex items-center text-muted-foreground hover:text-foreground p-2"
+                    onClick={() => navigate(`/${currentUser.role}/projects/${projectId}`)}
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-xl shadow-lg">
+                    <FolderKanban className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                      Edit Project
+                    </h1>
+                    <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-emerald-600 rounded-full mt-2" />
+                  </div>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                  Update {project.name} — client details, team, timeline, and docs
+                </p>
+              </div>
 
-      <div className="flex items-start gap-3">
-        <div className="p-2.5 rounded-xl bg-blue-600/10 text-blue-500">
-          <Pencil className="h-6 w-6" />
+              <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-emerald-50 dark:from-blue-950/30 dark:to-emerald-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
+                <div className="p-1.5 bg-emerald-500 rounded-lg">
+                  <Pencil className="h-5 w-5 text-white" />
+                </div>
+                <div className="text-lg font-bold text-blue-700 dark:text-blue-300 truncate max-w-[200px]">
+                  {project.name}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Edit Project</h1>
-          <p className="text-muted-foreground text-sm sm:text-base mt-1">
-            Update {project.name}
-          </p>
-        </div>
-      </div>
 
-      <ProjectForm
-        mode="edit"
-        values={values}
-        onChange={setValues}
-        onSubmit={handleSubmit}
-        isSubmitting={isSubmitting}
-        users={users}
-        existingAttachments={allAttachments}
-        projectMeta={project}
-        createdByName={createdByName}
-        attachmentFiles={attachmentFiles}
-        onAttachmentFilesChange={setAttachmentFiles}
-        error={error}
-      />
-
-      <div className="flex justify-end pb-4 -mt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate(`/${currentUser.role}/projects/${projectId}`)}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </Button>
-      </div>
-    </div>
+        <ProjectForm
+          mode="edit"
+          values={values}
+          onChange={setValues}
+          onSubmit={handleSubmit}
+          onCancel={() => navigate(`/${currentUser.role}/projects/${projectId}`)}
+          isSubmitting={isSubmitting}
+          users={users}
+          existingAttachments={allAttachments}
+          projectMeta={project}
+          createdByName={createdByName}
+          attachmentFiles={attachmentFiles}
+          onAttachmentFilesChange={setAttachmentFiles}
+          error={error}
+        />
+      </section>
+    </main>
   );
 };
 

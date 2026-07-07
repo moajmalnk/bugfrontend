@@ -3,22 +3,26 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ENV } from '@/lib/env';
+import { cn } from '@/lib/utils';
 import {
   computeProjectDurationDays,
   formatProjectDate,
@@ -29,17 +33,23 @@ import {
 } from '@/lib/utils/projectUtils';
 import { User } from '@/types';
 import {
+  ArrowLeft,
   Building2,
   Calendar,
+  Check,
+  ChevronsUpDown,
   Clock,
   File,
+  FileText,
+  FolderKanban,
+  Layers,
   Paperclip,
+  Plus,
+  UserCircle,
   Users,
   X,
-  Layers,
-  UserCircle,
 } from 'lucide-react';
-import { ChangeEvent, FormEvent, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, ReactNode, useRef, useState } from 'react';
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -50,6 +60,7 @@ interface ProjectFormProps {
   values: ProjectFormValues;
   onChange: (values: ProjectFormValues) => void;
   onSubmit: (e: FormEvent) => void;
+  onCancel: () => void;
   isSubmitting: boolean;
   users: User[];
   existingAttachments?: ProjectAttachment[];
@@ -57,11 +68,165 @@ interface ProjectFormProps {
   createdByName?: string;
   attachmentFiles: FileWithPreview[];
   onAttachmentFilesChange: (files: FileWithPreview[]) => void;
+  availableBugDocs?: Array<{ id: number; title: string; creatorName?: string | null }>;
+  selectedBugDocIds?: number[];
+  onSelectedBugDocIdsChange?: (ids: number[]) => void;
+  availableBugSheets?: Array<{ id: number; title: string; creatorName?: string | null }>;
+  selectedBugSheetIds?: number[];
+  onSelectedBugSheetIdsChange?: (ids: number[]) => void;
   error?: string | null;
+}
+
+const NAME_MAX = 100;
+const DESCRIPTION_MAX = 2000;
+
+const inputClass =
+  'h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md';
+
+const textareaClass =
+  'min-h-[140px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md';
+
+const selectTriggerClass =
+  'h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md';
+
+function FieldLabel({
+  htmlFor,
+  dotClass,
+  children,
+  hint,
+}: {
+  htmlFor?: string;
+  dotClass: string;
+  children: ReactNode;
+  hint?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label
+        htmlFor={htmlFor}
+        className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"
+      >
+        <div className={cn('w-2 h-2 shrink-0 rounded-full bg-gradient-to-r', dotClass)} />
+        {children}
+      </Label>
+      {hint && <p className="text-xs text-gray-500 dark:text-gray-400 font-medium pl-4">{hint}</p>}
+    </div>
+  );
+}
+
+type SearchableOption = {
+  value: string;
+  label: string;
+  searchValue?: string;
+};
+
+function SearchableSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  searchPlaceholder = 'Search...',
+  emptyMessage = 'No results found.',
+  triggerClassName,
+  id,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  options: SearchableOption[];
+  placeholder: string;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+  triggerClassName?: string;
+  id?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn(
+            'h-12 w-full justify-between font-medium',
+            selectTriggerClass,
+            triggerClassName
+          )}
+        >
+          <span className="truncate">{selected?.label || placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[70]" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} />
+          <CommandList>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.searchValue || `${option.label} ${option.value}`}
+                  onSelect={() => {
+                    onValueChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      value === option.value ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SectionBlock({
+  title,
+  description,
+  icon: Icon,
+  iconClass,
+  children,
+}: {
+  title: string;
+  description?: string;
+  icon: typeof FolderKanban;
+  iconClass: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-4 rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-br from-gray-50/40 to-white/40 dark:from-gray-800/20 dark:to-gray-900/20 p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <div className={cn('p-2 rounded-lg shrink-0', iconClass)}>
+          <Icon className="h-4 w-4 text-white" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">{title}</h3>
+          {description && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
+          )}
+        </div>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </div>
+  );
 }
 
 function MultiUserSelect({
   label,
+  dotClass,
   users,
   selectedIds,
   onChange,
@@ -69,15 +234,20 @@ function MultiUserSelect({
   placeholder,
 }: {
   label: string;
+  dotClass: string;
   users: User[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   roleFilter?: string[];
   placeholder: string;
 }) {
+  const [open, setOpen] = useState(false);
+
   const filtered = roleFilter?.length
     ? users.filter((u) => roleFilter.includes(u.role))
     : users;
+
+  const availableUsers = filtered.filter((u) => !selectedIds.includes(u.id));
 
   const toggleUser = (userId: string) => {
     if (selectedIds.includes(userId)) {
@@ -88,17 +258,17 @@ function MultiUserSelect({
   };
 
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="flex flex-wrap gap-2 min-h-[2.5rem] p-2 rounded-lg border border-border bg-muted/20">
+    <div className="space-y-3">
+      <FieldLabel dotClass={dotClass}>{label}</FieldLabel>
+      <div className="flex flex-wrap gap-2 min-h-[2.75rem] p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
         {selectedIds.length === 0 && (
-          <span className="text-sm text-muted-foreground">{placeholder}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">{placeholder}</span>
         )}
         {selectedIds.map((id) => {
           const user = users.find((u) => u.id === id);
           if (!user) return null;
           return (
-            <Badge key={id} variant="secondary" className="gap-1 pr-1">
+            <Badge key={id} variant="secondary" className="gap-1 pr-1 text-sm">
               {user.username || user.name}
               <button
                 type="button"
@@ -111,27 +281,48 @@ function MultiUserSelect({
           );
         })}
       </div>
-      <Select
-        value=""
-        onValueChange={(value) => {
-          if (value && !selectedIds.includes(value)) {
-            onChange([...selectedIds, value]);
-          }
-        }}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder={`Add ${label.toLowerCase()}...`} />
-        </SelectTrigger>
-        <SelectContent>
-          {filtered
-            .filter((u) => !selectedIds.includes(u.id))
-            .map((user) => (
-              <SelectItem key={user.id} value={user.id}>
-                {user.username || user.name} ({user.role})
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={cn('h-12 w-full justify-between font-medium', selectTriggerClass)}
+          >
+            <span className="truncate text-muted-foreground">{`Add ${label.toLowerCase()}...`}</span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[70]" align="start">
+          <Command>
+            <CommandInput placeholder={`Search ${label.toLowerCase()}...`} />
+            <CommandList>
+              <CommandEmpty>
+                {availableUsers.length === 0 ? 'All matching users are already assigned.' : 'No users found.'}
+              </CommandEmpty>
+              <CommandGroup>
+                {availableUsers.map((user) => {
+                  const displayName = user.username || user.name;
+                  return (
+                    <CommandItem
+                      key={user.id}
+                      value={`${displayName} ${user.email || ''} ${user.role} ${user.id}`}
+                      onSelect={() => {
+                        onChange([...selectedIds, user.id]);
+                        setOpen(false);
+                      }}
+                    >
+                      <Check className="mr-2 h-4 w-4 opacity-0" />
+                      {displayName} ({user.role})
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
@@ -141,6 +332,7 @@ export function ProjectForm({
   values,
   onChange,
   onSubmit,
+  onCancel,
   isSubmitting,
   users,
   existingAttachments = [],
@@ -148,6 +340,12 @@ export function ProjectForm({
   createdByName,
   attachmentFiles,
   onAttachmentFilesChange,
+  availableBugDocs = [],
+  selectedBugDocIds = [],
+  onSelectedBugDocIdsChange,
+  availableBugSheets = [],
+  selectedBugSheetIds = [],
+  onSelectedBugSheetIdsChange,
   error,
 }: ProjectFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -178,14 +376,12 @@ export function ProjectForm({
   const addTechItem = () => {
     const item = techInput.trim();
     if (!item) return;
-    const next = [...techStackItems, item].join(', ');
-    setField('technology_stack', next);
+    setField('technology_stack', [...techStackItems, item].join(', '));
     setTechInput('');
   };
 
   const removeTechItem = (index: number) => {
-    const next = techStackItems.filter((_, i) => i !== index).join(', ');
-    setField('technology_stack', next);
+    setField('technology_stack', techStackItems.filter((_, i) => i !== index).join(', '));
   };
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
@@ -198,357 +394,565 @@ export function ProjectForm({
     onAttachmentFilesChange(attachmentFiles.filter((_, i) => i !== index));
   };
 
+  const toggleExistingDoc = (docId: number) => {
+    if (!onSelectedBugDocIdsChange) return;
+    if (selectedBugDocIds.includes(docId)) {
+      onSelectedBugDocIdsChange(selectedBugDocIds.filter((id) => id !== docId));
+      return;
+    }
+    onSelectedBugDocIdsChange([...selectedBugDocIds, docId]);
+  };
+
+  const toggleExistingSheet = (sheetId: number) => {
+    if (!onSelectedBugSheetIdsChange) return;
+    if (selectedBugSheetIds.includes(sheetId)) {
+      onSelectedBugSheetIdsChange(selectedBugSheetIds.filter((id) => id !== sheetId));
+      return;
+    }
+    onSelectedBugSheetIdsChange([...selectedBugSheetIds, sheetId]);
+  };
+
   const adminsAndDevs = users.filter((u) => ['admin', 'developer'].includes(u.role));
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
-      {/* Summary strip (edit mode) */}
-      {mode === 'edit' && projectMeta && (
-        <Card className="border-blue-500/20 bg-blue-950/10">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> Duration</p>
-                <p className="font-medium">{durationDays} days</p>
+    <div className="relative">
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl" />
+      <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+        <Card className="border-0 shadow-none bg-transparent">
+          <CardHeader className="p-6 sm:p-8 pb-2">
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shrink-0">
+                <FileText className="h-5 w-5 text-white" />
               </div>
-              <div>
-                <p className="text-muted-foreground">Status</p>
-                <p className="font-medium">{getProjectStatusLabel(values.status)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Created</p>
-                <p className="font-medium">{formatProjectDate(projectMeta.created_at)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground flex items-center gap-1"><UserCircle className="h-3.5 w-3.5" /> Created By</p>
-                <p className="font-medium">{createdByName || 'System'}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Basic Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Project Details</CardTitle>
-          <CardDescription>Name, description, and status</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-2">
-            <Label htmlFor="name">Name *</Label>
-            <Input
-              id="name"
-              placeholder="Project name"
-              value={values.name}
-              onChange={(e) => setField('name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="description">Project Description *</Label>
-            <Textarea
-              id="description"
-              placeholder="Project description"
-              value={values.description}
-              onChange={(e) => setField('description', e.target.value)}
-              rows={4}
-              required
-            />
-          </div>
-          <div className="grid gap-2 max-w-xs">
-            <Label htmlFor="status">Status</Label>
-            <Select value={values.status} onValueChange={(v) => setField('status', v as ProjectFormValues['status'])}>
-              <SelectTrigger id="status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Ongoing</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Client Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" /> Client Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
-          <div className="grid gap-2 sm:col-span-2">
-            <Label htmlFor="client_name">Client Name</Label>
-            <Input
-              id="client_name"
-              placeholder="e.g. CODO AI Innovations"
-              value={values.client_name}
-              onChange={(e) => setField('client_name', e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2 sm:col-span-2">
-            <Label htmlFor="client_location">Location</Label>
-            <Input
-              id="client_location"
-              placeholder="City, Country"
-              value={values.client_location}
-              onChange={(e) => setField('client_location', e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="client_contact_name">Primary Contact</Label>
-            <Input
-              id="client_contact_name"
-              placeholder="Contact name"
-              value={values.client_contact_name}
-              onChange={(e) => setField('client_contact_name', e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="client_account_status">Account Status</Label>
-            <Select
-              value={values.client_account_status}
-              onValueChange={(v) => setField('client_account_status', v as ProjectFormValues['client_account_status'])}
-            >
-              <SelectTrigger id="client_account_status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="client_email">Email</Label>
-            <Input
-              id="client_email"
-              type="email"
-              placeholder="client@example.com"
-              value={values.client_email}
-              onChange={(e) => setField('client_email', e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="client_phone">Phone</Label>
-            <Input
-              id="client_phone"
-              placeholder="+91 ..."
-              value={values.client_phone}
-              onChange={(e) => setField('client_phone', e.target.value)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Team Allocation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" /> Team Allocation
-          </CardTitle>
-          <CardDescription>Project Lead, Developer, QA &amp; Testing</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-2">
-            <Label>Project Lead</Label>
-            <Select
-              value={values.project_lead_id || 'none'}
-              onValueChange={(v) => setField('project_lead_id', v === 'none' ? '' : v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select project lead" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Not assigned</SelectItem>
-                {adminsAndDevs.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.username || user.name} ({user.role})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <MultiUserSelect
-            label="Developers"
-            users={users}
-            selectedIds={values.developer_ids}
-            onChange={(ids) => setField('developer_ids', ids)}
-            roleFilter={['developer', 'admin']}
-            placeholder="No developers assigned"
-          />
-          <MultiUserSelect
-            label="QA & Testing"
-            users={users}
-            selectedIds={values.tester_ids}
-            onChange={(ids) => setField('tester_ids', ids)}
-            roleFilter={['tester']}
-            placeholder="No QA assigned"
-          />
-        </CardContent>
-      </Card>
-
-      {/* Technology Stack */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Layers className="h-5 w-5" /> Technology Stack
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-2 min-h-[2rem]">
-            {techStackItems.length === 0 && (
-              <span className="text-sm text-muted-foreground">No technologies added</span>
-            )}
-            {techStackItems.map((item, index) => (
-              <Badge key={`${item}-${index}`} variant="outline" className="gap-1 pr-1">
-                {item}
-                <button type="button" onClick={() => removeTechItem(index)} className="ml-1 hover:bg-muted rounded-full p-0.5">
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <Input
-              placeholder="e.g. React, Node.js, MySQL"
-              value={techInput}
-              onChange={(e) => setTechInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addTechItem();
-                }
-              }}
-            />
-            <Button type="button" variant="outline" onClick={addTechItem}>
-              Add
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Project Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" /> Project Timeline
-          </CardTitle>
-          {mode === 'create' && (
-            <CardDescription>
-              Duration: {durationDays} days (calculated from start date)
+              {mode === 'create' ? 'Project Setup Form' : 'Edit Project Form'}
+            </CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-400 text-base mt-2">
+              {mode === 'create'
+                ? 'Add client details, team allocation, timeline, and documentation'
+                : 'Update project metadata, team, timeline, and attachments'}
             </CardDescription>
-          )}
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="grid gap-2">
-            <Label>Start Date</Label>
-            <DatePicker value={values.start_date} onChange={(v) => setField('start_date', v)} placeholder="Not set" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Deadline Date</Label>
-            <DatePicker value={values.deadline_date} onChange={(v) => setField('deadline_date', v)} placeholder="Not set" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Expected Publish</Label>
-            <DatePicker value={values.expected_publish_date} onChange={(v) => setField('expected_publish_date', v)} placeholder="Not set" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Testing Start</Label>
-            <DatePicker value={values.testing_start_date} onChange={(v) => setField('testing_start_date', v)} placeholder="Not set" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Testing End</Label>
-            <DatePicker value={values.testing_end_date} onChange={(v) => setField('testing_end_date', v)} placeholder="Not set" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Frontend Finish</Label>
-            <DatePicker value={values.frontend_finish_date} onChange={(v) => setField('frontend_finish_date', v)} placeholder="Not set" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Backend Finish</Label>
-            <DatePicker value={values.backend_finish_date} onChange={(v) => setField('backend_finish_date', v)} placeholder="Not set" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Duration</Label>
-            <div className="flex h-10 items-center rounded-md border border-input bg-muted/30 px-3 text-sm">
-              {durationDays} days
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
 
-      {/* Attachments */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Paperclip className="h-5 w-5" /> Attachment Docs
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {existingAttachments.length > 0 && (
-            <div className="space-y-2">
-              <Label>Existing attachments</Label>
-              <div className="space-y-2">
-                {existingAttachments.map((att) => (
-                  <a
-                    key={att.id}
-                    href={`${ENV.API_URL.replace('/api', '')}/${att.file_path}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 p-2 rounded-lg border hover:bg-muted/50 text-sm"
-                  >
-                    <File className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{att.file_name}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label>New attachments</Label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={handleFileSelect}
-            />
-            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Paperclip className="mr-2 h-4 w-4" /> Choose files
-            </Button>
-            {attachmentFiles.length > 0 && (
-              <div className="space-y-2 mt-2">
-                {attachmentFiles.map((file, index) => (
-                  <div key={`${file.name}-${index}`} className="flex items-center justify-between p-2 rounded-lg border text-sm">
-                    <span className="flex items-center gap-2 truncate">
-                      <File className="h-4 w-4 shrink-0" />
-                      {file.name}
-                    </span>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeNewFile(index)}>
-                      <X className="h-4 w-4" />
-                    </Button>
+          <form onSubmit={onSubmit}>
+            <CardContent className="space-y-8 p-6 sm:p-8 pt-4">
+              {mode === 'edit' && projectMeta && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 rounded-xl border border-blue-200/60 dark:border-blue-800/50 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-950/15 dark:to-indigo-950/10 p-4 shadow-sm">
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" /> Duration
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1">{durationDays} days</p>
                   </div>
-                ))}
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1">
+                      {getProjectStatusLabel(values.status)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5" /> Created
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1">
+                      {formatProjectDate(projectMeta.created_at)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <UserCircle className="h-3.5 w-3.5" /> Created By
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1">
+                      {createdByName || 'System'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <SectionBlock
+                title="Project Details"
+                description="Name, description, and status"
+                icon={FolderKanban}
+                iconClass="bg-gradient-to-br from-blue-500 to-indigo-600"
+              >
+                <div className="space-y-3">
+                  <FieldLabel htmlFor="name" dotClass="from-blue-500 to-indigo-600">
+                    Project Name
+                  </FieldLabel>
+                  <Input
+                    id="name"
+                    placeholder="Enter a descriptive project name"
+                    value={values.name}
+                    maxLength={NAME_MAX}
+                    onChange={(e) => setField('name', e.target.value)}
+                    required
+                    className={cn(inputClass, 'focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500')}
+                  />
+                  <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-medium">Keep it clear and recognizable</span>
+                    <span className={cn('font-semibold', values.name.length > NAME_MAX * 0.9 && 'text-blue-600')}>
+                      {values.name.length}/{NAME_MAX}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <FieldLabel htmlFor="description" dotClass="from-emerald-500 to-teal-600">
+                    Project Description
+                  </FieldLabel>
+                  <Textarea
+                    id="description"
+                    placeholder="Describe the project scope, goals, and key deliverables..."
+                    value={values.description}
+                    maxLength={DESCRIPTION_MAX}
+                    onChange={(e) => setField('description', e.target.value)}
+                    required
+                    className={cn(textareaClass, 'focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500')}
+                  />
+                  <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-medium">Include scope, goals, and context</span>
+                    <span
+                      className={cn(
+                        'font-semibold',
+                        values.description.length > DESCRIPTION_MAX * 0.9 && 'text-emerald-600'
+                      )}
+                    >
+                      {values.description.length}/{DESCRIPTION_MAX}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 max-w-sm">
+                  <FieldLabel htmlFor="status" dotClass="from-violet-500 to-purple-600">
+                    Status
+                  </FieldLabel>
+                  <SearchableSelect
+                    id="status"
+                    value={values.status}
+                    onValueChange={(v) => setField('status', v as ProjectFormValues['status'])}
+                    placeholder="Select status"
+                    searchPlaceholder="Search status..."
+                    options={[
+                      { value: 'active', label: 'Ongoing' },
+                      { value: 'completed', label: 'Completed' },
+                      { value: 'archived', label: 'Archived' },
+                    ]}
+                    triggerClassName="focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500"
+                  />
+                </div>
+              </SectionBlock>
+
+              <SectionBlock
+                title="Client Details"
+                description="Client contact and account information"
+                icon={Building2}
+                iconClass="bg-gradient-to-br from-amber-500 to-orange-600"
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-3 sm:col-span-2">
+                    <FieldLabel htmlFor="client_name" dotClass="from-amber-500 to-orange-600">
+                      Client Name
+                    </FieldLabel>
+                    <Input
+                      id="client_name"
+                      placeholder="e.g. CODO AI Innovations"
+                      value={values.client_name}
+                      onChange={(e) => setField('client_name', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500')}
+                    />
+                  </div>
+                  <div className="space-y-3 sm:col-span-2">
+                    <FieldLabel htmlFor="client_location" dotClass="from-yellow-500 to-amber-600">
+                      Location
+                    </FieldLabel>
+                    <Input
+                      id="client_location"
+                      placeholder="City, Country"
+                      value={values.client_location}
+                      onChange={(e) => setField('client_location', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500')}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel htmlFor="client_contact_name" dotClass="from-orange-500 to-red-600">
+                      Primary Contact
+                    </FieldLabel>
+                    <Input
+                      id="client_contact_name"
+                      placeholder="Contact name"
+                      value={values.client_contact_name}
+                      onChange={(e) => setField('client_contact_name', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500')}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel htmlFor="client_account_status" dotClass="from-green-500 to-emerald-600">
+                      Account Status
+                    </FieldLabel>
+                    <SearchableSelect
+                      value={values.client_account_status}
+                      onValueChange={(v) =>
+                        setField('client_account_status', v as ProjectFormValues['client_account_status'])
+                      }
+                      placeholder="Select account status"
+                      searchPlaceholder="Search status..."
+                      options={[
+                        { value: 'active', label: 'Active' },
+                        { value: 'inactive', label: 'Inactive' },
+                      ]}
+                      triggerClassName="focus:ring-2 focus:ring-green-500/50"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel htmlFor="client_email" dotClass="from-blue-500 to-cyan-600">
+                      Email
+                    </FieldLabel>
+                    <Input
+                      id="client_email"
+                      type="email"
+                      placeholder="client@example.com"
+                      value={values.client_email}
+                      onChange={(e) => setField('client_email', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500')}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel htmlFor="client_phone" dotClass="from-indigo-500 to-purple-600">
+                      Phone
+                    </FieldLabel>
+                    <Input
+                      id="client_phone"
+                      placeholder="+91 ..."
+                      value={values.client_phone}
+                      onChange={(e) => setField('client_phone', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500')}
+                    />
+                  </div>
+                </div>
+              </SectionBlock>
+
+              <SectionBlock
+                title="Team Allocation"
+                description="Project Lead, Developer, QA & Testing"
+                icon={Users}
+                iconClass="bg-gradient-to-br from-purple-500 to-violet-600"
+              >
+                <div className="space-y-3">
+                  <FieldLabel dotClass="from-purple-500 to-violet-600">Project Lead</FieldLabel>
+                  <SearchableSelect
+                    value={values.project_lead_id || 'none'}
+                    onValueChange={(v) => setField('project_lead_id', v === 'none' ? '' : v)}
+                    placeholder="Select project lead"
+                    searchPlaceholder="Search project lead..."
+                    emptyMessage="No users found."
+                    options={[
+                      { value: 'none', label: 'Not assigned' },
+                      ...adminsAndDevs.map((user) => {
+                        const displayName = user.username || user.name;
+                        return {
+                          value: user.id,
+                          label: `${displayName} (${user.role})`,
+                          searchValue: `${displayName} ${user.email || ''} ${user.role} ${user.id}`,
+                        };
+                      }),
+                    ]}
+                    triggerClassName="focus:ring-2 focus:ring-purple-500/50"
+                  />
+                </div>
+                <MultiUserSelect
+                  label="Developers"
+                  dotClass="from-blue-500 to-indigo-600"
+                  users={users}
+                  selectedIds={values.developer_ids}
+                  onChange={(ids) => setField('developer_ids', ids)}
+                  roleFilter={['developer', 'admin']}
+                  placeholder="No developers assigned"
+                />
+                <MultiUserSelect
+                  label="QA & Testing"
+                  dotClass="from-emerald-500 to-teal-600"
+                  users={users}
+                  selectedIds={values.tester_ids}
+                  onChange={(ids) => setField('tester_ids', ids)}
+                  roleFilter={['tester']}
+                  placeholder="No QA assigned"
+                />
+              </SectionBlock>
+
+              <SectionBlock
+                title="Technology Stack"
+                description="Languages, frameworks, and tools used"
+                icon={Layers}
+                iconClass="bg-gradient-to-br from-cyan-500 to-blue-600"
+              >
+                <div className="flex flex-wrap gap-2 min-h-[2rem]">
+                  {techStackItems.length === 0 && (
+                    <span className="text-sm text-gray-500 dark:text-gray-400">No technologies added</span>
+                  )}
+                  {techStackItems.map((item, index) => (
+                    <Badge key={`${item}-${index}`} variant="outline" className="gap-1 pr-1 text-sm">
+                      {item}
+                      <button
+                        type="button"
+                        onClick={() => removeTechItem(index)}
+                        className="ml-1 hover:bg-muted rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g. React, Node.js, MySQL"
+                    value={techInput}
+                    onChange={(e) => setTechInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addTechItem();
+                      }
+                    }}
+                    className={cn(inputClass, 'focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500')}
+                  />
+                  <Button type="button" variant="outline" onClick={addTechItem} className="h-12 px-5 rounded-xl">
+                    Add
+                  </Button>
+                </div>
+              </SectionBlock>
+
+              <SectionBlock
+                title="Project Timeline"
+                description={`Duration: ${durationDays} days (from start date)`}
+                icon={Calendar}
+                iconClass="bg-gradient-to-br from-rose-500 to-pink-600"
+              >
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    { key: 'start_date' as const, label: 'Start Date', dot: 'from-rose-500 to-pink-600' },
+                    { key: 'deadline_date' as const, label: 'Deadline Date', dot: 'from-red-500 to-orange-600' },
+                    { key: 'expected_publish_date' as const, label: 'Expected Publish', dot: 'from-orange-500 to-amber-600' },
+                    { key: 'testing_start_date' as const, label: 'Testing Start', dot: 'from-yellow-500 to-lime-600' },
+                    { key: 'testing_end_date' as const, label: 'Testing End', dot: 'from-lime-500 to-green-600' },
+                    { key: 'frontend_finish_date' as const, label: 'Frontend Finish', dot: 'from-green-500 to-emerald-600' },
+                    { key: 'backend_finish_date' as const, label: 'Backend Finish', dot: 'from-emerald-500 to-teal-600' },
+                  ].map(({ key, label, dot }) => (
+                    <div key={key} className="space-y-3">
+                      <FieldLabel dotClass={dot}>{label}</FieldLabel>
+                      <DatePicker
+                        value={values[key]}
+                        onChange={(v) => setField(key, v)}
+                        placeholder="Not set"
+                        className={cn(selectTriggerClass, 'focus:ring-2')}
+                      />
+                    </div>
+                  ))}
+                  <div className="space-y-3">
+                    <FieldLabel dotClass="from-blue-500 to-indigo-600">Duration</FieldLabel>
+                    <div className="flex h-12 items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm font-semibold text-gray-900 dark:text-white shadow-sm">
+                      {durationDays} days
+                    </div>
+                  </div>
+                </div>
+              </SectionBlock>
+
+              {(availableBugDocs.length > 0 || availableBugSheets.length > 0) && (
+                <SectionBlock
+                  title="Connect Existing Docs"
+                  description="Link existing BugDocs and BugSheets to this project"
+                  icon={FileText}
+                  iconClass="bg-gradient-to-br from-fuchsia-500 to-purple-600"
+                >
+                  {availableBugDocs.length > 0 && (
+                    <div className="space-y-3">
+                      <FieldLabel dotClass="from-fuchsia-500 to-purple-600">
+                        Existing BugDocs
+                      </FieldLabel>
+                      <div className="flex flex-wrap gap-2 min-h-[2.75rem] p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+                        {selectedBugDocIds.length === 0 && (
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            No BugDocs selected
+                          </span>
+                        )}
+                        {selectedBugDocIds.map((id) => {
+                          const doc = availableBugDocs.find((item) => item.id === id);
+                          if (!doc) return null;
+                          return (
+                            <Badge key={id} variant="secondary" className="gap-1 pr-1 text-sm">
+                              {doc.title}
+                              <button
+                                type="button"
+                                onClick={() => toggleExistingDoc(id)}
+                                className="ml-1 rounded-full hover:bg-muted p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                      <SearchableSelect
+                        value=""
+                        onValueChange={(v) => toggleExistingDoc(Number(v))}
+                        placeholder="Add existing BugDoc..."
+                        searchPlaceholder="Search BugDocs..."
+                        emptyMessage="No BugDocs available."
+                        options={availableBugDocs
+                          .filter((doc) => !selectedBugDocIds.includes(doc.id))
+                          .map((doc) => ({
+                            value: String(doc.id),
+                            label: doc.creatorName
+                              ? `${doc.title} (${doc.creatorName})`
+                              : doc.title,
+                            searchValue: `${doc.title} ${doc.creatorName || ''} ${doc.id}`,
+                          }))}
+                        triggerClassName="focus:ring-2 focus:ring-fuchsia-500/50"
+                      />
+                    </div>
+                  )}
+
+                  {availableBugSheets.length > 0 && (
+                    <div className="space-y-3">
+                      <FieldLabel dotClass="from-indigo-500 to-violet-600">
+                        Existing BugSheets
+                      </FieldLabel>
+                      <div className="flex flex-wrap gap-2 min-h-[2.75rem] p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+                        {selectedBugSheetIds.length === 0 && (
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            No BugSheets selected
+                          </span>
+                        )}
+                        {selectedBugSheetIds.map((id) => {
+                          const sheet = availableBugSheets.find((item) => item.id === id);
+                          if (!sheet) return null;
+                          return (
+                            <Badge key={id} variant="secondary" className="gap-1 pr-1 text-sm">
+                              {sheet.title}
+                              <button
+                                type="button"
+                                onClick={() => toggleExistingSheet(id)}
+                                className="ml-1 rounded-full hover:bg-muted p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                      <SearchableSelect
+                        value=""
+                        onValueChange={(v) => toggleExistingSheet(Number(v))}
+                        placeholder="Add existing BugSheet..."
+                        searchPlaceholder="Search BugSheets..."
+                        emptyMessage="No BugSheets available."
+                        options={availableBugSheets
+                          .filter((sheet) => !selectedBugSheetIds.includes(sheet.id))
+                          .map((sheet) => ({
+                            value: String(sheet.id),
+                            label: sheet.creatorName
+                              ? `${sheet.title} (${sheet.creatorName})`
+                              : sheet.title,
+                            searchValue: `${sheet.title} ${sheet.creatorName || ''} ${sheet.id}`,
+                          }))}
+                        triggerClassName="focus:ring-2 focus:ring-indigo-500/50"
+                      />
+                    </div>
+                  )}
+                </SectionBlock>
+              )}
+
+              <div className="space-y-4">
+                <FieldLabel dotClass="from-indigo-500 to-purple-600">Attachment Docs</FieldLabel>
+                <div className="rounded-xl border border-indigo-200/60 dark:border-indigo-800/50 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/15 dark:to-purple-950/10 p-4 sm:p-5 space-y-4">
+                  {existingAttachments.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Existing attachments</p>
+                      {existingAttachments.map((att) => (
+                        <a
+                          key={att.id}
+                          href={`${ENV.API_URL.replace('/api', '')}/${att.file_path}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md text-sm transition-all"
+                        >
+                          <File className="h-4 w-4 shrink-0 text-indigo-500" />
+                          <span className="truncate font-medium">{att.file_name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-12 w-full sm:w-auto rounded-xl border-dashed border-2 hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20"
+                  >
+                    <Paperclip className="mr-2 h-4 w-4" /> Choose documentation files
+                  </Button>
+
+                  {attachmentFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {attachmentFiles.map((file, index) => (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                        >
+                          <span className="flex items-center gap-2 truncate font-medium">
+                            <File className="h-4 w-4 shrink-0 text-indigo-500" />
+                            {file.name}
+                          </span>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeNewFile(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
-      {error && (
-        <p className="text-sm font-medium text-red-500">{error}</p>
-      )}
+              {error && (
+                <p className="text-sm font-medium text-red-500 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+                  {error}
+                </p>
+              )}
+            </CardContent>
 
-      <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pb-8">
-        <Button type="submit" disabled={isSubmitting || !values.name.trim() || !values.description.trim()} className="sm:min-w-[140px]">
-          {isSubmitting ? (mode === 'create' ? 'Creating...' : 'Saving...') : (mode === 'create' ? 'Create Project' : 'Save Changes')}
-        </Button>
+            <CardFooter className="p-6 sm:p-8 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+              <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onCancel}
+                  disabled={isSubmitting}
+                  className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || !values.name.trim() || !values.description.trim()}
+                  className="h-12 px-8 bg-gradient-to-r from-blue-600 to-emerald-700 hover:from-blue-700 hover:to-emerald-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      {mode === 'create' ? 'Creating...' : 'Saving...'}
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {mode === 'create' ? 'Create Project' : 'Save Changes'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardFooter>
+          </form>
+        </Card>
       </div>
-    </form>
+    </div>
   );
 }

@@ -20,10 +20,11 @@ import {
   NotificationSettings,
 } from "@/services/notificationService";
 import { whatsappService } from "@/services/whatsappService";
-import { Bell, BellRing, Mail, MessageCircle, Smartphone, Volume2 } from "lucide-react";
-import { useState } from "react";
+import { Bell, BellRing, Mail, MessageCircle, Smartphone, Volume2, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   getNotificationPermissionState,
+  isNotificationPermissionBlocked,
   registerPushOnThisDevice,
 } from "@/firebase-messaging-sw";
 
@@ -53,6 +54,16 @@ export function NotificationSettingsCard() {
     null
   );
   const [registeringPush, setRegisteringPush] = useState(false);
+  const [browserPermission, setBrowserPermission] = useState(() => getNotificationPermissionState());
+
+  useEffect(() => {
+    const refresh = () => setBrowserPermission(getNotificationPermissionState());
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") refresh();
+    });
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
 
   const { emailNotificationsEnabled, refreshGlobalSettings } =
     useNotificationSettings();
@@ -125,8 +136,22 @@ export function NotificationSettingsCard() {
   const handleRegisterPushOnDevice = async () => {
     setRegisteringPush(true);
     try {
+      const currentPermission = getNotificationPermissionState();
+      setBrowserPermission(currentPermission);
+
+      if (isNotificationPermissionBlocked()) {
+        toast({
+          title: "Notifications blocked in browser",
+          description:
+            "Click the lock icon next to the address bar → Notifications → turn ON → then tap “Enable on this device” again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const result = await registerPushOnThisDevice();
       const permission = getNotificationPermissionState();
+      setBrowserPermission(permission);
       if (result === "granted" || permission === "granted") {
         handleSettingChange("browserNotifications", true);
         toast({
@@ -295,7 +320,24 @@ export function NotificationSettingsCard() {
               {/* Browser Notifications */}
               <div className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-50/40 via-transparent to-emerald-50/40 dark:from-green-950/15 dark:via-transparent dark:to-emerald-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative p-6 sm:p-8">
+                <div className="relative p-6 sm:p-8 space-y-4">
+                  {browserPermission === "denied" && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                        <div className="space-y-2 text-sm">
+                          <p className="font-semibold text-amber-800 dark:text-amber-200">
+                            Notifications are blocked for this site
+                          </p>
+                          <ol className="list-decimal list-inside text-amber-900/90 dark:text-amber-100/90 space-y-1">
+                            <li>Click the <strong>lock or tune icon</strong> left of the address bar</li>
+                            <li>Turn <strong>Notifications</strong> ON for BugRicer</li>
+                            <li>Return here and tap <strong>Enable on this device</strong></li>
+                          </ol>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="flex items-start gap-4">
                       <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">

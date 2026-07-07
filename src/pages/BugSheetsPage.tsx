@@ -207,6 +207,8 @@ const BugSheetsPage = () => {
     console.log('📊 Sheet count changed:', sheets.length);
   }, [sheets.length]);
 
+  const isInitialLoading = isCheckingConnection || (isLoading && sheets.length === 0);
+
   const loadProjects = async () => {
     setIsLoadingProjects(true);
     try {
@@ -850,9 +852,6 @@ const BugSheetsPage = () => {
                   }}
                 >
                   <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                  <span className={`text-sm font-semibold ${isConnected ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-                    {isConnected ? 'Google Connected' : 'Not Connected'}
-                  </span>
                   {!isConnected && (
                     <Button
                       variant="link"
@@ -1015,6 +1014,36 @@ const BugSheetsPage = () => {
               </div>
             </div>
 
+            {isInitialLoading ? (
+              <div className="space-y-6 sm:space-y-8">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-emerald-50/30 dark:from-gray-800/30 dark:to-emerald-900/30 rounded-2xl"></div>
+                  <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="p-1.5 bg-emerald-500 rounded-lg">
+                          <Search className="h-4 w-4 text-white" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Loading BugSheets...</h3>
+                      </div>
+                      <div className="flex flex-col md:flex-row gap-4">
+                        <Skeleton className="h-12 flex-1 rounded-xl" />
+                        <div className="flex gap-3">
+                          <Skeleton className="h-11 w-[160px] rounded-xl" />
+                          <Skeleton className="h-11 w-[160px] rounded-xl" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 lg:grid-cols-2" aria-label="Loading bugsheets">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <BugSheetCardSkeleton key={`bugsheet-initial-skeleton-${index}`} index={index} />
+                  ))}
+                </div>
+              </div>
+            ) : (
             <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
               {/* Project Cards View (Admin - All Sheets) */}
               {shouldShowProjectCards() && (
@@ -1335,6 +1364,7 @@ const BugSheetsPage = () => {
                 </div>
               )}
             </TabsContent>
+            )}
           </Tabs>
         )}
 

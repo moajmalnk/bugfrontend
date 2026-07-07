@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import {
   requestNotificationPermission,
   getNotificationPermissionState,
+  needsNotificationPermission,
+  isNotificationPermissionBlocked,
+  canRequestNotificationPermission,
 } from "@/firebase-messaging-sw";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -13,7 +16,9 @@ const INSTALL_DISMISS_KEY = "bugricer_pwa_install_dismissed_at";
 const NOTIF_DISMISS_KEY = "bugricer_pwa_notif_dismissed_at";
 const LEGACY_DISMISS_KEY = "bugricer_pwa_prompt_dismissed_at";
 const INSTALL_DISMISS_DAYS = 7;
+const NOTIF_BLOCKED_DISMISS_KEY = "bugricer_pwa_notif_blocked_dismissed_at";
 const NOTIF_DISMISS_HOURS = 12;
+const NOTIF_BLOCKED_DISMISS_HOURS = 24;
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -95,7 +100,9 @@ export function PWAEngagementPrompt() {
 
   const ios = useMemo(() => isIosDevice(), []);
   const canInstall = Boolean(deferredPrompt) && !installDone;
-  const needsNotifications = notificationState === "default";
+  const notificationsBlocked = notificationState === "denied";
+  const canRequestNotifications = notificationState === "default";
+  const needsNotifications = needsNotificationPermission();
 
   const setInstalled = useCallback(() => {
     markInstalled();
@@ -110,8 +117,9 @@ export function PWAEngagementPrompt() {
   }, []);
 
   const openNotificationPrompt = useCallback(() => {
-    if (getNotificationPermissionState() !== "default") return;
+    if (!needsNotificationPermission()) return;
     clearDismissed(NOTIF_DISMISS_KEY);
+    clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);
     setForceNotifPrompt(true);
     refreshPermission();
     setOpen(true);
@@ -191,13 +199,7 @@ export function PWAEngagementPrompt() {
       const permission = refreshPermission();
 
       // Fully set up — never show install/notification modal
-      if (installed && permission !== "default") {
-        setOpen(false);
-        return;
-      }
-
-      // Notifications already decided (granted/denied/unsupported) and no install needed
-      if (permission !== "default" && installed) {
+      if (installed && permission === "granted") {
         setOpen(false);
         return;
       }
@@ -208,10 +210,12 @@ export function PWAEngagementPrompt() {
         !wasDismissed(INSTALL_DISMISS_KEY, INSTALL_DISMISS_DAYS * 24 * 60 * 60 * 1000);
 
       const showNotifications =
-        permission === "default" &&
+        needsNotificationPermission() &&
         (forceNotifPrompt ||
           installed ||
-          !wasDismissed(NOTIF_DISMISS_KEY, NOTIF_DISMISS_HOURS * 60 * 60 * 1000));
+          (permission === "denied"
+            ? !wasDismissed(NOTIF_BLOCKED_DISMISS_KEY, NOTIF_BLOCKED_DISMISS_HOURS * 60 * 60 * 1000)
+            : !wasDismissed(NOTIF_DISMISS_KEY, NOTIF_DISMISS_HOURS * 60 * 60 * 1000)));
 
       // Only open when there is something useful to do
       if (showNotifications || showInstall) {
@@ -223,6 +227,38 @@ export function PWAEngagementPrompt() {
 
     return () => window.clearTimeout(timer);
   }, [currentUser, deferredPrompt, forceNotifPrompt, ios, refreshPermission, setInstalled]);
+
+  // Re-check permission when user returns from browser site settings
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const recheck = () => {
+      const previous = notificationState;
+      const permission = refreshPermission();
+      if (previous === "denied" && permission === "granted") {
+        void requestNotificationPermission({ interactive: false });
+        setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
+        window.setTimeout(() => {
+          setOpen(false);
+          setForceNotifPrompt(false);
+        }, 1500);
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        recheck();
+      }
+    };
+
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [currentUser, notificationState, refreshPermission]);
 
   // Quietly refresh FCM token when already granted
   useEffect(() => {
@@ -243,6 +279,9 @@ export function PWAEngagementPrompt() {
       }
       if (getNotificationPermissionState() === "default") {
         markDismissed(NOTIF_DISMISS_KEY);
+      }
+      if (isNotificationPermissionBlocked()) {
+        markDismissed(NOTIF_BLOCKED_DISMISS_KEY);
       }
     },
     [installDone]
@@ -280,10 +319,18 @@ export function PWAEngagementPrompt() {
     setEnablingNotifications(true);
     setStatusMessage(null);
     try {
+      if (isNotificationPermissionBlocked()) {
+        setStatusMessage(
+          "Notifications are blocked. Use the lock icon next to the address bar, turn Notifications ON, then tap “I've enabled them”."
+        );
+        return;
+      }
+
       const result = await requestNotificationPermission({ interactive: true });
       const permission = refreshPermission();
       if (result === "granted" || permission === "granted") {
         clearDismissed(NOTIF_DISMISS_KEY);
+        clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);
         setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
         window.setTimeout(() => {
           setOpen(false);
@@ -291,7 +338,7 @@ export function PWAEngagementPrompt() {
         }, 1200);
       } else if (result === "denied" || permission === "denied") {
         setStatusMessage(
-          "Notifications are blocked. Open site settings and allow notifications for BugRicer."
+          "Notifications are blocked. Open site settings (lock icon in the address bar) and allow notifications for BugRicer."
         );
       } else {
         setStatusMessage("Could not enable notifications on this device.");
@@ -301,7 +348,33 @@ export function PWAEngagementPrompt() {
     }
   };
 
-  // Floating bell only when permission still needs a decision
+  const handleRecheckBlockedPermission = async () => {
+    setEnablingNotifications(true);
+    setStatusMessage(null);
+    try {
+      const permission = refreshPermission();
+      if (permission === "granted") {
+        const result = await requestNotificationPermission({ interactive: false });
+        if (result === "granted") {
+          clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);
+          setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
+          window.setTimeout(() => {
+            setOpen(false);
+            setForceNotifPrompt(false);
+          }, 1200);
+          return;
+        }
+      }
+
+      setStatusMessage(
+        "Still blocked. Click the lock/tune icon next to bugs.bugricer.com → Notifications → turn ON → then try again."
+      );
+    } finally {
+      setEnablingNotifications(false);
+    }
+  };
+
+  // Floating bell when notifications still need attention (default or blocked)
   const showFloatingBell = Boolean(currentUser) && !open && needsNotifications;
 
   // Nothing useful to show in the modal
@@ -323,7 +396,7 @@ export function PWAEngagementPrompt() {
           )}
         >
           <Bell className="h-4 w-4" />
-          Enable notifications
+          {notificationsBlocked ? "Notifications blocked" : "Enable notifications"}
         </button>
       )}
 
@@ -349,12 +422,18 @@ export function PWAEngagementPrompt() {
                 </div>
                 <div>
                   <h2 id="pwa-prompt-title" className="text-base font-semibold text-white">
-                    {installDone ? "Enable push notifications" : "Install BugRicer & stay updated"}
+                    {notificationsBlocked
+                      ? "Notifications are blocked"
+                      : installDone
+                        ? "Enable push notifications"
+                        : "Install BugRicer & stay updated"}
                   </h2>
                   <p className="mt-1 text-sm text-slate-400 leading-relaxed">
-                    {installDone
-                      ? "Allow notifications so you get alerts for new bugs, fixes, and messages on this device."
-                      : "Add the app to your home screen and allow notifications for new bugs, fixes, and messages."}
+                    {notificationsBlocked
+                      ? "BugRicer cannot show the permission popup again. Turn notifications on in your browser site settings."
+                      : installDone
+                        ? "Allow notifications so you get alerts for new bugs, fixes, and messages on this device."
+                        : "Add the app to your home screen and allow notifications for new bugs, fixes, and messages."}
                   </p>
                 </div>
               </div>
@@ -403,16 +482,35 @@ export function PWAEngagementPrompt() {
                     <Bell className="h-4 w-4 text-violet-400" />
                     Push notifications
                   </div>
-                  <p className="mt-1.5 text-sm text-slate-400">
-                    Get alerts for bugs and important project updates. Tap the button to allow.
-                  </p>
-                  <Button
-                    className="mt-3 w-full bg-violet-600 hover:bg-violet-500"
-                    onClick={handleEnableNotifications}
-                    disabled={enablingNotifications}
-                  >
-                    {enablingNotifications ? "Requesting…" : "Enable notifications"}
-                  </Button>
+                  {notificationsBlocked ? (
+                    <>
+                      <ol className="mt-2 space-y-2 text-sm text-slate-400 list-decimal list-inside">
+                        <li>Click the <strong className="text-slate-200">lock or tune icon</strong> left of the address bar</li>
+                        <li>Find <strong className="text-slate-200">Notifications</strong> and turn it <strong className="text-slate-200">ON</strong></li>
+                        <li>Come back here and tap the button below</li>
+                      </ol>
+                      <Button
+                        className="mt-3 w-full bg-violet-600 hover:bg-violet-500"
+                        onClick={handleRecheckBlockedPermission}
+                        disabled={enablingNotifications}
+                      >
+                        {enablingNotifications ? "Checking…" : "I've enabled them"}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-1.5 text-sm text-slate-400">
+                        Get alerts for bugs and important project updates. Tap the button to allow.
+                      </p>
+                      <Button
+                        className="mt-3 w-full bg-violet-600 hover:bg-violet-500"
+                        onClick={handleEnableNotifications}
+                        disabled={enablingNotifications || !canRequestNotifications}
+                      >
+                        {enablingNotifications ? "Requesting…" : "Enable notifications"}
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
 
