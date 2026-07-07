@@ -20,8 +20,12 @@ import {
   NotificationSettings,
 } from "@/services/notificationService";
 import { whatsappService } from "@/services/whatsappService";
-import { Bell, BellRing, Mail, MessageCircle, Volume2 } from "lucide-react";
+import { Bell, BellRing, Mail, MessageCircle, Smartphone, Volume2 } from "lucide-react";
 import { useState } from "react";
+import {
+  getNotificationPermissionState,
+  registerPushOnThisDevice,
+} from "@/firebase-messaging-sw";
 
 const updateGlobalEmailSetting = async (enabled: boolean) => {
   const token = localStorage.getItem("token");
@@ -48,6 +52,7 @@ export function NotificationSettingsCard() {
   const [pendingEmailChange, setPendingEmailChange] = useState<boolean | null>(
     null
   );
+  const [registeringPush, setRegisteringPush] = useState(false);
 
   const { emailNotificationsEnabled, refreshGlobalSettings } =
     useNotificationSettings();
@@ -115,6 +120,38 @@ export function NotificationSettingsCard() {
       title: "Notification preferences saved",
       description: "Your notification settings have been updated.",
     });
+  };
+
+  const handleRegisterPushOnDevice = async () => {
+    setRegisteringPush(true);
+    try {
+      const result = await registerPushOnThisDevice();
+      const permission = getNotificationPermissionState();
+      if (result === "granted" || permission === "granted") {
+        handleSettingChange("browserNotifications", true);
+        toast({
+          title: "Push enabled on this device",
+          description:
+            "This phone, tablet, or computer can now receive BugRicer alerts. Repeat on each device you use.",
+        });
+      } else if (result === "denied" || permission === "denied") {
+        toast({
+          title: "Notifications blocked",
+          description:
+            "Allow notifications for BugRicer in your browser or phone settings, then try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Could not register this device",
+          description:
+            "Use HTTPS, install the PWA on iPhone/iPad, or try Chrome/Edge on desktop.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setRegisteringPush(false);
+    }
   };
 
   const handleTestNotification = async () => {
@@ -274,16 +311,32 @@ export function NotificationSettingsCard() {
                         <p className="text-gray-600 dark:text-gray-400 text-base">
                           Show desktop notifications when using the browser
                         </p>
+                        <p className="text-sm text-muted-foreground">
+                          Push is per device — enable on each phone, iPad, Mac, and laptop you use.
+                        </p>
                       </div>
                     </div>
-                    <Switch
-                      id="browserNotifications"
-                      checked={settings.browserNotifications}
-                      onCheckedChange={(checked) =>
-                        handleSettingChange("browserNotifications", checked)
-                      }
-                      className="scale-125"
-                    />
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={registeringPush}
+                        onClick={handleRegisterPushOnDevice}
+                        className="whitespace-nowrap"
+                      >
+                        <Smartphone className="h-4 w-4 mr-2 shrink-0" />
+                        {registeringPush ? "Registering…" : "Enable on this device"}
+                      </Button>
+                      <Switch
+                        id="browserNotifications"
+                        checked={settings.browserNotifications}
+                        onCheckedChange={(checked) =>
+                          handleSettingChange("browserNotifications", checked)
+                        }
+                        className="scale-125 shrink-0"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

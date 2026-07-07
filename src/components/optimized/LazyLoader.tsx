@@ -67,7 +67,7 @@ export const LazyPages = {
 // Lazy-loaded component components
 export const LazyComponents = {
   BugCard: createLazyComponent(() => import('@/components/bugs/BugCard'), 'BugCard'),
-  EditBugDialog: lazy(() => import('@/components/bugs/EditBugDialog')),
+  EditBug: lazy(() => import('@/pages/EditBug')),
   NewProjectDialog: createLazyComponent(() => import('@/components/projects/NewProjectDialog'), 'NewProjectDialog'),
   EditProjectDialog: createLazyComponent(() => import('@/components/projects/EditProjectDialog'), 'EditProjectDialog'),
   AddUserDialog: createLazyComponent(() => import('@/components/users/AddUserDialog'), 'AddUserDialog'),

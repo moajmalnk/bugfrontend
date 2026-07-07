@@ -3,7 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
+import {
+  alreadyRaisedBadgeClass,
+  bugLevelBadgeClass,
+  formatBugLevelLabel,
+} from "@/lib/bugMetaUtils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
+import { CommonBug } from "@/types";
+import { Copy } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 interface Bug {
@@ -121,6 +128,111 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
           </Link>
         </Button>
       </div>
+      </div>
+    </Card>
+  );
+}
+
+interface CommonBugCardProps {
+  bug: CommonBug;
+}
+
+export function CommonBugCard({ bug }: CommonBugCardProps) {
+  const { currentUser } = useAuth();
+  const developerNames =
+    bug.project_developers?.map((d) => d.username).join(", ") || "—";
+
+  return (
+    <Card className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm w-full h-full p-4 sm:p-5 hover:shadow-xl transition-all duration-300">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-red-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-red-950/15"></div>
+      <div className="relative w-full h-full flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="font-semibold text-base sm:text-lg break-words whitespace-pre-line w-full text-gray-900 dark:text-white">
+              {bug.title || "Untitled Bug"}
+            </h4>
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                priorityColors[bug.priority] || priorityColors.medium
+              }`}
+            >
+              {bug.priority || "medium"}
+            </Badge>
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                statusColors[bug.status] || statusColors.pending
+              }`}
+            >
+              {(bug.status || "pending").replace("_", " ")}
+            </Badge>
+            <Badge
+              variant="outline"
+              className={`text-xs ${bugLevelBadgeClass(bug.bug_level)}`}
+            >
+              {formatBugLevelLabel(bug.bug_level)}
+            </Badge>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {bug.common_reasons?.includes("already_raised") && (
+              <Badge
+                variant="outline"
+                className={`text-xs ${alreadyRaisedBadgeClass(true)}`}
+              >
+                Already Raised
+              </Badge>
+            )}
+            {bug.common_reasons?.includes("duplicate") && (
+              <Badge
+                variant="outline"
+                className="text-xs bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800"
+              >
+                <Copy className="h-3 w-3 mr-1 inline" />
+                Duplicate
+                {bug.duplicate_count && bug.duplicate_count > 1
+                  ? ` (${bug.duplicate_count})`
+                  : ""}
+              </Badge>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            {bug.project_name && (
+              <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">
+                Project: {bug.project_name}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              <span>
+                Tester: <b>{bug.reporter_name || bug.reported_by}</b>
+              </span>
+              <br />
+              <span>
+                Developer(s): <b>{developerNames}</b>
+              </span>
+              <br />
+              <span>Reported: {formatDateTime(bug.created_at)}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="text-xs sm:text-sm h-9 px-3 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700 text-gray-700 dark:text-gray-300 hover:text-orange-700 dark:hover:text-orange-300 font-semibold shadow-sm transition-all duration-300"
+          >
+            <Link
+              to={`/${currentUser?.role || "admin"}/bugs/${bug.id}`}
+              state={{ from: "common-bugs" }}
+            >
+              View
+            </Link>
+          </Button>
+        </div>
       </div>
     </Card>
   );

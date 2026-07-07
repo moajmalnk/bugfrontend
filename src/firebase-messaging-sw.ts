@@ -86,8 +86,16 @@ export function getNotificationPermissionState(): NotificationPermission | "unsu
   return Notification.permission;
 }
 
+function getAuthToken(): string | null {
+  return (
+    sessionStorage.getItem("token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("auth_token")
+  );
+}
+
 async function saveFcmToken(token: string): Promise<boolean> {
-  const userToken = localStorage.getItem("token");
+  const userToken = getAuthToken();
   if (!userToken) {
     return false;
   }
@@ -115,11 +123,18 @@ async function saveFcmToken(token: string): Promise<boolean> {
   });
 
   if (!response.ok) {
+    localStorage.removeItem(TOKEN_CACHE_KEY);
     return false;
   }
 
   localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
   return true;
+}
+
+/** Re-register push token on this browser/device (call after user enables notifications). */
+export async function registerPushOnThisDevice(): Promise<NotificationPermissionResult> {
+  localStorage.removeItem(TOKEN_CACHE_KEY);
+  return requestNotificationPermission({ interactive: true });
 }
 
 /**

@@ -56,6 +56,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChatListItem } from "./ChatListItem";
+import { UndoDeleteNotification } from "@/components/ui/UndoDeleteNotification";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 function messagingAuthToken(): string {
@@ -645,22 +646,6 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       [groupId]: 10,
     }));
 
-    // Show success toast with undo option
-    toast({
-      title: "Chat group deleted",
-      description: "You can undo this action within 10 seconds",
-      action: (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => undoDeleteGroup(groupId)}
-          className="ml-2"
-        >
-          Undo (10s)
-        </Button>
-      ),
-    });
-
     // Schedule server deletion after 10 seconds
     const timeoutId = setTimeout(async () => {
       try {
@@ -741,6 +726,38 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     toast({
       title: "Undo successful",
       description: "Chat group has been restored",
+    });
+  };
+
+  const confirmDeleteGroupNow = async (groupId: string) => {
+    const deletedGroup = deletedGroups[groupId];
+    if (!deletedGroup) return;
+
+    if (deletedGroup.timeoutId) {
+      clearTimeout(deletedGroup.timeoutId);
+    }
+
+    try {
+      await MessagingService.deleteGroup(groupId);
+    } catch (error) {
+      console.error("Error deleting group from server:", error);
+      setGroups((prev) => [...prev, deletedGroup.group]);
+      toast({
+        title: "Error",
+        description: "Failed to delete chat group",
+        variant: "destructive",
+      });
+    }
+
+    setDeletedGroups((prev) => {
+      const newState = { ...prev };
+      delete newState[groupId];
+      return newState;
+    });
+    setUndoCountdown((prev) => {
+      const newState = { ...prev };
+      delete newState[groupId];
+      return newState;
     });
   };
 
@@ -1913,45 +1930,23 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       )}
 
       {/* Floating Undo Notifications */}
-      {Object.keys(deletedGroups).map((groupId) => {
+      {Object.keys(deletedGroups).map((groupId, index) => {
         const deletedGroup = deletedGroups[groupId];
         const timeLeft = undoCountdown[groupId] || 0;
 
         if (!deletedGroup || timeLeft <= 0) return null;
 
         return (
-          <div
+          <UndoDeleteNotification
             key={groupId}
-            className="fixed bottom-4 right-4 z-50 bg-background border rounded-lg shadow-lg p-4 max-w-sm animate-in slide-in-from-bottom-2"
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm">Chat group deleted</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  "{deletedGroup.group.name}" has been deleted
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => undoDeleteGroup(groupId)}
-                    className="text-xs"
-                  >
-                    Undo ({timeLeft}s)
-                  </Button>
-                  <div className="flex-1 bg-muted rounded-full h-1">
-                    <div
-                      className="bg-primary h-1 rounded-full transition-all duration-1000"
-                      style={{ width: `${(timeLeft / 10) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            stackIndex={index}
+            title="Chat Group Deleted"
+            itemName={deletedGroup.group.name}
+            timeLeft={timeLeft}
+            duration={10}
+            onUndo={() => undoDeleteGroup(groupId)}
+            onConfirmNow={() => confirmDeleteGroupNow(groupId)}
+          />
         );
       })}
     </div>

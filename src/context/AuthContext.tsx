@@ -141,6 +141,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentUser) return;
     void requestNotificationPermission({ interactive: false });
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void requestNotificationPermission({ interactive: false });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [currentUser?.id]);
 
   // Run auth check on mount and token change

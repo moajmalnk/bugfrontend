@@ -144,6 +144,13 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     permission: "FEEDBACK_VIEW",
   },
   {
+    id: "page-common-bugs",
+    label: "Common Bugs",
+    path: "/common-bugs",
+    keywords: ["common bugs", "duplicate", "already raised", "recurring"],
+    adminOnly: true,
+  },
+  {
     id: "page-activity",
     label: "Activity",
     path: "/activity",

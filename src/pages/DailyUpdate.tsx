@@ -9,9 +9,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
-import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, Undo2, Plus, Bell, Timer } from 'lucide-react';
+import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, Plus, Bell, Timer } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
+import { UndoDeleteNotificationPortal } from '@/components/ui/UndoDeleteNotification';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
 import {
@@ -489,23 +490,6 @@ export default function DailyUpdate() {
   function handleDeleteSubmission(submission: any) {
     setSubmissionToDelete(submission);
     undoDelete.startCountdown();
-    
-    toast({
-      title: "Deleting submission",
-      description: `Daily update for ${submission.submission_date} will be deleted in ${undoDelete.timeLeft} seconds.`,
-      variant: "destructive",
-      action: (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => undoDelete.cancelCountdown()}
-          className="gap-2"
-        >
-          <Undo2 className="h-4 w-4" />
-          Undo
-        </Button>
-      ),
-    });
   }
 
   async function performActualDelete(submission: any) {
@@ -847,12 +831,7 @@ export default function DailyUpdate() {
                         >
                           <ClipboardCopy className="h-3 w-3" />
                         </Button>
-                        {!(currentUser?.role === 'admin' && showRequestsOnly) && submissionToDelete?.id === s.id && undoDelete.isCountingDown ? (
-                          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium">
-                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                            Deleting in {undoDelete.timeLeft}s
-                          </div>
-                        ) : !(currentUser?.role === 'admin' && showRequestsOnly) ? (
+                        {!(currentUser?.role === 'admin' && showRequestsOnly) ? (
                           <Button 
                             variant="destructive" 
                             size="sm" 
@@ -878,6 +857,16 @@ export default function DailyUpdate() {
           </TabsContent>
         </Tabs>
       </section>
+
+      <UndoDeleteNotificationPortal
+        open={undoDelete.isCountingDown && !!submissionToDelete}
+        title="Submission Deleted"
+        itemName={submissionToDelete ? `Daily update for ${submissionToDelete.submission_date}` : ""}
+        timeLeft={undoDelete.timeLeft}
+        duration={10}
+        onUndo={undoDelete.cancelCountdown}
+        onConfirmNow={undoDelete.confirmDelete}
+      />
     </main>
   );
 }

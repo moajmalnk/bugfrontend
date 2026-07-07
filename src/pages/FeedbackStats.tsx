@@ -7,6 +7,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { feedbackService, type FeedbackStats } from '@/services/feedbackService';
 import { toast } from '@/hooks/use-toast';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
+import { UndoDeleteNotificationPortal } from '@/components/ui/UndoDeleteNotification';
 import { 
   Star, 
   Users, 
@@ -135,21 +136,6 @@ export default function FeedbackStats() {
   const handleDeleteClick = (feedbackId: string) => {
     setFeedbackToDelete(feedbackId);
     startCountdown();
-    toast({
-      title: 'Feedback Deletion Started',
-      description: `Feedback will be deleted in ${timeLeft} seconds. Click "Undo" to cancel.`,
-      variant: 'default',
-      action: (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={cancelCountdown}
-          className="text-xs"
-        >
-          Undo ({timeLeft}s)
-        </Button>
-      ),
-    });
   };
 
   const getRatingColor = (rating: number) => {
@@ -502,6 +488,18 @@ export default function FeedbackStats() {
           </div>
         </div>
       </section>
+
+      <UndoDeleteNotificationPortal
+        open={isCountingDown && !!feedbackToDelete}
+        title="Feedback Deleted"
+        itemName={
+          stats?.recent_feedback.find((f) => f.id === feedbackToDelete)?.username ?? "Feedback"
+        }
+        timeLeft={timeLeft}
+        duration={10}
+        onUndo={cancelCountdown}
+        onConfirmNow={confirmDeleteFeedback}
+      />
     </main>
   );
 }

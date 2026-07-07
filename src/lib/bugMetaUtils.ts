@@ -69,3 +69,32 @@ export function bugMetaTextLines(bug: {
   }
   return lines.join("\n");
 }
+
+export const BUG_LEVEL_FORM_OPTIONS: {
+  value: BugLevel;
+  label: string;
+  hint: string;
+  selectedClass: string;
+}[] = [
+  {
+    value: "normal",
+    label: "Normal",
+    hint: "Low impact",
+    selectedClass:
+      "border-emerald-500 bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400/50",
+  },
+  {
+    value: "floap",
+    label: "Floap",
+    hint: "Notable issue",
+    selectedClass:
+      "border-amber-500 bg-amber-600 text-white shadow-sm ring-2 ring-amber-400/50",
+  },
+  {
+    value: "utter_floap",
+    label: "Utter Floap",
+    hint: "Critical breakdown",
+    selectedClass:
+      "border-red-500 bg-red-600 text-white shadow-sm ring-2 ring-red-400/50",
+  },
+];

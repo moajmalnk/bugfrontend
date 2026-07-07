@@ -14,16 +14,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,7 +22,8 @@ import { toast } from "@/components/ui/use-toast";
 import { permissionService } from "@/services/permissionService";
 import { Permission, Role } from "@/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
-import { Plus, Shield, Users, UserCog, Pencil, Trash2, AlertTriangle, Undo2, CheckSquare, Square } from "lucide-react";
+import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
+import { Plus, Shield, Users, UserCog, Pencil, Trash2, CheckSquare, Square } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function RolesTab() {
@@ -104,19 +95,6 @@ export function RolesTab() {
   const handleDeleteRole = (role: Role) => {
     setRoleToDelete(role);
     undoDelete.startCountdown();
-    toast({
-      title: "Role Deletion Started",
-      description: `${role.role_name.replace(/\s*0$/, '')} will be deleted in ${undoDelete.timeLeft} seconds. Click undo to cancel.`,
-      action: (
-        <button
-          onClick={() => undoDelete.cancelCountdown()}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
-        >
-          <Undo2 className="h-4 w-4" />
-          Undo
-        </button>
-      ),
-    });
   };
 
   const getRoleIcon = (roleName: string) => {
@@ -172,53 +150,15 @@ export function RolesTab() {
         </CardContent>
       </Card>
 
-      {/* Custom Deletion Confirmation Dialog */}
-      <AlertDialog
-        open={!!roleToDelete && undoDelete.isCountingDown}
-        onOpenChange={() => {
-          if (undoDelete.isCountingDown) {
-            undoDelete.cancelCountdown();
-          }
-        }}
-      >
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/30">
-                <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
-              </div>
-              <AlertDialogTitle className="text-xl">
-                Delete Role?
-              </AlertDialogTitle>
-            </div>
-            <AlertDialogDescription className="space-y-4 pt-2">
-              <p className="text-base">
-                You are about to delete the role <span className="font-semibold text-gray-900 dark:text-white">"{roleToDelete?.role_name.replace(/\s*0$/, '')}"</span>. This will remove all permissions associated with this role.
-              </p>
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
-                  ⏱️ This action will be completed in {undoDelete.timeLeft} seconds
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-            <AlertDialogCancel
-              onClick={() => undoDelete.cancelCountdown()}
-              className="w-full sm:w-auto order-2 sm:order-1"
-            >
-              <Undo2 className="mr-2 h-4 w-4" />
-              Cancel Deletion
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => undoDelete.confirmDelete()}
-              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 order-1 sm:order-2"
-            >
-              Delete Now
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UndoDeleteNotificationPortal
+        open={undoDelete.isCountingDown && !!roleToDelete}
+        title="Role Deleted"
+        itemName={roleToDelete?.role_name.replace(/\s*0$/, "") ?? ""}
+        timeLeft={undoDelete.timeLeft}
+        duration={10}
+        onUndo={undoDelete.cancelCountdown}
+        onConfirmNow={undoDelete.confirmDelete}
+      />
     </>
   );
 }

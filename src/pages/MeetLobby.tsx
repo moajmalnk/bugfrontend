@@ -24,6 +24,7 @@ import { ENV } from "@/lib/env";
 import { apiClient } from "@/lib/axios";
 import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
+import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 
 // Type definitions for Google Meet API response
 interface GoogleMeetResponse {
@@ -1370,93 +1371,15 @@ export default function MeetLobby() {
           </TabsContent>
         </Tabs>
 
-        {/* Undo Delete Countdown */}
-        {undoDelete.isCountingDown && deletedMeeting && (
-          <div className="fixed bottom-4 right-4 z-50">
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-4 max-w-sm">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                    <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
-                  </div>
-                  {/* Circular Progress Indicator */}
-                  <div className="absolute inset-0 w-12 h-12">
-                    <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 48 48">
-                      <circle
-                        cx="24"
-                        cy="24"
-                        r="20"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        fill="none"
-                        className="text-gray-200 dark:text-gray-700"
-                      />
-                      <circle
-                        cx="24"
-                        cy="24"
-                        r="20"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        fill="none"
-                        strokeDasharray={`${2 * Math.PI * 20}`}
-                        strokeDashoffset={`${2 * Math.PI * 20 * (1 - (10 - undoDelete.timeLeft) / 10)}`}
-                        className="text-red-500 transition-all duration-1000 ease-linear"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    Meeting Deleted
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    "{deletedMeeting.title}"
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-red-500 animate-pulse" />
-                        <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                          Permanently deleted in
-                        </span>
-                      </div>
-                      <div className="bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-md border border-red-200 dark:border-red-800">
-                        <span className="text-sm font-bold text-red-700 dark:text-red-300 tabular-nums">
-                          {undoDelete.timeLeft}s
-                        </span>
-                      </div>
-                    </div>
-                    {/* Progress Bar */}
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                      <div 
-                        className="bg-red-500 h-1.5 rounded-full transition-all duration-1000 ease-linear"
-                        style={{ width: `${((10 - undoDelete.timeLeft) / 10) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Button
-                    onClick={undoDelete.cancelCountdown}
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 h-7"
-                  >
-                    Undo
-                  </Button>
-                  <Button
-                    onClick={undoDelete.confirmDelete}
-                    size="sm"
-                    variant="outline"
-                    className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20 text-xs px-3 py-1 h-7"
-                  >
-                    Now
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <UndoDeleteNotificationPortal
+          open={undoDelete.isCountingDown && !!deletedMeeting}
+          title="Meeting Deleted"
+          itemName={deletedMeeting?.title ?? ""}
+          timeLeft={undoDelete.timeLeft}
+          duration={10}
+          onUndo={undoDelete.cancelCountdown}
+          onConfirmNow={undoDelete.confirmDelete}
+        />
 
         {/* Professional Modal for Create/Join Meeting */}
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

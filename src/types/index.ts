@@ -52,6 +52,20 @@ export type BugPriority = 'low' | 'medium' | 'high';
 export type BugLevel = 'normal' | 'floap' | 'utter_floap';
 export type BugStatus = 'pending' | 'in_progress' | 'fixed' | 'rejected' | 'declined';
 
+export type CommonBugReason = 'already_raised' | 'duplicate';
+
+export type CommonBug = Bug & {
+  common_reasons: CommonBugReason[];
+  duplicate_count?: number;
+  project_developers: { id: string; username: string }[];
+};
+
+export type CommonBugsSummary = {
+  total: number;
+  already_raised_count: number;
+  duplicate_count: number;
+};
+
 export type UserRole = 'admin' | 'developer' | 'tester';
 
 export interface Permission {

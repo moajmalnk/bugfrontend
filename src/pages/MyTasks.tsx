@@ -9,11 +9,12 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2, Undo2, X, Share2, Copy, ChevronsUpDown, Check } from 'lucide-react';
+import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, Users, CheckCircle2, X, Share2, Copy, ChevronsUpDown, Check } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { useAuth } from '@/context/AuthContext';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
+import { UndoDeleteNotificationPortal } from '@/components/ui/UndoDeleteNotification';
 import { useSearchParams } from 'react-router-dom';
 import { projectService, Project } from '@/services/projectService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -449,20 +450,6 @@ export default function MyTasks() {
 
     setTaskToDelete(task);
     undoDeleteTask.startCountdown();
-
-    toast({
-      title: "Task Deletion Started",
-      description: `"${task.title}" will be deleted in ${undoDeleteTask.timeLeft} seconds. Click undo to cancel.`,
-      action: (
-        <button
-          onClick={() => undoDeleteTask.cancelCountdown()}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
-        >
-          <Undo2 className="h-4 w-4" />
-          Undo
-        </button>
-      ),
-    });
   }
 
   async function markCompleted(t: UserTask) {
@@ -616,20 +603,6 @@ export default function MyTasks() {
 
     setSharedTaskToDelete(task);
     undoDeleteSharedTask.startCountdown();
-
-    toast({
-      title: "Shared Task Deletion Started",
-      description: `"${task.title}" will be deleted in ${undoDeleteSharedTask.timeLeft} seconds. Click undo to cancel.`,
-      action: (
-        <button
-          onClick={() => undoDeleteSharedTask.cancelCountdown()}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
-        >
-          <Undo2 className="h-4 w-4" />
-          Undo
-        </button>
-      ),
-    });
   }
 
   async function markSharedCompleted(t: SharedTask) {
@@ -1281,14 +1254,7 @@ export default function MyTasks() {
                         )
                       },
                       {
-                        component: taskToDelete?.id === t.id && undoDeleteTask.isCountingDown ? (
-                          <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                            <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                          {undoDeleteTask.timeLeft}s
-                        </span>
-                      </div>
-                    ) : (
+                        component: (
                       <Button 
                             variant="destructive"
                         size="sm" 
@@ -1697,14 +1663,7 @@ export default function MyTasks() {
                             )
                           });
                           buttons.push({
-                            component: sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
-                              <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
-                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                                <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                                  {undoDeleteSharedTask.timeLeft}s
-                                </span>
-                              </div>
-                            ) : (
+                            component: (
                               <Button 
                                 variant="destructive"
                                 size="sm" 
@@ -1732,14 +1691,7 @@ export default function MyTasks() {
                             )
                           });
                           buttons.push({
-                            component: sharedTaskToDelete?.id === t.id && undoDeleteSharedTask.isCountingDown ? (
-                              <div className="flex items-center justify-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-11 w-full">
-                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                                <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                                  {undoDeleteSharedTask.timeLeft}s
-                                </span>
-                              </div>
-                            ) : (
+                            component: (
                               <Button 
                                 variant="destructive"
                                 size="sm" 
@@ -3042,14 +2994,7 @@ export default function MyTasks() {
                       }] : []),
                       // Delete button (only for creator)
                       ...(selectedShared.created_by === currentUser?.id ? [{
-                        component: selectedShared.id && undoDeleteSharedTask.isCountingDown && sharedTaskToDelete?.id === selectedShared.id ? (
-                          <div className="flex items-center justify-center gap-2 px-6 py-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md h-12 w-full">
-                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                          <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                            Deleting in {undoDeleteSharedTask.timeLeft}s
-                          </span>
-                        </div>
-                      ) : (
+                        component: (
                         <Button 
                           variant="outline"
                           onClick={async () => { 
@@ -3152,6 +3097,28 @@ export default function MyTasks() {
           </DialogContent>
         </Dialog>
       </section>
+
+      <UndoDeleteNotificationPortal
+        open={undoDeleteTask.isCountingDown && !!taskToDelete}
+        title="Task Deleted"
+        itemName={taskToDelete?.title ?? ""}
+        timeLeft={undoDeleteTask.timeLeft}
+        duration={10}
+        onUndo={undoDeleteTask.cancelCountdown}
+        onConfirmNow={undoDeleteTask.confirmDelete}
+        stackIndex={undoDeleteSharedTask.isCountingDown && sharedTaskToDelete ? 1 : 0}
+      />
+
+      <UndoDeleteNotificationPortal
+        open={undoDeleteSharedTask.isCountingDown && !!sharedTaskToDelete}
+        title="Shared Task Deleted"
+        itemName={sharedTaskToDelete?.title ?? ""}
+        timeLeft={undoDeleteSharedTask.timeLeft}
+        duration={10}
+        onUndo={undoDeleteSharedTask.cancelCountdown}
+        onConfirmNow={undoDeleteSharedTask.confirmDelete}
+        stackIndex={0}
+      />
     </main>
   );
 }

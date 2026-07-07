@@ -1,13 +1,8 @@
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -16,6 +11,19 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -28,31 +36,36 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { apiClient } from "@/lib/axios";
 import { sendBugStatusUpdateNotification } from "@/services/emailService";
-import { Bug, BugPriority, BugStatus } from "@/types";
+import { Bug, BugLevel, BugPriority, BugStatus, Project } from "@/types";
+import { cn } from "@/lib/utils";
+import { ENV } from "@/lib/env";
+import {
+  BUG_LEVEL_FORM_OPTIONS,
+  isAlreadyRaised,
+} from "@/lib/bugMetaUtils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient } from "@tanstack/react-query";
-import React, { ChangeEvent, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  Download,
-  Eye,
+  ArrowLeft,
+  Check,
+  ChevronsUpDown,
   File,
   FileImage,
-  ImagePlus,
   Paperclip,
-  Plus,
-  Volume2,
   X,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { ENV } from "@/lib/env";
 import { useAuth } from "@/context/AuthContext";
 import {
   RecordedVoiceNote,
   WhatsAppVoiceRecorder,
 } from "@/components/voice/WhatsAppVoiceRecorder";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
+import { ScreenshotDropZone } from "@/components/attachments/ScreenshotDropZone";
 
 // Character limits
 const TITLE_MAX = 120;
@@ -115,9 +128,10 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-interface EditBugDialogProps {
+interface EditBugFormProps {
   bug: Bug;
-  children: React.ReactNode;
+  onCancel: () => void;
+  onSuccess?: () => void;
 }
 
 interface ApiResponse<T> {
@@ -126,8 +140,7 @@ interface ApiResponse<T> {
   data?: T;
 }
 
-const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
-  const [open, setOpen] = useState(false);
+const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
   const { currentUser } = useAuth();
@@ -140,10 +153,38 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
   const [attachmentsToDelete, setAttachmentsToDelete] = useState<string[]>([]);
 
   const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
+  const [alreadyRaised, setAlreadyRaised] = useState(() =>
+    isAlreadyRaised(bug.already_raised)
+  );
+  const [bugLevel, setBugLevel] = useState<BugLevel>(
+    bug.bug_level || "normal"
+  );
+  const [projectId, setProjectId] = useState(bug.project_id);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
   // Refs for file inputs
   const screenshotInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    data: projects = [],
+    isLoading: projectsLoading,
+    error: projectsError,
+  } = useQuery({
+    queryKey: ["projects", currentUser?.id],
+    queryFn: async () => {
+      const token = localStorage.getItem("token");
+      const response = await axios.get<ApiResponse<Project[]>>(
+        `${ENV.API_URL}/projects/getAll.php`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.data.success) return response.data.data;
+      throw new Error(response.data.message || "Failed to fetch projects");
+    },
+    enabled: !!currentUser,
+  });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -157,9 +198,8 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
     },
   });
 
-  // Reset form and load existing attachments when bug changes or dialog opens
+  // Reset form and load existing attachments when bug changes
   useEffect(() => {
-    if (open) {
     form.reset({
       title: bug.title,
       description: bug.description,
@@ -168,6 +208,9 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
       priority: bug.priority as BugPriority,
       status: bug.status as BugStatus,
     });
+    setAlreadyRaised(isAlreadyRaised(bug.already_raised));
+    setBugLevel(bug.bug_level || "normal");
+    setProjectId(bug.project_id);
 
       // Load existing attachments
       const loadAttachments = async () => {
@@ -209,8 +252,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
       setFiles([]);
       setVoiceNotes([]);
       setAttachmentsToDelete([]);
-    }
-  }, [bug, form, open]);
+  }, [bug, form]);
 
   // Cleanup effect for blob URLs
   useEffect(() => {
@@ -248,15 +290,65 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
 
   const handleScreenshotChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files) as FileWithPreview[];
-      newFiles.forEach((file) => {
-        if (file.type.startsWith("image/")) {
-          file.preview = URL.createObjectURL(file);
-        }
-      });
-      setScreenshots((prev) => [...prev, ...newFiles]);
+      addScreenshotFiles(Array.from(e.target.files));
       e.target.value = "";
     }
+  };
+
+  const addScreenshotFiles = (raw: File[]) => {
+    if (raw.length === 0) return;
+    const imageFiles = raw.filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) {
+      toast({
+        title: "Images only",
+        description: "Please use image files (PNG, JPG, GIF, WebP, …).",
+        variant: "destructive",
+      });
+      return;
+    }
+    const newFiles = imageFiles as FileWithPreview[];
+    newFiles.forEach((file) => {
+      file.preview = URL.createObjectURL(file);
+    });
+    setScreenshots((prev) => [...prev, ...newFiles]);
+  };
+
+  const handlePasteScreenshot = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const pasted: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf("image") !== -1) {
+        const file = item.getAsFile();
+        if (file) pasted.push(file);
+      }
+    }
+    if (pasted.length > 0) addScreenshotFiles(pasted);
+  };
+
+  const clearAllScreenshots = () => {
+    screenshots.forEach((file) => {
+      if (file.preview) URL.revokeObjectURL(file.preview);
+    });
+    setScreenshots([]);
+  };
+
+  const clearAllFiles = () => {
+    files.forEach((file) => {
+      if (file.preview) URL.revokeObjectURL(file.preview);
+    });
+    setFiles([]);
+  };
+
+  const clearAllVoiceNotes = () => {
+    voiceNotes.forEach((voiceNote) => {
+      if (voiceNote.audioUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(voiceNote.audioUrl);
+      }
+    });
+    setVoiceNotes([]);
+    setActiveVoiceId(null);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -361,6 +453,15 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
       return;
     }
 
+    if (!projectId) {
+      toast({
+        title: "Project required",
+        description: "Please select a project for this bug.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Create FormData for file uploads
@@ -372,7 +473,9 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
       formData.append("actual_result", values.actual_result || "");
       formData.append("priority", values.priority);
       formData.append("status", values.status);
-      formData.append("project_id", bug.project_id);
+      formData.append("already_raised", alreadyRaised ? "1" : "0");
+      formData.append("bug_level", bugLevel);
+      formData.append("project_id", projectId);
 
       // Add new screenshots
       screenshots.forEach((file) => {
@@ -475,7 +578,7 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
       queryClient.invalidateQueries({ queryKey: ["bug", bug.id] });
       queryClient.invalidateQueries({ queryKey: ["bugs"] });
 
-      setOpen(false);
+      onSuccess?.();
     } catch (error: any) {
       console.error("Failed to update bug:", error);
       
@@ -508,37 +611,21 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent
-        className="
-          w-full
-          max-w-[95vw]
-          sm:max-w-[720px]
-          lg:max-w-[900px]
-          max-h-[90vh]
-          overflow-y-auto
-          px-4
-          sm:px-6
-        "
-      >
-        <DialogHeader>
-          <DialogTitle>Edit Bug</DialogTitle>
-          <DialogDescription>
-            Update the bug details and add or remove attachments.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <CardContent className="space-y-8 p-6 sm:p-8 pt-4">
             {/* Title Field with Character Counter */}
             <FormField
               control={form.control}
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Bug Title</FormLabel>
+                  <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-orange-500 to-red-600 rounded-full" />
+                    Bug Title
+                  </FormLabel>
                   <FormControl>
-                    <Input {...field} maxLength={TITLE_MAX} />
+                    <Input {...field} maxLength={TITLE_MAX} className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800" />
                   </FormControl>
                   <div className="flex justify-between items-center text-xs text-gray-500">
                     <span>Keep it concise and specific</span>
@@ -557,9 +644,12 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full" />
+                    Description
+                  </FormLabel>
                   <FormControl>
-                    <Textarea rows={5} {...field} maxLength={DESCRIPTION_MAX} />
+                    <Textarea rows={5} {...field} maxLength={DESCRIPTION_MAX} className="min-h-[150px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800" />
                   </FormControl>
                   <div className="flex justify-between items-center text-xs text-gray-500">
                     <span>Describe the bug in detail</span>
@@ -577,19 +667,23 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
               control={form.control}
               name="expected_result"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Expected Result (Optional)</FormLabel>
+                <FormItem className="space-y-3">
+                  <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full" />
+                    Expected Result
+                    <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(Optional)</span>
+                  </FormLabel>
                   <FormControl>
-                    <Textarea 
-                      rows={3} 
-                      maxLength={EXPECTED_RESULT_MAX} 
-                      placeholder="What should have happened?" 
-                      {...field} 
+                    <Textarea
+                      maxLength={EXPECTED_RESULT_MAX}
+                      placeholder="What should have happened? Describe the expected behavior..."
+                      className="min-h-[100px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      {...field}
                     />
                   </FormControl>
-                  <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span>Describe expected behavior</span>
-                    <span className={field.value && field.value.length > EXPECTED_RESULT_MAX * 0.9 ? 'text-green-600 font-semibold' : ''}>
+                  <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-medium">Describe what you expected to happen</span>
+                    <span className={`font-semibold ${(field.value?.length || 0) > EXPECTED_RESULT_MAX * 0.9 ? "text-green-600" : ""}`}>
                       {field.value?.length || 0}/{EXPECTED_RESULT_MAX}
                     </span>
                   </div>
@@ -603,19 +697,23 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
               control={form.control}
               name="actual_result"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Actual Result (Optional)</FormLabel>
+                <FormItem className="space-y-3">
+                  <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-red-500 to-pink-600 rounded-full" />
+                    Actual Result
+                    <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(Optional)</span>
+                  </FormLabel>
                   <FormControl>
-                    <Textarea 
-                      rows={3} 
-                      maxLength={ACTUAL_RESULT_MAX} 
-                      placeholder="What actually happened?" 
-                      {...field} 
+                    <Textarea
+                      maxLength={ACTUAL_RESULT_MAX}
+                      placeholder="What actually happened? Describe the actual behavior..."
+                      className="min-h-[100px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      {...field}
                     />
                   </FormControl>
-                  <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span>Describe actual behavior</span>
-                    <span className={field.value && field.value.length > ACTUAL_RESULT_MAX * 0.9 ? 'text-red-600 font-semibold' : ''}>
+                  <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-medium">Describe what actually happened instead</span>
+                    <span className={`font-semibold ${(field.value?.length || 0) > ACTUAL_RESULT_MAX * 0.9 ? "text-red-600" : ""}`}>
                       {field.value?.length || 0}/{ACTUAL_RESULT_MAX}
                     </span>
                   </div>
@@ -624,23 +722,101 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
               )}
             />
 
+            {/* Project */}
+            <div className="space-y-3">
+              <Label
+                htmlFor="edit-bug-project"
+                className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"
+              >
+                <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-purple-500 to-violet-600 rounded-full" />
+                Project
+              </Label>
+              <Popover open={projectPickerOpen} onOpenChange={setProjectPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="edit-bug-project"
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={projectPickerOpen}
+                    className="h-12 w-full justify-between border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                  >
+                    <span className="truncate">
+                      {projectId
+                        ? (projects as Project[])?.find((p) => p.id === projectId)?.name ||
+                          bug.project_name ||
+                          "Select a project"
+                        : "Select a project"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[70]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search project..." />
+                    <CommandList>
+                      <CommandEmpty>No project found.</CommandEmpty>
+                      {projectsLoading ? (
+                        <CommandGroup>
+                          <CommandItem disabled>Loading projects...</CommandItem>
+                        </CommandGroup>
+                      ) : projectsError ? (
+                        <CommandGroup>
+                          <CommandItem disabled>Error loading projects</CommandItem>
+                        </CommandGroup>
+                      ) : (projects as Project[])?.length === 0 ? (
+                        <CommandGroup>
+                          <CommandItem disabled>No projects available</CommandItem>
+                        </CommandGroup>
+                      ) : (
+                        <CommandGroup>
+                          {(projects as Project[])?.map((project: Project) => (
+                            <CommandItem
+                              key={project.id}
+                              value={`${project.name} ${project.id}`}
+                              onSelect={() => {
+                                setProjectId(project.id);
+                                setProjectPickerOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  projectId === project.id ? "opacity-100" : "opacity-0"
+                                }`}
+                              />
+                              {project.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Priority & Status */}
+            <div className="grid gap-6 md:grid-cols-2">
             {/* Priority Field */}
             <FormField
               control={form.control}
               name="priority"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Priority</FormLabel>
+                  <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full" />
+                    Priority
+                  </FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
                         <SelectValue placeholder="Select priority" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="z-[60]">
                       <SelectItem value="low">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -672,17 +848,20 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
               name="status"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Status</FormLabel>
+                  <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full" />
+                    Status
+                  </FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="z-[60]">
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="fixed">Fixed</SelectItem>
@@ -694,12 +873,111 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                 </FormItem>
               )}
             />
+            </div>
+
+            {/* Already Raised */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full" />
+                Is this bug already raised?
+              </Label>
+              <div className="rounded-xl border border-blue-200/60 dark:border-blue-800/50 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-950/15 dark:to-indigo-950/10 p-4 shadow-sm">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Mark <span className="font-medium text-gray-700 dark:text-gray-300">Yes</span> if the same issue was reported before
+                </p>
+                <div
+                  className="grid w-full grid-cols-2 gap-2"
+                  role="radiogroup"
+                  aria-label="Is this bug already raised?"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!alreadyRaised}
+                    onClick={() => setAlreadyRaised(false)}
+                    className={cn(
+                      "h-11 w-full cursor-pointer rounded-lg border text-sm font-semibold transition-all",
+                      !alreadyRaised
+                        ? "border-emerald-500 bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400/50"
+                        : "border-gray-200/80 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
+                    )}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={alreadyRaised}
+                    onClick={() => setAlreadyRaised(true)}
+                    className={cn(
+                      "h-11 w-full cursor-pointer rounded-lg border text-sm font-semibold transition-all",
+                      alreadyRaised
+                        ? "border-amber-500 bg-amber-600 text-white shadow-sm ring-2 ring-amber-400/50"
+                        : "border-gray-200/80 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
+                    )}
+                  >
+                    Yes
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bug Level */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-violet-500 to-purple-600 rounded-full" />
+                Bug Level
+              </Label>
+              <div className="rounded-xl border border-violet-200/60 dark:border-violet-800/50 bg-gradient-to-br from-violet-50/50 to-purple-50/30 dark:from-violet-950/15 dark:to-purple-950/10 p-4 shadow-sm">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Rate how severe the impact feels — from normal workflow issues to utter floap
+                </p>
+                <div
+                  className="grid w-full grid-cols-1 sm:grid-cols-3 gap-2"
+                  role="radiogroup"
+                  aria-label="Bug level rating"
+                >
+                  {BUG_LEVEL_FORM_OPTIONS.map((option) => {
+                    const selected = bugLevel === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setBugLevel(option.value)}
+                        className={cn(
+                          "min-h-12 w-full cursor-pointer flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all",
+                          selected
+                            ? option.selectedClass
+                            : "border-gray-200/80 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
+                        )}
+                      >
+                        <span>{option.label}</span>
+                        <span
+                          className={cn(
+                            "text-[10px] font-normal",
+                            selected ? "text-white/90" : "opacity-70"
+                          )}
+                        >
+                          {option.hint}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
 
             {/* Attachments Section */}
-            <div className="space-y-4 border-t pt-4">
-              <Label className="text-base font-semibold">Attachments</Label>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full" />
+                  Attachments
+                </Label>
+              </div>
 
-              {/* Hidden file inputs */}
               <input
                 type="file"
                 ref={screenshotInputRef}
@@ -716,380 +994,357 @@ const EditBugDialog = ({ bug, children }: EditBugDialogProps) => {
                 multiple
               />
 
-              {/* Three-card grid: screenshots, files, voice recorder - matching UI/UX */}
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-                {/* Screenshots section - matching Voice Note design */}
-                <div className="space-y-3">
-                  <div
-                    className="w-full h-28 sm:h-28 rounded-xl border-2 border-dashed border-gray-300 bg-slate-900/60 px-4 py-3 shadow-sm transition-all dark:border-gray-600 hover:border-blue-400 hover:shadow-[0_0_0_1px_rgba(59,130,246,0.4)] cursor-pointer"
-                    onClick={handleScreenshotClick}
-                  >
-                    <div className="flex h-full w-full items-center justify-center gap-4">
-                  <Button
-                    type="button"
-                        disabled={isSubmitting}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleScreenshotClick();
-                        }}
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg transition-all disabled:opacity-50"
-                        aria-label="Add Screenshots"
-                  >
-                        <ImagePlus className="h-5 w-5" />
-                  </Button>
-                      <span className="text-sm font-semibold text-gray-100">
-                        Add Screenshots
-                      </span>
-                    </div>
-                  </div>
-                  {screenshots.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                        New Screenshots ({screenshots.length})
-                      </Label>
-                      {screenshots.map((file, index) => (
-                        <div key={index} className="relative rounded border p-2 group">
-                          {file.preview && (
-                            <img
-                              src={file.preview}
-                              alt={`Screenshot ${index + 1}`}
-                              className="h-16 w-full object-cover rounded"
-                            />
-                          )}
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon"
-                            className="h-5 w-5 absolute -top-1 -right-1"
-                            onClick={() => removeScreenshot(index)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Files section - matching Voice Note design */}
-                <div className="space-y-3">
-                  <div
-                    className="w-full h-28 sm:h-28 rounded-xl border-2 border-dashed border-gray-300 bg-slate-900/60 px-4 py-3 shadow-sm transition-all dark:border-gray-600 hover:border-purple-400 hover:shadow-[0_0_0_1px_rgba(168,85,247,0.4)] cursor-pointer"
-                    onClick={handleFileClick}
-                  >
-                    <div className="flex h-full w-full items-center justify-center gap-4">
-                  <Button
-                    type="button"
-                        disabled={isSubmitting}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleFileClick();
-                        }}
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-purple-500 hover:bg-purple-600 text-white shadow-lg transition-all disabled:opacity-50"
-                        aria-label="Attach Files"
-                  >
-                        <Paperclip className="h-5 w-5" />
-                  </Button>
-                      <span className="text-sm font-semibold text-gray-100">
-                        Attach Files
-                      </span>
-                    </div>
-                  </div>
-                  {files.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-green-700 dark:text-green-400">
-                        New Files ({files.length})
-                      </Label>
-                      {files.map((file, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between rounded border p-2 text-sm"
-                        >
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <File className="h-4 w-4 flex-shrink-0" />
-                            <span className="truncate text-xs">{file.name}</span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 flex-shrink-0"
-                            onClick={() => removeFile(index)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Voice Notes section - recorder only */}
-                <div className="space-y-3">
-                  <WhatsAppVoiceRecorder
-                    onComplete={handleVoiceRecorderComplete}
-                    disabled={isSubmitting}
-                    maxDuration={300}
-                  />
-                </div>
-              </div>
-
-              {/* Compact voice-notes list below attachments */}
-              {voiceNotes.length > 0 && (
-                <div className="mt-4 space-y-3">
-                  <Label className="text-sm font-medium text-purple-700 dark:text-purple-400">
-                    New Voice Notes ({voiceNotes.length})
-                  </Label>
-                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                    {voiceNotes.map((voiceNote, index) => {
-                      const voiceId = voiceNote.id;
-                      return (
-                        <WhatsAppVoiceMessage
-                          key={voiceId}
-                          id={voiceId}
-                          audioSource={voiceNote.blob}
-                          duration={voiceNote.duration}
-                          waveform={voiceNote.waveform}
-                          accent="sent"
-                          autoPlay
-                          isActive={activeVoiceId === voiceId}
-                          onPlay={(id) => setActiveVoiceId(id)}
-                          onPause={(id) => {
-                            if (id === activeVoiceId) {
-                              setActiveVoiceId(null);
-                            }
-                          }}
-                          onRemove={() => {
-                            if (activeVoiceId === voiceId) {
-                              setActiveVoiceId(null);
-                            }
-                            removeVoiceNote(index);
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Existing Attachments - Separated by Type */}
-              {existingAttachments.length > 0 && (() => {
-                const voiceNoteAttachments = existingAttachments.filter(att => att.file_type.startsWith("audio/"));
-                const screenshotAttachments = existingAttachments.filter(att => att.file_type.startsWith("image/"));
-                const otherAttachments = existingAttachments.filter(att => 
-                  !att.file_type.startsWith("audio/") && !att.file_type.startsWith("image/")
+              {(() => {
+                const voiceNoteAttachments = existingAttachments.filter((att) =>
+                  att.file_type.startsWith("audio/")
                 );
+                const screenshotAttachments = existingAttachments.filter((att) =>
+                  att.file_type.startsWith("image/")
+                );
+                const otherAttachments = existingAttachments.filter(
+                  (att) =>
+                    !att.file_type.startsWith("audio/") &&
+                    !att.file_type.startsWith("image/")
+                );
+                const totalScreenshots =
+                  screenshots.length + screenshotAttachments.length;
+                const totalFiles = files.length + otherAttachments.length;
+                const totalVoiceNotes =
+                  voiceNotes.length + voiceNoteAttachments.length;
 
                 return (
-                  <div className="border-t pt-4 space-y-6">
-                    {/* Voice Notes Section */}
-                    {voiceNoteAttachments.length > 0 && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded">
-                            <Volume2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                          </div>
-                          <Label className="text-sm font-semibold text-gray-900 dark:text-white">
-                            Existing Voice Notes ({voiceNoteAttachments.length})
-                          </Label>
-                        </div>
+                  <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+                    {/* Screenshots column */}
+                    <div
+                      className="space-y-4 min-w-0"
+                      tabIndex={0}
+                      onPaste={handlePasteScreenshot}
+                    >
+                      <ScreenshotDropZone
+                        onAddFiles={addScreenshotFiles}
+                        onOpenPicker={handleScreenshotClick}
+                        disabled={isSubmitting}
+                      />
+                      {totalScreenshots > 0 && (
                         <div className="space-y-3">
-                          {voiceNoteAttachments.map((attachment, index) => {
-                            const messageId = `existing-${attachment.id}`;
-                            const audioSource = attachment.full_url ?? `${ENV.API_URL}/${attachment.file_path}`;
-                            return (
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate">
+                              Screenshots ({totalScreenshots})
+                            </Label>
+                            {screenshots.length > 0 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearAllScreenshots}
+                                className="text-xs shrink-0 text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                              >
+                                Clear All
+                              </Button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            {screenshotAttachments.map((attachment) => (
                               <div
                                 key={attachment.id}
-                                className="rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20 p-3 space-y-3"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                                      Voice Note {index + 1}
-                                    </div>
-                                    <div className="text-xs text-purple-600 dark:text-purple-400">
-                                      {attachment.file_name}
-                                    </div>
-                                  </div>
-                                  <div className="h-8 w-8 flex items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/40">
-                                    <Volume2 className="h-4 w-4 text-purple-600 dark:text-purple-300" />
-                                  </div>
-                                </div>
-                                <WhatsAppVoiceMessage
-                                  id={messageId}
-                                  audioSource={audioSource}
-                                  accent="received"
-                                  autoPlay
-                                  isActive={activeVoiceId === messageId}
-                                  onPlay={(id) => setActiveVoiceId(id)}
-                                  onPause={(id) => {
-                                    if (id === activeVoiceId) {
-                                      setActiveVoiceId(null);
-                                    }
-                                  }}
-                                  onDownload={() => downloadAttachment(attachment)}
-                                  onRemove={() => removeExistingAttachment(attachment.id)}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Screenshots Section */}
-                    {screenshotAttachments.length > 0 && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded">
-                            <FileImage className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <Label className="text-sm font-semibold text-gray-900 dark:text-white">
-                            Existing Screenshots ({screenshotAttachments.length})
-                          </Label>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {screenshotAttachments.map((attachment) => (
-                            <div key={attachment.id} className="group relative rounded-lg border border-blue-200 dark:border-blue-800 overflow-hidden bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors">
-                              <div 
-                                className="relative aspect-video bg-gray-100 dark:bg-gray-800 cursor-pointer"
-                                onClick={() => viewImage(attachment.full_url!, attachment.file_name)}
+                                className="relative rounded-xl border border-gray-200 dark:border-gray-700 p-2 group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
                               >
                                 <img
                                   src={attachment.full_url}
                                   alt={attachment.file_name}
-                                  className="h-full w-full object-cover group-hover:opacity-90 transition-opacity"
+                                  className="h-24 w-full object-cover rounded-lg cursor-pointer"
+                                  onClick={() =>
+                                    viewImage(
+                                      attachment.full_url!,
+                                      attachment.file_name
+                                    )
+                                  }
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                    const parent = target.parentElement;
-                                    if (parent) {
-                                      parent.innerHTML = '<svg class="h-12 w-12 text-gray-400 m-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>';
-                                    }
+                                    target.style.display = "none";
                                   }}
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Eye className="h-6 w-6 text-white drop-shadow-lg" />
-                                </div>
-                              </div>
-                              <div className="p-2 bg-white dark:bg-gray-900">
-                                <div className="truncate text-xs font-medium text-gray-900 dark:text-white">
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg"
+                                  onClick={() =>
+                                    removeExistingAttachment(attachment.id)
+                                  }
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                                <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">
                                   {attachment.file_name}
                                 </div>
-                                <div className="flex items-center justify-between mt-1">
-                                  <span className="text-xs text-blue-600 dark:text-blue-400">Screenshot</span>
-                                  <div className="flex items-center gap-0.5">
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 hover:bg-green-50 dark:hover:bg-green-950/20 hover:text-green-600"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        downloadAttachment(attachment);
-                                      }}
-                                      title="Download"
-                                    >
-                                      <Download className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        removeExistingAttachment(attachment.id);
-                                      }}
-                                      title="Remove"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
+                              </div>
+                            ))}
+                            {screenshots.map((file, index) => (
+                              <div
+                                key={`new-${index}`}
+                                className="relative rounded-xl border border-gray-200 dark:border-gray-700 p-2 group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                              >
+                                {file.preview ? (
+                                  <img
+                                    src={file.preview}
+                                    alt={`Screenshot ${index + 1}`}
+                                    className="h-24 w-full object-cover rounded-lg"
+                                  />
+                                ) : (
+                                  <div className="h-24 w-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                    <FileImage className="h-8 w-8 text-gray-400" />
+                                  </div>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg"
+                                  onClick={() => removeScreenshot(index)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                                <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">
+                                  {file.name}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Files column */}
+                    <div className="space-y-4 min-w-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400 dark:hover:border-green-500 hover:bg-green-50/50 dark:hover:bg-green-950/20 transition-all duration-300 rounded-xl group"
+                        onClick={handleFileClick}
+                        disabled={isSubmitting}
+                      >
+                        <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full mb-3 group-hover:bg-green-200 dark:group-hover:bg-green-800/40 transition-colors">
+                          <Paperclip className="h-6 w-6 text-green-600 dark:text-green-400" />
+                        </div>
+                        <span className="font-semibold text-gray-700 dark:text-gray-300">
+                          Attach Files
+                        </span>
+                      </Button>
+                      {totalFiles > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate">
+                              Files ({totalFiles})
+                            </Label>
+                            {files.length > 0 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearAllFiles}
+                                className="text-xs shrink-0 text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                              >
+                                Clear All
+                              </Button>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            {otherAttachments.map((attachment) => (
+                              <div
+                                key={attachment.id}
+                                className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                              >
+                                <div className="flex items-center space-x-3 overflow-hidden min-w-0 flex-1">
+                                  <div className="h-10 w-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg shrink-0">
+                                    <File className="h-5 w-5 text-gray-400" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate font-medium text-gray-700 dark:text-gray-300">
+                                      {attachment.file_name}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {attachment.file_type || "File"}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Other Attachments Section */}
-                    {otherAttachments.length > 0 && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 bg-gray-100 dark:bg-gray-800 rounded">
-                            <File className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                          </div>
-                          <Label className="text-sm font-semibold text-gray-900 dark:text-white">
-                            Existing Attachments ({otherAttachments.length})
-                          </Label>
-                        </div>
-                        <div className="space-y-2">
-                          {otherAttachments.map((attachment) => (
-                            <div key={attachment.id} className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                              <div className="h-12 w-12 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg flex-shrink-0">
-                                <File className="h-6 w-6 text-gray-500 dark:text-gray-400" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                                  {attachment.file_name}
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                  {attachment.file_type || 'File'}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 flex-shrink-0">
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 hover:bg-green-50 dark:hover:bg-green-950/20 hover:text-green-600 dark:hover:text-green-400"
-                                  onClick={() => downloadAttachment(attachment)}
-                                  title="Download"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
-                                  onClick={() => removeExistingAttachment(attachment.id)}
-                                  title="Remove"
+                                  className="h-8 w-8 shrink-0 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
+                                  onClick={() =>
+                                    removeExistingAttachment(attachment.id)
+                                  }
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                            {files.map((file, index) => (
+                              <div
+                                key={`new-${index}`}
+                                className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800"
+                              >
+                                <div className="flex items-center space-x-3 overflow-hidden min-w-0 flex-1">
+                                  {file.preview ? (
+                                    <img
+                                      src={file.preview}
+                                      alt={`File preview ${index + 1}`}
+                                      className="h-10 w-10 object-cover rounded-lg shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="h-10 w-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg shrink-0">
+                                      <File className="h-5 w-5 text-gray-400" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate font-medium text-gray-700 dark:text-gray-300">
+                                      {file.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {(file.size / 1024).toFixed(1)} KB
+                                    </div>
+                                  </div>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
+                                  onClick={() => removeFile(index)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+
+                    {/* Voice notes column */}
+                    <div className="space-y-4 min-w-0">
+                      <WhatsAppVoiceRecorder
+                        onComplete={handleVoiceRecorderComplete}
+                        onCancel={() =>
+                          toast({
+                            title: "Recording cancelled",
+                            description: "Hold the mic to record a new voice note.",
+                          })
+                        }
+                        disabled={isSubmitting}
+                        maxDuration={300}
+                      />
+                      {totalVoiceNotes > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate">
+                              Voice Notes ({totalVoiceNotes})
+                            </Label>
+                            {voiceNotes.length > 0 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearAllVoiceNotes}
+                                className="text-xs shrink-0 text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                              >
+                                Clear All
+                              </Button>
+                            )}
+                          </div>
+                          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                            {voiceNoteAttachments.map((attachment) => {
+                              const messageId = `existing-${attachment.id}`;
+                              const audioSource =
+                                attachment.full_url ??
+                                `${ENV.API_URL}/${attachment.file_path}`;
+                              return (
+                                <div
+                                  key={attachment.id}
+                                  className="rounded-xl border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800"
+                                >
+                                  <WhatsAppVoiceMessage
+                                    id={messageId}
+                                    audioSource={audioSource}
+                                    accent="received"
+                                    autoPlay
+                                    isActive={activeVoiceId === messageId}
+                                    onPlay={(id) => setActiveVoiceId(id)}
+                                    onPause={(id) => {
+                                      if (id === activeVoiceId) setActiveVoiceId(null);
+                                    }}
+                                    onDownload={() => downloadAttachment(attachment)}
+                                    onRemove={() =>
+                                      removeExistingAttachment(attachment.id)
+                                    }
+                                  />
+                                </div>
+                              );
+                            })}
+                            {voiceNotes.map((voiceNote, index) => {
+                              const voiceId = voiceNote.id;
+                              return (
+                                <div
+                                  key={voiceId}
+                                  className="rounded-xl border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800"
+                                >
+                                  <WhatsAppVoiceMessage
+                                    id={voiceId}
+                                    audioSource={voiceNote.blob}
+                                    duration={voiceNote.duration}
+                                    waveform={voiceNote.waveform}
+                                    accent="sent"
+                                    autoPlay
+                                    isActive={activeVoiceId === voiceId}
+                                    onPlay={(id) => setActiveVoiceId(id)}
+                                    onPause={(id) => {
+                                      if (id === activeVoiceId) setActiveVoiceId(null);
+                                    }}
+                                    onRemove={() => {
+                                      if (activeVoiceId === voiceId) setActiveVoiceId(null);
+                                      removeVoiceNote(index);
+                                    }}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
             </div>
 
-            <DialogFooter className="gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
-            </DialogFooter>
+        </CardContent>
+            <CardFooter className="p-6 sm:p-8 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+              <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onCancel}
+                  disabled={isSubmitting}
+                  className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="h-12 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </CardFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
   );
 };
 
-export default EditBugDialog;
+export default EditBugForm;
+export { EditBugForm };

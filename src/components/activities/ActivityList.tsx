@@ -11,6 +11,7 @@ import { Clock, RefreshCw, ChevronLeft, ChevronRight, Activity as ActivityIcon, 
 import { motion, AnimatePresence } from 'framer-motion';
 import ActivityDetailsModal from './ActivityDetailsModal';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
+import { UndoDeleteNotificationPortal } from '@/components/ui/UndoDeleteNotification';
 
 interface ActivityListProps {
   projectId?: string;
@@ -275,21 +276,6 @@ export const ActivityList: React.FC<ActivityListProps> = ({
   const handleDeleteClick = (activity: Activity) => {
     setActivityToDelete(activity);
     startCountdown();
-    toast({
-      title: 'Activity Deletion Started',
-      description: `Activity will be deleted in ${timeLeft} seconds. Click "Undo" to cancel.`,
-      variant: 'default',
-      action: (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={cancelCountdown}
-          className="text-xs"
-        >
-          Undo ({timeLeft}s)
-        </Button>
-      ),
-    });
   };
 
   const totalPages = Math.ceil(totalActivities / limit);
@@ -432,6 +418,20 @@ export const ActivityList: React.FC<ActivityListProps> = ({
         activity={selectedActivity}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
+      />
+
+      <UndoDeleteNotificationPortal
+        open={isCountingDown && !!activityToDelete}
+        title="Activity Deleted"
+        itemName={
+          activityToDelete
+            ? activityService.formatActivityDescription(activityToDelete).slice(0, 80)
+            : ""
+        }
+        timeLeft={timeLeft}
+        duration={10}
+        onUndo={cancelCountdown}
+        onConfirmNow={confirmDeleteActivity}
       />
     </div>
   );

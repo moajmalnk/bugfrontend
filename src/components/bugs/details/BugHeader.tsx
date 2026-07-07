@@ -1,4 +1,3 @@
-import EditBugDialog from "@/components/bugs/EditBugDialog";
 import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,12 +9,14 @@ import { generateShareableUrl, getEffectiveRole } from "@/lib/utils";
 import { bugService } from "@/services/bugService";
 import { Bug } from "@/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
-import { CheckSquare, ChevronLeft, Edit2, Share2, Trash2, Undo2 } from "lucide-react";
+import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
+import { CheckSquare, ChevronLeft, Edit2, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 
-// Add getStatusColor function
+const UNDO_DELETE_DURATION = 10;
+
 const getStatusColor = (status: string) => {
   switch (status) {
     case "fixed":
@@ -49,7 +50,6 @@ export const BugHeader = ({
   const { currentUser: authUser } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showUndoNotification, setShowUndoNotification] = useState(false);
 
   const searchParams = new URLSearchParams(location.search);
   const fromParam = searchParams.get("from");
@@ -125,7 +125,7 @@ export const BugHeader = ({
 
   // Undo delete functionality
   const { isCountingDown, timeLeft, startCountdown, cancelCountdown, confirmDelete } = useUndoDelete({
-    duration: 10,
+    duration: UNDO_DELETE_DURATION,
     onConfirm: async () => {
       setIsDeleting(true);
       try {
@@ -136,10 +136,8 @@ export const BugHeader = ({
           description: `"${bug.title}" has been permanently deleted.`,
         });
 
-        // Navigate back to the appropriate page
         handleBackNavigation();
       } catch (error) {
-        // console.error('Error deleting bug:', error);
         toast({
           title: "Delete Failed",
           description: "Failed to delete the bug. Please try again.",
@@ -148,11 +146,9 @@ export const BugHeader = ({
       } finally {
         setIsDeleting(false);
         setShowDeleteModal(false);
-        setShowUndoNotification(false);
       }
     },
     onUndo: () => {
-      setShowUndoNotification(false);
       setShowDeleteModal(false);
       toast({
         title: "Delete Cancelled",
@@ -175,7 +171,6 @@ export const BugHeader = ({
 
   const handleDeleteConfirm = () => {
     setShowDeleteModal(false);
-    setShowUndoNotification(true);
     startCountdown();
   };
 
@@ -185,6 +180,10 @@ export const BugHeader = ({
 
   const handleUndoClick = () => {
     cancelCountdown();
+  };
+
+  const handleSpotDeleteClick = () => {
+    confirmDelete();
   };
 
   // Professional Delete Modal Component
@@ -277,52 +276,6 @@ export const BugHeader = ({
     </div>
   );
 
-  // Undo Notification Component
-  const UndoNotification = () => (
-    <div className="fixed top-4 right-4 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-2xl p-4 max-w-sm w-full mx-4">
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-8 h-8 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
-          <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Bug Deleted
-            </h4>
-            <button
-              onClick={handleUndoClick}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-            "{bug.title}" has been deleted
-          </p>
-          <div className="mt-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Auto-deleting in {timeLeft}s
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleUndoClick}
-              className="h-7 px-3 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-            >
-              <Undo2 className="w-3 h-3 mr-1" />
-              Undo
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <>
       <div className="space-y-3 sm:space-y-4">
@@ -359,15 +312,22 @@ export const BugHeader = ({
           <div className="w-full sm:w-auto">
             <div className="flex flex-row flex-wrap items-center gap-2">
             {canEditBug && (
-              <EditBugDialog bug={bug}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap"
-                >
-                  <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                </Button>
-              </EditBugDialog>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap"
+                onClick={() => {
+                  const editUrl = `/${role}/bugs/${bug.id}/edit`;
+                  const redirectUrl = isFromProject
+                    ? `${editUrl}?from=project`
+                    : isFromFixes
+                      ? `${editUrl}?from=fixes`
+                      : editUrl;
+                  navigate(redirectUrl);
+                }}
+              >
+                <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
+              </Button>
             )}
 
             {/* General Share Button */}
@@ -454,7 +414,16 @@ export const BugHeader = ({
       {showDeleteModal && createPortal(<DeleteModal />, document.body)}
       
       {/* Portal-rendered Undo Notification */}
-      {showUndoNotification && createPortal(<UndoNotification />, document.body)}
+      <UndoDeleteNotificationPortal
+        open={isCountingDown}
+        title="Bug Deleted"
+        itemName={bug.title}
+        timeLeft={timeLeft}
+        duration={UNDO_DELETE_DURATION}
+        onUndo={handleUndoClick}
+        onConfirmNow={handleSpotDeleteClick}
+        isConfirming={isDeleting}
+      />
     </>
   );
 };

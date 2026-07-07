@@ -20,9 +20,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
+import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { updateService } from "@/services/updateService";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, Undo2, CheckCircle2, ImagePlus, Paperclip, File, Clock, CalendarDays, Play, Timer, Flag } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Clock, CalendarDays, Play, Timer, Flag } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -284,20 +285,6 @@ const UpdateDetails = () => {
 
     setIsDeletingUpdate(true);
     undoDelete.startCountdown();
-
-    toast({
-      title: "Update Deletion Started",
-      description: `"${update.title}" will be deleted in ${undoDelete.timeLeft} seconds. Click undo to cancel.`,
-      action: (
-        <button
-          onClick={() => undoDelete.cancelCountdown()}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
-        >
-          <Undo2 className="h-4 w-4" />
-          Undo
-        </button>
-      ),
-    });
   };
   
   const getTypeBadgeStyle = (type: string) => {
@@ -454,18 +441,9 @@ const UpdateDetails = () => {
                       type="update_details"
                       size="sm"
                     />
-                    {isDeletingUpdate && undoDelete.isCountingDown ? (
-                      <div className="flex items-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                        <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                          Deleting in {undoDelete.timeLeft}s
-                        </span>
-                      </div>
-                    ) : (
-                      <Button variant="destructive" size="sm" onClick={handleDeleteUpdate}>
-                        <Trash2 className="mr-2 h-4 w-4"/>Delete
-                      </Button>
-                    )}
+                    <Button variant="destructive" size="sm" onClick={handleDeleteUpdate}>
+                      <Trash2 className="mr-2 h-4 w-4"/>Delete
+                    </Button>
                   </>
                 )}
               </div>
@@ -961,6 +939,16 @@ const UpdateDetails = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <UndoDeleteNotificationPortal
+        open={isDeletingUpdate && undoDelete.isCountingDown}
+        title="Update Deleted"
+        itemName={update?.title ?? ""}
+        timeLeft={undoDelete.timeLeft}
+        duration={10}
+        onUndo={undoDelete.cancelCountdown}
+        onConfirmNow={undoDelete.confirmDelete}
+      />
     </main>
   );
 };

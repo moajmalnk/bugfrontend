@@ -52,7 +52,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 
@@ -182,7 +182,6 @@ const Projects = () => {
   const tabFromUrl = searchParams.get("tab") || (currentUser?.role === "admin" ? "all-projects" : currentUser?.role === "developer" ? "my-projects" : "overview");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(12);
-  const [showUndoNotification, setShowUndoNotification] = useState(false);
   const [projectToUndo, setProjectToUndo] = useState<Project | null>(null);
 
   useEffect(() => {
@@ -526,7 +525,7 @@ const Projects = () => {
   };
 
   // Undo delete functionality
-  const { isCountingDown, timeLeft, startCountdown, cancelCountdown } = useUndoDelete({
+  const { isCountingDown, timeLeft, startCountdown, cancelCountdown, confirmDelete } = useUndoDelete({
     duration: 10,
     onConfirm: async () => {
       if (!projectToUndo) return;
@@ -599,7 +598,6 @@ const Projects = () => {
             setDeleteErrorMessage(data.message);
             setIsErrorDialogOpen(true);
             // Don't show undo notification if there are constraints
-            setShowUndoNotification(false);
             setProjectToUndo(null);
           } else {
             toast({
@@ -616,12 +614,10 @@ const Projects = () => {
           variant: "destructive",
         });
       } finally {
-        setShowUndoNotification(false);
         setProjectToUndo(null);
       }
     },
     onUndo: () => {
-      setShowUndoNotification(false);
       setProjectToUndo(null);
       toast({
         title: "Delete Cancelled",
@@ -729,7 +725,6 @@ const Projects = () => {
 
     // For regular delete, start the undo countdown
     setProjectToUndo(project);
-    setShowUndoNotification(true);
     startCountdown();
   };
 
@@ -1645,50 +1640,15 @@ const Projects = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Portal-rendered Undo Notification */}
-      {showUndoNotification && projectToUndo && createPortal(
-        <div className="fixed top-4 right-4 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-2xl p-4 max-w-sm w-full mx-4">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
-              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  Project Deleted
-                </h4>
-                <button
-                  onClick={handleUndoClick}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                "{projectToUndo.name}" has been deleted
-              </p>
-              <div className="mt-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Auto-deleting in {timeLeft}s
-                  </span>
-                </div>
-                <button
-                  onClick={handleUndoClick}
-                  className="h-7 px-3 text-xs border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 rounded-md transition-colors duration-200 flex items-center gap-1"
-                >
-                  <Undo2 className="w-3 h-3" />
-                  Undo
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <UndoDeleteNotificationPortal
+        open={isCountingDown && !!projectToUndo}
+        title="Project Deleted"
+        itemName={projectToUndo?.name ?? ""}
+        timeLeft={timeLeft}
+        duration={10}
+        onUndo={handleUndoClick}
+        onConfirmNow={confirmDelete}
+      />
     </main>
   );
 };

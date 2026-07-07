@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { sessionService, type Session } from '@/services/sessionService';
 import { toast } from '@/hooks/use-toast';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
+import { UndoDeleteNotificationPortal } from '@/components/ui/UndoDeleteNotification';
 import { 
   Clock, 
   User, 
@@ -87,21 +88,6 @@ export function ActiveSessionsManager() {
   const handleForceEndClick = (sessionId: string) => {
     setSessionToEnd(sessionId);
     startCountdown();
-    toast({
-      title: 'Session Force End Started',
-      description: `Session will be force ended in ${timeLeft} seconds. Click "Undo" to cancel.`,
-      variant: 'default',
-      action: (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={cancelCountdown}
-          className="text-xs"
-        >
-          Undo ({timeLeft}s)
-        </Button>
-      ),
-    });
   };
 
   const getActivityTypeColor = (type: string) => {
@@ -167,6 +153,7 @@ export function ActiveSessionsManager() {
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -278,5 +265,16 @@ export function ActiveSessionsManager() {
         )}
       </CardContent>
     </Card>
+
+    <UndoDeleteNotificationPortal
+      open={isCountingDown && !!sessionToEnd}
+      title="Session Force Ended"
+      itemName={sessions.find((s) => s.id === sessionToEnd)?.username ?? "Session"}
+      timeLeft={timeLeft}
+      duration={10}
+      onUndo={cancelCountdown}
+      onConfirmNow={confirmForceEnd}
+    />
+    </>
   );
 }

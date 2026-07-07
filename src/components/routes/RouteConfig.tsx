@@ -113,6 +113,7 @@ const Reports = lazy(() => import("@/pages/Reports"));
 const Fixes = lazy(() => import("@/pages/Fixes"));
 const Messages = lazy(() => import("@/pages/Messages"));
 const FixBug = lazy(() => import("@/pages/FixBug"));
+const EditBug = lazy(() => import("@/pages/EditBug"));
 const Updates = lazy(() => import("@/pages/Updates"));
 const NewUpdate = lazy(() => import("@/pages/NewUpdate"));
 const UpdateDetails = lazy(() => import("@/pages/UpdateDetails"));
@@ -172,6 +173,7 @@ const AdminOvertimeRequests = lazy(() => import("@/pages/AdminOvertimeRequests")
 const AdminOvertimeUserDetail = lazy(() => import("@/pages/AdminOvertimeUserDetail"));
 const DailyWorkUpdate = lazy(() => import("@/pages/DailyWorkUpdate"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
+const CommonBugs = lazy(() => import("@/pages/CommonBugs"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
 const DocsSetupError = lazy(() => import("@/pages/DocsSetupError"));
 const BugDocsPage = lazy(() => import("@/pages/BugDocsPage"));
@@ -303,6 +305,7 @@ const RouteConfig = () => {
       <Route path="/daily-work-update" element={<RolePathRedirect suffix="daily-work-update" />} />
       <Route path="/overtime-requests" element={<RolePathRedirect suffix="overtime-requests" />} />
       <Route path="/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
+      <Route path="/common-bugs" element={<RolePathRedirect suffix="common-bugs" />} />
       <Route path="/users/:userId" element={<RolePathRedirect suffix="users/:userId" />} />
       <Route path="/users" element={<RolePathRedirect suffix="users" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
@@ -318,6 +321,7 @@ const RouteConfig = () => {
           {/* More specific routes must come BEFORE the general bugs/:bugId route */}
           <Route path="bugs/:bugId/diagnostic" element={<BugDetailsDiagnostic />} />
           <Route path="bugs/:bugId/fix" element={<FixBug />} />
+          <Route path="bugs/:bugId/edit" element={<EditBug />} />
           <Route path="bugs/:bugId" element={<BugDetails />} />
           <Route path="activity" element={<Activity />} />
           <Route path="users" element={<Users />} />
@@ -343,6 +347,7 @@ const RouteConfig = () => {
           <Route path="overtime-requests/:userId" element={<AdminOvertimeUserDetail />} />
           <Route path="overtime-requests" element={<AdminOvertimeRequests />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
+          <Route path="common-bugs" element={<CommonBugs />} />
           <Route path="bugdocs" element={<BugDocsPage />} />
           <Route path="bugdocs/project/:projectId" element={<ProjectDocumentsPage />} />
           <Route path="bugsheets" element={<BugSheetsPage />} />
