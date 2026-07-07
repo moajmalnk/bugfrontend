@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Command,
@@ -19,7 +19,13 @@ import { useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getEffectiveRole } from "@/lib/utils";
-import { type SearchCategory } from "@/lib/globalSearchIndex";
+import {
+  getSearchCategoryOrder,
+  getSearchEmptyHint,
+  getSearchPlaceholder,
+  SEARCH_GROUP_LABELS,
+  type SearchCategory,
+} from "@/lib/globalSearchIndex";
 import {
   Bug,
   CheckCircle,
@@ -70,9 +76,29 @@ export function GlobalSearchDialog() {
     query: debouncedQuery,
     activeTab: "all",
     role,
+    userId: currentUser?.id,
     permissions,
     enabled: open,
   });
+
+  const groupedResults = useMemo(() => {
+    const groups = new Map<SearchCategory, typeof results>();
+    for (const result of results) {
+      const existing = groups.get(result.category) ?? [];
+      existing.push(result);
+      groups.set(result.category, existing);
+    }
+
+    return getSearchCategoryOrder(role)
+      .filter((category) => groups.has(category))
+      .map((category) => ({
+        category,
+        label: SEARCH_GROUP_LABELS[category],
+        items: groups.get(category)!,
+      }));
+  }, [results, role]);
+
+  const hasQuery = Boolean(query.trim());
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -126,11 +152,11 @@ export function GlobalSearchDialog() {
             <CommandInput
               value={query}
               onValueChange={setQuery}
-              placeholder="Search pages, help, users, bugs, docs…"
+              placeholder={getSearchPlaceholder(role)}
               className="h-12 border-0 focus:ring-0 shadow-none"
             />
             <kbd className="ml-2 hidden shrink-0 sm:inline-flex h-6 items-center rounded border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-              ESC
+              ⌘K
             </kbd>
           </div>
 
@@ -149,46 +175,47 @@ export function GlobalSearchDialog() {
               </div>
             ) : results.length === 0 ? (
               <CommandEmpty className="py-10 px-3 text-left text-sm text-muted-foreground">
-                {query.trim()
-                  ? "No results found. Try another keyword."
-                  : "Start typing to search across the app."}
+                {getSearchEmptyHint(role, hasQuery)}
               </CommandEmpty>
             ) : (
-              <CommandGroup
-                heading={query.trim() ? "Results" : "Suggestions"}
-                className="p-0 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-3"
-              >
-                {results.map((result) => {
-                  const Icon = CATEGORY_ICONS[result.category];
-                  return (
-                    <CommandItem
-                      key={result.id}
-                      value={result.id}
-                      onSelect={() =>
-                        handleSelect(result.href, result.external)
-                      }
-                      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
-                    >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Icon className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {result.title}
-                        </p>
-                        {result.subtitle && (
-                          <p className="truncate text-xs text-muted-foreground capitalize">
-                            {result.subtitle}
+              groupedResults.map((group) => (
+                <CommandGroup
+                  key={group.category}
+                  heading={hasQuery ? group.label : `${group.label} · Quick access`}
+                  className="p-0 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground/80"
+                >
+                  {group.items.map((result) => {
+                    const Icon = CATEGORY_ICONS[result.category];
+                    return (
+                      <CommandItem
+                        key={result.id}
+                        value={result.id}
+                        onSelect={() =>
+                          handleSelect(result.href, result.external)
+                        }
+                        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {result.title}
                           </p>
+                          {result.subtitle && (
+                            <p className="truncate text-xs text-muted-foreground">
+                              {result.subtitle}
+                            </p>
+                          )}
+                        </div>
+                        {result.external && (
+                          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         )}
-                      </div>
-                      {result.external && (
-                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      )}
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              ))
             )}
           </CommandList>
         </Command>

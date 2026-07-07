@@ -99,13 +99,14 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     subtitle: "Help center",
   },
 
-  // —— Developer & admin ——
+  // —— Admin only ——
   {
     id: "page-projects-new",
     label: "New Project",
     path: "/projects/new",
     keywords: ["new project", "create project"],
-    excludeRoles: ["tester"],
+    adminOnly: true,
+    subtitle: "Administration",
   },
   {
     id: "page-bugdocs",
@@ -176,7 +177,8 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "Reports",
     path: "/reports",
     keywords: ["reports", "analytics", "statistics", "metrics"],
-    excludeRoles: ["tester"],
+    adminOnly: true,
+    subtitle: "Administration",
   },
   {
     id: "page-common-bugs",
@@ -371,6 +373,87 @@ export function getVisibleTabs(
   }
 
   return tabs;
+}
+
+export const SEARCH_GROUP_LABELS: Record<SearchCategory, string> = {
+  pages: "Navigation",
+  help: "Help Center",
+  users: "Users",
+  bugs: "Bugs",
+  fixes: "Fixes",
+  docs: "BugDocs",
+  sheets: "BugSheets",
+  other: "Projects & updates",
+};
+
+export function getSearchCategoryOrder(role: string): SearchCategory[] {
+  if (role === "admin") {
+    return ["pages", "help", "users", "bugs", "fixes", "docs", "sheets", "other"];
+  }
+  if (role === "tester") {
+    return ["pages", "help", "bugs", "fixes", "other"];
+  }
+  return ["pages", "help", "bugs", "fixes", "docs", "sheets", "other"];
+}
+
+export function getSearchPlaceholder(role: string): string {
+  switch (role) {
+    case "admin":
+      return "Search pages, users, bugs, docs, help…";
+    case "developer":
+      return "Search your projects, bugs, docs, and help…";
+    case "tester":
+      return "Search your projects, bugs, fixes, and help…";
+    default:
+      return "Search pages, bugs, and help…";
+  }
+}
+
+export function getSearchEmptyHint(role: string, hasQuery: boolean): string {
+  if (hasQuery) {
+    return "No results found. Try another keyword or check spelling.";
+  }
+  switch (role) {
+    case "admin":
+      return "Type to search across navigation, users, bugs, docs, and help.";
+    case "developer":
+      return "Type to search your assigned projects, bugs, docs, and help guides.";
+    case "tester":
+      return "Type to search your assigned projects, bugs, fixes, and help guides.";
+    default:
+      return "Start typing to search across the app.";
+  }
+}
+
+type ProjectMembershipSource = {
+  created_by?: string;
+  members?: unknown[];
+  members_detail?: { user_id?: string }[];
+};
+
+export function isUserAssignedToProject(
+  project: ProjectMembershipSource,
+  userId: string | undefined,
+  role: string
+): boolean {
+  if (role === "admin") return true;
+  if (!userId) return false;
+  if (project.created_by === userId) return true;
+
+  if (Array.isArray(project.members_detail) && project.members_detail.length > 0) {
+    return project.members_detail.some((member) => member.user_id === userId);
+  }
+
+  if (Array.isArray(project.members) && project.members.length > 0) {
+    if (typeof project.members[0] === "string") {
+      return (project.members as string[]).includes(userId);
+    }
+    return (project.members as { id?: string; user_id?: string }[]).some(
+      (member) => member.id === userId || member.user_id === userId
+    );
+  }
+
+  return false;
 }
 
 export function tabLabel(tab: SearchTab): string {

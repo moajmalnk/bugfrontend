@@ -748,6 +748,11 @@ const Projects = () => {
   // This placeholder was removed to avoid duplicate returns preventing dialogs from rendering.
 
   function renderProjectsContent(activeTab?: string) {
+    const showProjectActions =
+      (currentUser?.role === "developer" && activeTab === "my-projects") ||
+      currentUser?.role === "admin" ||
+      currentUser?.role === "tester";
+
     return (
       <>
         {/* Professional Search and Filter Controls - show when there are projects OR when there are active filters */}
@@ -1174,7 +1179,7 @@ const Projects = () => {
                     >
                       {getProjectStatusLabel(project.status)}
                     </Badge>
-                    {project.compliance && (
+                    {project.compliance && showProjectActions && (
                       <Badge
                         variant="outline"
                         className="text-[10px] sm:text-xs px-2 py-0.5 mb-2 rounded-full border-slate-600 text-slate-600 dark:text-slate-300"
@@ -1283,6 +1288,7 @@ const Projects = () => {
                     </div>
                   </div>
                 </CardContent>
+                {showProjectActions && (
                 <CardFooter className="relative pt-2 mt-auto p-4 sm:p-5">
                   <div className="grid grid-cols-2 gap-2 w-full">
                     {((currentUser?.role === "developer" && activeTab === "my-projects") ||
@@ -1332,6 +1338,7 @@ const Projects = () => {
                         </Link>
                       </Button>
                     )}
+                    {showProjectActions && (
                     <Button
                       asChild
                       variant="outline"
@@ -1353,6 +1360,7 @@ const Projects = () => {
                         <span className="truncate text-xs sm:text-sm">Compliance</span>
                       </Link>
                     </Button>
+                    )}
                     {currentUser?.role === "admin" && (
                       <Button
                         variant="destructive"
@@ -1368,6 +1376,7 @@ const Projects = () => {
                     )}
                   </div>
                 </CardFooter>
+                )}
               </Card>
             </motion.div>
           ))}

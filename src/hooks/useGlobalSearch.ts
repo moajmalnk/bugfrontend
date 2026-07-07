@@ -10,11 +10,13 @@ import {
   buildRolePath,
   createPermissionChecker,
   getVisiblePages,
+  isUserAssignedToProject,
   matchesSearchText,
   type SearchCategory,
   type SearchResult,
   type SearchTab,
 } from "@/lib/globalSearchIndex";
+import type { Project } from "@/services/projectService";
 
 interface SearchCache {
   pages: SearchResult[];
@@ -30,14 +32,15 @@ interface SearchCache {
 let sessionCache: SearchCache | null = null;
 let sessionCacheKey = "";
 
-function buildCacheKey(role: string, permissions: string[]): string {
-  return `${role}:${permissions.sort().join(",")}`;
+function buildCacheKey(role: string, userId: string, permissions: string[]): string {
+  return `${role}:${userId}:${permissions.sort().join(",")}`;
 }
 
 interface UseGlobalSearchOptions {
   query: string;
   activeTab: SearchTab;
   role: string;
+  userId?: string;
   permissions: string[];
   enabled: boolean;
 }
@@ -46,6 +49,7 @@ export function useGlobalSearch({
   query,
   activeTab,
   role,
+  userId,
   permissions,
   enabled,
 }: UseGlobalSearchOptions) {
@@ -59,7 +63,7 @@ export function useGlobalSearch({
   );
 
   const loadData = useCallback(async () => {
-    const key = buildCacheKey(role, permissions);
+    const key = buildCacheKey(role, userId ?? "", permissions);
     if (sessionCache && sessionCacheKey === key) {
       setCache(sessionCache);
       return;
@@ -81,6 +85,8 @@ export function useGlobalSearch({
           ...page,
           href: buildRolePath(role, page.href),
         }));
+
+      const restrictToAssignedProjects = role === "developer" || role === "tester";
 
       const [
         usersResult,
@@ -119,6 +125,20 @@ export function useGlobalSearch({
           : Promise.resolve([]),
       ]);
 
+      const allProjects =
+        projectsResult.status === "fulfilled" ? projectsResult.value : [];
+
+      const accessibleProjects = restrictToAssignedProjects
+        ? allProjects.filter((project) =>
+            isUserAssignedToProject(project as Project, userId, role)
+          )
+        : allProjects;
+
+      const accessibleProjectIds = new Set(accessibleProjects.map((project) => project.id));
+
+      const canAccessProjectResult = (projectId?: string | null) =>
+        !restrictToAssignedProjects || (projectId ? accessibleProjectIds.has(projectId) : false);
+
       const users: SearchResult[] =
         usersResult.status === "fulfilled"
           ? usersResult.value.map((user) => ({
@@ -136,6 +156,7 @@ export function useGlobalSearch({
 
       const bugs: SearchResult[] = allBugs
         .filter((bug) => bug.status !== "fixed")
+        .filter((bug) => canAccessProjectResult(bug.project_id))
         .map((bug) => ({
           id: `bug-${bug.id}`,
           category: "bugs" as const,
@@ -147,6 +168,7 @@ export function useGlobalSearch({
 
       const fixes: SearchResult[] = allBugs
         .filter((bug) => bug.status === "fixed")
+        .filter((bug) => canAccessProjectResult(bug.project_id))
         .map((bug) => ({
           id: `fix-${bug.id}`,
           category: "fixes" as const,
@@ -268,32 +290,32 @@ export function useGlobalSearch({
 
       const other: SearchResult[] = [];
 
-      if (projectsResult.status === "fulfilled") {
-        projectsResult.value.forEach((project) => {
-          other.push({
-            id: `project-${project.id}`,
-            category: "other",
-            title: project.name,
-            subtitle: "Project",
-            href: buildRolePath(role, `/projects/${project.id}`),
-            keywords: [project.name, project.description],
-          });
+      accessibleProjects.forEach((project) => {
+        other.push({
+          id: `project-${project.id}`,
+          category: "other",
+          title: project.name,
+          subtitle: "Project",
+          href: buildRolePath(role, `/projects/${project.id}`),
+          keywords: [project.name, project.description],
         });
-      }
+      });
 
       if (updatesResult.status === "fulfilled") {
-        updatesResult.value.forEach((update) => {
-          other.push({
-            id: `update-${update.id}`,
-            category: "other",
-            title: update.title,
-            subtitle: [update.status, update.project_name]
-              .filter(Boolean)
-              .join(" · "),
-            href: buildRolePath(role, `/updates/${update.id}`),
-            keywords: [update.title, update.description, update.project_name],
+        updatesResult.value
+          .filter((update) => canAccessProjectResult(update.project_id))
+          .forEach((update) => {
+            other.push({
+              id: `update-${update.id}`,
+              category: "other",
+              title: update.title,
+              subtitle: [update.status, update.project_name]
+                .filter(Boolean)
+                .join(" · "),
+              href: buildRolePath(role, `/updates/${update.id}`),
+              keywords: [update.title, update.description, update.project_name],
+            });
           });
-        });
       }
 
       if (tasksResult.status === "fulfilled") {
@@ -333,7 +355,7 @@ export function useGlobalSearch({
     } finally {
       setLoading(false);
     }
-  }, [role, permissions, hasPermission]);
+  }, [role, userId, permissions, hasPermission]);
 
   useEffect(() => {
     if (!enabled) {
@@ -347,8 +369,8 @@ export function useGlobalSearch({
   }, [enabled, loadData]);
 
   const filterResults = useCallback(
-    (items: SearchResult[]) => {
-      if (!query.trim()) return items.slice(0, 12);
+    (items: SearchResult[], limit = 20) => {
+      if (!query.trim()) return items.slice(0, limit);
       return items
         .filter((item) =>
           matchesSearchText(
@@ -358,7 +380,7 @@ export function useGlobalSearch({
             ...(item.keywords ?? [])
           )
         )
-        .slice(0, 20);
+        .slice(0, limit);
     },
     [query]
   );
@@ -366,9 +388,11 @@ export function useGlobalSearch({
   const results = useMemo(() => {
     if (!cache) return [];
 
+    const hasQuery = Boolean(query.trim());
+
     const byCategory: Record<SearchCategory, SearchResult[]> = {
-      pages: filterResults(cache.pages),
-      help: filterResults(cache.help),
+      pages: filterResults(cache.pages, hasQuery ? 20 : 10),
+      help: filterResults(cache.help, hasQuery ? 20 : 8),
       users: filterResults(cache.users),
       bugs: filterResults(cache.bugs),
       fixes: filterResults(cache.fixes),
@@ -378,6 +402,10 @@ export function useGlobalSearch({
     };
 
     if (activeTab === "all") {
+      if (!hasQuery) {
+        return [...byCategory.pages, ...byCategory.help];
+      }
+
       return [
         ...byCategory.pages,
         ...byCategory.help,
@@ -391,7 +419,7 @@ export function useGlobalSearch({
     }
 
     return byCategory[activeTab];
-  }, [cache, activeTab, filterResults]);
+  }, [cache, activeTab, filterResults, query]);
 
   return { results, loading, reload: loadData };
 }
