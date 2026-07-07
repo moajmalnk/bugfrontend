@@ -191,6 +191,43 @@ class NotificationService {
     );
   }
 
+  async sendBugFixedNotification(bug: {
+    title: string;
+    reporter_name?: string | null;
+    reported_by_name?: string | null;
+    fixed_by_name?: string | null;
+    updated_by_name?: string | null;
+    updated_at?: string | null;
+  }): Promise<boolean> {
+    const reporter = bug.reporter_name || bug.reported_by_name || "Unknown";
+    const fixer = bug.fixed_by_name || bug.updated_by_name || "Unknown";
+    const when = bug.updated_at
+      ? new Date(bug.updated_at).toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }) + " IST"
+      : new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }) + " IST";
+
+    return this.sendBugNotification(
+      "Bug Fixed",
+      `Bug '${bug.title}' was fixed by ${fixer} (reported by ${reporter}) on ${when}`,
+      "status_change"
+    );
+  }
+
   // Helper function to get token and check for impersonation
   private getTokenAndImpersonationHeaders(): { token: string | null; headers: Record<string, string> } {
     // Check sessionStorage first (for impersonation tokens), then localStorage

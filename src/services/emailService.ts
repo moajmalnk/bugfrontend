@@ -14,6 +14,30 @@ const generatePersonalizedEmailContent = (template: string, recipientRole: strin
   return template.replace(/\${bugLink}/g, bugLink);
 };
 
+function formatBugNotificationDateTime(value?: string | null) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }) + " IST";
+  }
+  return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }) + " IST";
+}
+
 export const sendEmailNotification = async (
   to: string[],
   subject: string,
@@ -170,8 +194,9 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>New Status:</strong> <span style="font-weight: normal; text-transform: capitalize; color: #65a30d;">Fixed</span></p>
                 <p style="font-size: 14px; margin-bottom: 5px;"><strong>Priority:</strong> <span style="font-weight: normal; text-transform: capitalize;">${bug.priority}</span></p>
                 ${bugMetaEmailRows(bug)}
-                <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated On:</strong> <span style="font-weight: normal;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></p>
-                <p style="font-size: 14px; margin-bottom: 0;"><strong>Updated By:</strong> <span style="font-weight: normal;">${bug.updated_by_name || 'BugRicer User'}</span></p>
+                <p style="font-size: 14px; margin-bottom: 5px;"><strong>Reported By:</strong> <span style="font-weight: normal;">${bug.reporter_name || bug.reported_by_name || "Unknown"}</span></p>
+                <p style="font-size: 14px; margin-bottom: 5px;"><strong>Fixed By:</strong> <span style="font-weight: normal;">${bug.fixed_by_name || bug.updated_by_name || "Unknown"}</span></p>
+                <p style="font-size: 14px; margin-bottom: 0;"><strong>Fixed On:</strong> <span style="font-weight: normal;">${formatBugNotificationDateTime(bug.updated_at)}</span></p>
                 <p style="margin-top: 18px; text-align: center;">
                   <a href="${bugLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 500; font-size: 16px;">View Bug Details</a>
                 </p>
@@ -202,7 +227,12 @@ export const sendBugStatusUpdateNotification = async (bug: any) => {
 
     // Send browser notification if enabled
     if (settings.browserNotifications && settings.statusChangeNotifications) {
-      browserResult = await notificationService.sendBugStatusNotification(bug.title, bug.status);
+      const isFixed = String(bug.status || "").toLowerCase() === "fixed";
+      if (isFixed) {
+        browserResult = await notificationService.sendBugFixedNotification(bug);
+      } else {
+        browserResult = await notificationService.sendBugStatusNotification(bug.title, bug.status);
+      }
     }
 
     return {

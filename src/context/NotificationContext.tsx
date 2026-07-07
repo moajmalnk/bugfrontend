@@ -73,6 +73,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastFetchTimeRef = useRef<Date>(new Date(0));
   const isFetchingRef = useRef<boolean>(false);
+  const isFullListLoadedRef = useRef(false);
 
   const applyFetchResult = useCallback(
     (result: Awaited<ReturnType<typeof notificationService.getUserNotifications>>, append = false) => {
@@ -109,6 +110,28 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       try {
         const result = await notificationService.getUserNotifications(PAGE_SIZE, 0);
+
+        if (isFullListLoadedRef.current) {
+          const mapped = mapApiNotifications(result.notifications);
+          setUnreadCount(result.unreadCount);
+          setReadCount(result.readCount);
+          setTotalCount(result.total);
+          setHasMoreNotifications(false);
+          setNotifications((prev) => {
+            const existingIds = new Set(prev.map((n) => n.id));
+            const newOnes = mapped.filter((n) => !existingIds.has(n.id));
+            if (newOnes.length === 0) {
+              return prev.map((notification) => {
+                const updated = mapped.find((n) => n.id === notification.id);
+                return updated ? { ...notification, ...updated } : notification;
+              });
+            }
+            return [...newOnes, ...prev];
+          });
+          lastFetchTimeRef.current = new Date();
+          return;
+        }
+
         applyFetchResult(result, false);
         lastFetchTimeRef.current = new Date();
       } catch {
@@ -182,6 +205,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setReadCount(latestStats.readCount);
       setTotalCount(latestStats.total);
       setHasMoreNotifications(false);
+      isFullListLoadedRef.current = true;
       lastFetchTimeRef.current = new Date();
     } finally {
       setIsLoading(false);
@@ -271,6 +295,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setReadCount(0);
     setTotalCount(0);
     setHasMoreNotifications(false);
+    isFullListLoadedRef.current = false;
 
     await notificationService.deleteAll();
     await fetchNotifications();
