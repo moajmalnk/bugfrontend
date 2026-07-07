@@ -28,7 +28,6 @@ import {
   FileText,
   FolderKanban,
   LayoutGrid,
-  Search,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -119,7 +118,6 @@ export function GlobalSearchDialog() {
         <DialogTitle className="sr-only">Global search</DialogTitle>
         <Command shouldFilter={false} className="rounded-2xl">
           <div className="flex items-center border-b px-3">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <CommandInput
               value={query}
               onValueChange={setQuery}

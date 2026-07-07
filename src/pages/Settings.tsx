@@ -10,6 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -18,7 +25,18 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Bell, Megaphone, Moon, Settings as SettingsIcon, Shield, Sun, Users, RefreshCw } from "lucide-react";
+import {
+  Bell,
+  Check,
+  ChevronDown,
+  Megaphone,
+  Moon,
+  Settings as SettingsIcon,
+  Shield,
+  Sun,
+  Users,
+  RefreshCw,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -32,6 +50,15 @@ const Settings = () => {
   const requestedTab = searchParams.get("tab") || "general";
   const initialTab = requestedTab === "whatsapp" ? "general" : requestedTab;
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
+  const settingsTabs = [
+    { value: "general", label: "General", shortLabel: "General", icon: SettingsIcon },
+    { value: "notifications", label: "Notifications", shortLabel: "Alerts", icon: Bell },
+    { value: "announcements", label: "Announcements", shortLabel: "News", icon: Megaphone },
+    { value: "roles", label: "Roles", shortLabel: "Roles", icon: Users },
+  ];
+  const activeSettingsTab =
+    settingsTabs.find((tab) => tab.value === activeTab) ?? settingsTabs[0];
 
   useEffect(() => {
     const rawTab = searchParams.get("tab") || "general";
@@ -161,42 +188,101 @@ const Settings = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
             <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <TabsList className="grid w-full grid-cols-4 h-14 bg-transparent p-1">
-                <TabsTrigger
-                  value="general"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+              <div className="md:hidden p-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 rounded-2xl justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
+                  onClick={() => setIsMobileTabSelectorOpen(true)}
                 >
-                  <SettingsIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">General</span>
-                  <span className="sm:hidden">General</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="notifications"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Bell className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Notifications</span>
-                  <span className="sm:hidden">Alerts</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="announcements"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Megaphone className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Announcements</span>
-                  <span className="sm:hidden">News</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="roles"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Roles</span>
-                  <span className="sm:hidden">Roles</span>
-                </TabsTrigger>
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    {activeSettingsTab?.icon && (
+                      <activeSettingsTab.icon className="h-4 w-4" />
+                    )}
+                    {activeSettingsTab?.label}
+                  </span>
+                  <ChevronDown className="h-4 w-4 opacity-70" />
+                </Button>
+              </div>
+              <TabsList className="hidden md:grid w-full grid-cols-4 h-14 bg-transparent p-1">
+                {settingsTabs.map((tab) => (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                  >
+                    <tab.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="sm:hidden">{tab.shortLabel}</span>
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </div>
           </div>
+
+          <Drawer
+            open={isMobileTabSelectorOpen}
+            onOpenChange={setIsMobileTabSelectorOpen}
+          >
+            <DrawerContent className="md:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+              <DrawerHeader className="text-left pb-2">
+                <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Select Section
+                </DrawerTitle>
+                <DrawerDescription>
+                  Navigate to different settings areas
+                </DrawerDescription>
+              </DrawerHeader>
+              <div className="px-4 pb-6 space-y-3 max-h-[65vh] overflow-y-auto">
+                {settingsTabs.map((tab) => {
+                  const isActive = activeTab === tab.value;
+                  return (
+                    <Button
+                      key={tab.value}
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setActiveTab(tab.value);
+                        setSearchParams((prev) => {
+                          const p = new URLSearchParams(prev);
+                          p.set("tab", tab.value);
+                          return p as any;
+                        });
+                        setIsMobileTabSelectorOpen(false);
+                      }}
+                      className={`w-full h-auto min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between ${
+                        isActive
+                          ? "bg-lime-400 text-gray-950 hover:bg-lime-400"
+                          : "bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:bg-gray-200/80 dark:hover:bg-gray-700/80"
+                      }`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <span
+                          className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+                            isActive
+                              ? "bg-lime-500/80 text-gray-950"
+                              : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                          }`}
+                        >
+                          <tab.icon className="h-5 w-5" />
+                        </span>
+                        <span className="text-lg font-semibold">{tab.label}</span>
+                      </span>
+                      <span
+                        className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+                          isActive
+                            ? "bg-gray-950 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100"
+                        }`}
+                      >
+                        {isActive ? <Check className="h-5 w-5" /> : <ChevronDown className="h-4 w-4 -rotate-90 opacity-80" />}
+                      </span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </DrawerContent>
+          </Drawer>
 
           <TabsContent value="general" className="space-y-6 sm:space-y-8">
             <Card className="shadow-sm hover:shadow-md transition-all duration-200">

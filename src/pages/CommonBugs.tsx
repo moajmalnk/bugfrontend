@@ -5,6 +5,13 @@ import {
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { Button } from "@/components/ui/button";
 import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -15,14 +22,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import { downloadBugReportPdf } from "@/lib/utils/bugPdfReport";
 import { commonBugsService } from "@/services/commonBugsService";
 import { projectService } from "@/services/projectService";
 import { CommonBug, Project } from "@/types";
 import {
   Bug as BugIcon,
   Copy,
+  Check,
+  ChevronDown,
+  Download,
   FolderOpen,
   Lock,
+  Loader2,
   Repeat,
   Search,
 } from "lucide-react";
@@ -55,6 +67,8 @@ const CommonBugs = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalCommonCount, setTotalCommonCount] = useState(0);
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
+  const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
 
   useEffect(() => {
     if (currentUser?.role === "admin") {
@@ -169,12 +183,84 @@ const CommonBugs = () => {
   };
 
   const filteredBugs = getFilteredBugs();
+  const commonTabs = [
+    {
+      value: "all-common",
+      label: "All Common",
+      shortLabel: "All",
+      icon: Repeat,
+      count: getTabCount("all-common"),
+      countClass:
+        "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300",
+    },
+    {
+      value: "already-raised",
+      label: "Already Raised",
+      shortLabel: "Raised",
+      icon: BugIcon,
+      count: getTabCount("already-raised"),
+      countClass:
+        "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
+    },
+    {
+      value: "duplicates",
+      label: "Duplicates",
+      shortLabel: "Dupes",
+      icon: Copy,
+      count: getTabCount("duplicates"),
+      countClass: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300",
+    },
+  ];
+  const activeCommonTab =
+    commonTabs.find((tab) => tab.value === activeTab) ?? commonTabs[0];
   const totalFiltered = filteredBugs.length;
   const paginatedBugs = filteredBugs.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
   const totalPages = Math.ceil(totalFiltered / itemsPerPage) || 1;
+
+  const handleDownloadPdfReport = async () => {
+    try {
+      setIsDownloadingReport(true);
+      await downloadBugReportPdf({
+        reportTitle: "Common Bugs Report",
+        subtitle: "Already raised and duplicate bugs in projects",
+        generatedBy: currentUser?.username || currentUser?.name || "System",
+        generatedByRole: currentUser?.role,
+        filePrefix: "codo-common-bugs-report",
+        summary: [
+          { label: "Filtered Common Bugs", value: filteredBugs.length },
+          { label: "Already Raised", value: summary.already_raised_count },
+          { label: "Duplicates", value: summary.duplicate_count },
+          { label: "Total Common", value: summary.total },
+        ],
+        bugs: filteredBugs.map((bug) => {
+          const projectName =
+            bug.project_name ||
+            projects.find((p) => String(p.id) === String(bug.project_id))?.name ||
+            "-";
+          return {
+            id: bug.id,
+            title: bug.title,
+            projectName,
+            status: bug.status,
+            priority: bug.priority,
+            reporterName: bug.reporter_name,
+            createdAt: bug.created_at,
+          };
+        }),
+      });
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "Unable to generate common bugs PDF report.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingReport(false);
+    }
+  };
 
   const renderPagination = () => {
     if (skeletonLoading || loading || filteredBugs.length === 0) return null;
@@ -310,6 +396,25 @@ const CommonBugs = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={handleDownloadPdfReport}
+                  disabled={isDownloadingReport || filteredBugs.length === 0}
+                  className="h-12 px-6 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 font-semibold"
+                >
+                  {isDownloadingReport ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-5 w-5" />
+                      Download PDF
+                    </>
+                  )}
+                </Button>
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm">
                   <div className="p-1.5 bg-orange-500 rounded-lg">
                     <Repeat className="h-5 w-5 text-white" />
@@ -338,43 +443,136 @@ const CommonBugs = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-orange-50/50 dark:from-gray-800/50 dark:to-orange-900/50 rounded-2xl"></div>
             <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <TabsList className="grid w-full grid-cols-3 h-14 bg-transparent p-1">
-                <TabsTrigger
-                  value="all-common"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Repeat className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 shrink-0" />
-                  <span className="hidden sm:inline">All Common</span>
-                  <span className="sm:hidden">All</span>
-                  <span className="ml-1 sm:ml-2 px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-bold">
-                    {getTabCount("all-common")}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="already-raised"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <BugIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 shrink-0" />
-                  <span className="hidden sm:inline">Already Raised</span>
-                  <span className="sm:hidden">Raised</span>
-                  <span className="ml-1 sm:ml-2 px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full text-xs font-bold">
-                    {getTabCount("already-raised")}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="duplicates"
-                  className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                >
-                  <Copy className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 shrink-0" />
-                  <span className="hidden sm:inline">Duplicates</span>
-                  <span className="sm:hidden">Dupes</span>
-                  <span className="ml-1 sm:ml-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-xs font-bold">
-                    {getTabCount("duplicates")}
-                  </span>
-                </TabsTrigger>
-              </TabsList>
+              {commonTabs.length > 2 ? (
+                <>
+                  <div className="md:hidden p-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-12 rounded-2xl justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
+                      onClick={() => setIsMobileTabSelectorOpen(true)}
+                    >
+                      <span className="flex items-center gap-2 text-sm font-semibold">
+                        {activeCommonTab?.icon && (
+                          <activeCommonTab.icon className="h-4 w-4" />
+                        )}
+                        {activeCommonTab?.label}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-70" />
+                    </Button>
+                  </div>
+
+                  <TabsList className="hidden md:grid w-full grid-cols-3 h-14 bg-transparent p-1">
+                    {commonTabs.map((tab) => (
+                      <TabsTrigger
+                        key={tab.value}
+                        value={tab.value}
+                        className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                      >
+                        <tab.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 shrink-0" />
+                        <span className="hidden sm:inline">{tab.label}</span>
+                        <span className="sm:hidden">{tab.shortLabel}</span>
+                        <span
+                          className={`ml-1 sm:ml-2 px-2 py-1 rounded-full text-xs font-bold ${tab.countClass}`}
+                        >
+                          {tab.count}
+                        </span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </>
+              ) : (
+                <TabsList className="grid w-full grid-cols-3 h-14 bg-transparent p-1">
+                  {commonTabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.value}
+                      value={tab.value}
+                      className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                    >
+                      <tab.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 shrink-0" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="sm:hidden">{tab.shortLabel}</span>
+                      <span
+                        className={`ml-1 sm:ml-2 px-2 py-1 rounded-full text-xs font-bold ${tab.countClass}`}
+                      >
+                        {tab.count}
+                      </span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              )}
             </div>
           </div>
+
+          {commonTabs.length > 2 && (
+            <Drawer
+              open={isMobileTabSelectorOpen}
+              onOpenChange={setIsMobileTabSelectorOpen}
+            >
+              <DrawerContent className="md:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+                <DrawerHeader className="text-left pb-2">
+                  <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+                    Select Section
+                  </DrawerTitle>
+                  <DrawerDescription>
+                    Navigate to different common bug types
+                  </DrawerDescription>
+                </DrawerHeader>
+                <div className="px-4 pb-6 space-y-3 max-h-[65vh] overflow-y-auto">
+                  {commonTabs.map((tab) => {
+                    const isActive = activeTab === tab.value;
+                    return (
+                      <Button
+                        key={tab.value}
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setActiveTab(tab.value);
+                          setSearchParams((prev) => {
+                            const p = new URLSearchParams(prev);
+                            p.set("tab", tab.value);
+                            return p as URLSearchParams;
+                          });
+                          setIsMobileTabSelectorOpen(false);
+                        }}
+                        className={`w-full h-auto min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between ${
+                          isActive
+                            ? "bg-lime-400 text-gray-950 hover:bg-lime-400"
+                            : "bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:bg-gray-200/80 dark:hover:bg-gray-700/80"
+                        }`}
+                      >
+                        <span className="flex items-center gap-3">
+                          <span
+                            className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+                              isActive
+                                ? "bg-lime-500/80 text-gray-950"
+                                : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                            }`}
+                          >
+                            <tab.icon className="h-5 w-5" />
+                          </span>
+                          <span className="text-lg font-semibold">{tab.label}</span>
+                        </span>
+                        <span
+                          className={`inline-flex h-10 min-w-10 px-2 items-center justify-center rounded-full ${
+                            isActive
+                              ? "bg-gray-950 text-white"
+                              : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100"
+                          }`}
+                        >
+                          {isActive ? (
+                            <Check className="h-5 w-5" />
+                          ) : (
+                            <span className="text-sm font-bold">{tab.count}</span>
+                          )}
+                        </span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </DrawerContent>
+            </Drawer>
+          )}
 
           <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
             {!skeletonLoading && !loading && (

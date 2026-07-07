@@ -19,7 +19,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
@@ -88,7 +102,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 // Skeleton components for loading state
 const ProjectHeaderSkeleton = () => (
@@ -185,12 +199,14 @@ const MemberCard = ({
   member,
   isAdmin = false,
   onRemove,
+  onView,
   bugCount = 0,
   fixCount = 0,
 }: {
   member: ProjectUser;
   isAdmin?: boolean;
   onRemove?: (id: string) => void;
+  onView?: (member: ProjectUser) => void;
   bugCount?: number;
   fixCount?: number;
 }) => {
@@ -231,7 +247,12 @@ const MemberCard = ({
       transition={{ duration: 0.3 }}
       className="h-full"
     >
-      <Card className="group h-full overflow-hidden border border-gray-200/70 dark:border-gray-800/70 bg-white/90 dark:bg-gray-950/60 shadow-sm hover:shadow-md hover:border-gray-300/80 dark:hover:border-gray-700/80 transition-all duration-200">
+      <Card
+        className={`group h-full overflow-hidden border border-gray-200/70 dark:border-gray-800/70 bg-white/90 dark:bg-gray-950/60 shadow-sm hover:shadow-md hover:border-gray-300/80 dark:hover:border-gray-700/80 transition-all duration-200 ${
+          onView ? "cursor-pointer" : ""
+        }`}
+        onClick={() => onView?.(member)}
+      >
         <CardContent className="p-0 h-full flex flex-col">
           <div className="p-4 pb-3">
             <div className="flex items-start justify-between gap-2">
@@ -256,7 +277,10 @@ const MemberCard = ({
                   size="sm"
                   variant="ghost"
                   className="h-7 w-7 p-0 text-gray-400 hover:text-destructive hover:bg-destructive/10 rounded-lg flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => onRemove(member.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(member.id);
+                  }}
                 >
                   <X className="h-3.5 w-3.5" />
                   <span className="sr-only">Remove</span>
@@ -3829,6 +3853,7 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
 
 const ProjectDetails = () => {
   const { projectId } = useParams();
+  const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
   const [projectOwner, setProjectOwner] = useState<ProjectUser | null>(null);
   const [bugs, setBugs] = useState<BugType[]>([]);
@@ -3877,6 +3902,7 @@ const ProjectDetails = () => {
   );
   const [isAdding, setIsAdding] = useState(false);
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
+  const [isAddMembersModalOpen, setIsAddMembersModalOpen] = useState(false);
   // Task tab state management
   const [activeTaskTab, setActiveTaskTab] = useState<"all-tasks" | "my-tasks">("all-tasks");
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
@@ -3884,6 +3910,7 @@ const ProjectDetails = () => {
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<SharedTask | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<'details' | 'members'>('details');
+  const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
 
   // Bugs tab filters and pagination (sync with URL)
   const [bugSearch, setBugSearch] = useState(searchParams.get("q") || "");
@@ -3958,6 +3985,27 @@ const ProjectDetails = () => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bugSearch, bugStatus, bugPriority, bugSort, bugPage, bugPageSize, activeTab]);
+
+  const projectTabs = useMemo(() => {
+    const tabs = [
+      { value: "overview", label: "Overview", icon: Code },
+      ...(currentUser?.role === "admin" || currentUser?.role === "developer"
+        ? [{ value: "bugs", label: "Bugs", icon: Bug }]
+        : []),
+      ...(currentUser?.role === "tester" || currentUser?.role === "admin"
+        ? [{ value: "fixes", label: "Fixes", icon: TestTube }]
+        : []),
+      { value: "updates", label: "Updates", icon: Bell },
+      ...(currentUser?.role === "admin" || currentUser?.role === "developer"
+        ? [{ value: "tasks", label: "Tasks", icon: ListChecks }]
+        : []),
+      { value: "members", label: "Members", icon: Users },
+    ];
+    return tabs;
+  }, [currentUser?.role]);
+
+  const activeProjectTab =
+    projectTabs.find((tab) => tab.value === activeTab) ?? projectTabs[0];
 
   const fetchProjectDetails = async () => {
     try {
@@ -4227,6 +4275,11 @@ const ProjectDetails = () => {
     setMemberToRemove(userId);
   };
 
+  const handleViewMemberDetails = (member: ProjectUser) => {
+    if (currentUser?.role !== "admin") return;
+    navigate(`/${currentUser.role}/users/${member.id}`);
+  };
+
   const confirmRemoveMember = async () => {
     if (!memberToRemove) return;
 
@@ -4339,13 +4392,19 @@ const ProjectDetails = () => {
       isAdmin: false as const,
     }));
     return [...adminEntries, ...memberEntries].sort((a, b) => {
+      const aStats = memberStats[a.id] ?? { bugs: 0, fixes: 0 };
+      const bStats = memberStats[b.id] ?? { bugs: 0, fixes: 0 };
+      const aTotal = aStats.bugs + aStats.fixes;
+      const bTotal = bStats.bugs + bStats.fixes;
+      if (bTotal !== aTotal) return bTotal - aTotal;
+
       const roleA = a.isAdmin ? "admin" : a.role;
       const roleB = b.isAdmin ? "admin" : b.role;
       const orderDiff = (roleOrder[roleA] ?? 3) - (roleOrder[roleB] ?? 3);
       if (orderDiff !== 0) return orderDiff;
       return (a.username || "").localeCompare(b.username || "");
     });
-  }, [filteredAdmins, filteredMembers]);
+  }, [filteredAdmins, filteredMembers, memberStats]);
 
   const totalDisplayStats = useMemo(
     () =>
@@ -4585,42 +4644,127 @@ const ProjectDetails = () => {
         <div className="relative mb-4">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-1 sm:p-2">
-            <TabsList className="flex w-full gap-1 sm:gap-2 md:gap-3 p-1 bg-transparent">
-              <TabsTrigger value="overview" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm cursor-pointer pointer-events-auto">
-                Overview
-              </TabsTrigger>
-              {/* Show Bugs tab for Admins and Developers */}
-              {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
-                <TabsTrigger value="bugs" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm cursor-pointer pointer-events-auto">
-                Bugs
-              </TabsTrigger>
-              )}
-              
-              {/* Show Fixes tab for Testers and Admins */}
-              {(currentUser?.role === "tester" || currentUser?.role === "admin") && (
-                <TabsTrigger value="fixes" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm cursor-pointer pointer-events-auto">
-                  Fixes
-              </TabsTrigger>
-              )}
-              <TabsTrigger value="updates" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto">
-                <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
-                <span className="truncate">Updates</span>
-              </TabsTrigger>
-              {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
-                <TabsTrigger value="tasks" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto">
-                  <ListChecks className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
-                  <span className="truncate">Tasks</span>
-                  <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold flex-shrink-0">
-                  {sharedTasks.length}
-                </span>
-              </TabsTrigger>
-              )}
-              <TabsTrigger value="members" className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm cursor-pointer pointer-events-auto">
-                Members
-              </TabsTrigger>
-            </TabsList>
+            {projectTabs.length > 2 ? (
+              <>
+                <div className="md:hidden p-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12 rounded-2xl justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
+                    onClick={() => setIsMobileTabSelectorOpen(true)}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      {activeProjectTab?.icon && <activeProjectTab.icon className="h-4 w-4" />}
+                      {activeProjectTab?.label}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-70" />
+                  </Button>
+                </div>
+
+                <TabsList className="hidden md:flex w-full gap-1 sm:gap-2 md:gap-3 p-1 bg-transparent">
+                  {projectTabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.value}
+                      value={tab.value}
+                      className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto"
+                    >
+                      <tab.icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                      <span className="truncate">{tab.label}</span>
+                      {tab.value === "tasks" && (
+                        <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold flex-shrink-0">
+                          {sharedTasks.length}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </>
+            ) : (
+              <TabsList className="flex w-full gap-1 sm:gap-2 md:gap-3 p-1 bg-transparent">
+                {projectTabs.map((tab) => (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto"
+                  >
+                    <tab.icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                    <span className="truncate">{tab.label}</span>
+                    {tab.value === "tasks" && (
+                      <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold flex-shrink-0">
+                        {sharedTasks.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            )}
           </div>
         </div>
+
+        {projectTabs.length > 2 && (
+          <Drawer open={isMobileTabSelectorOpen} onOpenChange={setIsMobileTabSelectorOpen}>
+            <DrawerContent className="md:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+              <DrawerHeader className="text-left pb-2">
+                <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">Select Section</DrawerTitle>
+                <DrawerDescription>Navigate to different project areas</DrawerDescription>
+              </DrawerHeader>
+              <div className="px-4 pb-6 space-y-3 max-h-[65vh] overflow-y-auto">
+                {projectTabs.map((tab) => {
+                  const isActive = activeTab === tab.value;
+                  return (
+                    <Button
+                      key={tab.value}
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setActiveTab(tab.value);
+                        setSearchParams((prev) => {
+                          const p = new URLSearchParams(prev);
+                          p.set("tab", tab.value);
+                          return p as any;
+                        });
+                        setIsMobileTabSelectorOpen(false);
+                      }}
+                      className={`w-full h-auto min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between ${
+                        isActive
+                          ? "bg-lime-400 text-gray-950 hover:bg-lime-400"
+                          : "bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:bg-gray-200/80 dark:hover:bg-gray-700/80"
+                      }`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <span
+                          className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+                            isActive
+                              ? "bg-lime-500/80 text-gray-950"
+                              : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                          }`}
+                        >
+                          <tab.icon className="h-5 w-5" />
+                        </span>
+                        <span className="text-lg font-semibold">{tab.label}</span>
+                      </span>
+                      <span
+                        className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+                          isActive
+                            ? "bg-gray-950 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100"
+                        }`}
+                      >
+                        {isActive ? (
+                          <Check className="h-5 w-5" />
+                        ) : tab.value === "tasks" ? (
+                          <span className="text-sm font-bold">{sharedTasks.length}</span>
+                        ) : (
+                          <ChevronDown className="h-4 w-4 -rotate-90 opacity-80" />
+                        )}
+                      </span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </DrawerContent>
+          </Drawer>
+        )}
 
         <TabsContent value="overview">
           <div className="space-y-6 sm:space-y-8">
@@ -5150,19 +5294,32 @@ const ProjectDetails = () => {
                       Manage project team members and their roles
                   </p>
                 </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-3 shadow-lg">
-                      <Users className="h-6 w-6 text-white" />
-                        </div>
-                    <div className="text-right">
-                      <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                        {members.length + admins.length}
+                  {currentUser?.role === "admin" ? (
+                    <Button
+                      onClick={async () => {
+                        await fetchAvailableMembers();
+                        setIsAddMembersModalOpen(true);
+                      }}
+                      className="h-11 px-5 bg-gradient-to-r from-blue-600 to-cyan-700 hover:from-blue-700 hover:to-cyan-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Members
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-3 shadow-lg">
+                        <Users className="h-6 w-6 text-white" />
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        Total Members
+                      <div className="text-right">
+                        <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                          {members.length + admins.length}
+                        </div>
+                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                          Total Members
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                         </div>
                       </div>
@@ -5223,8 +5380,8 @@ const ProjectDetails = () => {
               </div>
             </div>
 
-            {/* Add Members Section (Admin Only) */}
-              {currentUser?.role === "admin" && (
+            {/* Add Members Section moved to modal */}
+              {false && currentUser?.role === "admin" && (
               <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/30 to-cyan-50/30 dark:from-blue-900/30 dark:to-cyan-900/30"></div>
                 <div className="relative p-4 sm:p-6">
@@ -5467,6 +5624,7 @@ const ProjectDetails = () => {
                         member={person}
                         isAdmin={person.isAdmin}
                         onRemove={person.isAdmin ? undefined : handleRemoveMember}
+                        onView={currentUser?.role === "admin" ? handleViewMemberDetails : undefined}
                         bugCount={memberStats[person.id]?.bugs ?? 0}
                         fixCount={memberStats[person.id]?.fixes ?? 0}
                       />
@@ -5478,6 +5636,166 @@ const ProjectDetails = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Add Members Modal */}
+      <Dialog open={isAddMembersModalOpen} onOpenChange={setIsAddMembersModalOpen}>
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-start justify-between gap-3">
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                  <Plus className="h-4 w-4 text-white" />
+                </div>
+                Add Members
+              </DialogTitle>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsAddMembersModalOpen(false)}
+                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
+                aria-label="Close add members modal"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <DialogDescription>
+              Select one or more members and add them to this project.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2 max-h-24 overflow-auto">
+              {selectedUsers.map((id) => {
+                const u = availableMembers.find((m) => m.id === id);
+                if (!u) return null;
+                return (
+                  <span
+                    key={id}
+                    className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-full border bg-background text-sm shadow-sm"
+                  >
+                    <span
+                      aria-hidden
+                      className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold"
+                    >
+                      {u.username?.[0]?.toUpperCase() || "U"}
+                    </span>
+                    {u.username} ({u.role})
+                    <button
+                      type="button"
+                      className="ml-1 rounded-full h-5 w-5 grid place-items-center hover:bg-muted"
+                      onClick={() =>
+                        setSelectedUsers((prev) =>
+                          prev.filter((x) => x !== id)
+                        )
+                      }
+                      aria-label={`Remove ${u.username}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
+              {selectedUsers.length === 0 && (
+                <span className="text-xs text-muted-foreground">
+                  No members selected yet
+                </span>
+              )}
+            </div>
+
+            <Popover
+              open={memberPickerOpen}
+              onOpenChange={(open) => {
+                setMemberPickerOpen(open);
+                if (open) fetchAvailableMembers();
+              }}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={memberPickerOpen}
+                  aria-label="Select member to add"
+                  className="w-full justify-between border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm font-normal h-10"
+                >
+                  Select member to add...
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[90]" align="start">
+                <Command>
+                  <CommandInput placeholder="Search member by name or role..." />
+                  <CommandList className="max-h-64">
+                    <CommandEmpty>No available members found.</CommandEmpty>
+                    <CommandGroup>
+                      {availableMembers
+                        ?.slice()
+                        .sort((a, b) =>
+                          (a.username || "").localeCompare(b.username || "")
+                        )
+                        .filter((user) => user.id && !selectedUsers.includes(user.id))
+                        .map((user) => (
+                          <CommandItem
+                            key={user.id}
+                            value={`${user.id} ${user.username} ${user.role}`}
+                            onSelect={() => {
+                              if (user.id) {
+                                setSelectedUsers((prev) =>
+                                  prev.includes(user.id) ? prev : [...prev, user.id]
+                                );
+                              }
+                            }}
+                          >
+                            <Check className="mr-2 h-4 w-4 opacity-0" />
+                            <span className="truncate">
+                              {user.username} ({user.role})
+                            </span>
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <p className="text-xs text-muted-foreground">
+              Pick a user to add; they appear above. Remove with the ×.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            {selectedUsers.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setSelectedUsers([])}
+              >
+                Clear Selection
+              </Button>
+            )}
+            <Button
+              onClick={async () => {
+                await handleAddMember();
+                setIsAddMembersModalOpen(false);
+              }}
+              disabled={selectedUsers.length === 0 || isAdding}
+              className="inline-flex items-center gap-2"
+            >
+              {isAdding ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  Add {selectedUsers.length > 0 ? selectedUsers.length : ""} Member{selectedUsers.length > 1 ? "s" : ""}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Professional Shared Task Detail Modal */}
       <Dialog open={taskDetailOpen} onOpenChange={setTaskDetailOpen}>
