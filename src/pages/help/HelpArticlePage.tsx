@@ -1,5 +1,5 @@
 import { Link, useParams, Navigate } from "react-router-dom";
-import { ChevronRight, Clock, Lock, ArrowLeft, List, BookOpen } from "lucide-react";
+import { ChevronRight, Clock, Lock, ArrowLeft, BookOpen } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getEffectiveRole } from "@/lib/utils";
@@ -10,10 +10,6 @@ import {
 } from "@/lib/help";
 import { HelpArticleBody } from "@/components/help/HelpArticleBody";
 import { HelpCategorySidebar } from "@/components/help/HelpCategorySidebar";
-import {
-  HelpTableOfContents,
-  useHelpActiveSection,
-} from "@/components/help/HelpTableOfContents";
 import { HelpRelatedArticles } from "@/components/help/HelpRelatedArticles";
 import { HelpFeedbackFooter } from "@/components/help/HelpFeedbackFooter";
 import { HelpRoleBadges } from "@/components/help/HelpRoleBadge";
@@ -24,12 +20,6 @@ import {
 } from "@/components/help/HelpPageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { HelpArticleSkeleton } from "@/components/help/HelpSkeletons";
 
 export default function HelpArticlePage() {
@@ -39,9 +29,6 @@ export default function HelpArticlePage() {
   const { hasPermission, isLoading: permissionsLoading } = usePermissions(null);
 
   const article = articleId ? getArticleById(articleId) : undefined;
-
-  const sectionIds = article?.sections.map((s) => s.id) ?? [];
-  const activeSectionId = useHelpActiveSection(sectionIds);
 
   if (permissionsLoading) {
     return <HelpArticleSkeleton />;
@@ -135,46 +122,14 @@ export default function HelpArticlePage() {
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
                     {article.title}
                   </h1>
-                  <p className="mt-2 text-muted-foreground leading-relaxed">
+                  <p className="mt-2 text-muted-foreground leading-relaxed break-words [overflow-wrap:anywhere]">
                     {article.description}
                   </p>
                 </div>
               </div>
             </header>
 
-            {/* Mobile TOC */}
-            {article.sections.length > 1 && (
-              <Accordion
-                type="single"
-                collapsible
-                className={`xl:hidden mb-8 ${helpGlassCard} px-4 border-gray-200/50 dark:border-gray-700/50`}
-              >
-                <AccordionItem value="toc" className="border-none">
-                  <AccordionTrigger className="py-3 hover:no-underline">
-                    <span className="flex items-center gap-2 text-sm font-semibold">
-                      <List className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      On this page
-                    </span>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <ul className="space-y-2 pb-2">
-                      {article.sections.map((section) => (
-                        <li key={section.id}>
-                          <a
-                            href={`#${section.id}`}
-                            className="text-sm text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                          >
-                            {section.heading}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            )}
-
-            <article className="space-y-10">
+            <article className="space-y-10 min-w-0">
               {article.sections.map((section) => (
                 <section key={section.id} id={section.id} className="scroll-mt-28">
                   <h2 className="text-xl font-bold mb-5 pb-3 border-b border-gray-200/60 dark:border-gray-700/60 text-foreground">
@@ -186,16 +141,6 @@ export default function HelpArticlePage() {
             </article>
           </HelpContentCard>
         </main>
-
-        {/* Right TOC */}
-        <aside className="hidden xl:block w-52 shrink-0">
-          <div className="sticky top-6">
-            <HelpTableOfContents
-              sections={article.sections}
-              activeSectionId={activeSectionId}
-            />
-          </div>
-        </aside>
       </div>
 
       {/* Full-width bottom area: related articles + feedback */}

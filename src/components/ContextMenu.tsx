@@ -169,6 +169,55 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
         }
     };
 
+    const replaceSelectedText = (replacement: string) => {
+        const editable = getActiveEditable();
+        if (editable instanceof HTMLInputElement || editable instanceof HTMLTextAreaElement) {
+            const start = editable.selectionStart ?? 0;
+            const end = editable.selectionEnd ?? 0;
+            const before = editable.value.slice(0, start);
+            const after = editable.value.slice(end);
+            editable.value = before + replacement + after;
+            const caret = start + replacement.length;
+            editable.setSelectionRange(caret, caret);
+            editable.dispatchEvent(new Event('input', { bubbles: true }));
+            editable.focus();
+            return;
+        }
+
+        if (editable?.isContentEditable) {
+            if (!document.execCommand('insertText', false, replacement)) {
+                const sel = window.getSelection();
+                if (!sel?.rangeCount) return;
+                const range = sel.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(document.createTextNode(replacement));
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+            editable.focus();
+            return;
+        }
+
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+
+        const translatedNode = document.createElement('span');
+        translatedNode.textContent = replacement;
+        translatedNode.setAttribute('data-translated', 'ml');
+        translatedNode.className =
+            'bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded px-0.5 break-words [overflow-wrap:anywhere]';
+        range.insertNode(translatedNode);
+
+        range.setStartAfter(translatedNode);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    };
+
     const translateAction = async () => {
         const text = getSelectedText().trim();
         if (!text) {
@@ -178,13 +227,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
 
         try {
             const translated = await translateToMalayalam(text);
-            await navigator.clipboard.writeText(translated);
-            const preview =
-                translated.length > 120 ? `${translated.slice(0, 120)}…` : translated;
-            toast({
-                title: 'Translated to Malayalam',
-                description: preview,
-            });
+            replaceSelectedText(translated);
         } catch {
             toast({
                 title: 'Translation failed',

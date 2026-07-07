@@ -1,6 +1,7 @@
 import { AlertCircle, Info, Lightbulb } from "lucide-react";
 import type { HelpCalloutVariant } from "@/lib/help/types";
 import { cn } from "@/lib/utils";
+import { helpTextWrap } from "./HelpPageShell";
 
 const VARIANTS: Record<
   HelpCalloutVariant,
@@ -48,7 +49,7 @@ export function HelpCallout({ variant, title, text }: HelpCalloutProps) {
       </div>
       <div className="min-w-0 space-y-1">
         {title && <p className="font-semibold text-foreground">{title}</p>}
-        <p className="text-sm text-muted-foreground leading-relaxed">{text}</p>
+        <p className={cn("text-sm text-muted-foreground leading-relaxed", helpTextWrap)}>{text}</p>
       </div>
     </div>
   );

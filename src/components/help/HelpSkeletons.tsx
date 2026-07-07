@@ -162,16 +162,6 @@ export function HelpArticleSkeleton() {
             ))}
           </div>
         </main>
-
-        {/* Right TOC */}
-        <aside className="hidden xl:block w-52 shrink-0">
-          <div className={cn(helpInnerCard, "p-4 space-y-3")}>
-            <Skeleton className="h-3 w-24" />
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-4 w-full" />
-            ))}
-          </div>
-        </aside>
       </div>
 
       {/* Full-width related + feedback */}

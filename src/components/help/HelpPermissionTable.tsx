@@ -30,9 +30,9 @@ export function HelpPermissionTable({ title, rows }: HelpPermissionTableProps) {
           <TableBody>
             {rows.map((row, i) => (
               <TableRow key={i} className="hover:bg-muted/20">
-                <TableCell className="font-medium">{row.role}</TableCell>
-                <TableCell>{row.access}</TableCell>
-                <TableCell className="hidden sm:table-cell text-muted-foreground">
+                <TableCell className="font-medium break-words [overflow-wrap:anywhere]">{row.role}</TableCell>
+                <TableCell className="break-words [overflow-wrap:anywhere]">{row.access}</TableCell>
+                <TableCell className="hidden sm:table-cell text-muted-foreground break-words [overflow-wrap:anywhere]">
                   {row.notes ?? "—"}
                 </TableCell>
               </TableRow>

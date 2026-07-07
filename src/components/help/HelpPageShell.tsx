@@ -8,6 +8,9 @@ export const helpGlassCard =
 export const helpInnerCard =
   "rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm";
 
+/** Prevents long words / translated text from overflowing flex layouts */
+export const helpTextWrap = "min-w-0 break-words [overflow-wrap:anywhere]";
+
 interface HelpPageShellProps {
   children: ReactNode;
   className?: string;
@@ -81,6 +84,7 @@ export function HelpContentCard({
     <div
       className={cn(
         helpGlassCard,
+        "min-w-0 overflow-x-hidden",
         padding === "default" && "p-5 sm:p-6 md:p-8",
         className
       )}

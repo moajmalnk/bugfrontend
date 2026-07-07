@@ -4,6 +4,8 @@ import { HelpDataTable, HelpPermissionTable } from "./HelpPermissionTable";
 import { HelpScreenshot } from "./HelpScreenshot";
 import { HelpStepList } from "./HelpStepList";
 import { HelpVideoEmbed } from "./HelpVideoEmbed";
+import { helpTextWrap } from "./HelpPageShell";
+import { cn } from "@/lib/utils";
 
 interface HelpArticleBodyProps {
   blocks: HelpBlock[];
@@ -11,20 +13,22 @@ interface HelpArticleBodyProps {
 
 export function HelpArticleBody({ blocks }: HelpArticleBodyProps) {
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", helpTextWrap)}>
       {blocks.map((block, i) => {
         switch (block.type) {
           case "paragraph":
             return (
-              <p key={i} className="text-muted-foreground leading-relaxed">
+              <p key={i} className={cn("text-muted-foreground leading-relaxed", helpTextWrap)}>
                 {block.text}
               </p>
             );
           case "list":
             return (
-              <ul key={i} className="list-disc list-inside space-y-1.5 text-muted-foreground">
+              <ul key={i} className={cn("list-disc list-inside space-y-1.5 text-muted-foreground", helpTextWrap)}>
                 {block.items.map((item, j) => (
-                  <li key={j}>{item}</li>
+                  <li key={j} className={helpTextWrap}>
+                    {item}
+                  </li>
                 ))}
               </ul>
             );
