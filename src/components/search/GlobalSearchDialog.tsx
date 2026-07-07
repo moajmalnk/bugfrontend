@@ -28,6 +28,7 @@ import {
   FileText,
   FolderKanban,
   LayoutGrid,
+  LifeBuoy,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ const CATEGORY_ICONS: Record<
   React.ComponentType<{ className?: string }>
 > = {
   pages: LayoutGrid,
+  help: LifeBuoy,
   users: Users,
   bugs: Bug,
   fixes: CheckCircle,
@@ -124,7 +126,7 @@ export function GlobalSearchDialog() {
             <CommandInput
               value={query}
               onValueChange={setQuery}
-              placeholder="Search pages, users, bugs, docs…"
+              placeholder="Search pages, help, users, bugs, docs…"
               className="h-12 border-0 focus:ring-0 shadow-none"
             />
             <kbd className="ml-2 hidden shrink-0 sm:inline-flex h-6 items-center rounded border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">

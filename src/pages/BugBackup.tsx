@@ -229,7 +229,7 @@ const BugBackup = () => {
 
       toast({
         title: 'Backup started',
-        description: 'Your archive is being prepared in the background. Track progress below.',
+        description: `Preparing archive — watch Backup History below. Email will go to ${email}.`,
       });
     } catch (error: unknown) {
       setIsStarting(false);
@@ -465,8 +465,13 @@ const BugBackup = () => {
                   className="h-12 border-2 text-base"
                 />
                 <p className="mt-2 text-sm text-muted-foreground">
-                  The encrypted ZIP archive and restoration README will be sent here.
+                  The encrypted ZIP archive and restoration README will be sent to this inbox — check spam/promotions if it does not arrive within a few minutes.
                 </p>
+                {email && (
+                  <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                    Delivery target: {email}
+                  </p>
+                )}
               </div>
 
               <div className="rounded-2xl border border-gray-200/70 bg-white/80 p-4 dark:border-gray-700/70 dark:bg-gray-900/80 sm:p-5">

@@ -1,3 +1,4 @@
+import { ALL_HELP_ARTICLES, HELP_CATEGORIES, getCategoryById } from "@/lib/help";
 import { showBugMessageInMainNav } from "@/lib/utils";
 
 export type SearchCategory =
@@ -7,6 +8,7 @@ export type SearchCategory =
   | "fixes"
   | "docs"
   | "sheets"
+  | "help"
   | "other";
 
 export type SearchTab = "all" | SearchCategory;
@@ -16,6 +18,7 @@ export interface PageSearchEntry {
   label: string;
   path: string;
   keywords: string[];
+  subtitle?: string;
   roles?: string[];
   excludeRoles?: string[];
   permission?: string;
@@ -39,29 +42,70 @@ export interface SearchResult {
 }
 
 const PAGE_ENTRIES: PageSearchEntry[] = [
+  // —— Core (all roles) ——
   {
     id: "page-projects",
     label: "Projects",
     path: "/projects",
-    keywords: ["projects", "project"],
+    keywords: ["projects", "project", "team"],
   },
   {
     id: "page-bugs",
     label: "Bugs",
     path: "/bugs",
-    keywords: ["bugs", "bug", "issues"],
+    keywords: ["bugs", "bug", "issues", "report"],
+  },
+  {
+    id: "page-bugs-new",
+    label: "New Bug",
+    path: "/bugs/new",
+    keywords: ["new bug", "report bug", "create bug", "submit bug"],
   },
   {
     id: "page-fixes",
     label: "Fixes",
     path: "/fixes",
-    keywords: ["fixes", "fixed", "resolved"],
+    keywords: ["fixes", "fixed", "resolved", "verify"],
   },
   {
     id: "page-updates",
     label: "Updates",
     path: "/updates",
-    keywords: ["updates", "update"],
+    keywords: ["updates", "update", "release notes", "changelog"],
+  },
+  {
+    id: "page-new-update",
+    label: "New Update",
+    path: "/new-update",
+    keywords: ["new update", "create update", "release note"],
+  },
+  {
+    id: "page-profile",
+    label: "Profile",
+    path: "/profile",
+    keywords: ["profile", "account", "password", "avatar", "me"],
+  },
+  {
+    id: "page-notifications",
+    label: "Notifications",
+    path: "/notifications",
+    keywords: ["notifications", "alerts", "push", "bell"],
+  },
+  {
+    id: "page-help",
+    label: "Help & Support",
+    path: "/help",
+    keywords: ["help", "support", "guide", "documentation", "how to", "tutorial", "docs"],
+    subtitle: "Help center",
+  },
+
+  // —— Developer & admin ——
+  {
+    id: "page-projects-new",
+    label: "New Project",
+    path: "/projects/new",
+    keywords: ["new project", "create project"],
+    excludeRoles: ["tester"],
   },
   {
     id: "page-bugdocs",
@@ -81,14 +125,14 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-meet",
     label: "BugMeet",
     path: "/meet?tab=shared-meets",
-    keywords: ["meet", "meeting", "video", "bugmeet"],
+    keywords: ["meet", "meeting", "video", "bugmeet", "conference"],
     excludeRoles: ["tester"],
   },
   {
     id: "page-tasks",
     label: "BugToDo",
     path: "/my-tasks?tab=shared-tasks",
-    keywords: ["tasks", "todo", "bugtodo", "shared tasks"],
+    keywords: ["tasks", "todo", "bugtodo", "shared tasks", "check in"],
     excludeRoles: ["tester"],
     showWhen: (ctx) =>
       ctx.hasPermission("TASKS_VIEW_ALL") ||
@@ -99,7 +143,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-daily-update",
     label: "BugUpdate",
     path: "/daily-update",
-    keywords: ["daily update", "bugupdate"],
+    keywords: ["daily update", "bugupdate", "status report"],
     excludeRoles: ["tester"],
     showWhen: (ctx) =>
       ctx.hasPermission("DAILY_UPDATE_CREATE") ||
@@ -108,40 +152,31 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       ctx.hasPermission("UPDATES_CREATE"),
   },
   {
-    id: "page-messages",
-    label: "BugMessage",
-    path: "/messages",
-    keywords: ["messages", "chat", "bugmessage"],
+    id: "page-daily-work",
+    label: "Daily Work Update",
+    path: "/daily-work-update",
+    keywords: [
+      "daily work",
+      "work update",
+      "work hours",
+      "check in",
+      "checkout",
+      "overtime",
+      "ot",
+      "hours",
+    ],
+    excludeRoles: ["tester"],
     showWhen: (ctx) =>
-      showBugMessageInMainNav(ctx.role) || ctx.hasPermission("MESSAGING_VIEW"),
+      ctx.hasPermission("TASKS_VIEW_ALL") ||
+      ctx.hasPermission("TASKS_VIEW_ASSIGNED") ||
+      ctx.hasPermission("TASKS_CREATE"),
   },
   {
-    id: "page-users",
-    label: "Users",
-    path: "/users",
-    keywords: ["users", "team", "members"],
-    adminOnly: true,
-  },
-  {
-    id: "page-ot",
-    label: "OT requests",
-    path: "/overtime-requests",
-    keywords: ["overtime", "ot", "requests"],
-    adminOnly: true,
-  },
-  {
-    id: "page-whatsapp",
-    label: "WhatsApp",
-    path: "/whatsapp-messages",
-    keywords: ["whatsapp", "messages"],
-    permission: "MESSAGING_CREATE",
-  },
-  {
-    id: "page-feedback",
-    label: "Feedback Stats",
-    path: "/feedback-stats",
-    keywords: ["feedback", "stats"],
-    permission: "FEEDBACK_VIEW",
+    id: "page-reports",
+    label: "Reports",
+    path: "/reports",
+    keywords: ["reports", "analytics", "statistics", "metrics"],
+    excludeRoles: ["tester"],
   },
   {
     id: "page-common-bugs",
@@ -150,53 +185,128 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     keywords: ["common bugs", "duplicate", "already raised", "recurring"],
     roles: ["admin", "developer"],
   },
+
+  // —— Messaging ——
+  {
+    id: "page-messages",
+    label: "BugMessage",
+    path: "/messages",
+    keywords: ["messages", "chat", "bugmessage", "team chat"],
+    showWhen: (ctx) =>
+      showBugMessageInMainNav(ctx.role) || ctx.hasPermission("MESSAGING_VIEW"),
+  },
+
+  // —— Administration (admin role) ——
+  {
+    id: "page-users",
+    label: "Users",
+    path: "/users",
+    keywords: ["users", "team", "members", "add user", "permissions"],
+    adminOnly: true,
+    subtitle: "Administration",
+  },
+  {
+    id: "page-ot",
+    label: "OT Requests",
+    path: "/overtime-requests",
+    keywords: ["overtime", "ot", "requests", "extra hours", "approval"],
+    adminOnly: true,
+    subtitle: "Administration",
+  },
+
+  // —— Administration (permission-gated) ——
+  {
+    id: "page-whatsapp",
+    label: "WhatsApp",
+    path: "/whatsapp-messages",
+    keywords: ["whatsapp", "messages", "bulk", "notify"],
+    permission: "MESSAGING_CREATE",
+    subtitle: "Administration",
+  },
+  {
+    id: "page-feedback",
+    label: "Feedbacks",
+    path: "/feedback-stats",
+    keywords: ["feedback", "stats", "rating", "satisfaction"],
+    permission: "FEEDBACK_VIEW",
+    subtitle: "Administration",
+  },
   {
     id: "page-activity",
-    label: "Activity",
+    label: "Activities",
     path: "/activity",
-    keywords: ["activity", "log", "audit"],
+    keywords: ["activity", "log", "audit", "history"],
     permission: "ACTIVITY_VIEW",
+    subtitle: "Administration",
   },
   {
     id: "page-settings",
     label: "Settings",
     path: "/settings",
-    keywords: ["settings", "preferences", "config"],
+    keywords: [
+      "settings",
+      "preferences",
+      "config",
+      "roles",
+      "announcements",
+      "notifications",
+      "dark mode",
+    ],
     permission: "SETTINGS_EDIT",
+    subtitle: "Administration",
   },
   {
     id: "page-bugbackup",
     label: "BugBackup",
     path: "/bugbackup",
-    keywords: ["backup", "bugbackup"],
+    keywords: ["backup", "bugbackup", "restore", "database", "archive"],
     permission: "SETTINGS_EDIT",
+    subtitle: "Administration",
   },
-  {
-    id: "page-profile",
-    label: "Profile",
-    path: "/profile",
-    keywords: ["profile", "account", "me"],
-  },
-  {
-    id: "page-daily-work",
-    label: "Work Update",
-    path: "/daily-update",
-    keywords: ["daily work", "work update", "hours", "check in", "checkout"],
-    excludeRoles: ["tester"],
-  },
-  {
-    id: "page-notifications",
-    label: "Notifications",
-    path: "/notifications",
-    keywords: ["notifications", "alerts"],
-  },
-  {
-    id: "page-reports",
-    label: "Reports",
-    path: "/reports",
-    keywords: ["reports", "analytics"],
-    excludeRoles: ["tester"],
-  },
+];
+
+function helpCategoryEntries(): PageSearchEntry[] {
+  return HELP_CATEGORIES.map((cat) => ({
+    id: `help-cat-${cat.id}`,
+    label: `Help: ${cat.title}`,
+    path: `/help?category=${cat.id}`,
+    keywords: [cat.title, cat.description, "help", "support", "guide", cat.id],
+    subtitle: "Help center",
+  }));
+}
+
+function helpArticleEntries(): PageSearchEntry[] {
+  return ALL_HELP_ARTICLES.map((article) => {
+    const category = getCategoryById(article.categoryId);
+    const entry: PageSearchEntry = {
+      id: `help-article-${article.id}`,
+      label: article.title,
+      path: `/help/${article.id}`,
+      keywords: [
+        ...article.keywords,
+        article.description,
+        article.title,
+        category?.title ?? "",
+        "help",
+        "support",
+        "guide",
+        "how to",
+      ],
+      subtitle: category ? `Help · ${category.title}` : "Help guide",
+    };
+
+    if (!article.roles.includes("all")) {
+      entry.roles = article.roles.filter((r) => r !== "all");
+    }
+
+    return entry;
+  });
+}
+
+const ALL_PAGE_ENTRIES: PageSearchEntry[] = [
+  ...PAGE_ENTRIES,
+  ...helpCategoryEntries(),
+  ...helpArticleEntries(),
 ];
 
 export function isPageVisible(
@@ -211,33 +321,39 @@ export function isPageVisible(
   return true;
 }
 
+function entryToSearchResult(entry: PageSearchEntry): SearchResult {
+  const isHelp =
+    entry.id.startsWith("help-article-") || entry.id.startsWith("help-cat-");
+
+  return {
+    id: entry.id,
+    category: isHelp ? "help" : "pages",
+    title: entry.label,
+    subtitle: entry.subtitle ?? "Navigation",
+    href: entry.path,
+    keywords: entry.keywords,
+  };
+}
+
 export function getVisiblePages(ctx: SearchVisibilityContext): SearchResult[] {
-  return PAGE_ENTRIES.filter((entry) => isPageVisible(entry, ctx)).map(
-    (entry) => ({
-      id: entry.id,
-      category: "pages" as const,
-      title: entry.label,
-      subtitle: "Navigation",
-      href: entry.path,
-      keywords: entry.keywords,
-    })
+  return ALL_PAGE_ENTRIES.filter((entry) => isPageVisible(entry, ctx)).map(
+    entryToSearchResult
   );
 }
 
 export function getVisibleTabs(
   role: string,
-  hasPermission: (key: string) => boolean
+  _hasPermission: (key: string) => boolean
 ): SearchTab[] {
-  const ctx: SearchVisibilityContext = { role, hasPermission };
-  const tabs: SearchTab[] = ["all", "pages", "bugs", "fixes", "other"];
+  const tabs: SearchTab[] = ["all", "pages", "help", "bugs", "fixes", "other"];
 
   if (role === "admin") {
-    tabs.splice(2, 0, "users");
+    tabs.splice(3, 0, "users");
   }
 
   if (role !== "tester") {
-    const docsIndex = tabs.indexOf("other");
-    tabs.splice(docsIndex, 0, "docs", "sheets");
+    const otherIndex = tabs.indexOf("other");
+    tabs.splice(otherIndex, 0, "docs", "sheets");
   }
 
   return tabs;
@@ -247,6 +363,7 @@ export function tabLabel(tab: SearchTab): string {
   const labels: Record<SearchTab, string> = {
     all: "All",
     pages: "Pages",
+    help: "Help",
     users: "Users",
     bugs: "Bugs",
     fixes: "Fixes",
@@ -269,4 +386,11 @@ export function matchesSearchText(
 export function buildRolePath(role: string, path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return role ? `/${role}${normalized}` : normalized;
+}
+
+export function createPermissionChecker(permissions: string[]) {
+  return (key: string): boolean => {
+    if (permissions.includes("SUPER_ADMIN")) return true;
+    return permissions.includes(key);
+  };
 }

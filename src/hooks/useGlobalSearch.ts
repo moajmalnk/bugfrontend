@@ -8,6 +8,7 @@ import { updateService } from "@/services/updateService";
 import { userService } from "@/services/userService";
 import {
   buildRolePath,
+  createPermissionChecker,
   getVisiblePages,
   matchesSearchText,
   type SearchCategory,
@@ -17,6 +18,7 @@ import {
 
 interface SearchCache {
   pages: SearchResult[];
+  help: SearchResult[];
   users: SearchResult[];
   bugs: SearchResult[];
   fixes: SearchResult[];
@@ -52,7 +54,7 @@ export function useGlobalSearch({
   const fetchStarted = useRef(false);
 
   const hasPermission = useCallback(
-    (key: string) => permissions.includes(key),
+    (key: string) => createPermissionChecker(permissions)(key),
     [permissions]
   );
 
@@ -65,10 +67,20 @@ export function useGlobalSearch({
 
     setLoading(true);
     try {
-      const pages = getVisiblePages({ role, hasPermission }).map((page) => ({
-        ...page,
-        href: buildRolePath(role, page.href),
-      }));
+      const visiblePages = getVisiblePages({ role, hasPermission });
+      const pages = visiblePages
+        .filter((p) => p.category === "pages")
+        .map((page) => ({
+          ...page,
+          href: buildRolePath(role, page.href),
+        }));
+
+      const help = visiblePages
+        .filter((p) => p.category === "help")
+        .map((page) => ({
+          ...page,
+          href: buildRolePath(role, page.href),
+        }));
 
       const [
         usersResult,
@@ -306,6 +318,7 @@ export function useGlobalSearch({
 
       const nextCache: SearchCache = {
         pages,
+        help,
         users,
         bugs,
         fixes,
@@ -355,6 +368,7 @@ export function useGlobalSearch({
 
     const byCategory: Record<SearchCategory, SearchResult[]> = {
       pages: filterResults(cache.pages),
+      help: filterResults(cache.help),
       users: filterResults(cache.users),
       bugs: filterResults(cache.bugs),
       fixes: filterResults(cache.fixes),
@@ -366,13 +380,14 @@ export function useGlobalSearch({
     if (activeTab === "all") {
       return [
         ...byCategory.pages,
+        ...byCategory.help,
         ...byCategory.users,
         ...byCategory.bugs,
         ...byCategory.fixes,
         ...byCategory.docs,
         ...byCategory.sheets,
         ...byCategory.other,
-      ].slice(0, 20);
+      ].slice(0, 24);
     }
 
     return byCategory[activeTab];

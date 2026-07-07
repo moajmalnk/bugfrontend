@@ -5,7 +5,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Menu, Bug, Search, RefreshCw } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import FirebaseListener from "../messaging/FirebaseListener";
 import AnnouncementPopup from "../ui/AnnouncementPopup";
@@ -197,7 +197,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                   <footer className="max-w-7xl mx-auto mt-8 mb-8 border-t pt-4 pb-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3 text-xs text-muted-foreground">
                       <p className="order-2 sm:order-none justify-self-center sm:justify-self-start text-center sm:text-left">© {new Date().getFullYear()} BugRicer. All rights reserved.</p>
-                      <div className="order-3 sm:order-none justify-self-center flex items-center gap-3">
+                      <div className="order-3 sm:order-none justify-self-center flex items-center gap-3 flex-wrap justify-center">
+                        <Link to={`/${currentUser.role}/help`} className="hover:text-foreground transition-colors" aria-label="Help center">Help Center</Link>
+                        <span className="hidden sm:inline text-border">|</span>
                         <a href="mailto:support@bugricer.com" className="hover:text-foreground transition-colors" aria-label="Contact support">support@bugricer.com</a>
                         <span className="hidden sm:inline text-border">|</span>
                         <a href="https://bugricer.com" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors" aria-label="Visit website">bugricer.com</a>

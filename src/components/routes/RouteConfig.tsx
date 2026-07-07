@@ -13,6 +13,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 import MeetLobby from "@/pages/MeetLobby";
 import MeetRoom from "@/pages/MeetRoom";
+import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
 
 // Professional Skeleton Loading Component
 const SkeletonFallback = () => (
@@ -315,6 +316,8 @@ const RouteConfig = () => {
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
       <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
       <Route path="/document" element={<RolePathRedirect suffix="document" />} />
+      <Route path="/help/:articleId" element={<RolePathRedirect suffix="help/:articleId" />} />
+      <Route path="/help" element={<RolePathRedirect suffix="help" />} />
 
       {/* Protected Routes with role prefix */}
       {isAuthenticated && role && (
@@ -362,6 +365,8 @@ const RouteConfig = () => {
           <Route path="bugsheets" element={<BugSheetsPage />} />
           <Route path="bugsheets/project/:projectId" element={<ProjectDocumentsPage />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="help" element={<HelpSupportRoute />} />
+          <Route path="help/:articleId" element={<HelpArticleRoute />} />
           {/* Redirect from /:role to /:role/projects */}
           <Route index element={<Navigate to="projects" replace />} />
         </Route>

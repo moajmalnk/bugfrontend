@@ -27,6 +27,7 @@ import {
   Timer,
   Repeat,
   Search,
+  LifeBuoy,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -239,6 +240,12 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 label="Common Bugs"
               />
             )}
+
+            <NavLink
+              to="/help"
+              icon={<LifeBuoy className="h-5 w-5" />}
+              label="Help & Support"
+            />
             
           </div>
 
