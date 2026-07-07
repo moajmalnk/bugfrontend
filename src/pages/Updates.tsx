@@ -29,11 +29,12 @@ import { useAuth } from "@/context/AuthContext";
 import { projectService } from "@/services/projectService";
 import { updateService } from "@/services/updateService";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { AlertCircle, Bell, Filter, Lock, Plus, Search, User, X, FolderOpen } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
+import { formatLocalDate } from "@/lib/utils/dateUtils";
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -828,6 +829,12 @@ const Updates = () => {
                       <TableHead className="min-w-[140px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                         Project
                       </TableHead>
+                      <TableHead className="min-w-[170px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                        Created
+                      </TableHead>
+                      <TableHead className="min-w-[170px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                        Approved / Declined
+                      </TableHead>
                       <TableHead className="w-[100px] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                         Actions
                       </TableHead>
@@ -859,6 +866,24 @@ const Updates = () => {
                         </TableCell>
                         <TableCell className="min-w-[140px] px-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium break-words">
                           {update.project_name}
+                        </TableCell>
+                        <TableCell className="min-w-[170px] px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4 whitespace-nowrap">
+                          {update.created_at
+                            ? formatLocalDate(update.created_at, 'datetime')
+                            : '—'}
+                        </TableCell>
+                        <TableCell className="min-w-[170px] px-4 text-xs sm:text-sm py-4">
+                          {update.status === 'approved' && update.approved_at ? (
+                            <span className="text-emerald-700 dark:text-emerald-300">
+                              Approved · {formatLocalDate(update.approved_at, 'datetime')}
+                            </span>
+                          ) : update.status === 'declined' && update.declined_at ? (
+                            <span className="text-rose-700 dark:text-rose-300">
+                              Declined · {formatLocalDate(update.declined_at, 'datetime')}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground italic">Awaiting approval</span>
+                          )}
                         </TableCell>
                         <TableCell className="w-[100px] pr-4 text-right py-4">
                           <Button
@@ -924,6 +949,7 @@ const Updates = () => {
                         {update.project_name}
                       </span>
                     </div>
+                    <UpdateTimingInfo update={update} />
                   </CardContent>
                   <CardFooter className="flex-col items-start gap-3 p-4 sm:p-5 pt-0">
                     <div className="flex justify-end w-full gap-2">

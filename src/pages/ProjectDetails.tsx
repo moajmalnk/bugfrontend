@@ -1,6 +1,7 @@
 import { ActivityList } from "@/components/activities/ActivityList";
 import { BugCard } from "@/components/bugs/BugCard";
 import { ProjectInfoOverview } from "@/components/projects/ProjectInfoOverview";
+import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
 import Bugs from "@/pages/Bugs";
 import Fixes from "@/pages/Fixes";
 import MyTasks from "@/pages/MyTasks";
@@ -72,6 +73,7 @@ import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import { ENV } from "@/lib/env";
 import { canReportBug } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import {
   Project,
@@ -3501,6 +3503,12 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                           <TableHead className="w-[30%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Project
                           </TableHead>
+                          <TableHead className="w-[15%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Created
+                          </TableHead>
+                          <TableHead className="w-[15%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Approved / Declined
+                          </TableHead>
                           <TableHead className="w-[10%] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Actions
                           </TableHead>
@@ -3532,6 +3540,24 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                             </TableCell>
                             <TableCell className="w-[30%] px-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
                               {update.project_name}
+                            </TableCell>
+                            <TableCell className="w-[15%] px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4 whitespace-nowrap">
+                              {update.created_at
+                                ? formatLocalDate(update.created_at, 'datetime')
+                                : '—'}
+                            </TableCell>
+                            <TableCell className="w-[15%] px-4 text-xs sm:text-sm py-4">
+                              {update.status === 'approved' && update.approved_at ? (
+                                <span className="text-emerald-700 dark:text-emerald-300">
+                                  Approved · {formatLocalDate(update.approved_at, 'datetime')}
+                                </span>
+                              ) : update.status === 'declined' && update.declined_at ? (
+                                <span className="text-rose-700 dark:text-rose-300">
+                                  Declined · {formatLocalDate(update.declined_at, 'datetime')}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground italic">Awaiting approval</span>
+                              )}
                             </TableCell>
                             <TableCell className="w-[10%] pr-4 text-right py-4">
                               <Button
@@ -3598,6 +3624,7 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                           {update.project_name}
                         </span>
                       </div>
+                      <UpdateTimingInfo update={update} />
                     </CardContent>
                     <CardFooter className="flex-col items-start gap-3 p-4 sm:p-5 pt-0">
                       <div className="flex justify-end w-full gap-2">
@@ -3775,6 +3802,12 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                           <TableHead className="w-[30%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Project
                           </TableHead>
+                          <TableHead className="w-[15%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Created
+                          </TableHead>
+                          <TableHead className="w-[15%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                            Approved / Declined
+                          </TableHead>
                           <TableHead className="w-[10%] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Actions
                           </TableHead>
@@ -3806,6 +3839,24 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                             </TableCell>
                             <TableCell className="w-[30%] px-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
                               {update.project_name}
+                            </TableCell>
+                            <TableCell className="w-[15%] px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4 whitespace-nowrap">
+                              {update.created_at
+                                ? formatLocalDate(update.created_at, 'datetime')
+                                : '—'}
+                            </TableCell>
+                            <TableCell className="w-[15%] px-4 text-xs sm:text-sm py-4">
+                              {update.status === 'approved' && update.approved_at ? (
+                                <span className="text-emerald-700 dark:text-emerald-300">
+                                  Approved · {formatLocalDate(update.approved_at, 'datetime')}
+                                </span>
+                              ) : update.status === 'declined' && update.declined_at ? (
+                                <span className="text-rose-700 dark:text-rose-300">
+                                  Declined · {formatLocalDate(update.declined_at, 'datetime')}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground italic">Awaiting approval</span>
+                              )}
                             </TableCell>
                             <TableCell className="w-[10%] pr-4 text-right py-4">
                               <Button
@@ -3872,6 +3923,7 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                           {update.project_name}
                         </span>
                       </div>
+                      <UpdateTimingInfo update={update} />
                     </CardContent>
                     <CardFooter className="flex-col items-start gap-3 p-4 sm:p-5 pt-0">
                       <div className="flex justify-end w-full gap-2">

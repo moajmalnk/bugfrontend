@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/context/ThemeContext';
 import { toast } from '@/components/ui/use-toast';
-import { translateToMalayalam } from '@/lib/malayalamUtils';
-import { getHelpContextMenuSections } from '@/lib/help/contextMenuItems';
+import { translateToMalayalam, containsMalayalamScript } from '@/lib/malayalamUtils';
+import { isTextToSpeechSupported, speakText } from '@/lib/textToSpeech';
 import {
     Moon,
     Sun,
@@ -30,6 +30,7 @@ import {
     ClipboardCopy,
     ClipboardPaste,
     Scissors,
+    Volume2,
 } from 'lucide-react';
 
 interface ContextMenuActionItem {
@@ -240,6 +241,67 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
         }
     };
 
+    const speakEnglishAction = async () => {
+        const text = getSelectedText().trim();
+        if (!text) {
+            onClose();
+            return;
+        }
+        if (!isTextToSpeechSupported()) {
+            toast({
+                title: 'Voice not supported',
+                description: 'Your browser does not support text-to-speech.',
+                variant: 'destructive',
+            });
+            onClose();
+            return;
+        }
+
+        try {
+            await speakText(text, 'en');
+        } catch {
+            toast({
+                title: 'Could not read aloud',
+                description: 'English voice could not be played.',
+                variant: 'destructive',
+            });
+        } finally {
+            onClose();
+        }
+    };
+
+    const speakMalayalamAction = async () => {
+        const text = getSelectedText().trim();
+        if (!text) {
+            onClose();
+            return;
+        }
+        if (!isTextToSpeechSupported()) {
+            toast({
+                title: 'Voice not supported',
+                description: 'Your browser does not support text-to-speech.',
+                variant: 'destructive',
+            });
+            onClose();
+            return;
+        }
+
+        try {
+            const mlText = containsMalayalamScript(text)
+                ? text
+                : await translateToMalayalam(text);
+            await speakText(mlText, 'ml');
+        } catch {
+            toast({
+                title: 'Could not read aloud',
+                description: 'Malayalam voice could not be played. Check your connection and try again.',
+                variant: 'destructive',
+            });
+        } finally {
+            onClose();
+        }
+    };
+
     const safeNavigate = (path: string) => {
         if (import.meta.env.PROD && window.location.pathname.includes('/bugs/')) {
             window.location.href = path;
@@ -278,6 +340,16 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
             clipboardItems.push({
                 label: 'Translate',
                 action: translateAction,
+                icon: <MalayalamBadge />,
+            });
+            clipboardItems.push({
+                label: 'English voice',
+                action: speakEnglishAction,
+                icon: <Volume2 className="h-4 w-4" />,
+            });
+            clipboardItems.push({
+                label: 'Malayalam voice',
+                action: speakMalayalamAction,
                 icon: <MalayalamBadge />,
             });
         }
@@ -322,18 +394,6 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                 },
             ],
         };
-
-    const helpSections: MenuSection[] = getHelpContextMenuSections(
-        role || 'user',
-        safeNavigate,
-        onClose
-    ).map((section) => ({
-        ...section,
-        items: section.items.map((item) => ({
-            ...item,
-            icon: item.icon ? <item.icon className="h-4 w-4" /> : undefined,
-        })),
-    }));
 
     if (role === 'admin') {
             return [
@@ -404,7 +464,6 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                     ],
                 },
                 { label: 'Clipboard', items: clipboardItems },
-                ...helpSections,
                 appSection,
             ];
         }
@@ -451,7 +510,6 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                     ],
                 },
                 { label: 'Clipboard', items: clipboardItems },
-                ...helpSections,
                 appSection,
             ];
         }
@@ -493,12 +551,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                     ],
                 },
                 { label: 'Clipboard', items: clipboardItems },
-                ...helpSections,
                 appSection,
             ];
         }
 
-        return [{ label: 'Clipboard', items: clipboardItems }, ...helpSections, appSection];
+        return [{ label: 'Clipboard', items: clipboardItems }, appSection];
     };
 
     const menuSections = getMenuSections(currentUser?.role);
