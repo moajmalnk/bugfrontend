@@ -313,57 +313,49 @@ const BugBackup = () => {
       <section className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
-          <div className="relative rounded-2xl border border-gray-200/50 bg-white/80 p-6 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/80 sm:p-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 space-y-3">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigate(-1)}
-                    className="shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
-                  >
-                    <ArrowLeft className="h-5 w-5" />
-                  </Button>
-                  <div className="rounded-xl bg-gradient-to-br from-blue-600 to-emerald-600 p-2 shadow-lg">
+          <div className="relative rounded-2xl border border-gray-200/50 bg-white/80 p-4 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/80 sm:p-6 md:p-8 min-w-0 overflow-hidden">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between min-w-0">
+              <div className="min-w-0 flex-1 space-y-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="rounded-xl bg-gradient-to-br from-blue-600 to-emerald-600 p-2 shadow-lg shrink-0">
                     <Database className="h-6 w-6 text-white" />
                   </div>
-                  <div className="min-w-0">
-                    <h1 className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 bg-clip-text text-3xl font-bold tracking-tight text-transparent dark:from-white dark:via-gray-100 dark:to-gray-300 sm:text-4xl">
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-2xl sm:text-3xl xl:text-4xl font-bold tracking-tight text-gray-900 dark:text-white break-words [overflow-wrap:anywhere]">
                       BugBackup Pro
                     </h1>
                     <div className="mt-2 h-1 w-24 rounded-full bg-gradient-to-r from-blue-600 to-emerald-600" />
                   </div>
                 </div>
-                <p className="max-w-3xl text-base font-medium text-gray-600 dark:text-gray-400 lg:text-lg">
+                <p className="max-w-3xl text-sm sm:text-base font-medium text-gray-600 dark:text-gray-400 xl:text-lg leading-relaxed break-words">
                   Enterprise-grade disaster recovery for BugRicer — snapshot your database,
                   uploads, and configuration into a signed archive delivered securely by email.
                 </p>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="flex h-12 min-w-[12rem] items-center gap-3 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 shadow-sm dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30">
-                  <div className="rounded-lg bg-blue-500 p-1.5">
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap xl:w-auto xl:shrink-0 xl:justify-end">
+                <div className="flex h-12 w-full sm:min-w-[11rem] sm:flex-1 xl:flex-none xl:w-44 items-center gap-3 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 shadow-sm dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30">
+                  <div className="rounded-lg bg-blue-500 p-1.5 shrink-0">
                     <Archive className="h-5 w-5 text-white" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-xs font-medium text-blue-800/80 dark:text-blue-200/80">
                       Archive
                     </div>
-                    <div className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                    <div className="text-sm font-bold text-blue-700 dark:text-blue-300 truncate">
                       ZIP + Manifest
                     </div>
                   </div>
                 </div>
-                <div className="flex h-12 min-w-[12rem] items-center gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-3 shadow-sm dark:border-emerald-800 dark:from-emerald-950/30 dark:to-green-950/30">
-                  <div className="rounded-lg bg-emerald-600 p-1.5">
+                <div className="flex h-12 w-full sm:min-w-[11rem] sm:flex-1 xl:flex-none xl:w-44 items-center gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-3 shadow-sm dark:border-emerald-800 dark:from-emerald-950/30 dark:to-green-950/30">
+                  <div className="rounded-lg bg-emerald-600 p-1.5 shrink-0">
                     <Mail className="h-5 w-5 text-white" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80">
                       Delivery
                     </div>
-                    <div className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                    <div className="text-sm font-bold text-emerald-700 dark:text-emerald-300 truncate">
                       Secure Email
                     </div>
                   </div>
@@ -414,9 +406,9 @@ const BugBackup = () => {
             return (
               <div
                 key={card.label}
-                className="rounded-2xl border border-gray-200/70 bg-white/80 p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-900/80"
+                className="rounded-2xl border border-gray-200/70 bg-white/80 p-4 sm:p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-900/80 min-w-0"
               >
-                <div className="mb-4 flex items-center justify-between">
+                <div className="mb-3 sm:mb-4 flex items-center justify-between gap-2 min-w-0">
                   <div className={cn('rounded-xl bg-gradient-to-br p-2 text-white shadow-md', card.accent)}>
                     <Icon className="h-5 w-5" />
                   </div>
@@ -426,9 +418,9 @@ const BugBackup = () => {
                     </Badge>
                   ) : null}
                 </div>
-                <p className="text-sm font-medium text-muted-foreground">{card.label}</p>
-                <p className="mt-1 text-xl font-bold text-gray-900 dark:text-white">{card.value}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{card.sub}</p>
+                <p className="text-sm font-medium text-muted-foreground break-words">{card.label}</p>
+                <p className="mt-1 text-lg sm:text-xl font-bold text-gray-900 dark:text-white break-words">{card.value}</p>
+                <p className="mt-1 text-xs text-muted-foreground break-words leading-relaxed">{card.sub}</p>
               </div>
             );
           })}
@@ -436,7 +428,7 @@ const BugBackup = () => {
 
         {(isStarting || activeJob?.status === 'processing' || (stats?.jobs.active ?? 0) > 0) && (
           <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 p-5 dark:border-blue-800/70 dark:from-blue-950/30 dark:to-indigo-950/20">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between min-w-0">
               <div className="flex items-start gap-3">
                 <div className="rounded-xl bg-blue-600 p-2 text-white">
                   <Activity className="h-5 w-5 animate-pulse" />
@@ -537,9 +529,9 @@ const BugBackup = () => {
                   ].map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between gap-4 rounded-xl border-2 border-gray-200 px-4 py-3 dark:border-gray-700"
+                      className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border-2 border-gray-200 px-4 py-3 dark:border-gray-700 min-w-0"
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium text-gray-900 dark:text-white">{item.label}</p>
                         <p className="text-sm text-muted-foreground">{item.description}</p>
                       </div>
@@ -634,7 +626,7 @@ const BugBackup = () => {
         </div>
 
         <div className="rounded-2xl border border-gray-200/50 bg-white/70 shadow-xl backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/70">
-          <div className="flex flex-col gap-3 border-b border-gray-200/60 px-6 py-5 dark:border-gray-700/60 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-gray-200/60 px-4 py-5 dark:border-gray-700/60 sm:px-6 xl:flex-row xl:items-center xl:justify-between min-w-0">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-gradient-to-br from-slate-600 to-slate-800 p-2 text-white">
                 <History className="h-5 w-5" />
@@ -722,7 +714,7 @@ const BugBackup = () => {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {[
             {
               icon: CheckCircle2,

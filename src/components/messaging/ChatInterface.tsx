@@ -182,6 +182,8 @@ function DocumentPreviewBody({
 interface ChatInterfaceProps {
   selectedGroup: ChatGroup | null;
   onBackToChatList?: () => void;
+  /** Show back arrow on compact (single-pane) layouts. */
+  showBackButton?: boolean;
   /** Update sidebar preview locally — no full group list reload. */
   onChatActivity?: (update: ChatGroupPreviewUpdate) => void;
   /** Open the same member-management dialog as the sidebar (group managers only). */
@@ -208,6 +210,7 @@ function getMessagePreview(message: Pick<ChatMessage, "message_type" | "content"
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   selectedGroup,
   onBackToChatList,
+  showBackButton = false,
   onChatActivity,
   onOpenGroupMembers,
 }) => {
@@ -1154,7 +1157,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <ChatHeader
         selectedGroup={selectedGroup}
         typingUsers={typingUsers}
-        onBackToChatList={onBackToChatList}
+        onBackToChatList={showBackButton ? onBackToChatList : undefined}
         onOpenGroupMembers={onOpenGroupMembers}
         onMessageClick={(message) => handleMessageClick(message.id)}
       />
@@ -1191,8 +1194,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         onPaste={handleChatImagePaste}
       >
         {isImageDropActive && (
-          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#00a884]/15">
-            <span className="rounded-xl bg-[#182229]/90 px-4 py-2 text-sm font-semibold text-[#e9edef] shadow-lg">
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-emerald-500/10 dark:bg-emerald-500/15">
+            <span className="rounded-xl bg-white/95 dark:bg-gray-900/95 border border-emerald-200/60 dark:border-emerald-800/60 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-white shadow-lg">
               Drop image to send
             </span>
           </div>
@@ -1201,7 +1204,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Messages Area - Scrollable */}
       <div
         ref={scrollAreaRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-0.5 bg-[#efeae2] dark:bg-[#0b141a] hide-scrollbar"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 md:px-4 py-2 space-y-0.5 bg-gradient-to-b from-gray-50/80 to-blue-50/30 dark:from-gray-950/50 dark:to-blue-950/20 hide-scrollbar"
       >
         {hasMoreMessages && (
           <div className="flex justify-center mb-3">
@@ -1229,7 +1232,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             <React.Fragment key={message.id}>
               {shouldShowDateSeparator(message, index) && (
                 <div className="sticky top-2 z-10 flex justify-center py-2 pointer-events-none">
-                  <span className="rounded-lg bg-[#182229]/90 px-3 py-1 text-[11px] font-medium text-[#aebac1] shadow-sm">
+                  <span className="rounded-lg bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 px-3 py-1 text-[11px] font-medium text-gray-600 dark:text-gray-300 shadow-sm">
                     {formatMessageDay(message.created_at)}
                   </span>
                 </div>
@@ -1263,10 +1266,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     </div>
                   )}
                   <div
-                    className={`rounded-2xl px-3 py-2 shadow-sm transition-colors break-all whitespace-pre-wrap max-w-full overflow-hidden ${
+                    className={`rounded-2xl px-3 py-2 shadow-sm transition-colors break-all whitespace-pre-wrap max-w-full overflow-hidden border ${
                       isOwnMessage
-                        ? "bg-[#dcf8c6] dark:bg-[#005c4b] text-foreground"
-                        : "bg-white dark:bg-[#202c33] text-foreground"
+                        ? "bg-gradient-to-br from-blue-600 to-emerald-600 text-white border-blue-500/30"
+                        : "bg-white/90 dark:bg-gray-800/90 text-foreground border-gray-200/60 dark:border-gray-700/60"
                     } ${
                       isDeleted
                         ? "opacity-60 italic"
@@ -1289,11 +1292,24 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                         {/* Reply to message */}
                         {hasReply && (
-                          <div className="mb-2 p-2 bg-background/60 rounded text-xs border-l-4 border-primary/30">
+                          <div
+                            className={cn(
+                              "mb-2 p-2 rounded text-xs border-l-4",
+                              isOwnMessage
+                                ? "bg-white/15 border-white/50"
+                                : "bg-background/60 border-primary/30"
+                            )}
+                          >
                             <div className="font-medium">
                               Replying to {displaySenderLabel(message.reply_sender_name)}
                             </div>
-                            <div className="text-muted-foreground">
+                            <div
+                              className={cn(
+                                isOwnMessage
+                                  ? "text-white/80"
+                                  : "text-muted-foreground"
+                              )}
+                            >
                               {message.reply_type === "voice"
                                 ? "🎤 Voice message"
                                 : message.reply_content}
@@ -1372,7 +1388,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                               }}
                             />
                             {isEdited && (
-                              <span className="text-xs text-muted-foreground italic ml-1">
+                              <span
+                                className={cn(
+                                  "text-xs italic ml-1",
+                                  isOwnMessage
+                                    ? "text-white/70"
+                                    : "text-muted-foreground"
+                                )}
+                              >
                                 (edited)
                               </span>
                             )}
@@ -1380,21 +1403,26 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         )}
                         {!isDeleted && (
                           <div
-                            className={`flex items-center gap-1.5 mt-1 pt-0.5 border-t border-black/[0.06] dark:border-white/[0.08] ${
-                              isOwnMessage ? "justify-end" : "justify-end"
-                            } text-[11px] text-[#667781] dark:text-[#8696a0] shrink-0`}
+                            className={cn(
+                              "flex items-center gap-1.5 mt-1 pt-0.5 border-t shrink-0 justify-end text-[11px]",
+                              isOwnMessage
+                                ? "border-white/20 text-white/80"
+                                : "border-gray-200/60 dark:border-gray-700/60 text-gray-500 dark:text-gray-400"
+                            )}
                           >
                             <span className="tabular-nums whitespace-nowrap">
                               {MessagingService.formatMessageTime(message.created_at)}
                             </span>
                             {isOwnMessage && (
-                              <MessageStatus
-                                status={normalizeDeliveryStatus(message.delivery_status)}
-                                receiptLabel={
-                                  message.message_type === "voice" ? "played" : "read"
-                                }
-                                size="sm"
-                              />
+                              <span className="[&_svg]:!text-white/80">
+                                <MessageStatus
+                                  status={normalizeDeliveryStatus(message.delivery_status)}
+                                  receiptLabel={
+                                    message.message_type === "voice" ? "played" : "read"
+                                  }
+                                  size="sm"
+                                />
+                              </span>
                             )}
                           </div>
                         )}

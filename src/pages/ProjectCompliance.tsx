@@ -78,10 +78,9 @@ const ProjectCompliance = () => {
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3 min-w-0">
+            <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
+              <div className="space-y-3 min-w-0 flex-1">
                 <div className="flex items-center gap-3">
-
                   <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
                     <ShieldCheck className="h-6 w-6 text-white" />
                   </div>
@@ -97,44 +96,42 @@ const ProjectCompliance = () => {
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <div className="flex h-12 min-w-[12rem] items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
-                    <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
-                      <FolderOpen className="h-5 w-5 text-white" />
-                    </div>
-                    <span className="text-sm font-bold text-blue-700 dark:text-blue-300 truncate">
-                      {project.name}
-                    </span>
+              <div className="flex w-full xl:w-auto flex-wrap gap-3 shrink-0">
+                <div className="flex h-12 min-w-0 flex-1 sm:flex-none items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
+                  <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                    <FolderOpen className="h-5 w-5 text-white" />
                   </div>
-
-                  <div className="flex h-12 min-w-[12rem] items-center gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border border-violet-200 dark:border-violet-800 rounded-xl shadow-sm">
-                    <Badge variant="secondary" className="text-xs font-semibold uppercase tracking-wide">
-                      {getProjectStatusLabel(displayStatus)}
-                    </Badge>
-                  </div>
-
-                  {!complianceLoading && compliance && (
-                    <div className="flex h-12 min-w-[12rem] items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
-                      <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
-                        <ShieldCheck className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80">
-                          Overall
-                        </div>
-                        <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 leading-none">
-                          {progressPercent}%
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <span className="text-sm font-bold text-blue-700 dark:text-blue-300 truncate">
+                    {project.name}
+                  </span>
                 </div>
+
+                <div className="flex h-12 items-center gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border border-violet-200 dark:border-violet-800 rounded-xl shadow-sm shrink-0">
+                  <Badge variant="secondary" className="text-xs font-semibold uppercase tracking-wide">
+                    {getProjectStatusLabel(displayStatus)}
+                  </Badge>
+                </div>
+
+                {!complianceLoading && compliance && (
+                  <div className="flex h-12 items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm shrink-0">
+                    <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
+                      <ShieldCheck className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80">
+                        Overall
+                      </div>
+                      <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 leading-none">
+                        {progressPercent}%
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {!complianceLoading && compliance && (
-              <div className="mt-6 space-y-2 max-w-xl">
+              <div className="mt-6 space-y-2 w-full">
                 <div className="flex items-center justify-between text-xs font-medium text-gray-600 dark:text-gray-400">
                   <span>Overall compliance progress</span>
                   <span>{progressPercent}%</span>

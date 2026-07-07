@@ -54,11 +54,11 @@ const ActivityItem: React.FC<{
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="group relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300 m-1 sm:m-2"
+      className="group relative rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300 m-1 sm:m-2 min-w-0"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-indigo-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-indigo-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
       
-      <div className="relative flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4">
+      <div className="relative flex items-start gap-3 sm:gap-4 p-3 sm:p-4 min-w-0">
         <div className="flex-shrink-0">
           <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
             <span className="text-sm sm:text-lg text-white" role="img" aria-label={typeInfo.label}>
@@ -86,8 +86,8 @@ const ActivityItem: React.FC<{
             </div>
           )}
           
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
-            <div className="flex items-center space-x-2">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
               <Badge 
                 variant="outline" 
                 className={`text-xs font-medium ${typeInfo.color} border-current/20 bg-current/10`}
@@ -96,44 +96,32 @@ const ActivityItem: React.FC<{
               </Badge>
             </div>
             
-            <div className="flex items-center gap-2">
-              {/* Mobile: Full-width View button at bottom */}
-              <div className="block sm:hidden">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onShowDetails(activity)}
-                  className="w-full h-8 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                >
-                  <Eye className="h-3 w-3 mr-1" />
-                  View Details
-                </Button>
-              </div>
+            <div
+              className={`grid gap-2 w-full shrink-0 xl:flex xl:w-auto xl:items-center xl:gap-2 ${
+                isAdmin ? 'grid-cols-2' : 'grid-cols-1'
+              }`}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onShowDetails(activity)}
+                className="h-8 w-full xl:w-auto px-3 text-xs border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 text-blue-600 dark:text-blue-400 transition-all duration-200 justify-center"
+              >
+                <Eye className="h-3 w-3 mr-1 shrink-0" />
+                View
+              </Button>
               
-              {/* Desktop: Compact buttons */}
-              <div className="hidden sm:flex items-center gap-2">
+              {isAdmin && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onShowDetails(activity)}
-                  className="h-7 px-3 text-xs border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800 text-blue-600 dark:text-blue-400 transition-all duration-200"
+                  onClick={() => onDeleteClick(activity)}
+                  className="h-8 w-full xl:w-auto px-3 text-xs border border-red-200 dark:border-red-700 bg-white/50 dark:bg-gray-800/50 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 text-red-600 dark:text-red-400 transition-all duration-200 justify-center"
                 >
-                  <Eye className="h-3 w-3 mr-1" />
-                  View
+                  <Trash2 className="h-3 w-3 mr-1 shrink-0" />
+                  Delete
                 </Button>
-                
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDeleteClick(activity)}
-                    className="h-7 px-3 text-xs border border-red-200 dark:border-red-700 bg-white/50 dark:bg-gray-800/50 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 text-red-600 dark:text-red-400 transition-all duration-200"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Delete
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -282,9 +270,9 @@ export const ActivityList: React.FC<ActivityListProps> = ({
 
   if (isLoading) {
     return (
-      <div className={`relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm ${className}`}>
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30"></div>
-        <div className="relative p-3 sm:p-4 lg:p-6">
+      <div className={`relative rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm min-w-0 ${className}`}>
+        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30"></div>
+        <div className="relative p-3 sm:p-4 lg:p-6 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 mb-4">
             <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
               <ActivityIcon className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
@@ -305,10 +293,10 @@ export const ActivityList: React.FC<ActivityListProps> = ({
   }
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm ${className}`}>
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30"></div>
+    <div className={`relative rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm min-w-0 ${className}`}>
+      <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30"></div>
       
-      <div className="relative p-3 sm:p-4 lg:p-6">
+      <div className="relative p-3 sm:p-4 lg:p-6 min-w-0">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3 sm:gap-0">
           <div className="flex items-center gap-2 sm:gap-3">

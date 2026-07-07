@@ -1420,7 +1420,7 @@ export function DailyWorkFlowPanel({
       <div
         className={
           isHeaderLayout
-            ? 'flex flex-col items-stretch gap-3 sm:items-end'
+            ? 'flex flex-col items-stretch gap-3 w-full min-w-0 xl:items-end'
             : 'flex flex-wrap items-center gap-2 sm:gap-3'
         }
       >
@@ -1435,7 +1435,7 @@ export function DailyWorkFlowPanel({
             Editing submission
           </span>
         )}
-        <div className={`flex flex-wrap items-center gap-3 ${isHeaderLayout ? 'sm:justify-end' : ''}`}>
+        <div className={`flex flex-wrap items-center gap-3 w-full min-w-0 ${isHeaderLayout ? 'xl:justify-end' : ''}`}>
         {hasActiveWorkSession && (
           <Button
             onClick={onToggleBreak}

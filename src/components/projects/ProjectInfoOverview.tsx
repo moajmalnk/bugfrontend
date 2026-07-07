@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   Building2,
   Calendar,
+  ExternalLink,
   FileText,
   Layers,
   Mail,
@@ -98,7 +99,7 @@ function StatPill({
       <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">
         {label}
       </p>
-      <p className="mt-1 text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate">
+      <p className="mt-1 text-sm sm:text-base font-semibold text-gray-900 dark:text-white break-words">
         {value}
       </p>
     </div>
@@ -256,7 +257,7 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Key metrics strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
         <StatPill label="Duration" value={`${duration} days`} highlight />
         <StatPill label="Status" value={statusLabel} />
         <StatPill label="Created" value={formatProjectDate(project.created_at)} />
@@ -271,7 +272,7 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
       {/* Two-column dashboard on large screens */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
         <SectionShell title="Client Details" icon={Building2} accent="violet">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-5">
             <DetailField label="Client" value={project.client_name} icon={Building2} />
             <DetailField
               label="Location"
@@ -351,7 +352,7 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
         </SectionShell>
 
         <SectionShell title="Project Timeline" icon={Calendar} accent="blue" className="xl:col-span-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
             {timelineItems.map((item) => (
               <TimelineItem key={item.label} label={item.label} value={item.value} />
             ))}

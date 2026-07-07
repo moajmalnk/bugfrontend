@@ -1149,40 +1149,42 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
     <div
       className={cn(
         "flex flex-col h-full min-h-0 overflow-hidden",
-        isMessaging ? "bg-[#111b21] text-[#e9edef]" : "bg-background"
+        isMessaging ? "bg-transparent text-foreground" : "bg-background"
       )}
     >
       {isMessaging ? (
         <>
-          <div className="flex-shrink-0 bg-[#202c33] border-b border-[#2a3942] px-3 py-2.5 z-10">
-            <div className="flex items-center justify-between gap-2">
+          <div className="flex-shrink-0 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-700/60 px-3 py-2.5 z-10">
+            <div className="flex items-center justify-between gap-2 min-w-0">
               <div className="flex items-center gap-2 min-w-0">
-                <MessageCircle className="h-5 w-5 text-[#00a884] shrink-0" />
-                <h2 className="text-base font-semibold text-[#e9edef] truncate">
+                <div className="p-1.5 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-lg shrink-0">
+                  <MessageCircle className="h-4 w-4 text-white" />
+                </div>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white truncate">
                   Chats
                 </h2>
               </div>
               {isAdmin && (
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="outline"
                   onClick={() => setIsCreateDialogOpen(true)}
-                  className="h-9 w-9 rounded-full text-[#aebac1] hover:bg-[#2a3942] hover:text-[#e9edef] shrink-0"
+                  className="h-9 w-9 rounded-xl border-gray-200 dark:border-gray-700 shrink-0 hover:bg-blue-50 dark:hover:bg-blue-950/30"
                   title="New group"
                 >
-                  <Plus className="h-5 w-5" />
+                  <Plus className="h-4 w-4" />
                 </Button>
               )}
             </div>
           </div>
-          <div className="flex-shrink-0 px-2 py-2 border-b border-[#2a3942]">
+          <div className="flex-shrink-0 px-3 py-2 border-b border-gray-200/50 dark:border-gray-700/50 bg-white/40 dark:bg-gray-900/40">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8696a0] pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <Input
                 placeholder="Search or start new chat"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 bg-[#2a3942] border-0 rounded-lg text-sm text-[#e9edef] placeholder:text-[#8696a0] focus-visible:ring-1 focus-visible:ring-[#00a884]"
+                className="pl-9 h-9 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/60"
               />
             </div>
           </div>
@@ -1249,7 +1251,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
       <div
         className={cn(
           "flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden space-y-0 hide-scrollbar",
-          isMessaging ? "bg-[#111b21]" : "bg-background"
+          isMessaging ? "bg-transparent" : "bg-background"
         )}
       >
         {isLoading ? (

@@ -95,14 +95,31 @@ class ProjectService {
     projectId: string,
     params: { from?: string; to?: string } = {}
   ) {
-    const qs = new URLSearchParams({ project_id: projectId, ...params } as Record<string, string>);
-    const response = await apiClient.get<{ success: boolean; data: any }>(
-      `/projects/project_work_activity.php?${qs.toString()}`
-    );
-    if (response.data.success) {
-      return response.data.data;
+    const empty = { project_id: projectId, from: '', to: '', entries: [] as unknown[] };
+
+    const parse = (data: { success?: boolean; data?: unknown }) => {
+      const payload = data?.success ? data.data : null;
+      if (payload && typeof payload === 'object' && Array.isArray((payload as { entries?: unknown }).entries)) {
+        return payload as typeof empty;
+      }
+      return empty;
+    };
+
+    const qs = new URLSearchParams({
+      id: projectId,
+      work_activity: '1',
+      ...(params.from ? { from: params.from } : {}),
+      ...(params.to ? { to: params.to } : {}),
+    });
+
+    try {
+      const response = await apiClient.get<{ success: boolean; data: unknown }>(
+        `/projects/get.php?${qs.toString()}`
+      );
+      return parse(response.data);
+    } catch {
+      return empty;
     }
-    return { project_id: projectId, from: '', to: '', entries: [] };
   }
 }
 

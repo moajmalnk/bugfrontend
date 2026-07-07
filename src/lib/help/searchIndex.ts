@@ -74,10 +74,14 @@ export function searchArticles(
 export function getPopularArticleIds(): string[] {
   return [
     "getting-started-overview",
+    "tester-handbook",
+    "developer-handbook",
+    "admin-handbook",
     "bugs-reporting",
     "bugs-workflow",
     "projects-guide",
     "daily-work-update",
+    "admin-compliance-pipeline",
     "users-management",
   ];
 }

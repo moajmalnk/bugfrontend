@@ -383,7 +383,7 @@ export default function Notifications() {
     <div
       key={notification.id}
       className={cn(
-        "group relative flex items-start gap-4 p-5 pl-4 border-l-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 cursor-pointer animate-in fade-in slide-in-from-top-2",
+        "group relative flex items-start gap-3 sm:gap-4 p-4 sm:p-5 pl-3 sm:pl-4 border-l-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 cursor-pointer animate-in fade-in slide-in-from-top-2 min-w-0",
         isUnread
           ? "bg-blue-50/50 dark:bg-blue-900/10 border-l-blue-500"
           : "border-l-transparent"
@@ -406,13 +406,13 @@ export default function Notifications() {
       <div className="flex-1 min-w-0">
         <p
           className={cn(
-            "font-semibold text-base leading-tight",
+            "font-semibold text-sm sm:text-base leading-tight break-words",
             isUnread ? "text-gray-900 dark:text-white" : "text-gray-700 dark:text-gray-300"
           )}
         >
           {notification.title}
         </p>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 leading-relaxed break-words">
           {notification.message}
         </p>
 
@@ -480,21 +480,21 @@ export default function Notifications() {
         {/* Professional Header */}
         <div className="relative overflow-hidden rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-purple-50/30 to-pink-50/50 dark:from-blue-950/20 dark:via-purple-950/10 dark:to-pink-950/20 pointer-events-none" />
-          <div className="relative p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+          <div className="relative p-4 sm:p-6 md:p-8 min-w-0 overflow-hidden">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between min-w-0">
               <div className="space-y-3 min-w-0 flex-1">
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3 min-w-0">
                   <div className="flex-shrink-0 p-2 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-xl shadow-lg">
                     <BellRing className="h-6 w-6 text-white" />
                   </div>
-                  <div className="min-w-0 inline-flex flex-col items-start">
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-2xl sm:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white tracking-tight break-words">
                       Notifications
                     </h1>
-                    <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full mt-2" />
+                    <div className="h-1 w-20 max-w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full mt-2" />
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base xl:text-lg font-medium max-w-2xl leading-relaxed break-words">
                   {hasActiveFilters ? (
                     <>
                       Showing {filteredNotifications.length} of {notifications.length} notification
@@ -514,12 +514,12 @@ export default function Notifications() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4 flex-shrink-0">
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap xl:w-auto xl:shrink-0 xl:justify-end">
                 {notifications.length > 0 && (
                   <Button
                     onClick={() => (unreadCount > 0 ? setShowMarkAllDialog(true) : null)}
                     disabled={unreadCount === 0 || isMarkingAll}
-                    className="h-11 sm:h-12 px-4 sm:px-6 text-sm sm:text-base font-semibold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-11 sm:h-12 w-full sm:w-auto px-4 sm:px-6 text-sm sm:text-base font-semibold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                   >
                     {isMarkingAll ? (
                       <>
@@ -529,13 +529,13 @@ export default function Notifications() {
                     ) : (
                       <>
                         <Check className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                        Mark all read
+                        Mark all
                       </>
                     )}
                   </Button>
                 )}
 
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm flex-shrink-0">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm w-full sm:w-auto shrink-0">
                   <div className="flex-shrink-0 p-1.5 bg-blue-600 rounded-lg">
                     <BellRing className="h-5 w-5 text-white" />
                   </div>
@@ -558,15 +558,17 @@ export default function Notifications() {
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
             <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6">
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
-                    <Filter className="h-4 w-4 text-white" />
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                      <Filter className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Search & Filter
+                    </h3>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Search & Filter
-                  </h3>
                   {hasActiveFilters && (
-                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                       <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
                         {[
                           searchQuery.trim() && 'Search',
@@ -594,25 +596,25 @@ export default function Notifications() {
                   )}
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1 relative group">
+                <div className="flex flex-col xl:flex-row gap-4 min-w-0">
+                  <div className="w-full xl:flex-1 min-w-0 relative group">
                     <Bell className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
                     <input
                       type="text"
-                      placeholder="Search by title, message, project, bug, or user..."
+                      placeholder="Search notifications..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      className="w-full min-w-0 pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                     />
                   </div>
 
-                  <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-                    <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:flex xl:flex-wrap gap-3 w-full xl:w-auto xl:shrink-0 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 w-full xl:w-auto">
                       <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
                         <Filter className="h-4 w-4 text-white" />
                       </div>
                       <Select value={typeFilter} onValueChange={setTypeFilter}>
-                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                        <SelectTrigger className="w-full min-w-0 xl:w-[11rem] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
                           <SelectValue placeholder="Type" />
                         </SelectTrigger>
                         <SelectContent position="popper" className="z-[60]">
@@ -629,12 +631,12 @@ export default function Notifications() {
                     </div>
 
                     {projectOptions.length > 0 && (
-                      <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
+                      <div className="flex items-center gap-2 min-w-0 w-full xl:w-auto">
                         <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
                           <BellRing className="h-4 w-4 text-white" />
                         </div>
                         <Select value={projectFilter} onValueChange={setProjectFilter}>
-                          <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                          <SelectTrigger className="w-full min-w-0 xl:w-[11rem] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
                             <SelectValue placeholder="Project" />
                           </SelectTrigger>
                           <SelectContent position="popper" className="z-[60] max-h-[280px]">
@@ -656,7 +658,7 @@ export default function Notifications() {
                         variant="outline"
                         size="sm"
                         onClick={clearFilters}
-                        className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm font-medium sm:ml-auto"
+                        className="h-11 w-full sm:col-span-2 xl:col-span-1 xl:w-auto px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm font-medium"
                       >
                         Clear
                       </Button>
@@ -707,24 +709,24 @@ export default function Notifications() {
               </div>
             ) : (
               <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                <div className="p-3 border-b border-gray-100 dark:border-gray-800">
-                  <TabsList className="grid w-full grid-cols-2 h-12 sm:h-14 bg-gray-100/80 dark:bg-gray-800/80 p-1 rounded-xl">
+                <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-gray-800">
+                  <TabsList className="grid w-full grid-cols-2 h-11 sm:h-12 bg-gray-100/80 dark:bg-gray-800/80 p-1 rounded-xl">
                     <TabsTrigger
                       value="unread"
-                      className="flex items-center justify-center gap-2 text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-lg transition-all duration-200"
+                      className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold min-w-0 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-lg transition-all duration-200 h-full"
                     >
-                      <BellRing className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                      <span>Unread</span>
+                      <BellRing className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">Unread</span>
                       <Badge className="min-w-[1.5rem] justify-center px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold border-0">
                         {hasActiveFilters ? unreadNotifications.length : unreadCount}
                       </Badge>
                     </TabsTrigger>
                     <TabsTrigger
                       value="read"
-                      className="flex items-center justify-center gap-2 text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-lg transition-all duration-200"
+                      className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold min-w-0 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-lg transition-all duration-200 h-full"
                     >
-                      <Check className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                      <span>Read</span>
+                      <Check className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">Read</span>
                       <Badge className="min-w-[1.5rem] justify-center px-2 py-0.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 rounded-full text-xs font-bold border-0">
                         {hasActiveFilters ? readNotifications.length : readCount}
                       </Badge>
@@ -846,7 +848,7 @@ export default function Notifications() {
                   Marking...
                 </>
               ) : (
-                'Mark All Read'
+                'Mark all'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

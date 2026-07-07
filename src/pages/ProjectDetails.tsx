@@ -37,6 +37,7 @@ import {
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
+  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -4723,9 +4724,9 @@ const ProjectDetails = () => {
       <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
         <div className="relative p-5 sm:p-6 md:p-7">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="space-y-2 min-w-0">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 min-w-0">
+            <div className="space-y-2 min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white tracking-tight break-words [overflow-wrap:anywhere]">
                 {project.name}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base max-w-2xl break-words">
@@ -4741,7 +4742,7 @@ const ProjectDetails = () => {
               <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full"></div>
             </div>
             {currentUser?.role === "admin" && (
-              <Button asChild className="w-full md:w-auto mt-2 md:mt-0 flex-shrink-0" size="sm">
+              <Button asChild className="w-full xl:w-auto mt-0 flex-shrink-0" size="sm">
                 <Link to={`/${currentUser.role}/projects/${projectId}/edit`}>
                   <Pencil className="mr-2 h-4 w-4" /> Edit Project
                 </Link>
@@ -4770,29 +4771,102 @@ const ProjectDetails = () => {
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-1 sm:p-2">
             {projectTabs.length > 2 ? (
               <>
-                <div className="lg:hidden p-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full h-12 rounded-2xl justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
-                    onClick={() => setIsMobileTabSelectorOpen(true)}
-                  >
-                    <span className="flex items-center gap-2 text-sm font-semibold">
-                      {activeProjectTab?.icon && <activeProjectTab.icon className="h-4 w-4" />}
-                      {activeProjectTab?.label}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-70" />
-                  </Button>
-                </div>
+                <Drawer
+                  open={isMobileTabSelectorOpen}
+                  onOpenChange={setIsMobileTabSelectorOpen}
+                >
+                  <div className="xl:hidden p-1">
+                    <DrawerTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full h-12 rounded-2xl justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-semibold">
+                          {activeProjectTab?.icon && (
+                            <activeProjectTab.icon className="h-4 w-4" />
+                          )}
+                          {activeProjectTab?.label}
+                        </span>
+                        <ChevronDown className="h-4 w-4 opacity-70" />
+                      </Button>
+                    </DrawerTrigger>
+                  </div>
 
-                <TabsList className="hidden lg:flex w-full gap-1 sm:gap-2 md:gap-3 p-1 bg-transparent">
+                  <DrawerContent className="xl:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+                    <DrawerHeader className="text-left pb-2">
+                      <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+                        Select Section
+                      </DrawerTitle>
+                      <DrawerDescription>
+                        Navigate to different project areas
+                      </DrawerDescription>
+                    </DrawerHeader>
+                    <div className="px-4 pb-6 space-y-3 max-h-[65vh] overflow-y-auto">
+                      {projectTabs.map((tab) => {
+                        const isActive = activeTab === tab.value;
+                        return (
+                          <Button
+                            key={tab.value}
+                            type="button"
+                            variant="ghost"
+                            onClick={() => {
+                              setActiveTab(tab.value);
+                              setSearchParams((prev) => {
+                                const p = new URLSearchParams(prev);
+                                p.set("tab", tab.value);
+                                return p as any;
+                              });
+                              setIsMobileTabSelectorOpen(false);
+                            }}
+                            className={`w-full h-auto min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between ${
+                              isActive
+                                ? "bg-lime-400 text-gray-950 hover:bg-lime-400"
+                                : "bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:bg-gray-200/80 dark:hover:bg-gray-700/80"
+                            }`}
+                          >
+                            <span className="flex items-center gap-3">
+                              <span
+                                className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+                                  isActive
+                                    ? "bg-lime-500/80 text-gray-950"
+                                    : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                                }`}
+                              >
+                                <tab.icon className="h-5 w-5" />
+                              </span>
+                              <span className="text-lg font-semibold">{tab.label}</span>
+                            </span>
+                            <span
+                              className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+                                isActive
+                                  ? "bg-gray-950 text-white"
+                                  : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100"
+                              }`}
+                            >
+                              {isActive ? (
+                                <Check className="h-5 w-5" />
+                              ) : tab.value === "tasks" ? (
+                                <span className="text-sm font-bold">{sharedTasks.length}</span>
+                              ) : (
+                                <ChevronDown className="h-4 w-4 -rotate-90 opacity-80" />
+                              )}
+                            </span>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </DrawerContent>
+                </Drawer>
+
+                <TabsList className="hidden xl:flex w-full gap-1 sm:gap-2 flex-wrap p-1 bg-transparent">
                   {projectTabs.map((tab) => (
                     <TabsTrigger
                       key={tab.value}
                       value={tab.value}
-                      className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto"
+                      className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-[5.5rem] px-2 sm:px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto"
                     >
-                      <tab.icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                      <tab.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 flex-shrink-0" />
                       <span className="truncate">{tab.label}</span>
                       {tab.value === "tasks" && (
                         <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold flex-shrink-0">
@@ -4825,84 +4899,19 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        {projectTabs.length > 2 && (
-          <Drawer open={isMobileTabSelectorOpen} onOpenChange={setIsMobileTabSelectorOpen}>
-            <DrawerContent className="lg:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
-              <DrawerHeader className="text-left pb-2">
-                <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">Select Section</DrawerTitle>
-                <DrawerDescription>Navigate to different project areas</DrawerDescription>
-              </DrawerHeader>
-              <div className="px-4 pb-6 space-y-3 max-h-[65vh] overflow-y-auto">
-                {projectTabs.map((tab) => {
-                  const isActive = activeTab === tab.value;
-                  return (
-                    <Button
-                      key={tab.value}
-                      type="button"
-                      variant="ghost"
-                      onClick={() => {
-                        setActiveTab(tab.value);
-                        setSearchParams((prev) => {
-                          const p = new URLSearchParams(prev);
-                          p.set("tab", tab.value);
-                          return p as any;
-                        });
-                        setIsMobileTabSelectorOpen(false);
-                      }}
-                      className={`w-full h-auto min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between ${
-                        isActive
-                          ? "bg-lime-400 text-gray-950 hover:bg-lime-400"
-                          : "bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:bg-gray-200/80 dark:hover:bg-gray-700/80"
-                      }`}
-                    >
-                      <span className="flex items-center gap-3">
-                        <span
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
-                            isActive
-                              ? "bg-lime-500/80 text-gray-950"
-                              : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
-                          }`}
-                        >
-                          <tab.icon className="h-5 w-5" />
-                        </span>
-                        <span className="text-lg font-semibold">{tab.label}</span>
-                      </span>
-                      <span
-                        className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
-                          isActive
-                            ? "bg-gray-950 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100"
-                        }`}
-                      >
-                        {isActive ? (
-                          <Check className="h-5 w-5" />
-                        ) : tab.value === "tasks" ? (
-                          <span className="text-sm font-bold">{sharedTasks.length}</span>
-                        ) : (
-                          <ChevronDown className="h-4 w-4 -rotate-90 opacity-80" />
-                        )}
-                      </span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </DrawerContent>
-          </Drawer>
-        )}
-
         <TabsContent value="overview">
           <div className="space-y-4 sm:space-y-6">
             <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
               <div className="relative p-4 sm:p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600 shadow-lg">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between min-w-0">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600 shadow-lg">
                         <Code className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                       </div>
-                      <div className="min-w-0">
-                        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 dark:text-white truncate">
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-xl sm:text-2xl xl:text-3xl font-bold tracking-tight text-gray-900 dark:text-white break-words">
                           Project Overview
                         </h2>
                         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5">
@@ -4911,7 +4920,7 @@ const ProjectDetails = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full lg:w-auto lg:min-w-[420px]">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full xl:w-auto xl:min-w-[20rem] shrink-0">
                     {[
                       { label: 'Bugs', value: bugs.length, tone: 'text-red-600 dark:text-red-400' },
                       { label: 'Tasks', value: sharedTasks.length, tone: 'text-orange-600 dark:text-orange-400' },
@@ -4933,10 +4942,10 @@ const ProjectDetails = () => {
 
             <ProjectInfoOverview project={project} createdByName={projectOwner?.username} />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-              <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30" />
-                <div className="relative p-4 sm:p-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 min-w-0">
+              <div className="xl:col-span-2 relative rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm min-w-0">
+                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30" />
+                <div className="relative p-4 sm:p-6 min-w-0 overflow-x-hidden">
                   <div className="flex items-center gap-2 mb-4">
                     <Clock className="h-4 w-4 text-indigo-500" />
                     <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
@@ -4953,20 +4962,20 @@ const ProjectDetails = () => {
                 </div>
               </div>
 
-              <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/30 to-emerald-50/20 dark:from-blue-950/20 dark:to-emerald-950/10" />
-                <div className="relative p-4 sm:p-6 space-y-4">
+              <div className="relative rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm min-w-0">
+                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-50/30 to-emerald-50/20 dark:from-blue-950/20 dark:to-emerald-950/10" />
+                <div className="relative p-4 sm:p-6 space-y-4 min-w-0">
                   <div className="flex items-center gap-2">
-                    <Plus className="h-4 w-4 text-blue-500" />
+                    <Plus className="h-4 w-4 text-blue-500 shrink-0" />
                     <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                       Quick Actions
                     </h3>
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 min-w-0">
                     {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
                       <Button
                         variant="outline"
-                        className="h-11 justify-start gap-3 border-blue-200/80 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                        className="h-11 w-full min-w-0 justify-start gap-3 border-blue-200/80 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/30"
                         onClick={() => setActiveTab("bugs")}
                       >
                         <Bug className="h-4 w-4 shrink-0" />
@@ -4976,7 +4985,7 @@ const ProjectDetails = () => {
                     {(currentUser?.role === "tester" || currentUser?.role === "admin") && (
                       <Button
                         variant="outline"
-                        className="h-11 justify-start gap-3 border-emerald-200/80 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                        className="h-11 w-full min-w-0 justify-start gap-3 border-emerald-200/80 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                         onClick={() => setActiveTab("fixes")}
                       >
                         <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -4985,7 +4994,7 @@ const ProjectDetails = () => {
                     )}
                     <Button
                       variant="outline"
-                      className="h-11 justify-start gap-3 border-indigo-200/80 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
+                      className="h-11 w-full min-w-0 justify-start gap-3 border-indigo-200/80 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
                       onClick={() => setActiveTab("updates")}
                     >
                       <Bell className="h-4 w-4 shrink-0" />
@@ -4994,7 +5003,7 @@ const ProjectDetails = () => {
                     {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
                       <Button
                         variant="outline"
-                        className="h-11 justify-start gap-3 border-orange-200/80 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-950/30"
+                        className="h-11 w-full min-w-0 justify-start gap-3 border-orange-200/80 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-950/30"
                         onClick={() => setActiveTab("tasks")}
                       >
                         <ListChecks className="h-4 w-4 shrink-0" />
@@ -5003,7 +5012,7 @@ const ProjectDetails = () => {
                     )}
                     <Button
                       variant="outline"
-                      className="h-11 justify-start gap-3"
+                      className="h-11 w-full min-w-0 justify-start gap-3"
                       onClick={() => setActiveTab("members")}
                     >
                       <Users className="h-4 w-4 shrink-0" />

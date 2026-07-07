@@ -64,14 +64,14 @@ export const MessageComposer = memo(function MessageComposer({
   const isVoiceActive = voicePhase !== "idle";
 
   return (
-    <div className="flex-shrink-0 z-20 bg-[#202c33] border-t border-[#2a3942]">
+    <div className="flex-shrink-0 z-20 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200/60 dark:border-gray-700/60">
       {replyToMessage && (
-        <div className="px-3 sm:px-4 py-2 bg-[#2a3942] border-b border-[#3b4a54] flex items-center justify-between">
-          <div className="text-sm flex-1 min-w-0 border-l-4 border-[#00a884] pl-3">
-            <span className="font-medium text-[#00a884]">
+        <div className="px-3 sm:px-4 py-2 bg-blue-50/80 dark:bg-blue-950/30 border-b border-blue-200/60 dark:border-blue-800/50 flex items-center justify-between gap-2 min-w-0">
+          <div className="text-sm flex-1 min-w-0 border-l-4 border-emerald-600 pl-3">
+            <span className="font-medium text-emerald-700 dark:text-emerald-400">
               Replying to {displaySenderLabel(replyToMessage.sender_name)}
             </span>
-            <div className="text-[#8696a0] text-xs truncate">
+            <div className="text-gray-500 dark:text-gray-400 text-xs truncate">
               {replyToMessage.message_type === "voice"
                 ? "Voice message"
                 : replyToMessage.content}
@@ -81,7 +81,7 @@ export const MessageComposer = memo(function MessageComposer({
             variant="ghost"
             size="icon"
             onClick={onClearReply}
-            className="h-8 w-8 text-[#8696a0] hover:bg-[#3b4a54] rounded-lg transition-all duration-200"
+            className="h-8 w-8 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg shrink-0"
             aria-label="Cancel reply"
           >
             <X className="h-4 w-4" />
@@ -91,19 +91,19 @@ export const MessageComposer = memo(function MessageComposer({
 
       <div className="px-2 sm:px-3 md:px-4 py-2 sm:py-3">
         {voicePhase === "recording" && (
-          <div className="flex items-center gap-3 rounded-2xl bg-[#2a3942] border border-[#3b4a54] px-3 py-2.5 sm:px-4">
+          <div className="flex items-center gap-3 rounded-2xl bg-gray-100/80 dark:bg-gray-800/80 border border-gray-200/60 dark:border-gray-700/60 px-3 py-2.5 sm:px-4">
             <span className="relative flex h-2.5 w-2.5 shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
             </span>
-            <span className="min-w-[3rem] text-sm font-medium tabular-nums text-[#e9edef]">
+            <span className="min-w-[3rem] text-sm font-medium tabular-nums text-gray-900 dark:text-white">
               {formatDuration(recordingDuration)}
             </span>
             <div className="flex flex-1 items-center gap-0.5 overflow-hidden px-1">
               {Array.from({ length: 28 }).map((_, i) => (
                 <span
                   key={i}
-                  className="w-0.5 shrink-0 rounded-full bg-[#00a884]/70 animate-pulse"
+                  className="w-0.5 shrink-0 rounded-full bg-emerald-500/70 animate-pulse"
                   style={{
                     height: `${10 + ((i * 7 + recordingDuration) % 18)}px`,
                     animationDelay: `${(i % 5) * 0.1}s`,
@@ -116,7 +116,7 @@ export const MessageComposer = memo(function MessageComposer({
               variant="ghost"
               size="icon"
               onClick={onVoiceCancel}
-              className="h-9 w-9 shrink-0 rounded-xl text-[#8696a0] hover:bg-[#3b4a54] hover:text-red-400"
+              className="h-9 w-9 shrink-0 rounded-xl text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-red-500"
               title="Cancel recording"
             >
               <Trash2 className="h-4 w-4" />
@@ -125,7 +125,7 @@ export const MessageComposer = memo(function MessageComposer({
               type="button"
               size="icon"
               onClick={onVoicePause}
-              className="h-9 w-9 shrink-0 rounded-xl bg-[#3b4a54] text-[#e9edef] hover:bg-[#4a5c66]"
+              className="h-9 w-9 shrink-0 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600"
               title="Pause recording"
             >
               <Pause className="h-4 w-4" />
@@ -134,13 +134,13 @@ export const MessageComposer = memo(function MessageComposer({
         )}
 
         {voicePhase === "review" && (
-          <div className="flex items-center gap-2 sm:gap-3 rounded-2xl bg-[#2a3942] border border-[#00a884]/40 px-3 py-2.5 sm:px-4">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#00a884]/15">
-              <Mic className="h-4 w-4 text-[#00a884]" />
+          <div className="flex items-center gap-2 sm:gap-3 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50 px-3 py-2.5 sm:px-4">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
+              <Mic className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[#e9edef]">Voice message</p>
-              <p className="text-xs text-[#8696a0] tabular-nums">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">Voice message</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
                 {formatDuration(reviewDuration)} · Ready to send
               </p>
             </div>
@@ -149,7 +149,7 @@ export const MessageComposer = memo(function MessageComposer({
               variant="ghost"
               size="icon"
               onClick={onVoiceCancel}
-              className="h-9 w-9 shrink-0 rounded-xl text-[#8696a0] hover:bg-[#3b4a54] hover:text-red-400"
+              className="h-9 w-9 shrink-0 rounded-xl text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-red-500"
               title="Delete recording"
             >
               <Trash2 className="h-4 w-4" />
@@ -158,7 +158,7 @@ export const MessageComposer = memo(function MessageComposer({
               type="button"
               size="icon"
               onClick={onVoiceSend}
-              className="h-9 w-9 shrink-0 rounded-xl bg-[#00a884] text-white hover:bg-[#06cf9c]"
+              className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-emerald-600 text-white hover:from-blue-700 hover:to-emerald-700"
               title="Send voice message"
             >
               <Send className="h-4 w-4" />
@@ -167,7 +167,7 @@ export const MessageComposer = memo(function MessageComposer({
         )}
 
         {voicePhase === "idle" && (
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 min-w-0">
             <div className="flex-1 min-w-0 relative rounded-2xl">
               <Textarea
                 ref={textareaRef}
@@ -177,12 +177,12 @@ export const MessageComposer = memo(function MessageComposer({
                 onPaste={onPaste}
                 placeholder="Type a message"
                 disabled={isImageDropUploading}
-                className="min-h-[40px] sm:min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-[#3b4a54] bg-[#2a3942] text-[#e9edef] placeholder:text-[#8696a0] focus:bg-[#2a3942] focus:border-[#00a884] transition-colors text-sm disabled:opacity-60"
+                className="min-h-[40px] sm:min-h-[44px] max-h-[120px] resize-none rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-colors text-sm disabled:opacity-60"
                 rows={1}
               />
             </div>
 
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <EmojiPicker onEmojiSelect={onEmojiSelect} size="md" />
               <MediaUploader groupId={groupId} onUploadSuccess={onUploadSuccess} />
               <Button
@@ -190,7 +190,7 @@ export const MessageComposer = memo(function MessageComposer({
                 size="icon"
                 onClick={onVoiceStart}
                 disabled={isVoiceActive}
-                className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 flex-shrink-0 transition-all duration-200 rounded-xl text-[#8696a0] hover:bg-[#3b4a54] hover:text-[#aebac1]"
+                className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 flex-shrink-0 transition-all duration-200 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
                 title="Record voice message"
               >
                 <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -200,7 +200,7 @@ export const MessageComposer = memo(function MessageComposer({
                 disabled={!value.trim()}
                 size="icon"
                 className={cn(
-                  "h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 bg-[#00a884] text-white hover:bg-[#06cf9c] flex-shrink-0 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 rounded-xl"
+                  "h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 bg-gradient-to-r from-blue-600 to-emerald-600 text-white hover:from-blue-700 hover:to-emerald-700 flex-shrink-0 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 rounded-xl"
                 )}
                 title="Send message"
               >

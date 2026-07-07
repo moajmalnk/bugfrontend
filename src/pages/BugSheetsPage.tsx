@@ -61,7 +61,7 @@ import { formatDistanceToNow } from "date-fns";
 
 const BugSheetCardSkeleton = ({ index = 0 }: { index?: number }) => (
   <div
-    className="group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 animate-pulse"
+    className="group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
     style={{ animationDelay: `${index * 80}ms` }}
   >
     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-300/60 to-blue-400/60" />
@@ -89,12 +89,54 @@ const BugSheetCardSkeleton = ({ index = 0 }: { index?: number }) => (
         ))}
       </div>
 
-      <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
-        <Skeleton className="h-9 flex-1 rounded-md" />
-        <Skeleton className="h-9 flex-1 rounded-md" />
-        <Skeleton className="h-9 w-10 rounded-md" />
-        <Skeleton className="h-9 w-10 rounded-md" />
+      <div className="grid grid-cols-4 gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
+        <Skeleton className="h-9 w-full rounded-md" />
+        <Skeleton className="h-9 w-full rounded-md" />
+        <Skeleton className="h-9 w-full rounded-md" />
+        <Skeleton className="h-9 w-full rounded-md" />
       </div>
+    </div>
+  </div>
+);
+
+const BugSheetsMainLayoutSkeleton = () => (
+  <div className="w-full space-y-6 sm:space-y-8" aria-label="Loading bugsheets layout" aria-busy="true">
+    {/* Tabs */}
+    <div className="relative">
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-green-50/50 dark:from-gray-800/50 dark:to-green-900/50 rounded-2xl" />
+      <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
+        <div className="grid grid-cols-2 h-12 sm:h-14 gap-1">
+          <Skeleton className="rounded-xl" />
+          <Skeleton className="rounded-xl" />
+        </div>
+      </div>
+    </div>
+
+    {/* Search & filter */}
+    <div className="relative">
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-green-50/30 dark:from-gray-800/30 dark:to-green-900/30 rounded-2xl" />
+      <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Skeleton className="h-7 w-7 rounded-lg" />
+            <Skeleton className="h-6 w-36" />
+          </div>
+          <div className="flex flex-col md:flex-row gap-4">
+            <Skeleton className="h-12 flex-1 rounded-xl" />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Skeleton className="h-11 w-full sm:w-[160px] rounded-xl" />
+              <Skeleton className="h-11 w-full sm:w-[160px] rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Sheet cards */}
+    <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-1 lg:grid-cols-2">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <BugSheetCardSkeleton key={`bugsheet-layout-skeleton-${index}`} index={index} />
+      ))}
     </div>
   </div>
 );
@@ -844,26 +886,13 @@ const BugSheetsPage = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                {/* Google Connection Status Indicator */}
-                <div className="flex items-center self-start gap-2 px-4 py-2.5 rounded-xl border transition-all duration-300"
-                  style={{
-                    backgroundColor: isConnected ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                    borderColor: isConnected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-                  }}
-                >
-                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                  {!isConnected && (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      onClick={() => navigate(`/${userRole}/profile`)}
-                      className="h-auto p-0 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline ml-1"
-                    >
-                      Connect
-                    </Button>
-                  )}
-                </div>
-
+                {isInitialLoading ? (
+                  <>
+                    <Skeleton className="h-12 w-36 rounded-xl self-start" />
+                    <Skeleton className="h-14 w-24 rounded-xl" />
+                  </>
+                ) : (
+                  <>
                 {isConnected && (
                   <Button
                     onClick={() => setIsCreateModalOpen(true)}
@@ -887,6 +916,8 @@ const BugSheetsPage = () => {
                       </div>
                     </div>
                   </div>
+                )}
+                  </>
                 )}
               </div>
             </div>
@@ -939,7 +970,9 @@ const BugSheetsPage = () => {
         </Dialog>
 
         {/* Sheets Tabs */}
-        {!isCheckingConnection && (
+        {isInitialLoading ? (
+          <BugSheetsMainLayoutSkeleton />
+        ) : (
           <Tabs
             value={activeTab}
             onValueChange={(val) => {
@@ -1011,36 +1044,6 @@ const BugSheetsPage = () => {
               </div>
             </div>
 
-            {isInitialLoading ? (
-              <div className="space-y-6 sm:space-y-8">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-emerald-50/30 dark:from-gray-800/30 dark:to-emerald-900/30 rounded-2xl"></div>
-                  <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="p-1.5 bg-emerald-500 rounded-lg">
-                          <Search className="h-4 w-4 text-white" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Loading BugSheets...</h3>
-                      </div>
-                      <div className="flex flex-col md:flex-row gap-4">
-                        <Skeleton className="h-12 flex-1 rounded-xl" />
-                        <div className="flex gap-3">
-                          <Skeleton className="h-11 w-[160px] rounded-xl" />
-                          <Skeleton className="h-11 w-[160px] rounded-xl" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 lg:grid-cols-2" aria-label="Loading bugsheets">
-                  {Array.from({ length: 6 }).map((_, index) => (
-                    <BugSheetCardSkeleton key={`bugsheet-initial-skeleton-${index}`} index={index} />
-                  ))}
-                </div>
-              </div>
-            ) : (
             <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
               {/* Project Cards View (Admin - All Sheets) */}
               {shouldShowProjectCards() && (
@@ -1156,7 +1159,7 @@ const BugSheetsPage = () => {
               {!shouldShowProjectCards() && (
                 <div className="space-y-4">
                   {isLoading ? (
-                    <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 lg:grid-cols-2" aria-label="Loading sheets">
+                    <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 xl:grid-cols-2" aria-label="Loading sheets">
                       {Array.from({ length: 6 }).map((_, index) => (
                         <BugSheetCardSkeleton key={`bugsheet-skeleton-${index}`} index={index} />
                       ))}
@@ -1198,7 +1201,7 @@ const BugSheetsPage = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 lg:grid-cols-2" style={{ minHeight: 200 }} aria-label="Sheet list">
+                    <div className="grid gap-4 sm:gap-5 md:gap-6 mt-4 grid-cols-1 xl:grid-cols-2" style={{ minHeight: 200 }} aria-label="Sheet list">
                       {filteredSheets.map((sheet) => (
                         <div
                           key={sheet.id}
@@ -1312,45 +1315,51 @@ const BugSheetsPage = () => {
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
+                            <div className="grid grid-cols-4 gap-2 pt-4 border-t border-gray-100 dark:border-gray-700 min-w-0">
                               <Button
                                 variant="outline"
                                 size="sm"
+                                title="View sheet"
                                 onClick={() => handleViewSheet(sheet)}
-                                className="flex-1 h-9 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-green-200 dark:border-green-800 hover:from-green-100 hover:to-blue-100 dark:hover:from-green-900/30 dark:hover:to-blue-900/30 text-green-700 dark:text-green-300 font-semibold"
+                                className="h-9 w-full min-w-0 px-2 inline-flex items-center justify-center gap-1 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-green-200 dark:border-green-800 hover:from-green-100 hover:to-blue-100 dark:hover:from-green-900/30 dark:hover:to-blue-900/30 text-green-700 dark:text-green-300 font-semibold"
                               >
-                                <ExternalLink className="h-4 w-4 mr-1.5" />
-                                <span className="hidden sm:inline">View</span>
+                                <ExternalLink className="h-4 w-4 shrink-0" />
+                                <span className="hidden xl:inline truncate">View</span>
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
+                                title="Edit sheet"
                                 onClick={() => handleEditClick(sheet)}
-                                className="flex-1 h-9 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold"
+                                className="h-9 w-full min-w-0 px-2 inline-flex items-center justify-center gap-1 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold"
                               >
-                                <Edit className="h-4 w-4 mr-1.5" />
-                                <span className="hidden sm:inline">Edit</span>
+                                <Edit className="h-4 w-4 shrink-0" />
+                                <span className="hidden xl:inline truncate">Edit</span>
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
+                                title="Copy sheet URL"
                                 onClick={() => handleCopySheetUrl(sheet)}
-                                className="h-9 px-3 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                                className="h-9 w-full min-w-0 px-2 inline-flex items-center justify-center bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
                               >
-                                <Copy className="h-4 w-4" />
+                                <Copy className="h-4 w-4 shrink-0" />
+                                <span className="sr-only">Copy</span>
                               </Button>
                               <Button
                                 variant="destructive"
                                 size="sm"
+                                title="Delete sheet"
                                 onClick={() => handleDeleteClick(sheet)}
                                 disabled={isDeleting === sheet.id}
-                                className="h-9 px-3"
+                                className="h-9 w-full min-w-0 px-2 inline-flex items-center justify-center"
                               >
                                 {isDeleting === sheet.id ? (
-                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                  <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
                                 ) : (
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-4 w-4 shrink-0" />
                                 )}
+                                <span className="sr-only">Delete</span>
                               </Button>
                             </div>
                           </div>
@@ -1361,7 +1370,6 @@ const BugSheetsPage = () => {
                 </div>
               )}
             </TabsContent>
-            )}
           </Tabs>
         )}
 

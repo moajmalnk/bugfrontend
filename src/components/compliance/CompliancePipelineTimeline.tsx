@@ -36,13 +36,13 @@ export function CompliancePipelineTimeline({
       <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
         Pipeline Telemetry
       </h3>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
         {STEPS.map((step, idx) => {
           const isComplete = emergencyBypass || idx < currentIdx || (idx === currentIdx && pipelineStage === 'admin_ready');
           const isCurrent = !emergencyBypass && idx === currentIdx && pipelineStage !== 'admin_ready';
 
           return (
-            <div key={step.key} className="flex flex-1 items-center gap-3">
+            <div key={step.key} className="flex min-w-0 flex-1 items-center gap-3">
               <div
                 className={cn(
                   'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border',
@@ -82,7 +82,7 @@ export function CompliancePipelineTimeline({
               {idx < STEPS.length - 1 && (
                 <div
                   className={cn(
-                    'hidden h-px flex-1 sm:block',
+                    'hidden h-px flex-1 lg:block',
                     isComplete ? 'bg-emerald-700/50' : 'bg-slate-700'
                   )}
                   aria-hidden

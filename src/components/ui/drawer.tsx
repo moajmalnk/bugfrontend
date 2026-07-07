@@ -5,13 +5,30 @@ import { cn } from "@/lib/utils"
 
 const Drawer = ({
   shouldScaleBackground = true,
+  onOpenChange,
+  open,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root
-    shouldScaleBackground={shouldScaleBackground}
-    {...props}
-  />
-)
+}: React.ComponentProps<typeof DrawerPrimitive.Root>) => {
+  React.useEffect(() => {
+    if (open) {
+      (document.activeElement as HTMLElement | null)?.blur()
+    }
+  }, [open])
+
+  return (
+    <DrawerPrimitive.Root
+      shouldScaleBackground={shouldScaleBackground}
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          (document.activeElement as HTMLElement | null)?.blur()
+        }
+        onOpenChange?.(nextOpen)
+      }}
+      {...props}
+    />
+  )
+}
 Drawer.displayName = "Drawer"
 
 const DrawerTrigger = DrawerPrimitive.Trigger

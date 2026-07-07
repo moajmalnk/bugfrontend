@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
-  admin: "Step-by-step guides for admins, developers, and testers — every BugRicer feature explained.",
+  admin: "Step-by-step guides, every BugRicer feature explained.",
   developer: "Guides for developers — projects, bugs, collaboration, and productivity tools.",
   tester: "Guides for testers — reporting bugs, tracking fixes, and core workflows.",
   user: "Step-by-step guides for your BugRicer role and permissions.",
@@ -270,9 +270,6 @@ export default function HelpSupport() {
               <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               Still need help?
             </h3>
-            <p className="mt-1.5 text-sm text-muted-foreground max-w-lg">
-              Contact our support team or use the Rate Us feedback widget on any page.
-            </p>
           </div>
           <div className="flex flex-wrap gap-3 shrink-0">
             <Button asChild className="rounded-xl shadow-sm">

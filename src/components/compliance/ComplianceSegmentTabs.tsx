@@ -72,7 +72,7 @@ export function ComplianceSegmentTabs({
     <div className="relative w-full">
       <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl pointer-events-none" />
       <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-        <div className="lg:hidden p-1">
+        <div className="xl:hidden p-1">
           <Button
             type="button"
             variant="outline"
@@ -105,7 +105,7 @@ export function ComplianceSegmentTabs({
           </Button>
         </div>
 
-        <div className="hidden lg:grid grid-cols-3 gap-2">
+        <div className="hidden xl:grid grid-cols-3 gap-2">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -155,7 +155,7 @@ export function ComplianceSegmentTabs({
       </div>
 
       <Drawer open={isMobileTabSelectorOpen} onOpenChange={setIsMobileTabSelectorOpen}>
-        <DrawerContent className="lg:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+        <DrawerContent className="xl:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
           <DrawerHeader className="text-left pb-2">
             <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
               Select Section

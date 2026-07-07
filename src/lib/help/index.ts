@@ -4,6 +4,10 @@ import { collaborationArticles } from "./articles/collaboration";
 import { productivityArticles } from "./articles/productivity";
 import { integrationsArticles } from "./articles/integrations";
 import { administrationArticles } from "./articles/administration";
+import { testerGuideArticles } from "./articles/tester-guides";
+import { developerGuideArticles } from "./articles/developer-guides";
+import { adminGuideArticles } from "./articles/admin-guides";
+import { sharedFeatureArticles } from "./articles/shared-features";
 import { articleMatchesRole } from "./searchIndex";
 import type { HelpArticle } from "./types";
 import type { HelpRoleFilter } from "./searchIndex";
@@ -16,6 +20,10 @@ export const ALL_HELP_ARTICLES: HelpArticle[] = [
   ...productivityArticles,
   ...integrationsArticles,
   ...administrationArticles,
+  ...testerGuideArticles,
+  ...developerGuideArticles,
+  ...adminGuideArticles,
+  ...sharedFeatureArticles,
 ];
 
 export function getArticleById(id: string): HelpArticle | undefined {

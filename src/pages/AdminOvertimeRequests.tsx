@@ -167,22 +167,12 @@ export default function AdminOvertimeRequests() {
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
               <div className="space-y-3 min-w-0">
                 <div className="flex items-center gap-3">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigate(`/${currentUser.role}/daily-update`)}
-                    className="shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
-                    aria-label="Back to Work Update"
-                  >
-                    <ArrowLeft className="h-5 w-5" />
-                  </Button>
                   <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
                     <Timer className="h-6 w-6 text-white" />
                   </div>
                   <div className="min-w-0">
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
-                      OT Requests
+                      OT
                     </h1>
                     <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2" />
                   </div>

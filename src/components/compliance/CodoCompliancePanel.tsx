@@ -286,7 +286,7 @@ export function CodoCompliancePanel({
           <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 space-y-6">
             {activeTab === 'developer' && (
               <div className="space-y-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-blue-500 rounded-lg">
                       <ListChecks className="h-4 w-4 text-white" />
@@ -358,7 +358,7 @@ export function CodoCompliancePanel({
 
             {activeTab === 'tester' && (
               <div className="space-y-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-emerald-500 rounded-lg">
                       <ListChecks className="h-4 w-4 text-white" />
@@ -460,7 +460,7 @@ export function CodoCompliancePanel({
                 />
 
                 <div className="rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 p-5 shadow-sm space-y-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                         Project-Level Checklist

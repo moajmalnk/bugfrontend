@@ -605,7 +605,7 @@ export default function DailyUpdate() {
         <div className="relative min-w-0 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-5 lg:gap-6 min-w-0">
+            <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-5 xl:gap-6 min-w-0">
               <div className="space-y-3 min-w-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
@@ -623,7 +623,7 @@ export default function DailyUpdate() {
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
+              <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4 shrink-0 w-full xl:w-auto">
                 {!(currentUser?.role === 'admin' && showRequestsOnly) && (
                   <DailyWorkFlowPanel
                     layout="header"
@@ -731,13 +731,13 @@ export default function DailyUpdate() {
         <div className="relative overflow-hidden rounded-2xl shadow-lg border border-gray-200/40 dark:border-gray-700/40">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 md:p-8 lg:p-10">
-            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 min-w-0">
-              <div className="flex gap-3 min-w-0 flex-1">
+            <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between min-w-0">
+              <div className="flex gap-3 min-w-0 w-full xl:flex-1">
                 <div className="p-3 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl shadow-lg ring-4 ring-blue-600/20 shrink-0 self-start">
                   <FileText className="h-6 w-6 text-white" />
                 </div>
-                <div className="min-w-0 pt-0.5">
-                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words [overflow-wrap:anywhere]">
                     Saved Submissions
                   </h2>
                   <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-1 break-words leading-relaxed">
@@ -746,10 +746,10 @@ export default function DailyUpdate() {
                 </div>
               </div>
 
-              <div className="flex w-full flex-col items-stretch gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:justify-end shrink-0">
+              <div className="flex w-full flex-col items-stretch gap-2 xl:ml-auto xl:w-auto xl:flex-row xl:flex-wrap xl:items-center xl:justify-end shrink-0">
                 {todayCheckInLabel && !(currentUser?.role === 'admin' && showRequestsOnly) ? (
                   <div
-                    className="inline-flex h-12 w-full sm:w-44 items-center justify-center gap-2 rounded-xl border border-emerald-200/90 bg-emerald-50/95 px-3 shadow-sm dark:border-emerald-900/55 dark:bg-emerald-950/35"
+                    className="inline-flex h-12 w-full xl:w-44 items-center justify-center gap-2 rounded-xl border border-emerald-200/90 bg-emerald-50/95 px-3 shadow-sm dark:border-emerald-900/55 dark:bg-emerald-950/35"
                     title={`Checked in at ${todayCheckInLabel}`}
                   >
                     <Clock className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -759,7 +759,7 @@ export default function DailyUpdate() {
                   </div>
                 ) : null}
                 <div
-                  className="inline-flex h-12 w-full sm:w-44 items-center justify-center rounded-xl border border-orange-200/90 bg-orange-50/95 px-3 shadow-sm dark:border-orange-900/55 dark:bg-orange-950/35"
+                  className="inline-flex h-12 w-full xl:w-44 items-center justify-center rounded-xl border border-orange-200/90 bg-orange-50/95 px-3 shadow-sm dark:border-orange-900/55 dark:bg-orange-950/35"
                   title="Overtime that counts in period totals: approved or adjusted. Pending and rejected extra-hour requests count as 0."
                 >
                   <span className="text-sm font-bold tabular-nums text-orange-700 dark:text-orange-200">
@@ -767,7 +767,7 @@ export default function DailyUpdate() {
                   </span>
                 </div>
                 {currentUser?.role === 'admin' && (
-                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
                     <Button
                       type="button"
                       variant="secondary"
@@ -839,7 +839,7 @@ export default function DailyUpdate() {
 
             {activeTab === 'all-submissions' && activeMonthSummary && (
               <div className="mb-6 rounded-2xl border border-blue-200/60 dark:border-blue-800/50 bg-gradient-to-r from-blue-600/95 to-emerald-600/95 text-white shadow-lg overflow-hidden">
-                <div className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="px-4 sm:px-6 py-4 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 min-w-0">
                   <div className="min-w-0">
                     <p className="text-lg sm:text-xl font-bold tracking-tight">{activeMonthSummary.title}</p>
                     <p className="text-sm text-white/85 mt-0.5">{activeMonthSummary.range}</p>
@@ -880,7 +880,7 @@ export default function DailyUpdate() {
                       const checkInLabel = formatCheckInTime(s.check_in_time);
                       return (
                   <div key={s.id ?? s.submission_date} className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-4 sm:p-6 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 min-w-0">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 mb-3 min-w-0">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between mb-3 min-w-0">
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold text-sm text-gray-900 dark:text-white break-words">
                           {s.submission_date}

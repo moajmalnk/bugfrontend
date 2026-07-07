@@ -347,7 +347,7 @@ const Fixes = () => {
       return (
         <div className="space-y-6">
           {/* Desktop & Tablet Table Skeleton */}
-          <div className="hidden sm:block">
+          <div className="hidden xl:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -375,7 +375,7 @@ const Fixes = () => {
             </Table>
           </div>
           {/* Mobile & Tablet Card Skeleton */}
-          <div className="grid sm:hidden grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid xl:hidden grid-cols-1 gap-4 md:grid-cols-2">
             {[...Array(4)].map((_, i) => (
               <CardSkeleton key={i} />
             ))}
@@ -413,7 +413,7 @@ const Fixes = () => {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
                 </div>
                 
-                <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex flex-col xl:flex-row gap-4">
                   {/* Search Bar */}
                   <div className="flex-1 relative group">
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -427,7 +427,7 @@ const Fixes = () => {
                   </div>
 
                   {/* Filter Controls */}
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-wrap gap-3 w-full xl:w-auto xl:shrink-0">
                     {/* Priority Filter */}
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
@@ -527,7 +527,7 @@ const Fixes = () => {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
                 </div>
                 
-                <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex flex-col xl:flex-row gap-4">
                   {/* Search Bar */}
                   <div className="flex-1 relative group">
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -541,7 +541,7 @@ const Fixes = () => {
                   </div>
 
                   {/* Filter Controls */}
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-wrap gap-3 w-full xl:w-auto xl:shrink-0">
                     {/* Priority Filter */}
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
@@ -650,9 +650,9 @@ const Fixes = () => {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
               </div>
               
-              <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex flex-col xl:flex-row gap-4">
                 {/* Search Bar */}
-                <div className="flex-1 relative group">
+                <div className="flex-1 min-w-0 relative group">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                   <input
                     type="text"
@@ -664,7 +664,7 @@ const Fixes = () => {
                 </div>
 
                 {/* Filter Controls */}
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-wrap gap-3 w-full xl:w-auto xl:shrink-0">
                   {/* Priority Filter */}
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
@@ -728,7 +728,7 @@ const Fixes = () => {
         {totalPages > 1 && (
           <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             {/* Top Row - Results Info and Items Per Page */}
-            <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 xl:gap-4 p-4 sm:p-5">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
                 <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -760,9 +760,9 @@ const Fixes = () => {
             </div>
 
             {/* Bottom Row - Pagination Navigation */}
-            <div className="flex flex-col sm:flex-row md:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 md:pt-0 border-t border-border/30">
-              {/* Page Info for Mobile */}
-              <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 p-4 sm:p-5 pt-0 xl:pt-0 border-t border-border/30">
+              {/* Page Info for Mobile/Tablet */}
+              <div className="xl:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
                 <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
                 Page{" "}
                 <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
@@ -775,7 +775,7 @@ const Fixes = () => {
               </div>
 
               {/* Pagination Controls */}
-              <div className="flex items-center justify-center gap-2 w-full sm:w-auto md:w-auto">
+              <div className="flex items-center justify-center gap-2 w-full xl:w-auto flex-wrap">
                 {/* Previous Button */}
                 <Button
                   variant="outline"
@@ -808,14 +808,14 @@ const Fixes = () => {
                     variant={currentPage === 1 ? "default" : "outline"}
                     size="sm"
                     onClick={() => setCurrentPage(1)}
-                    className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                    className="h-10 w-10 p-0 hidden xl:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                   >
                     1
                   </Button>
 
                   {/* Show ellipsis if needed on larger screens */}
                   {currentPage > 4 && (
-                    <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                    <span className="hidden xl:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
                       •••
                     </span>
                   )}
@@ -838,7 +838,7 @@ const Fixes = () => {
                         variant={currentPage === page ? "default" : "outline"}
                         size="sm"
                         onClick={() => setCurrentPage(page)}
-                        className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        className="h-10 w-10 p-0 hidden xl:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                       >
                         {page}
                       </Button>
@@ -847,7 +847,7 @@ const Fixes = () => {
 
                   {/* Show ellipsis if needed on larger screens */}
                   {currentPage < totalPages - 3 && (
-                    <span className="hidden md:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
+                    <span className="hidden xl:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
                       •••
                     </span>
                   )}
@@ -860,14 +860,14 @@ const Fixes = () => {
                       }
                       size="sm"
                       onClick={() => setCurrentPage(totalPages)}
-                      className="h-10 w-10 p-0 hidden md:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                      className="h-10 w-10 p-0 hidden xl:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                     >
                       {totalPages}
                     </Button>
                   )}
 
                   {/* Mobile-friendly page selector */}
-                  <div className="md:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
+                  <div className="xl:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
                     <select
                       value={currentPage}
                       onChange={(e) => setCurrentPage(Number(e.target.value))}
@@ -918,7 +918,7 @@ const Fixes = () => {
               </div>
 
               {/* Page Info for Desktop */}
-              <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground font-medium">
+              <div className="hidden xl:flex items-center gap-2 text-sm text-muted-foreground font-medium shrink-0">
                 <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
                 Page{" "}
                 <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
@@ -935,7 +935,7 @@ const Fixes = () => {
 
         {/* Simple results info when no pagination needed */}
         {totalPages <= 1 && (
-          <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 xl:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
               <span className="text-sm sm:text-base text-foreground font-semibold">
@@ -960,20 +960,20 @@ const Fixes = () => {
         )}
 
         {/* Professional Desktop & Tablet View */}
-        <div className="hidden sm:block relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+        <div className="hidden xl:block relative overflow-x-auto w-full min-w-0">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl pointer-events-none"></div>
+          <div className="relative min-w-[640px] bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
             
-            <Table>
+            <Table className="w-full">
               <TableHeader className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900">
                 <TableRow className="border-b border-gray-200/50 dark:border-gray-700/50">
-                  <TableHead className="w-[250px] sm:w-[280px] lg:w-[300px] xl:w-[350px] font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                  <TableHead className="min-w-[180px] font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                     Issue Title
                   </TableHead>
-                  <TableHead className="font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                  <TableHead className="w-[100px] font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                     Priority
                   </TableHead>
-                  <TableHead className="hidden sm:table-cell font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                  <TableHead className="min-w-[120px] font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                     Project
                   </TableHead>
                   <TableHead className="hidden xl:table-cell font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
@@ -982,7 +982,7 @@ const Fixes = () => {
                   <TableHead className="hidden 2xl:table-cell font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                     Fixed Date
                   </TableHead>
-                  <TableHead className="text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                  <TableHead className="w-[100px] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -997,13 +997,13 @@ const Fixes = () => {
                       index % 2 === 0 ? 'bg-white/50 dark:bg-gray-900/50' : 'bg-gray-50/30 dark:bg-gray-800/30'
                     }`}
                   >
-                    <TableCell className="font-semibold max-w-[250px] sm:max-w-[280px] lg:max-w-[300px] xl:max-w-[350px] truncate text-sm sm:text-base text-gray-900 dark:text-white py-4 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        {bug.title}
+                    <TableCell className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white py-4 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="w-2 h-2 bg-green-500 rounded-full shrink-0 mt-2"></div>
+                        <span className="break-words">{bug.title}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4">
+                    <TableCell className="w-[100px] py-4">
                       <Badge
                         variant={getPriorityBadgeVariant(bug.priority)}
                         className={`capitalize text-xs sm:text-sm px-3 py-1.5 font-semibold shadow-sm ${
@@ -1017,10 +1017,10 @@ const Fixes = () => {
                         {bug.priority}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                        {project?.name || "Unknown Project"}
+                    <TableCell className="min-w-[120px] text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium break-words">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full shrink-0 mt-2"></div>
+                        <span>{project?.name || "Unknown Project"}</span>
                       </div>
                     </TableCell>
                     <TableCell className="hidden xl:table-cell text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
@@ -1029,7 +1029,7 @@ const Fixes = () => {
                     <TableCell className="hidden 2xl:table-cell text-sm sm:text-base text-gray-600 dark:text-gray-400 py-4 font-medium">
                       {formatDate(bug.updated_at)}
                     </TableCell>
-                    <TableCell className="text-right py-4">
+                    <TableCell className="w-[100px] pr-4 text-right py-4">
                       <Button
                         variant="outline"
                         size="sm"
@@ -1056,9 +1056,9 @@ const Fixes = () => {
         </div>
 
         {/* Professional Mobile & Tablet Card View */}
-        <div className="sm:hidden">
+        <div className="xl:hidden w-full min-w-0">
           
-          <div className="grid grid-cols-1 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {paginatedBugs.map((bug) => (
               <BugCard key={bug.id} bug={bug} projects={allProjects} />
             ))}
@@ -1077,30 +1077,30 @@ const Fixes = () => {
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
         {/* Professional Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-green-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3">
+            <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-6">
+              <div className="space-y-3 min-w-0 flex-1">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
+                  <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg shrink-0">
                     <CheckCircle className="h-6 w-6 text-white" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
                       Fixes
                     </h1>
                     <div className="h-1 w-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full mt-2"></div>
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl break-words">
                   Overview of all resolved issues across your projects
                 </p>
               </div>
               
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
                 {showTabs && (
                   <Link
                     to={currentUser?.role ? `/${currentUser.role}/bugs` : "/bugs"}

@@ -11,7 +11,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
   {
     id: "bug-tracking",
     title: "Bug Tracking",
-    description: "Projects, bugs, fixes, updates, and compliance",
+    description: "Projects, bugs, fixes, updates, compliance, and role workflows",
     icon: "Bug",
     order: 2,
   },
@@ -25,7 +25,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
   {
     id: "productivity",
     title: "Productivity",
-    description: "Tasks, daily updates, work hours, and reports",
+    description: "Tasks, daily updates, work hours, reports, and dev workflows",
     icon: "ListTodo",
     order: 4,
   },
@@ -39,7 +39,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
   {
     id: "administration",
     title: "Administration",
-    description: "Users, OT, settings, backups, and audit logs",
+    description: "Users, OT, settings, backups, compliance pipeline, and audit",
     icon: "Shield",
     order: 6,
   },
