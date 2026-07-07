@@ -5,14 +5,18 @@ interface MessageStatusProps {
   status: "sent" | "delivered" | "read" | "failed";
   size?: "sm" | "md";
   showText?: boolean;
+  receiptLabel?: "read" | "played";
 }
 
 export const MessageStatus: React.FC<MessageStatusProps> = ({
   status,
   size = "sm",
   showText = false,
+  receiptLabel = "read",
 }) => {
   const iconSize = size === "sm" ? "h-3 w-3" : "h-4 w-4";
+  const readTitle = receiptLabel === "played" ? "Played" : "Read";
+  const readText = receiptLabel === "played" ? "played" : "read";
 
   const renderIcon = () => {
     switch (status) {
@@ -30,7 +34,7 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({
         );
       case "read":
         return (
-          <span title="Read">
+          <span title={readTitle}>
             <CheckCheck className={`${iconSize} text-blue-500`} />
           </span>
         );
@@ -54,7 +58,7 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({
       <div className="flex items-center gap-1">
         {renderIcon()}
         <span className="text-xs text-muted-foreground capitalize">
-          {status}
+          {status === "read" ? readText : status}
         </span>
       </div>
     );
@@ -62,4 +66,3 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({
 
   return renderIcon();
 };
-

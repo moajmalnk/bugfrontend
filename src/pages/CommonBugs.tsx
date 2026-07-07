@@ -21,11 +21,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { getEffectiveRole } from "@/lib/utils";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import { downloadBugReportPdf } from "@/lib/utils/bugPdfReport";
 import { commonBugsService } from "@/services/commonBugsService";
-import { projectService } from "@/services/projectService";
-import { CommonBug, Project } from "@/types";
+import { projectService, type Project } from "@/services/projectService";
+import { CommonBug } from "@/types";
 import {
   Bug as BugIcon,
   Copy,
@@ -43,6 +44,8 @@ import { useSearchParams } from "react-router-dom";
 
 const CommonBugs = () => {
   const { currentUser } = useAuth();
+  const role = getEffectiveRole(currentUser || {});
+  const canAccessCommonBugs = role === "admin" || role === "developer";
   const [bugs, setBugs] = useState<CommonBug[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,6 +226,21 @@ const CommonBugs = () => {
   const handleDownloadPdfReport = async () => {
     try {
       setIsDownloadingReport(true);
+      const statusPriority: Record<string, number> = {
+        pending: 0,
+        in_progress: 1,
+        fixed: 2,
+      };
+      const reportBugs = filteredBugs
+        .map((bug, index) => ({ bug, index }))
+        .sort((a, b) => {
+          const aPriority = statusPriority[a.bug.status] ?? 99;
+          const bPriority = statusPriority[b.bug.status] ?? 99;
+          if (aPriority !== bPriority) return aPriority - bPriority;
+          return a.index - b.index;
+        })
+        .map(({ bug }) => bug);
+
       await downloadBugReportPdf({
         reportTitle: "Common Bugs Report",
         subtitle: "Already raised and duplicate bugs in projects",
@@ -235,7 +253,7 @@ const CommonBugs = () => {
           { label: "Duplicates", value: summary.duplicate_count },
           { label: "Total Common", value: summary.total },
         ],
-        bugs: filteredBugs.map((bug) => {
+        bugs: reportBugs.map((bug) => {
           const projectName =
             bug.project_name ||
             projects.find((p) => String(p.id) === String(bug.project_id))?.name ||
@@ -346,7 +364,7 @@ const CommonBugs = () => {
     );
   };
 
-  if (currentUser?.role !== "admin") {
+  if (!canAccessCommonBugs) {
     return (
       <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
         <section className="max-w-7xl mx-auto">
@@ -360,7 +378,7 @@ const CommonBugs = () => {
                 Access Denied
               </h3>
               <p className="text-lg text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                Common Bugs is available to administrators only.
+                Common Bugs is available to administrators and developers only.
               </p>
             </div>
           </div>
@@ -445,7 +463,7 @@ const CommonBugs = () => {
             <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
               {commonTabs.length > 2 ? (
                 <>
-                  <div className="md:hidden p-1">
+                  <div className="lg:hidden p-1">
                     <Button
                       type="button"
                       variant="outline"
@@ -462,7 +480,7 @@ const CommonBugs = () => {
                     </Button>
                   </div>
 
-                  <TabsList className="hidden md:grid w-full grid-cols-3 h-14 bg-transparent p-1">
+                  <TabsList className="hidden lg:grid w-full grid-cols-3 h-14 bg-transparent p-1">
                     {commonTabs.map((tab) => (
                       <TabsTrigger
                         key={tab.value}
@@ -509,7 +527,7 @@ const CommonBugs = () => {
               open={isMobileTabSelectorOpen}
               onOpenChange={setIsMobileTabSelectorOpen}
             >
-              <DrawerContent className="md:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+              <DrawerContent className="lg:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
                 <DrawerHeader className="text-left pb-2">
                   <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
                     Select Section

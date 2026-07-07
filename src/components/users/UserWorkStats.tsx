@@ -55,6 +55,7 @@ interface UserWorkStatsProps {
   userId: string;
   compact?: boolean;
   showTrend?: boolean;
+  checkInTime?: string | null;
 }
 
 /** e.g. `Mar 28, 2026 - 10:26 PM` (Asia/Kolkata) from save time or check-in. */
@@ -115,7 +116,12 @@ function sumDailyBreakdownTotals(submissions: any[]) {
   );
 }
 
-export function UserWorkStats({ userId, compact = false, showTrend = true }: UserWorkStatsProps) {
+export function UserWorkStats({
+  userId,
+  compact = false,
+  showTrend = true,
+  checkInTime = null,
+}: UserWorkStatsProps) {
   const { currentUser } = useAuth();
   const effectiveRole = getEffectiveRole(currentUser || {});
   const navigate = useNavigate();
@@ -206,22 +212,48 @@ export function UserWorkStats({ userId, compact = false, showTrend = true }: Use
   const workTrendHeaderNet = workTrendHeaderTotals.hours + workTrendHeaderTotals.ot;
 
   if (compact) {
+    const checkInLabel = checkInTime
+      ? new Date(checkInTime).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+          timeZone: "Asia/Kolkata",
+        })
+      : null;
+
     return (
-      <div className="flex items-center gap-3 text-sm">
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-          <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-          <span className="font-semibold text-blue-700 dark:text-blue-300">{current_period.hours}h</span>
+      <div className="flex w-full items-center justify-between gap-2 text-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-md bg-blue-50 px-2 py-1 dark:bg-blue-900/20">
+            <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+            <span className="font-semibold text-blue-700 dark:text-blue-300">{current_period.hours}h</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 dark:bg-green-900/20">
+            <Calendar className="h-3 w-3 text-green-600 dark:text-green-400" />
+            <span className="font-semibold text-green-700 dark:text-green-300">{current_period.days}d</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded-md">
-          <Calendar className="h-3 w-3 text-green-600 dark:text-green-400" />
-          <span className="font-semibold text-green-700 dark:text-green-300">{current_period.days}d</span>
-        </div>
-        <div className="text-gray-500 dark:text-gray-400 text-xs text-right leading-tight">
-          <div className="font-medium text-gray-600 dark:text-gray-300">{current_period.period_name}</div>
-          {current_period.period_range ? (
-            <div className="text-[10px] text-gray-500 dark:text-gray-500">{current_period.period_range}</div>
-          ) : null}
-        </div>
+        {checkInLabel ? (
+          <div className="shrink-0 rounded-md bg-emerald-50 px-2.5 py-1.5 text-right dark:bg-emerald-950/30">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+              Checked in
+            </div>
+            <div className="whitespace-nowrap text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+              {checkInLabel}
+            </div>
+          </div>
+        ) : (
+          <div className="shrink-0 text-right leading-tight">
+            <div className="whitespace-nowrap font-medium text-gray-600 dark:text-gray-300">
+              {current_period.period_name}
+            </div>
+            {current_period.period_range ? (
+              <div className="whitespace-nowrap text-[10px] text-gray-500 dark:text-gray-500">
+                {current_period.period_range}
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     );
   }

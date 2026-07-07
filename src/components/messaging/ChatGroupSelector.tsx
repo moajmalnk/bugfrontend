@@ -26,7 +26,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -168,7 +167,7 @@ function MemberManagementPanel({
       : "bg-primary/10 border-primary/30";
 
   return (
-    <div className={cn("flex min-h-0 flex-col gap-3", listClassName)}>
+    <div className={cn("flex min-h-0 flex-1 flex-col gap-3", listClassName)}>
       <div className="flex shrink-0 items-center justify-between gap-2">
         <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold">
           {icon}
@@ -204,7 +203,7 @@ function MemberManagementPanel({
         />
       </div>
 
-      <ScrollArea className="min-h-[220px] flex-1 rounded-xl border bg-muted/20 sm:min-h-[280px]">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border bg-muted/20 touch-pan-y">
         <div className="space-y-1.5 p-2">
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
@@ -266,7 +265,7 @@ function MemberManagementPanel({
             })
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
@@ -1734,7 +1733,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
 
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-6">
               <div className="flex min-h-0 flex-1 flex-col md:hidden">
-                <Tabs defaultValue="current" className="flex min-h-0 flex-1 flex-col">
+                <Tabs defaultValue="current" className="flex min-h-0 flex-1 flex-col overflow-hidden">
                   <TabsList className="grid h-10 w-full shrink-0 grid-cols-2">
                     <TabsTrigger value="current" className="text-xs sm:text-sm">
                       Current ({existingMembers.length})
@@ -1745,7 +1744,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                   </TabsList>
                   <TabsContent
                     value="current"
-                    className="mt-3 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+                    className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
                   >
                     <MemberManagementPanel
                       title="Current Members"
@@ -1766,12 +1765,11 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                       loadingMessage="Loading members..."
                       emptyMessage="No members in this group"
                       filteredEmptyMessage="No members match your search"
-                      listClassName="min-h-[min(42vh,360px)]"
                     />
                   </TabsContent>
                   <TabsContent
                     value="available"
-                    className="mt-3 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+                    className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
                   >
                     <MemberManagementPanel
                       title="Available to Add"
@@ -1792,13 +1790,12 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                       loadingMessage="Loading users..."
                       emptyMessage="No users available to add"
                       filteredEmptyMessage="No users match your search"
-                      listClassName="min-h-[min(42vh,360px)]"
                     />
                   </TabsContent>
                 </Tabs>
               </div>
 
-              <div className="hidden min-h-0 flex-1 gap-5 md:grid md:grid-cols-2">
+              <div className="hidden min-h-0 flex-1 gap-5 overflow-hidden md:grid md:grid-cols-2">
                 <MemberManagementPanel
                   title="Current Members"
                   icon={<Users className="h-4 w-4" />}
@@ -1818,7 +1815,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                   loadingMessage="Loading members..."
                   emptyMessage="No members in this group"
                   filteredEmptyMessage="No members match your search"
-                  listClassName="h-[min(48vh,420px)]"
+                  listClassName="min-h-0 h-full"
                 />
                 <MemberManagementPanel
                   title="Available to Add"
@@ -1839,7 +1836,7 @@ export const ChatGroupSelector: React.FC<ChatGroupSelectorProps> = ({
                   loadingMessage="Loading users..."
                   emptyMessage="No users available to add"
                   filteredEmptyMessage="No users match your search"
-                  listClassName="h-[min(48vh,420px)]"
+                  listClassName="min-h-0 h-full"
                 />
               </div>
             </div>

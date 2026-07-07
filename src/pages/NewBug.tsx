@@ -128,10 +128,7 @@ const NewBug = () => {
   const [priority, setPriority] = useState<BugPriority>("medium");
   const [alreadyRaised, setAlreadyRaised] = useState(false);
   const [bugLevel, setBugLevel] = useState<BugLevel>("normal");
-  const TITLE_MAX = 120;
-  const DESCRIPTION_MAX = 2000;
-  const EXPECTED_RESULT_MAX = 1000;
-  const ACTUAL_RESULT_MAX = 1000;
+  const TITLE_MAX = 255;
 
   // File uploads
   const [screenshots, setScreenshots] = useState<FileWithPreview[]>([]);
@@ -588,15 +585,12 @@ const NewBug = () => {
                       placeholder="Describe the bug in detail. What were you doing when it happened? What did you expect to happen?"
                       className="min-h-[150px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                       value={description}
-                      maxLength={DESCRIPTION_MAX}
                       onChange={(e) => setDescription(e.target.value)}
                       required
                     />
                     <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-                      <span className="font-medium">Include steps, expected vs actual, and environment</span>
-                      <span className={`font-semibold ${description.length > DESCRIPTION_MAX * 0.9 ? 'text-blue-600' : ''}`}>
-                        {description.length}/{DESCRIPTION_MAX}
-                      </span>
+                      <span className="font-medium">Include steps, logs, SQL queries, or console output</span>
+                      <span className="font-semibold">{description.length} characters</span>
                     </div>
                   </div>
 
@@ -612,14 +606,11 @@ const NewBug = () => {
                       placeholder="What should have happened? Describe the expected behavior..."
                       className="min-h-[100px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                       value={expectedResult}
-                      maxLength={EXPECTED_RESULT_MAX}
                       onChange={(e) => setExpectedResult(e.target.value)}
                     />
                     <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                       <span className="font-medium">Describe what you expected to happen</span>
-                      <span className={`font-semibold ${expectedResult.length > EXPECTED_RESULT_MAX * 0.9 ? 'text-green-600' : ''}`}>
-                        {expectedResult.length}/{EXPECTED_RESULT_MAX}
-                      </span>
+                      <span className="font-semibold">{expectedResult.length} characters</span>
                     </div>
                   </div>
 
@@ -635,14 +626,11 @@ const NewBug = () => {
                       placeholder="What actually happened? Describe the actual behavior..."
                       className="min-h-[100px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                       value={actualResult}
-                      maxLength={ACTUAL_RESULT_MAX}
                       onChange={(e) => setActualResult(e.target.value)}
                     />
                     <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                       <span className="font-medium">Describe what actually happened instead</span>
-                      <span className={`font-semibold ${actualResult.length > ACTUAL_RESULT_MAX * 0.9 ? 'text-red-600' : ''}`}>
-                        {actualResult.length}/{ACTUAL_RESULT_MAX}
-                      </span>
+                      <span className="font-semibold">{actualResult.length} characters</span>
                     </div>
                   </div>
 

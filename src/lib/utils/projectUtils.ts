@@ -1,6 +1,17 @@
-export type ProjectStatus = 'active' | 'completed' | 'archived';
+export type ProjectStatus = 'active' | 'completed' | 'archived' | 'release_ready';
 export type ClientAccountStatus = 'active' | 'inactive';
 export type ProjectMemberRole = 'manager' | 'developer' | 'tester';
+
+export interface ProjectComplianceSummaryLite {
+  pipeline_stage: string;
+  developer_verified: number;
+  developer_total: number;
+  tester_verified: number;
+  tester_total: number;
+  project_verified: number;
+  project_total: number;
+  emergency_bypass: boolean;
+}
 
 export interface ProjectMemberDetail {
   user_id: string;
@@ -43,6 +54,7 @@ export interface Project {
   backend_finish_date?: string | null;
   members_detail?: ProjectMemberDetail[];
   attachments?: ProjectAttachment[];
+  compliance?: ProjectComplianceSummaryLite;
 }
 
 export interface ProjectMemberInput {
@@ -187,6 +199,8 @@ export function getProjectStatusLabel(status: ProjectStatus): string {
       return 'Completed';
     case 'archived':
       return 'Archived';
+    case 'release_ready':
+      return 'Release Ready';
     default:
       return status;
   }

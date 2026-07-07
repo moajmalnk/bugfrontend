@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { formatWorkSubmissionSubmittedAt, normalizeYmdDateString } from "@/lib/dateUtils";
 import { lookupProjectName, parsePlannedProjectIds, resolveSubmissionProjectNames } from "@/lib/periodDetailsFilters";
+import { formatProjectUpdatesForText, parseProjectUpdatesFromRow } from "@/lib/projectWorkUpdates";
 import { formatWorkingDaysPeriodLabel } from "@/lib/workPeriodUtils";
 import { format } from "date-fns";
 import { Calendar, Clock, FolderOpen, UserRound } from "lucide-react";
@@ -230,6 +231,28 @@ export function DailySubmissionDetailCard({
           items={upcoming}
         />
       </div>
+
+      {(() => {
+        const projectUpdates = parseProjectUpdatesFromRow(submission.project_updates);
+        if (!projectUpdates.length) return null;
+        const text = formatProjectUpdatesForText(
+          projectUpdates.map((u) => ({
+            ...u,
+            project_name:
+              u.project_name ||
+              (projectNameById ? lookupProjectName(u.project_id, projectNameById) : u.project_id),
+          }))
+        );
+        if (!text) return null;
+        return (
+          <div className="pt-2 border-t border-border/40 space-y-2">
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Project progress</p>
+            <pre className="text-xs whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400 font-sans">
+              {text}
+            </pre>
+          </div>
+        );
+      })()}
 
       {submission.planned_work ? (
         <div className="pt-2 border-t border-border/40 space-y-1">

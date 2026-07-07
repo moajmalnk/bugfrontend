@@ -584,13 +584,13 @@ export default function UserWorkStatsPeriod() {
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex w-full flex-col gap-3 sm:w-auto lg:items-end">
                 {canViewTeam ? (
-                  <div className="inline-flex rounded-xl border border-gray-200/60 dark:border-gray-700/60 p-1 bg-white/60 dark:bg-gray-900/40">
+                  <div className="flex w-full items-center gap-1 rounded-xl border border-gray-200/60 bg-white/60 p-1 dark:border-gray-700/60 dark:bg-gray-900/40 sm:inline-flex sm:w-auto">
                     <button
                       type="button"
                       onClick={() => setScope("user")}
-                      className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                      className={`inline-flex h-9 flex-1 items-center justify-center rounded-lg px-3 text-xs font-medium transition-colors sm:flex-initial sm:text-sm ${
                         viewScope === "user"
                           ? "bg-gradient-to-r from-blue-600 to-emerald-600 text-white shadow"
                           : "text-muted-foreground hover:text-foreground"
@@ -601,7 +601,7 @@ export default function UserWorkStatsPeriod() {
                     <button
                       type="button"
                       onClick={() => setScope("team")}
-                      className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                      className={`inline-flex h-9 flex-1 items-center justify-center rounded-lg px-3 text-xs font-medium transition-colors sm:flex-initial sm:text-sm ${
                         viewScope === "team"
                           ? "bg-gradient-to-r from-blue-600 to-emerald-600 text-white shadow"
                           : "text-muted-foreground hover:text-foreground"
@@ -613,10 +613,10 @@ export default function UserWorkStatsPeriod() {
                 ) : null}
                 <button
                   type="button"
-                  className="h-11 rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-900/40 backdrop-blur hover:bg-white/80 dark:hover:bg-gray-900/60 inline-flex items-center justify-center px-4 text-sm font-medium text-foreground transition-colors"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-gray-200/60 bg-white/60 px-4 text-sm font-medium text-foreground backdrop-blur transition-colors hover:bg-white/80 dark:border-gray-700/60 dark:bg-gray-900/40 dark:hover:bg-gray-900/60 sm:w-auto"
                   onClick={goBack}
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to user
                 </button>
               </div>

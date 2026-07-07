@@ -843,9 +843,9 @@ const BugSheetsPage = () => {
                 </p>
               </div>
 
-              <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 {/* Google Connection Status Indicator */}
-                <div className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border transition-all duration-300"
+                <div className="flex items-center self-start gap-2 px-4 py-2.5 rounded-xl border transition-all duration-300"
                   style={{
                     backgroundColor: isConnected ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                     borderColor: isConnected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
@@ -857,7 +857,7 @@ const BugSheetsPage = () => {
                       variant="link"
                       size="sm"
                       onClick={() => navigate(`/${userRole}/profile`)}
-                      className="h-auto p-0 text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline ml-1"
+                      className="h-auto p-0 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline ml-1"
                     >
                       Connect
                     </Button>
@@ -865,26 +865,23 @@ const BugSheetsPage = () => {
                 </div>
 
                 {isConnected && (
-                  <>
-                    <Button
-                      onClick={() => setIsCreateModalOpen(true)}
-                      size="lg"
-                      className="w-full xs:w-auto h-11 sm:h-12 px-4 sm:px-6 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
-                    >
-                      <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                      <span className="whitespace-nowrap">New Sheet</span>
-                    </Button>
-                  </>
+                  <Button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="h-12 px-6 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 self-start"
+                  >
+                    <Plus className="mr-2 h-5 w-5" />
+                    New Sheet
+                  </Button>
                 )}
 
                 {isConnected && (
-                  <div className="flex items-center justify-center xs:justify-start gap-4">
-                    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/30 dark:to-blue-950/30 border border-green-200 dark:border-green-800 rounded-xl shadow-sm">
-                      <div className="p-1 sm:p-1.5 bg-green-500 rounded-lg shrink-0">
-                        <FileSpreadsheet className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/30 dark:to-blue-950/30 border border-green-200 dark:border-green-800 rounded-xl shadow-sm">
+                      <div className="p-1.5 bg-green-500 rounded-lg shrink-0">
+                        <FileSpreadsheet className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <div className="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-300">
+                        <div className="text-2xl font-bold text-green-700 dark:text-green-300">
                           {sheets.length}
                         </div>
                       </div>

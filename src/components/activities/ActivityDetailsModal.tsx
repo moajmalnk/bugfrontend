@@ -202,13 +202,37 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
     return Object.entries(metadata).map(([key, value]) => {
       const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
       return (
-        <div key={key} className="flex justify-between items-center py-2 px-3 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200/60 dark:border-gray-700/60">
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{formattedKey}:</span>
-          <span className="text-sm font-semibold text-gray-900 dark:text-white">{String(value)}</span>
+        <div
+          key={key}
+          className="flex flex-col gap-1 rounded-lg border border-gray-200/60 bg-gray-50/50 px-4 py-3 dark:border-gray-700/60 dark:bg-gray-800/50 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+        >
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{formattedKey}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white sm:text-right">{String(value)}</span>
         </div>
       );
     });
   };
+
+  const SectionHeader = ({
+    icon,
+    iconClassName,
+    title,
+  }: {
+    icon: React.ReactNode;
+    iconClassName: string;
+    title: string;
+  }) => (
+    <div className="mb-4 flex items-center gap-3">
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${iconClassName}`}>
+        {icon}
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+    </div>
+  );
+
+  const SectionBody = ({ children }: { children: React.ReactNode }) => (
+    <div className="pl-11">{children}</div>
+  );
 
   const getActivityIcon = () => {
     const iconClass = "h-6 w-6";
@@ -252,15 +276,16 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
           <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-indigo-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-indigo-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
             <div className="relative p-4 sm:p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                  <FileText className="h-4 w-4 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Activity Details</h3>
-              </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                {formattedDescription}
-              </p>
+              <SectionHeader
+                icon={<FileText className="h-4 w-4 text-white" />}
+                iconClassName="bg-gradient-to-br from-blue-500 to-indigo-600"
+                title="Activity Details"
+              />
+              <SectionBody>
+                <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                  {formattedDescription}
+                </p>
+              </SectionBody>
             </div>
           </div>
 
@@ -269,28 +294,29 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-50/40 via-transparent to-teal-50/40 dark:from-emerald-950/15 dark:via-transparent dark:to-teal-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
-                    <MapPin className="h-4 w-4 text-white" />
+                <SectionHeader
+                  icon={<MapPin className="h-4 w-4 text-white" />}
+                  iconClassName="bg-gradient-to-br from-emerald-500 to-teal-600"
+                  title="Project Information"
+                />
+                <SectionBody>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-white">{activity.project.name}</p>
+                      {activity.project.description && (
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                          {activity.project.description}
+                        </p>
+                      )}
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="w-fit border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                    >
+                      {activity.project.status || 'Active'}
+                    </Badge>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Project Information</h3>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{activity.project.name}</p>
-                    {activity.project.description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {activity.project.description}
-                      </p>
-                    )}
-                  </div>
-                  <Badge 
-                    variant="outline" 
-                    className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                  >
-                    {activity.project.status || 'Active'}
-                  </Badge>
-                </div>
+                </SectionBody>
               </div>
             </div>
           )}
@@ -300,21 +326,24 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-50/40 via-transparent to-pink-50/40 dark:from-purple-950/15 dark:via-transparent dark:to-pink-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                    <User className="h-4 w-4 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">User Information</h3>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
-                    <User className="h-5 w-5 text-white" />
-                  </div>
+                <SectionHeader
+                  icon={<User className="h-4 w-4 text-white" />}
+                  iconClassName="bg-gradient-to-br from-purple-500 to-pink-600"
+                  title="User Information"
+                />
+                <SectionBody>
                   <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{activity.user.name || activity.user.email}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{activity.user.role || 'User'}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {activity.user.name || activity.user.email}
+                    </p>
+                    {activity.user.email && activity.user.name && (
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{activity.user.email}</p>
+                    )}
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 capitalize">
+                      {activity.user.role || 'User'}
+                    </p>
                   </div>
-                </div>
+                </SectionBody>
               </div>
             </div>
           )}
@@ -324,15 +353,14 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
             <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-yellow-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-yellow-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-lg flex items-center justify-center">
-                    <Settings className="h-4 w-4 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Additional Details</h3>
-                </div>
-                <div className="space-y-3">
-                  {formatMetadata(activity.metadata)}
-                </div>
+                <SectionHeader
+                  icon={<Settings className="h-4 w-4 text-white" />}
+                  iconClassName="bg-gradient-to-br from-orange-500 to-yellow-600"
+                  title="Additional Details"
+                />
+                <SectionBody>
+                  <div className="space-y-3">{formatMetadata(activity.metadata)}</div>
+                </SectionBody>
               </div>
             </div>
           )}
@@ -341,24 +369,25 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
           <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-50/40 via-transparent to-purple-50/40 dark:from-indigo-950/15 dark:via-transparent dark:to-purple-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
             <div className="relative p-4 sm:p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Calendar className="h-4 w-4 text-white" />
+              <SectionHeader
+                icon={<Calendar className="h-4 w-4 text-white" />}
+                iconClassName="bg-gradient-to-br from-indigo-500 to-purple-600"
+                title="Timestamp Information"
+              />
+              <SectionBody>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Created</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {new Date(activity.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Time Ago</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{activity.time_ago}</span>
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Timestamp Information</h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Created:</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {new Date(activity.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Time Ago:</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{activity.time_ago}</span>
-                </div>
-              </div>
+              </SectionBody>
             </div>
           </div>
 

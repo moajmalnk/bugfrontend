@@ -9,12 +9,22 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
-import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, Plus, Bell, Timer } from 'lucide-react';
+import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, Bell, Timer } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { DailyWorkFlowPanel } from '@/pages/DailyWorkUpdate';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
 import { UndoDeleteNotificationPortal } from '@/components/ui/UndoDeleteNotification';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
+import {
+  formatProjectUpdatesForText,
+  parseProjectUpdatesFromRow,
+} from '@/lib/projectWorkUpdates';
+import {
+  buildProjectNameLookup,
+  resolveSubmissionProjectNames,
+} from '@/lib/periodDetailsFilters';
+import { projectService } from '@/services/projectService';
 import {
   calendarMonthKey,
   computeMonthTotalsToDate,
@@ -44,7 +54,22 @@ export default function DailyUpdate() {
   const [activeMonth, setActiveMonth] = useState<string>(searchParams.get('month') || ''); // YYYY-MM
   const [submissionToDelete, setSubmissionToDelete] = useState<any | null>(null);
   const [showRequestsOnly, setShowRequestsOnly] = useState(false);
+  const [liveCheckInTime, setLiveCheckInTime] = useState<string | null>(null);
+  const [catalogProjects, setCatalogProjects] = useState<Array<{ id: string; name: string }>>([]);
   const didNormalizeMonth = useRef(false);
+
+  const projectNameById = useMemo(
+    () => buildProjectNameLookup([catalogProjects]),
+    [catalogProjects]
+  );
+
+  const projectNameRecord = useMemo(() => {
+    const rec: Record<string, string> = {};
+    catalogProjects.forEach((p) => {
+      rec[p.id] = p.name;
+    });
+    return rec;
+  }, [catalogProjects]);
 
   // Initialize undo delete hook
   const undoDelete = useUndoDelete({
@@ -79,6 +104,24 @@ export default function DailyUpdate() {
       return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
     } catch {
       return t;
+    }
+  }
+
+  function formatCheckInTime(raw?: string | null) {
+    if (!raw) return null;
+    try {
+      const d =
+        raw.includes('T') || raw.includes(' ')
+          ? new Date(raw.includes('T') ? raw : raw.replace(' ', 'T'))
+          : new Date(`1970-01-01T${raw}`);
+      if (Number.isNaN(d.getTime())) return null;
+      return d.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Kolkata',
+      });
+    } catch {
+      return null;
     }
   }
 
@@ -190,7 +233,7 @@ export default function DailyUpdate() {
     const d = new Date(s.submission_date);
     const weekday = d.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' });
     const dateText = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${weekday}`;
-    const startText = formatTime12h(s.start_time);
+    const startText = formatCheckInTime(s.check_in_time) || formatTime12h(s.start_time);
     const c = (s.completed_tasks || '').trim();
     const p = (s.pending_tasks || '').trim();
     const o = (s.ongoing_tasks || '').trim();
@@ -257,19 +300,17 @@ export default function DailyUpdate() {
     body += `\n🧮 Total Hours Completed : ${hours} hours`;
 
     const sections: string[] = [];
-    // Include planning fields in saved-card details when present.
-    if (s.planned_projects) {
-      try {
-        const projects = Array.isArray(s.planned_projects) ? s.planned_projects : JSON.parse(s.planned_projects);
-        if (Array.isArray(projects) && projects.length > 0) {
-          sections.push(`📁 *Projects:* ${projects.join(', ')}`);
-        }
-      } catch {
-        // Ignore malformed planned_projects and keep rendering other details.
-      }
+    const projectNames = resolveSubmissionProjectNames(s, projectNameById);
+    if (projectNames.length > 0) {
+      sections.push(`📁 *Projects:* ${projectNames.join(', ')}`);
     }
     if ((s.planned_work || '').trim()) {
       sections.push(`📝 *Planned Work:*\n${String(s.planned_work).trim()}`);
+    }
+    const projectUpdates = parseProjectUpdatesFromRow(s.project_updates);
+    const projectUpdatesText = formatProjectUpdatesForText(projectUpdates, projectNameRecord);
+    if (projectUpdatesText) {
+      sections.push(`📂 *Project Progress*\n\n${projectUpdatesText}`);
     }
     if (cCount > 0) sections.push(`✅ Completed (${cCount})\n\n${c}`);
     if (pCount > 0) sections.push(`⌛ Pending (${pCount})\n\n${p}`);
@@ -368,6 +409,21 @@ export default function DailyUpdate() {
       setSubsLoading(false);
     }
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    projectService
+      .getProjects()
+      .then((projects) => {
+        if (!cancelled) setCatalogProjects(projects);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogProjects([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Load my submissions for current month
   useEffect(() => {
@@ -470,6 +526,11 @@ export default function DailyUpdate() {
     [filteredSubmissions]
   );
 
+  const todayCheckInLabel = useMemo(
+    () => formatCheckInTime(liveCheckInTime),
+    [liveCheckInTime]
+  );
+
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
     const source =
@@ -507,15 +568,35 @@ export default function DailyUpdate() {
     }
   }
 
-  // New Daily Update Button
-  const NewDailyUpdateButton = () => (
-    <Button
-      onClick={() => navigate(`/${currentUser?.role}/daily-work-update`)}
-      className="h-12 w-full min-w-0 px-4 sm:w-auto sm:px-6 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 sm:hover:scale-105"
-    >
-      <Plus className="mr-2 h-5 w-5 shrink-0" /> New Daily Update
-    </Button>
-  );
+  function clearWorkFlowParams() {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.delete('action');
+      p.delete('edit');
+      return p as any;
+    });
+  }
+
+  function setWorkFlowAction(action: 'checkin' | 'checkout' | null) {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      if (action) {
+        p.set('action', action);
+        if (action === 'checkin') {
+          p.delete('edit');
+        }
+      } else {
+        p.delete('action');
+      }
+      return p as any;
+    });
+  }
+
+  const flowActionParam = searchParams.get('action');
+  const flowAction =
+    flowActionParam === 'checkin' || flowActionParam === 'checkout'
+      ? flowActionParam
+      : null;
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
@@ -538,20 +619,31 @@ export default function DailyUpdate() {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl leading-relaxed">
-                  Track your daily progress, log hours, and manage submissions in one place.
+                  Track your daily progress, log hours.
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 w-full min-w-0 lg:w-auto lg:shrink-0">
-                <NewDailyUpdateButton />
-                <div className="flex items-center justify-center sm:justify-start gap-3 px-4 py-3 w-full sm:w-auto min-w-0 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-950/30 dark:to-blue-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
-                  <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
-                    <Calendar className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="text-center sm:text-left">
-                    <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80"></div>
-                    <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
-                      {monthHours}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
+                {!(currentUser?.role === 'admin' && showRequestsOnly) && (
+                  <DailyWorkFlowPanel
+                    layout="header"
+                    editId={searchParams.get('edit')}
+                    flowAction={flowAction}
+                    onFlowActionChange={setWorkFlowAction}
+                    onSaved={() => void loadSubmissions()}
+                    onCheckInTimeChange={setLiveCheckInTime}
+                    onEditClose={clearWorkFlowParams}
+                  />
+                )}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-950/30 dark:to-blue-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
+                    <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
+                      <Calendar className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                        {monthHours}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -653,15 +745,26 @@ export default function DailyUpdate() {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto shrink-0">
+
+              <div className="flex w-full flex-col items-stretch gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:justify-end shrink-0">
+                {todayCheckInLabel && !(currentUser?.role === 'admin' && showRequestsOnly) ? (
+                  <div
+                    className="inline-flex h-12 w-full sm:w-44 items-center justify-center gap-2 rounded-xl border border-emerald-200/90 bg-emerald-50/95 px-3 shadow-sm dark:border-emerald-900/55 dark:bg-emerald-950/35"
+                    title={`Checked in at ${todayCheckInLabel}`}
+                  >
+                    <Clock className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span className="truncate text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                      {todayCheckInLabel}
+                    </span>
+                  </div>
+                ) : null}
                 <div
-                  className="rounded-xl border border-orange-200/90 dark:border-orange-900/55 bg-orange-50/95 dark:bg-orange-950/35 px-3 py-2 text-right shadow-sm"
+                  className="inline-flex h-12 w-full sm:w-44 items-center justify-center rounded-xl border border-orange-200/90 bg-orange-50/95 px-3 shadow-sm dark:border-orange-900/55 dark:bg-orange-950/35"
                   title="Overtime that counts in period totals: approved or adjusted. Pending and rejected extra-hour requests count as 0."
                 >
-                  <p className="text-xl sm:text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-200 leading-tight">
+                  <span className="text-sm font-bold tabular-nums text-orange-700 dark:text-orange-200">
                     {totalOtVisible.toFixed(2)}h
-                  </p>
-
+                  </span>
                 </div>
                 {currentUser?.role === 'admin' && (
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
@@ -773,7 +876,9 @@ export default function DailyUpdate() {
               </div>
             ) : (
               <div className={`grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8 ${activeTab === "today-submissions" ? "lg:grid-cols-1" : "lg:grid-cols-2"}`}>
-                    {visibleSubmissions.map((s) => (
+                    {visibleSubmissions.map((s) => {
+                      const checkInLabel = formatCheckInTime(s.check_in_time);
+                      return (
                   <div key={s.id ?? s.submission_date} className="bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-4 sm:p-6 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 min-w-0">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 mb-3 min-w-0">
                       <div className="min-w-0 flex-1">
@@ -786,7 +891,12 @@ export default function DailyUpdate() {
                           </div>
                         )}
                         <div className="text-xs text-gray-500 dark:text-gray-400 break-words mt-1">
-                          {s.start_time ? `Started at ${s.start_time}` : 'No start time'} • {s.hours_today ?? 0} hours
+                          {checkInLabel
+                            ? `Checked in at ${checkInLabel}`
+                            : s.start_time
+                              ? `Started at ${s.start_time}`
+                              : 'No check-in time'}{' '}
+                          • {s.hours_today ?? 0} hours
                           {Number(s.overtime_hours || 0) > 0 && (
                             <span className="ml-2 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium">
                               +{s.overtime_hours}h OT
@@ -813,7 +923,14 @@ export default function DailyUpdate() {
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            onClick={() => navigate(`/${currentUser?.role}/daily-work-update?edit=${s.id}`)}
+                            onClick={() => {
+                              setSearchParams((prev) => {
+                                const p = new URLSearchParams(prev);
+                                p.set('edit', String(s.id));
+                                p.set('action', 'checkout');
+                                return p as any;
+                              });
+                            }}
                             className="text-xs"
                           >
                             Edit
@@ -849,7 +966,8 @@ export default function DailyUpdate() {
                       </pre>
                     </div>
                   </div>
-                ))}
+                );
+                    })}
               </div>
             )}
           </div>

@@ -24,6 +24,7 @@ interface DeliveryInfo {
   delivered: Array<{ user_id: string; user_name: string; timestamp: string }>;
   read: Array<{ user_id: string; user_name: string; timestamp: string }>;
   pending: Array<{ user_id: string; user_name: string }>;
+  is_voice?: boolean;
 }
 
 export const MessageInfo: React.FC<MessageInfoProps> = ({
@@ -33,11 +34,14 @@ export const MessageInfo: React.FC<MessageInfoProps> = ({
   onOpenChange,
   hideTrigger = false,
 }) => {
+  const isVoiceMessage = message.message_type === "voice";
   const isEdited = Boolean(message.is_edited);
   const { toast } = useToast();
   const [internalOpen, setInternalOpen] = useState(false);
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const readSectionLabel =
+    deliveryInfo?.is_voice || isVoiceMessage ? "Played" : "Read";
   const isControlled = typeof open === "boolean";
   const isOpen = isControlled ? open : internalOpen;
 
@@ -146,7 +150,7 @@ export const MessageInfo: React.FC<MessageInfoProps> = ({
                           <CheckCheck className="h-4 w-4 text-white" />
                         </div>
                         <h3 className="text-sm font-semibold text-foreground">
-                          Read
+                          {readSectionLabel}
                         </h3>
                         <span className="ml-auto text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-full">
                           {deliveryInfo.read.length}
@@ -281,7 +285,9 @@ export const MessageInfo: React.FC<MessageInfoProps> = ({
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold mx-auto mb-2">
                     {deliveryInfo.read.length}
                   </div>
-                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Read</p>
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                    {readSectionLabel}
+                  </p>
                 </div>
                 <div className="p-3 bg-muted border border-border/50 rounded-xl">
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted-foreground/20 text-foreground text-sm font-bold mx-auto mb-2">

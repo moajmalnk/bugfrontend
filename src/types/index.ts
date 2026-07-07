@@ -101,6 +101,12 @@ export interface User {
   admin_id?: string; // For impersonation tracking
   status?: 'active' | 'idle' | 'offline'; // For presence tracking
   last_active_at?: string; // For last seen information - updated
+  /** True when the user checked in for work today (work_submissions.check_in_time) */
+  checked_in_today?: boolean;
+  check_in_time?: string | null;
+  today_hours_worked?: number;
+  today_break_minutes?: number;
+  checkout_time?: string | null;
   permissions?: string[]; // Effective permissions for the user
 }
 
@@ -188,6 +194,7 @@ export interface ChatMessage {
   reactions?: MessageReaction[];
   mentions?: MessageMention[];
   read_status?: MessageReadStatus[];
+  voice_played_count?: number;
 }
 
 export interface ChatGroupMember {
@@ -242,6 +249,7 @@ export interface MessageReadStatus {
   user_id: string;
   user_name: string;
   read_at: string;
+  played_at?: string;
 }
 
 export interface EmojiReaction {

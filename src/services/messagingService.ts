@@ -259,7 +259,8 @@ export class MessagingService {
     groupId: string, 
     onNewMessage: (message: ChatMessage) => void,
     onTypingUpdate: (typingUsers: TypingIndicator[]) => void,
-    interval: number = 3000
+    interval: number = 3000,
+    onReceiptSync?: (messages: ChatMessage[]) => void,
   ): () => void {
     let lastPollTimestamp: Date | null = null;
     let isPolling = true;
@@ -273,6 +274,8 @@ export class MessagingService {
         const messages = messageResponse.messages;
         
         if (messages.length > 0) {
+          onReceiptSync?.(messages);
+
           // If this is the first poll, just set the timestamp
           if (!lastPollTimestamp) {
             const latestMessage = messages[messages.length - 1];
@@ -518,6 +521,12 @@ export class MessagingService {
 
   static async markMessageAsRead(messageId: string): Promise<void> {
     await axiosInstance.post(`${MESSAGING_API_BASE}/mark_read.php`, {
+      message_id: messageId
+    });
+  }
+
+  static async markVoicePlayed(messageId: string): Promise<void> {
+    await axiosInstance.post(`${MESSAGING_API_BASE}/mark_voice_played.php`, {
       message_id: messageId
     });
   }

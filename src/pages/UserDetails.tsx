@@ -1,3 +1,4 @@
+import { UserActionCard } from "@/components/users/UserActionCard";
 import { ActiveHours } from "@/components/users/ActiveHours";
 import { ChangePasswordDialog } from "@/components/users/ChangePasswordDialog";
 import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
@@ -34,9 +35,12 @@ import {
   ExternalLink,
   Key,
   Loader2,
+  Lock,
   Mail,
+  Pencil,
   Phone,
   Shield,
+  Trash2,
   UserRound,
   UserCheck,
   UserX,
@@ -416,9 +420,119 @@ export default function UserDetails() {
                     </div>
                   </div>
 
-                  {/* Actions — 12-col grid: 1 per row mobile, 2 per row sm, 6 per row lg */}
-                  <div className="mt-5 grid grid-cols-12 gap-2 sm:gap-3">
-                    <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                  {/* Actions — drawer-style cards on mobile/tablet; compact grid on desktop */}
+                  <div className="mt-5 lg:hidden space-y-3">
+                    <EditUserDialog
+                      user={user}
+                      onUserUpdate={handleUserUpdate}
+                      loggedInUserRole={effectiveRole}
+                      trigger={<UserActionCard icon={Pencil} label="Edit User" />}
+                    />
+
+                    <ChangePasswordDialog
+                      user={user}
+                      onPasswordChange={handlePasswordChange}
+                      trigger={<UserActionCard icon={Lock} label="Password" />}
+                    />
+
+                    {hasPermission("USERS_MANAGE_PERMISSIONS") && (
+                      <UserActionCard
+                        icon={Key}
+                        label="Permissions"
+                        onClick={() =>
+                          navigate(`/${effectiveRole}/users/${user.id}/permissions`)
+                        }
+                      />
+                    )}
+
+                    {effectiveRole === "admin" && currentUser?.id !== user.id && (
+                      <UserActionCard
+                        icon={ExternalLink}
+                        label="Dashboard"
+                        onClick={handleGenerateDashboardLink}
+                        disabled={isGeneratingLink}
+                      />
+                    )}
+
+                    {canAdminManageAccount && !isAccountDeactivated && user.role !== "admin" && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <UserActionCard
+                            icon={UserX}
+                            label="Deactivate"
+                            tone="warning"
+                            disabled={isAccountToggleLoading}
+                          />
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="sm:max-w-md">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Deactivate this account?</AlertDialogTitle>
+                            <AlertDialogDescription className="space-y-2">
+                              <span className="block">
+                                {user.name} will be signed out immediately and won’t be able to sign in.
+                                Their data will remain intact.
+                              </span>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isAccountToggleLoading}>
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              disabled={isAccountToggleLoading}
+                              onClick={() => void toggleAccountActive(false)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Deactivate
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+
+                    {canAdminManageAccount && isAccountDeactivated && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <UserActionCard
+                            icon={UserCheck}
+                            label="Activate"
+                            tone="success"
+                            disabled={isAccountToggleLoading}
+                          />
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="sm:max-w-md">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Activate this account?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {user.name} will be able to sign in again.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isAccountToggleLoading}>
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              disabled={isAccountToggleLoading}
+                              onClick={() => void toggleAccountActive(true)}
+                            >
+                              Activate
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+
+                    {effectiveRole === "admin" && currentUser?.id !== user.id && (
+                      <DeleteUserDialog
+                        user={user}
+                        onUserDelete={handleUserDelete}
+                        trigger={<UserActionCard icon={Trash2} label="Delete User" tone="danger" />}
+                      />
+                    )}
+                  </div>
+
+                  <div className="mt-5 hidden lg:grid grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2 sm:gap-3">
+                    <div>
                       <EditUserDialog
                         user={user}
                         onUserUpdate={handleUserUpdate}
@@ -426,7 +540,7 @@ export default function UserDetails() {
                         trigger={
                           <Button
                             variant="outline"
-                            className="h-10 rounded-xl w-full inline-flex items-center justify-center"
+                            className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center"
                           >
                             Edit User
                           </Button>
@@ -434,14 +548,14 @@ export default function UserDetails() {
                       />
                     </div>
 
-                    <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                    <div>
                       <ChangePasswordDialog
                         user={user}
                         onPasswordChange={handlePasswordChange}
                         trigger={
                           <Button
                             variant="outline"
-                            className="h-10 rounded-xl w-full inline-flex items-center justify-center"
+                            className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center"
                           >
                             Password
                           </Button>
@@ -450,10 +564,10 @@ export default function UserDetails() {
                     </div>
 
                     {hasPermission("USERS_MANAGE_PERMISSIONS") && (
-                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                      <div>
                         <Button
                           variant="outline"
-                          className="h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                          className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
                           onClick={() =>
                             navigate(`/${effectiveRole}/users/${user.id}/permissions`)
                           }
@@ -465,10 +579,10 @@ export default function UserDetails() {
                     )}
 
                     {effectiveRole === "admin" && currentUser?.id !== user.id && (
-                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                      <div>
                         <Button
                           variant="outline"
-                          className="h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                          className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
                           onClick={handleGenerateDashboardLink}
                           disabled={isGeneratingLink}
                           title="Open user's dashboard in a new tab"
@@ -484,12 +598,12 @@ export default function UserDetails() {
                     )}
 
                     {canAdminManageAccount && !isAccountDeactivated && user.role !== "admin" && (
-                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                      <div>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
                               variant="secondary"
-                              className="h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                              className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
                               disabled={isAccountToggleLoading}
                             >
                               {isAccountToggleLoading ? (
@@ -528,12 +642,12 @@ export default function UserDetails() {
                     )}
 
                     {canAdminManageAccount && isAccountDeactivated && (
-                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                      <div>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
                               variant="secondary"
-                              className="h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
+                              className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center gap-2"
                               disabled={isAccountToggleLoading}
                             >
                               {isAccountToggleLoading ? (
@@ -568,14 +682,14 @@ export default function UserDetails() {
                     )}
 
                     {effectiveRole === "admin" && currentUser?.id !== user.id && (
-                      <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+                      <div>
                         <DeleteUserDialog
                           user={user}
                           onUserDelete={handleUserDelete}
                           trigger={
                             <Button
                               variant="destructive"
-                              className="h-10 rounded-xl w-full inline-flex items-center justify-center"
+                              className="h-11 lg:h-10 rounded-xl w-full inline-flex items-center justify-center"
                             >
                               Delete User
                             </Button>

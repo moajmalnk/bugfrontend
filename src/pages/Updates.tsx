@@ -129,24 +129,17 @@ const Updates = () => {
   const [creatorOpen, setCreatorOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Local state for search input to prevent re-render issues
+  // Local state for search input (avoids fighting persisted filter on each keystroke)
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
-  
-  // Sync local state with persisted filter
+
+  // Debounced persist only — do not sync searchTerm back into the input (that drops extra typed chars)
   useEffect(() => {
-    setLocalSearchTerm(searchTerm);
-  }, [searchTerm]);
-  
-  // Debounced update to persisted filter (prevents excessive localStorage writes)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (localSearchTerm !== searchTerm) {
-        setFilter("searchTerm", localSearchTerm);
-      }
+    const timer = window.setTimeout(() => {
+      setFilter("searchTerm", localSearchTerm);
     }, 300);
-    
-    return () => clearTimeout(timer);
-  }, [localSearchTerm, searchTerm, setFilter]);
+
+    return () => window.clearTimeout(timer);
+  }, [localSearchTerm, setFilter]);
   
   // Memoized onChange handler
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

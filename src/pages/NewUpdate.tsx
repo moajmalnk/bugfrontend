@@ -39,7 +39,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send, Paperclip, File, X, Calendar, Clock, FileImage, Check, ChevronsUpDown, Timer, Flag } from "lucide-react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useState, useRef, useEffect, ChangeEvent } from "react";
 import * as z from "zod";
@@ -156,6 +156,8 @@ const FormSkeleton = () => (
 
 const NewUpdate = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preSelectedProjectId = searchParams.get("projectId");
   const { currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
@@ -214,13 +216,21 @@ const NewUpdate = () => {
       title: "",
       type: undefined,
       description: "",
-      project_id: "",
+      project_id: preSelectedProjectId || "",
       expected_date: "",
       expected_time: "",
       calculated_hours: "",
       update_priority: "none",
     },
   });
+
+  useEffect(() => {
+    if (!preSelectedProjectId || projects.length === 0) return;
+    const isValidProject = projects.some((p: { id: string }) => p.id === preSelectedProjectId);
+    if (isValidProject) {
+      form.setValue("project_id", preSelectedProjectId);
+    }
+  }, [preSelectedProjectId, projects, form]);
 
   // Cleanup effect for blob URLs
   useEffect(() => {

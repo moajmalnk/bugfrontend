@@ -23,7 +23,7 @@ import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { updateService } from "@/services/updateService";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Clock, CalendarDays, Play, Timer, Flag } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Clock, CalendarDays, Play, Timer, Flag, Loader2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -266,6 +266,25 @@ const UpdateDetails = () => {
     }
   }, [showCompleteDialog]);
 
+  const handleCompleteSubmit = () => {
+    if (completeForm.tested === "") {
+      toast({
+        title: "Required",
+        description: "Please select whether this update was tested (yes or no).",
+        variant: "destructive",
+      });
+      return;
+    }
+    completeMutation.mutate({
+      completion_tested: completeForm.tested === "yes",
+      completion_dev_hours: completeForm.devHours.trim() || undefined,
+      completion_dev_started_at: completeForm.devStarted || undefined,
+      completion_dev_ended_at: completeForm.devEnded || undefined,
+      completion_tested_by: completeForm.testedBy.trim() || undefined,
+      completion_notes: completeForm.notes.trim() || undefined,
+    });
+  };
+
   const performActualDelete = useMutation({
     mutationFn: () => updateService.deleteUpdate(updateId),
     onSuccess: (successMessage) => {
@@ -412,13 +431,15 @@ const UpdateDetails = () => {
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   {fromProject ? "Back to Project Updates" : "Back to Updates"}
                 </Button>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent truncate">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent break-words">
                   {update.title}
                 </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Update ID: <span className="font-mono">{update.id}</span></p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 break-words">
+                  Update ID: <span className="font-mono break-all">{update.id}</span>
+                </p>
                 <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
               </div>
-              <div className="flex items-center gap-2 self-start sm:self-center">
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
                 {canPerformActions && (
                   <>
                     {(currentUser?.role === "admin" || update?.created_by === currentUser?.username) && (
@@ -831,110 +852,181 @@ const UpdateDetails = () => {
       <ConfirmationDialog open={showApproveDialog} onOpenChange={setShowApproveDialog} onConfirm={() => approveMutation.mutate()} title="Approve Update" description="Are you sure you want to approve this update?" confirmText="Approve" isLoading={approveMutation.isPending} />
       <ConfirmationDialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog} onConfirm={() => declineMutation.mutate()} title="Decline Update" description="Are you sure you want to decline this update? This cannot be undone." confirmText="Decline" isLoading={declineMutation.isPending} variant="destructive" />
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Mark as completed</DialogTitle>
-            <DialogDescription>
-              Record how this update was delivered and tested before closing it out.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="complete-tested">Was this update tested? *</Label>
-              <Select
-                value={completeForm.tested || undefined}
-                onValueChange={(v) =>
-                  setCompleteForm((f) => ({ ...f, tested: v as "yes" | "no" }))
-                }
-              >
-                <SelectTrigger id="complete-tested">
-                  <SelectValue placeholder="Select yes or no" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="yes">Yes</SelectItem>
-                  <SelectItem value="no">No</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="complete-dev-hours">Calculated hours for development</Label>
-              <Input
-                id="complete-dev-hours"
-                type="number"
-                min={0}
-                step={0.25}
-                placeholder="e.g. 8"
-                value={completeForm.devHours}
-                onChange={(e) => setCompleteForm((f) => ({ ...f, devHours: e.target.value }))}
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="complete-dev-started">Development started</Label>
-                <Input
-                  id="complete-dev-started"
-                  type="datetime-local"
-                  value={completeForm.devStarted}
-                  onChange={(e) => setCompleteForm((f) => ({ ...f, devStarted: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="complete-dev-ended">Development ended</Label>
-                <Input
-                  id="complete-dev-ended"
-                  type="datetime-local"
-                  value={completeForm.devEnded}
-                  onChange={(e) => setCompleteForm((f) => ({ ...f, devEnded: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="complete-tested-by">Who tested (name)</Label>
-              <Input
-                id="complete-tested-by"
-                placeholder="Tester name"
-                value={completeForm.testedBy}
-                onChange={(e) => setCompleteForm((f) => ({ ...f, testedBy: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="complete-notes">Notes</Label>
-              <Textarea
-                id="complete-notes"
-                placeholder="Optional notes about completion or testing"
-                className="min-h-[100px]"
-                value={completeForm.notes}
-                onChange={(e) => setCompleteForm((f) => ({ ...f, notes: e.target.value }))}
-              />
+        <DialogContent
+          showCloseButton={false}
+          className="flex max-h-[min(92vh,720px)] w-[calc(100vw-1rem)] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:w-full"
+        >
+          <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-emerald-600 px-4 py-5 text-white sm:px-6 sm:py-6">
+            <div className="absolute inset-0 bg-black/10" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowCompleteDialog(false)}
+              className="absolute right-3 top-3 z-10 h-9 w-9 rounded-full border border-white/30 bg-white/15 text-white hover:bg-white/25 hover:text-white"
+              aria-label="Close completion dialog"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <DialogHeader className="relative z-10 space-y-2 pr-10 text-left">
+              <DialogTitle className="flex items-center gap-3 text-xl font-bold text-white sm:text-2xl">
+                <div className="rounded-xl bg-white/20 p-2 backdrop-blur-sm">
+                  <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                </div>
+                Mark as Completed
+              </DialogTitle>
+              <DialogDescription className="text-sm text-blue-50 sm:text-base">
+                Record how this update was delivered and tested before closing it out.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50/60 p-4 dark:bg-gray-900/50 sm:p-6">
+            <div className="space-y-5">
+              <section className="space-y-4 rounded-2xl border border-gray-200/70 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-blue-100 p-1.5 dark:bg-blue-900/40">
+                    <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Testing</h3>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="complete-tested" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Was this update tested? <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={completeForm.tested || undefined}
+                    onValueChange={(v) =>
+                      setCompleteForm((f) => ({ ...f, tested: v as "yes" | "no" }))
+                    }
+                  >
+                    <SelectTrigger id="complete-tested" className="h-11 bg-white dark:bg-gray-800">
+                      <SelectValue placeholder="Select yes or no" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Yes</SelectItem>
+                      <SelectItem value="no">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="complete-tested-by" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Who tested (name)
+                  </Label>
+                  <Input
+                    id="complete-tested-by"
+                    placeholder="Tester name"
+                    value={completeForm.testedBy}
+                    onChange={(e) => setCompleteForm((f) => ({ ...f, testedBy: e.target.value }))}
+                    className="h-11 bg-white dark:bg-gray-800"
+                  />
+                </div>
+              </section>
+
+              <section className="space-y-4 rounded-2xl border border-gray-200/70 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-emerald-100 p-1.5 dark:bg-emerald-900/40">
+                    <Timer className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Development</h3>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="complete-dev-hours" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Calculated hours for development
+                  </Label>
+                  <Input
+                    id="complete-dev-hours"
+                    type="number"
+                    min={0}
+                    step={0.25}
+                    placeholder="e.g. 8"
+                    value={completeForm.devHours}
+                    onChange={(e) => setCompleteForm((f) => ({ ...f, devHours: e.target.value }))}
+                    className="h-11 bg-white dark:bg-gray-800"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="complete-dev-started" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Development started
+                    </Label>
+                    <Input
+                      id="complete-dev-started"
+                      type="datetime-local"
+                      value={completeForm.devStarted}
+                      onChange={(e) => setCompleteForm((f) => ({ ...f, devStarted: e.target.value }))}
+                      className="h-11 bg-white dark:bg-gray-800"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="complete-dev-ended" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Development ended
+                    </Label>
+                    <Input
+                      id="complete-dev-ended"
+                      type="datetime-local"
+                      value={completeForm.devEnded}
+                      onChange={(e) => setCompleteForm((f) => ({ ...f, devEnded: e.target.value }))}
+                      className="h-11 bg-white dark:bg-gray-800"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-3 rounded-2xl border border-gray-200/70 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-indigo-100 p-1.5 dark:bg-indigo-900/40">
+                    <File className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notes</h3>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="complete-notes" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Optional notes about completion or testing
+                  </Label>
+                  <Textarea
+                    id="complete-notes"
+                    placeholder="Add any extra context for the team..."
+                    className="min-h-[110px] resize-none bg-white dark:bg-gray-800"
+                    value={completeForm.notes}
+                    onChange={(e) => setCompleteForm((f) => ({ ...f, notes: e.target.value }))}
+                  />
+                </div>
+              </section>
             </div>
           </div>
-          <DialogFooter className="sm:justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setShowCompleteDialog(false)}>
+
+          <DialogFooter className="shrink-0 gap-2 border-t bg-background px-4 py-3 sm:justify-end sm:px-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowCompleteDialog(false)}
+              disabled={completeMutation.isPending}
+              className="w-full sm:w-auto"
+            >
               Cancel
             </Button>
             <Button
               type="button"
               disabled={completeMutation.isPending}
-              onClick={() => {
-                if (completeForm.tested === "") {
-                  toast({
-                    title: "Required",
-                    description: "Please select whether this update was tested (yes or no).",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                completeMutation.mutate({
-                  completion_tested: completeForm.tested === "yes",
-                  completion_dev_hours: completeForm.devHours.trim() || undefined,
-                  completion_dev_started_at: completeForm.devStarted || undefined,
-                  completion_dev_ended_at: completeForm.devEnded || undefined,
-                  completion_tested_by: completeForm.testedBy.trim() || undefined,
-                  completion_notes: completeForm.notes.trim() || undefined,
-                });
-              }}
+              onClick={handleCompleteSubmit}
+              className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 text-white hover:from-blue-700 hover:to-emerald-700 sm:w-auto"
             >
-              {completeMutation.isPending ? "Saving…" : "Mark as completed"}
+              {completeMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Mark as Completed
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

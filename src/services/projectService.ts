@@ -90,6 +90,20 @@ class ProjectService {
     }
     throw new Error('Failed to upload attachments');
   }
+
+  async getProjectWorkActivity(
+    projectId: string,
+    params: { from?: string; to?: string } = {}
+  ) {
+    const qs = new URLSearchParams({ project_id: projectId, ...params } as Record<string, string>);
+    const response = await apiClient.get<{ success: boolean; data: any }>(
+      `/projects/project_work_activity.php?${qs.toString()}`
+    );
+    if (response.data.success) {
+      return response.data.data;
+    }
+    return { project_id: projectId, from: '', to: '', entries: [] };
+  }
 }
 
 export const projectService = new ProjectService();

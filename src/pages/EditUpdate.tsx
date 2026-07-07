@@ -3,13 +3,13 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -28,13 +28,12 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ImagePlus, Paperclip, File, X, Calendar, Clock, FileImage, CalendarDays, Timer, Flag } from "lucide-react";
+import { ArrowLeft, ImagePlus, Paperclip, File, X, FileImage, Edit2, FolderOpen, Bell, AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useState, useEffect, useRef, ChangeEvent } from "react";
 import * as z from "zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -45,6 +44,9 @@ import {
 } from "@/components/voice/WhatsAppVoiceRecorder";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { apiClient } from "@/lib/axios";
+
+const TITLE_MAX = 200;
+const DESCRIPTION_MAX = 2000;
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -72,11 +74,17 @@ interface ExistingAttachment {
 
 const formSchema = z
   .object({
-    title: z.string().min(1, "Title is required"),
+    title: z
+      .string()
+      .min(1, "Title is required")
+      .max(TITLE_MAX, `Title must be at most ${TITLE_MAX} characters`),
     type: z.enum(["feature", "updation", "maintenance"], {
       required_error: "Please select an update type",
     }),
-    description: z.string().min(1, "Description is required"),
+    description: z
+      .string()
+      .min(1, "Description is required")
+      .max(DESCRIPTION_MAX, `Description must be at most ${DESCRIPTION_MAX} characters`),
     status: z.enum(["pending", "approved", "declined"]).optional(),
     project_id: z.string().min(1, "Project is required"),
     project_name: z.string().optional(),
@@ -105,10 +113,12 @@ const EditUpdate = () => {
   const navigate = useNavigate();
   const { updateId } = useParams<{ updateId: string }>();
   const { currentUser } = useAuth();
+  const role = currentUser?.role || "admin";
+  const backUrl = `/${role}/updates/${updateId}`;
   const canSetPlanningFields =
     currentUser?.role === "admin" || currentUser?.role === "developer";
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [canEdit, setCanEdit] = useState(true);
@@ -369,12 +379,8 @@ const EditUpdate = () => {
           },
         });
         if (response.status === 403 || response.status === 404) {
-          toast({
-            title: "Error",
-            description: "You do not have permission to edit this update.",
-            variant: "destructive",
-          });
-          navigate(currentUser?.role ? `/${currentUser.role}/updates` : "/updates");
+          setLoadError("You do not have permission to edit this update.");
+          setIsLoading(false);
           return;
         }
         const data = await response.json();
@@ -420,12 +426,9 @@ const EditUpdate = () => {
           throw new Error(data.message || "Failed to fetch update");
         }
       } catch (error) {
-        toast({
-          title: "Error",
-          description: error instanceof Error ? error.message : "Failed to fetch update",
-          variant: "destructive",
-        });
-        navigate(currentUser?.role ? `/${currentUser.role}/updates` : "/updates");
+        setLoadError(
+          error instanceof Error ? error.message : "Failed to fetch update"
+        );
       } finally {
         setIsLoading(false);
       }
@@ -437,317 +440,384 @@ const EditUpdate = () => {
     mutation.mutate(values);
   };
 
+  const watchedTitle = form.watch("title");
+  const watchedProjectName = form.watch("project_name");
+  const isSaving = mutation.isPending;
+
   if (isLoading) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
-        <section className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              className="flex items-center text-muted-foreground hover:text-foreground"
-              onClick={() => navigate(-1)}
-              disabled
-            >
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w mx-auto space-y-6">
+          <Skeleton className="h-40 w-full rounded-2xl" />
+          <Skeleton className="h-[600px] w-full rounded-2xl" />
+        </section>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w mx-auto">
+          <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 p-12 text-center">
+            <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold mb-2">Could not load update</h3>
+            <p className="text-muted-foreground mb-6">{loadError}</p>
+            <Button onClick={() => navigate(-1)} variant="outline">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+              Go Back
             </Button>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl sm:text-2xl">Loading...</CardTitle>
-              <CardDescription>Please wait while we load the update details</CardDescription>
-            </CardHeader>
-          </Card>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 sm:px-4 py-4 sm:py-6 md:px-6 lg:px-8 xl:px-10">
-      <section className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            className="flex items-center text-muted-foreground hover:text-foreground"
-            onClick={() => navigate(-1)}
-            disabled={isSubmitting}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+      <section className="max-w mx-auto space-y-6 sm:space-y-8">
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-blue-50/50 via-transparent to-indigo-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-indigo-950/20" />
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+              <div className="space-y-3 min-w-0">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    className="flex items-center text-muted-foreground hover:text-foreground p-2 shrink-0"
+                    onClick={() => navigate(backUrl)}
+                    disabled={isSaving}
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shrink-0">
+                    <Edit2 className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                      Edit Update
+                    </h1>
+                    <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full mt-2" />
+                  </div>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl break-words">
+                  Update details for{" "}
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">
+                    {watchedTitle || "this update"}
+                  </span>
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  {watchedProjectName && (
+                    <div className="flex h-12 min-w-[12rem] items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
+                      <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                        <FolderOpen className="h-5 w-5 text-white" />
+                      </div>
+                      <span className="text-sm font-bold text-blue-700 dark:text-blue-300 truncate">
+                        {watchedProjectName}
+                      </span>
+                    </div>
+                  )}
+                  {updateId && (
+                    <div className="flex h-12 min-w-[12rem] items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-50 to-slate-100 dark:from-gray-800/50 dark:to-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                      <div className="p-1.5 bg-gray-500 dark:bg-gray-600 rounded-lg shrink-0">
+                        <Bell className="h-5 w-5 text-white" />
+                      </div>
+                      <span className="text-sm font-mono font-bold text-gray-700 dark:text-gray-300 truncate">
+                        {updateId.slice(0, 8)}…
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl sm:text-2xl">Edit Update</CardTitle>
-            <CardDescription>
-              Modify the update details below
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!canEdit ? (
-              <div className="text-center text-muted-foreground py-8">
-                <p className="mb-2">You do not have permission to edit this update.</p>
-              </div>
-            ) : (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="project_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Project</FormLabel>
-                        <FormControl>
-                          <Input
-                            value={form.getValues('project_name') || "BugRicer Project"}
-                            disabled
-                            readOnly
-                          />
-                        </FormControl>
-                        <FormDescription>
+        <div className="relative">
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl" />
+          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardHeader className="p-6 sm:p-8 pb-2">
+                <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shrink-0">
+                    <File className="h-5 w-5 text-white" />
+                  </div>
+                  Update Form
+                </CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400 text-base mt-2">
+                  Update information, status, planning fields, and attachments
+                </CardDescription>
+              </CardHeader>
+
+              {!canEdit ? (
+                <CardContent className="p-6 sm:p-8 pt-4">
+                  <div className="text-center text-muted-foreground py-8">
+                    <p className="mb-2">You do not have permission to edit this update.</p>
+                    <Button variant="outline" onClick={() => navigate(backUrl)}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back to Update
+                    </Button>
+                  </div>
+                </CardContent>
+              ) : (
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)}>
+                    <CardContent className="space-y-8 p-6 sm:p-8 pt-4">
+                      <div className="space-y-3">
+                        <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                          <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-purple-500 to-violet-600 rounded-full" />
+                          Project
+                        </Label>
+                        <Input
+                          value={watchedProjectName || "BugRicer Project"}
+                          disabled
+                          readOnly
+                          className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                           The project this update belongs to
-                        </FormDescription>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Title</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter update title"
-                            {...field}
-                            disabled={isSubmitting || !canEdit}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          A clear and concise title for the update
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          disabled={isSubmitting || !canEdit}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select update type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="updation">Updation</SelectItem>
-                            <SelectItem value="feature">Feature</SelectItem>
-                            <SelectItem value="maintenance">Maintenance</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          The type of update
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  {/* Status Dropdown for Admins */}
-                  {currentUser?.role === "admin" && (
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            disabled={isSubmitting || !canEdit}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="approved">Approved</SelectItem>
-                              <SelectItem value="declined">Declined</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Set the status of this update
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter update description"
-                            className="min-h-[120px]"
-                            {...field}
-                            disabled={isSubmitting || !canEdit}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Detailed description of the update
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                        </p>
+                      </div>
 
-                  <FormField
-                    control={form.control}
-                    name="expected_date"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                          <div className="p-1 bg-indigo-500 rounded-lg">
-                            <CalendarDays className="h-3 w-3 text-white" />
-                          </div>
-                          Expected Completion Date
-                        </FormLabel>
-                        <FormControl>
-                          <DatePicker
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Select expected completion date"
-                            className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
-                            disableFuture={false}
-                          />
-                        </FormControl>
-                        <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
-                          The date by which this update is expected to be completed.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="expected_time"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                          <div className="p-1 bg-teal-500 rounded-lg">
-                            <Clock className="h-3 w-3 text-white" />
-                          </div>
-                          Expected Completion Time
-                        </FormLabel>
-                        <FormControl>
-                          <TimePicker
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Select expected completion time"
-                            className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
-                          />
-                        </FormControl>
-                        <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
-                          The time by which this update is expected to be completed.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {canSetPlanningFields && canEdit && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <FormField
                         control={form.control}
-                        name="calculated_hours"
+                        name="title"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                              <div className="p-1 bg-cyan-500 rounded-lg">
-                                <Timer className="h-3 w-3 text-white" />
-                              </div>
-                              Calculated Hours to Update
+                            <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                              <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-orange-500 to-red-600 rounded-full" />
+                              Title
                             </FormLabel>
                             <FormControl>
                               <Input
-                                type="number"
-                                min={0}
-                                step={0.25}
-                                placeholder="e.g. 4 or 2.5"
-                                className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl"
+                                placeholder="Enter update title"
+                                maxLength={TITLE_MAX}
+                                className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800"
                                 {...field}
-                                disabled={isSubmitting || !canEdit}
+                                disabled={isSaving || !canEdit}
                               />
                             </FormControl>
-                            <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
-                              Estimated hours to complete (admins and developers only)
-                            </FormDescription>
+                            <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                              <span className="font-medium">A clear and concise title for the update</span>
+                              <span className={field.value.length > TITLE_MAX * 0.9 ? "text-orange-600 font-semibold" : "font-semibold"}>
+                                {field.value.length}/{TITLE_MAX}
+                              </span>
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
+                      <div className="grid gap-6 md:grid-cols-2">
+                        <FormField
+                          control={form.control}
+                          name="type"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full" />
+                                Type
+                              </FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                disabled={isSaving || !canEdit}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
+                                    <SelectValue placeholder="Select update type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="updation">Updation</SelectItem>
+                                  <SelectItem value="feature">Feature</SelectItem>
+                                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {currentUser?.role === "admin" && (
+                          <FormField
+                            control={form.control}
+                            name="status"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                  <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full" />
+                                  Status
+                                </FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                  disabled={isSaving || !canEdit}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
+                                      <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="approved">Approved</SelectItem>
+                                    <SelectItem value="declined">Declined</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                      </div>
+
                       <FormField
                         control={form.control}
-                        name="update_priority"
+                        name="description"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                              <div className="p-1 bg-rose-500 rounded-lg">
-                                <Flag className="h-3 w-3 text-white" />
-                              </div>
-                              Update Priority
+                            <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                              <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full" />
+                              Description
                             </FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value ?? "none"}
-                              disabled={isSubmitting || !canEdit}
-                            >
-                              <FormControl>
-                                <SelectTrigger className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl">
-                                  <SelectValue placeholder="Select priority" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="none">Not set</SelectItem>
-                                <SelectItem value="high">High</SelectItem>
-                                <SelectItem value="medium">Medium</SelectItem>
-                                <SelectItem value="low">Low</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormDescription className="text-sm text-gray-600 dark:text-gray-400">
-                              Internal priority for planning
-                            </FormDescription>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Enter update description"
+                                rows={5}
+                                maxLength={DESCRIPTION_MAX}
+                                className="min-h-[150px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800"
+                                {...field}
+                                disabled={isSaving || !canEdit}
+                              />
+                            </FormControl>
+                            <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                              <span className="font-medium">Detailed description of the update</span>
+                              <span className={field.value.length > DESCRIPTION_MAX * 0.9 ? "text-blue-600 font-semibold" : "font-semibold"}>
+                                {field.value.length}/{DESCRIPTION_MAX}
+                              </span>
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    </div>
-                  )}
 
-                  {/* Attachments Section */}
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"></div>
-                        Attachments
-                      </Label>
-                    </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="expected_date"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full" />
+                                Expected Completion Date
+                              </FormLabel>
+                              <FormControl>
+                                <DatePicker
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  placeholder="Select expected completion date"
+                                  className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+                                  disableFuture={false}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="expected_time"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full" />
+                                Expected Completion Time
+                              </FormLabel>
+                              <FormControl>
+                                <TimePicker
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  placeholder="Select expected completion time"
+                                  className="h-12 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      {canSetPlanningFields && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                          <FormField
+                            control={form.control}
+                            name="calculated_hours"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                  <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full" />
+                                  Calculated Hours
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    step={0.25}
+                                    placeholder="e.g. 4 or 2.5"
+                                    className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800"
+                                    {...field}
+                                    disabled={isSaving || !canEdit}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="update_priority"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                  <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-rose-500 to-pink-600 rounded-full" />
+                                  Update Priority
+                                </FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value ?? "none"}
+                                  disabled={isSaving || !canEdit}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
+                                      <SelectValue placeholder="Select priority" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">Not set</SelectItem>
+                                    <SelectItem value="high">High</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="low">Low</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            <div className="w-2 h-2 shrink-0 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full" />
+                            Attachments
+                          </Label>
+                        </div>
 
                     {/* Hidden file inputs */}
                     <input
@@ -770,7 +840,7 @@ const EditUpdate = () => {
                     <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                       {/* Screenshots section */}
                       <div className="space-y-4">
-                        <Button type="button" variant="outline" className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-300 rounded-xl group" onClick={handleScreenshotClick} disabled={isSubmitting || !canEdit}>
+                        <Button type="button" variant="outline" className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-300 rounded-xl group" onClick={handleScreenshotClick} disabled={isSaving || !canEdit}>
                           <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
                             <ImagePlus className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                           </div>
@@ -780,7 +850,7 @@ const EditUpdate = () => {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Screenshots ({existingScreenshots.length + screenshots.length})</Label>
-                              <Button type="button" variant="ghost" size="sm" onClick={clearAllScreenshots} className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400" disabled={isSubmitting || !canEdit}>Clear New</Button>
+                              <Button type="button" variant="ghost" size="sm" onClick={clearAllScreenshots} className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400" disabled={isSaving || !canEdit}>Clear New</Button>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               {existingScreenshots.map((attachment) => (
@@ -792,7 +862,7 @@ const EditUpdate = () => {
                                       <FileImage className="h-8 w-8 text-gray-400" />
                                     </div>
                                   )}
-                                  <Button type="button" variant="destructive" size="icon" className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg" onClick={() => removeExistingScreenshot(attachment.id)} disabled={isSubmitting || !canEdit}>
+                                  <Button type="button" variant="destructive" size="icon" className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg" onClick={() => removeExistingScreenshot(attachment.id)} disabled={isSaving || !canEdit}>
                                     <X className="h-3 w-3" />
                                   </Button>
                                   <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">{attachment.file_name}</div>
@@ -807,7 +877,7 @@ const EditUpdate = () => {
                                       <FileImage className="h-8 w-8 text-gray-400" />
                                     </div>
                                   )}
-                                  <Button type="button" variant="destructive" size="icon" className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg" onClick={() => removeScreenshot(index)} disabled={isSubmitting || !canEdit}>
+                                  <Button type="button" variant="destructive" size="icon" className="h-6 w-6 absolute -top-1 -right-1 opacity-80 hover:opacity-100 shadow-lg" onClick={() => removeScreenshot(index)} disabled={isSaving || !canEdit}>
                                     <X className="h-3 w-3" />
                                   </Button>
                                   <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">{file.name}</div>
@@ -820,7 +890,7 @@ const EditUpdate = () => {
 
                       {/* Files section */}
                       <div className="space-y-4">
-                        <Button type="button" variant="outline" className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400 dark:hover:border-green-500 hover:bg-green-50/50 dark:hover:bg-green-950/20 transition-all duration-300 rounded-xl group" onClick={handleFileClick} disabled={isSubmitting || !canEdit}>
+                        <Button type="button" variant="outline" className="h-28 w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-400 dark:hover:border-green-500 hover:bg-green-50/50 dark:hover:bg-green-950/20 transition-all duration-300 rounded-xl group" onClick={handleFileClick} disabled={isSaving || !canEdit}>
                           <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full mb-3 group-hover:bg-green-200 dark:group-hover:bg-green-800/40 transition-colors">
                             <Paperclip className="h-6 w-6 text-green-600 dark:text-green-400" />
                           </div>
@@ -830,7 +900,7 @@ const EditUpdate = () => {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Files ({existingFiles.length + files.length})</Label>
-                              <Button type="button" variant="ghost" size="sm" onClick={clearAllFiles} className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400" disabled={isSubmitting || !canEdit}>Clear New</Button>
+                              <Button type="button" variant="ghost" size="sm" onClick={clearAllFiles} className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400" disabled={isSaving || !canEdit}>Clear New</Button>
                             </div>
                             <div className="space-y-2">
                               {existingFiles.map((attachment) => (
@@ -848,7 +918,7 @@ const EditUpdate = () => {
                                       <div className="text-xs text-gray-500 dark:text-gray-400">{attachment.file_size ? `${(attachment.file_size / 1024).toFixed(1)} KB` : ''}</div>
                                     </div>
                                   </div>
-                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400" onClick={() => removeExistingFile(attachment.id)} disabled={isSubmitting || !canEdit}>
+                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400" onClick={() => removeExistingFile(attachment.id)} disabled={isSaving || !canEdit}>
                                     <X className="h-4 w-4" />
                                   </Button>
                                 </div>
@@ -868,7 +938,7 @@ const EditUpdate = () => {
                                       <div className="text-xs text-gray-500 dark:text-gray-400">{(file.size / 1024).toFixed(1)} KB</div>
                                     </div>
                                   </div>
-                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400" onClick={() => removeFile(index)} disabled={isSubmitting || !canEdit}>
+                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400" onClick={() => removeFile(index)} disabled={isSaving || !canEdit}>
                                     <X className="h-4 w-4" />
                                   </Button>
                                 </div>
@@ -888,7 +958,7 @@ const EditUpdate = () => {
                               description: "Hold the mic to record a new voice note.",
                             })
                           }
-                          disabled={isSubmitting || !canEdit}
+                          disabled={isSaving || !canEdit}
                           maxDuration={300}
                         />
                         {(existingVoiceNotes.length > 0 || voiceNotes.length > 0) && (
@@ -903,7 +973,7 @@ const EditUpdate = () => {
                                 size="sm"
                                 onClick={clearAllVoiceNotes}
                                 className="text-xs text-gray-500 hover:text-red-600 dark:hover:text-red-400"
-                                disabled={isSubmitting || !canEdit}
+                                disabled={isSaving || !canEdit}
                               >
                                 Clear New
                               </Button>
@@ -972,18 +1042,36 @@ const EditUpdate = () => {
                         )}
                       </div>
                     </div>
-                  </div>
+                      </div>
+                    </CardContent>
 
-                  <div className="flex justify-end">
-                    <Button type="submit" disabled={isSubmitting || !canEdit}>
-                      {isSubmitting ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            )}
-          </CardContent>
-        </Card>
+                    <CardFooter className="p-6 sm:p-8 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+                      <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => navigate(backUrl)}
+                          disabled={isSaving}
+                          className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                        >
+                          <ArrowLeft className="mr-2 h-4 w-4" />
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={isSaving || !canEdit}
+                          className="h-12 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSaving ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
+                    </CardFooter>
+                  </form>
+                </Form>
+              )}
+            </Card>
+          </div>
+        </div>
       </section>
     </main>
   );

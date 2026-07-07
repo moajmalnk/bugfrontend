@@ -65,6 +65,7 @@ const Projects = lazy(() => import("@/pages/Projects"));
 const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
 const NewProject = lazy(() => import("@/pages/NewProject"));
 const EditProject = lazy(() => import("@/pages/EditProject"));
+const ProjectCompliance = lazy(() => import("@/pages/ProjectCompliance"));
 const Bugs = lazy(() => import("@/pages/Bugs"));
 const BugDetails = lazy(() => import("@/pages/BugDetails"));
 const BugDetailsDiagnostic = lazy(() => 
@@ -120,6 +121,7 @@ const Updates = lazy(() => import("@/pages/Updates"));
 const NewUpdate = lazy(() => import("@/pages/NewUpdate"));
 const UpdateDetails = lazy(() => import("@/pages/UpdateDetails"));
 const EditUpdate = lazy(() => import("@/pages/EditUpdate"));
+const DocumentPreviewPage = lazy(() => import("@/pages/DocumentPreviewPage"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const WhatsAppMessages = lazy(() => import("@/pages/WhatsAppMessages"));
 const MyTasks = lazy(() => 
@@ -312,14 +314,17 @@ const RouteConfig = () => {
       <Route path="/users" element={<RolePathRedirect suffix="users" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
       <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
+      <Route path="/document" element={<RolePathRedirect suffix="document" />} />
 
       {/* Protected Routes with role prefix */}
       {isAuthenticated && role && (
         <Route path={`/${role}`} element={<ProtectedRoleLayout />}>
           <Route path="projects" element={<Projects />} />
           <Route path="projects/new" element={<NewProject />} />
+          <Route path="projects/:projectId/compliance" element={<ProjectCompliance />} />
           <Route path="projects/:projectId/edit" element={<EditProject />} />
           <Route path="projects/:projectId" element={<ProjectDetails />} />
+          <Route path="document" element={<DocumentPreviewPage />} />
           <Route path="bugs" element={<Bugs />} />
           <Route path="bugs/new" element={<NewBug />} />
           {/* More specific routes must come BEFORE the general bugs/:bugId route */}

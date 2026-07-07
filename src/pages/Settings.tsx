@@ -18,9 +18,9 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -70,37 +70,31 @@ const Settings = () => {
   // Check for SETTINGS_EDIT permission
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <div className="text-center space-y-4 sm:space-y-6">
-          <div className="mx-auto flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-muted">
-            <Shield className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground animate-pulse" />
-          </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
-            Loading...
-          </h1>
-          <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-md">
-            Verifying your access permissions...
-          </p>
-        </div>
-      </div>
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+          <Skeleton className="h-40 w-full rounded-2xl" />
+          <Skeleton className="h-16 w-full rounded-2xl" />
+          <Skeleton className="h-80 w-full rounded-2xl" />
+        </section>
+      </main>
     );
   }
 
   if (!hasPermission('SETTINGS_EDIT')) {
     return (
-      <div className="flex flex-col items-center justify-center h-full px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <div className="text-center space-y-4 sm:space-y-6">
-          <div className="mx-auto flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-muted">
-            <Shield className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
+        <section className="max-w-7xl mx-auto">
+          <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 p-12 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+              <Shield className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              You do not have permission to access the settings page.
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
-            Access Denied
-          </h1>
-          <p className="text-muted-foreground text-sm sm:text-base lg:text-lg max-w-md">
-            You do not have permission to access the settings page.
-          </p>
-        </div>
-      </div>
+        </section>
+      </main>
     );
   }
 
@@ -156,16 +150,15 @@ const Settings = () => {
                   Manage your BugRicer application configuration
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 <Button
                   onClick={handleRefreshPermissions}
                   variant="outline"
-                  className="gap-2"
+                  className="h-12 px-6 self-start border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-semibold shadow-sm hover:shadow-md"
                   title="Refresh your permissions from the server"
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  <span className="hidden sm:inline">Refresh Permissions</span>
-                  <span className="sm:hidden">Refresh</span>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh Permissions
                 </Button>
               </div>
             </div>
@@ -188,7 +181,7 @@ const Settings = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
             <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <div className="md:hidden p-1">
+              <div className="lg:hidden p-1">
                 <Button
                   type="button"
                   variant="outline"
@@ -204,7 +197,7 @@ const Settings = () => {
                   <ChevronDown className="h-4 w-4 opacity-70" />
                 </Button>
               </div>
-              <TabsList className="hidden md:grid w-full grid-cols-4 h-14 bg-transparent p-1">
+              <TabsList className="hidden lg:grid w-full grid-cols-4 h-14 bg-transparent p-1">
                 {settingsTabs.map((tab) => (
                   <TabsTrigger
                     key={tab.value}
@@ -224,7 +217,7 @@ const Settings = () => {
             open={isMobileTabSelectorOpen}
             onOpenChange={setIsMobileTabSelectorOpen}
           >
-            <DrawerContent className="md:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+            <DrawerContent className="lg:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
               <DrawerHeader className="text-left pb-2">
                 <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
                   Select Section
@@ -284,103 +277,154 @@ const Settings = () => {
             </DrawerContent>
           </Drawer>
 
-          <TabsContent value="general" className="space-y-6 sm:space-y-8">
-            <Card className="shadow-sm hover:shadow-md transition-all duration-200">
-            <CardHeader className="p-4 sm:p-5 lg:p-6">
-              <CardTitle className="text-lg sm:text-xl lg:text-2xl">
-                General Settings
-              </CardTitle>
-              <CardDescription className="text-sm sm:text-base lg:text-lg">
-                Manage your BugRicer application settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 sm:space-y-8 p-4 sm:p-5 lg:p-6 pt-0 sm:pt-0 lg:pt-0">
-              <div className="space-y-4 sm:space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    {theme === "dark" ? (
-                      <Moon className="h-5 w-5 sm:h-6 sm:w-6" />
-                    ) : (
-                      <Sun className="h-5 w-5 sm:h-6 sm:w-6" />
-                    )}
-                    <div className="space-y-1 sm:space-y-2">
-                      <Label
-                        htmlFor="darkMode"
-                        className="text-base sm:text-lg font-semibold"
-                      >
-                        Dark Mode
-                      </Label>
-                      <p className="text-sm sm:text-base text-muted-foreground">
-                        Enable dark mode for the application
-                      </p>
+          <TabsContent value="general" className="space-y-6 sm:space-y-8 mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+                <Card className="border-0 shadow-none bg-transparent">
+                  <CardHeader className="p-6 sm:p-8 pb-2">
+                    <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shrink-0">
+                        <SettingsIcon className="h-5 w-5 text-white" />
+                      </div>
+                      General Settings
+                    </CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-400 text-base mt-2">
+                      Manage your BugRicer application settings
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 p-6 sm:p-8 pt-4">
+                    <div className="rounded-2xl border border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 p-4 sm:p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 shrink-0">
+                            {theme === "dark" ? (
+                              <Moon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                            ) : (
+                              <Sun className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="darkMode" className="text-base font-semibold text-gray-900 dark:text-white">
+                              Dark Mode
+                            </Label>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Enable dark mode for the application
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          id="darkMode"
+                          checked={theme === "dark"}
+                          onCheckedChange={toggleTheme}
+                          className="self-start sm:self-center"
+                        />
+                      </div>
                     </div>
+
+                    <div className="rounded-2xl border border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 p-4 sm:p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 shrink-0">
+                            <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="autoAssign" className="text-base font-semibold text-gray-900 dark:text-white">
+                              Auto-assign bugs
+                            </Label>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Automatically assign new bugs to developers
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          id="autoAssign"
+                          checked={autoAssign}
+                          onCheckedChange={setAutoAssign}
+                          className="self-start sm:self-center"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-gray-200/50 dark:border-gray-700/50">
+                      <Button
+                        onClick={handleSaveGeneral}
+                        disabled={autoAssign === initialAutoAssign}
+                        className="h-12 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+                      >
+                        Save Settings
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleResetGeneral}
+                        className="h-12 px-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-semibold"
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="notifications" className="space-y-6 sm:space-y-8 mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-xl">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shrink-0">
+                    <Bell className="h-5 w-5 text-white" />
                   </div>
-                  <Switch
-                    id="darkMode"
-                    checked={theme === "dark"}
-                    onCheckedChange={toggleTheme}
-                    className="scale-110 sm:scale-125"
-                  />
-                </div>
-
-                <Separator className="my-4 sm:my-6" />
-
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                  <div className="space-y-1 sm:space-y-2">
-                    <Label
-                      htmlFor="autoAssign"
-                      className="text-base sm:text-lg font-semibold"
-                    >
-                      Auto-assign bugs
-                    </Label>
-                    <p className="text-sm sm:text-base text-muted-foreground">
-                      Automatically assign new bugs to developers
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Notifications</h2>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
+                      Configure how and when you receive alerts
                     </p>
                   </div>
-                  <Switch
-                    id="autoAssign"
-                    checked={autoAssign}
-                    onCheckedChange={setAutoAssign}
-                    className="scale-110 sm:scale-125"
-                  />
                 </div>
+                <NotificationSettingsCard />
               </div>
-
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <Button
-                  onClick={handleSaveGeneral}
-                  className="w-full sm:w-auto h-10 sm:h-11 px-6 sm:px-8 text-sm sm:text-base"
-                  disabled={autoAssign === initialAutoAssign}
-                >
-                  Save Settings
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleResetGeneral}
-                  className="w-full sm:w-auto h-10 sm:h-11 px-6 sm:px-8 text-sm sm:text-base"
-                >
-                  Reset
-                </Button>
-              </div>
-            </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notifications" className="space-y-6 sm:space-y-8">
-            <div className="space-y-4 sm:space-y-6">
-              <NotificationSettingsCard />
             </div>
           </TabsContent>
 
-          <TabsContent value="announcements" className="space-y-6 sm:space-y-8">
-            <div className="space-y-4 sm:space-y-6">
-              <AnnouncementManager />
+          <TabsContent value="announcements" className="space-y-6 sm:space-y-8 mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-xl">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg shrink-0">
+                    <Megaphone className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Announcements</h2>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
+                      Broadcast messages to your team
+                    </p>
+                  </div>
+                </div>
+                <AnnouncementManager />
+              </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="roles" className="space-y-6 sm:space-y-8">
-            <div className="space-y-4 sm:space-y-6">
-              <RolesTab />
+          <TabsContent value="roles" className="space-y-6 sm:space-y-8 mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-xl">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg shrink-0">
+                    <Users className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Roles</h2>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
+                      Manage roles and permissions for your organization
+                    </p>
+                  </div>
+                </div>
+                <RolesTab />
+              </div>
             </div>
           </TabsContent>
         </Tabs>

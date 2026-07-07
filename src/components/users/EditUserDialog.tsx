@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -30,12 +29,12 @@ import { userService } from "@/services/userService";
 import { permissionService } from "@/services/permissionService";
 import { User, UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Pencil, X } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { cn } from "@/lib/utils";
 
-// Define the form schema
 const userFormSchema = z.object({
   username: z
     .string()
@@ -57,6 +56,53 @@ type EditUserDialogProps = {
   loggedInUserRole: string;
 };
 
+const fieldInputClass =
+  "h-11 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl shadow-sm";
+
+function FormLabelDot({
+  children,
+  color = "bg-blue-500",
+}: {
+  children: React.ReactNode;
+  color?: string;
+}) {
+  return (
+    <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+      <span className={cn("h-2 w-2 rounded-full shrink-0", color)} />
+      {children}
+    </FormLabel>
+  );
+}
+
+function PhoneInput({
+  value,
+  onChange,
+}: {
+  value?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex h-11 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+      <span className="flex items-center px-3 text-sm font-medium text-muted-foreground border-r border-gray-200 dark:border-gray-700 bg-muted/30 shrink-0">
+        +91
+      </span>
+      <input
+        type="tel"
+        placeholder="Enter 10-digit number"
+        value={value ? value.replace(/^\+91/, "") : ""}
+        onChange={(e) => {
+          const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+          onChange(val);
+        }}
+        className="flex-1 min-w-0 px-3 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+        maxLength={10}
+        pattern="\d{10}"
+        inputMode="numeric"
+      />
+    </div>
+  );
+}
+
 export function EditUserDialog({
   user,
   onUserUpdate,
@@ -66,11 +112,7 @@ export function EditUserDialog({
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
-  const [formData, setFormData] = useState({
-    ...user,
-  });
 
-  // Load roles on mount
   useEffect(() => {
     const loadRoles = async () => {
       try {
@@ -78,19 +120,16 @@ export function EditUserDialog({
         setRoles(data);
       } catch (error) {
         console.error("Failed to load roles:", error);
-        // Fallback to default roles
-        const fallbackRoles = [
+        setRoles([
           { id: 1, role_name: "Admin" },
           { id: 2, role_name: "Developer" },
           { id: 3, role_name: "Tester" },
-        ];
-        setRoles(fallbackRoles);
+        ]);
       }
     };
     loadRoles();
   }, []);
 
-  // Initialize the form
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
@@ -101,7 +140,6 @@ export function EditUserDialog({
     },
   });
 
-  // Update form values when user prop changes
   useEffect(() => {
     form.reset({
       username: user.username || "",
@@ -114,12 +152,10 @@ export function EditUserDialog({
   const onSubmit = async (data: UserFormValues) => {
     setIsSubmitting(true);
     try {
-      // Find the selected role to get role_id
       const selectedRole = roles.find(
         (r) => r.role_name.toLowerCase() === data.role.toLowerCase()
       );
 
-      // Call the update service and get the updated user from backend
       const updatedUser = await userService.updateUser(user.id, {
         username: data.username,
         email: data.email,
@@ -128,27 +164,28 @@ export function EditUserDialog({
         phone: data.phone ? "+91" + data.phone : "",
       });
 
-      // Use the updated user from backend response, ensuring all fields are properly set
       const updatedRole = (updatedUser.role || data.role) as UserRole;
       const finalUpdatedUser: User = {
-        ...user, // Start with current user data to preserve any fields not returned
-        ...updatedUser, // Override with backend response (includes role, role_id, etc.)
+        ...user,
+        ...updatedUser,
         username: updatedUser.username || data.username,
         email: updatedUser.email || data.email,
         role: updatedRole,
         phone: updatedUser.phone || (data.phone ? "+91" + data.phone : ""),
         name: updatedUser.name || updatedUser.username || data.username,
-        // Generate avatar based on updated role
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
           updatedUser.name || updatedUser.username || data.username
         )}&background=${
-          updatedRole === 'admin' ? '3b82f6' :
-          updatedRole === 'developer' ? '10b981' :
-          updatedRole === 'tester' ? 'f59e0b' : '6b7280'
+          updatedRole === "admin"
+            ? "3b82f6"
+            : updatedRole === "developer"
+              ? "10b981"
+              : updatedRole === "tester"
+                ? "f59e0b"
+                : "6b7280"
         }&color=fff&size=128`,
       };
 
-      // Call the onUserUpdate callback with the updated user from backend
       onUserUpdate(finalUpdatedUser);
 
       toast({
@@ -156,16 +193,15 @@ export function EditUserDialog({
         description: "User has been updated successfully.",
       });
       setOpen(false);
-    } catch (error: any) {
-      // console.error("Error updating user:", error);
+    } catch (error: unknown) {
       let errorMessage = "Failed to update the user. Please try again.";
       if (
-        error.message &&
+        error instanceof Error &&
         (error.message.includes("Username already taken") ||
           error.message.includes("Email already in use"))
       ) {
         errorMessage = error.message;
-      } else if (error.message) {
+      } else if (error instanceof Error && error.message) {
         errorMessage = error.message;
       }
 
@@ -189,122 +225,126 @@ export function EditUserDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
-          <DialogDescription>
-            Make changes to the user's information below.
-          </DialogDescription>
+      <DialogContent className="w-[min(96vw,520px)] max-w-none rounded-2xl p-0 gap-0 overflow-hidden">
+        <DialogHeader className="border-b border-gray-200/50 dark:border-gray-700/50 px-6 py-5 text-left">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
+              <Pencil className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <DialogTitle className="text-lg font-bold text-gray-900 dark:text-white">
+                Edit User
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Update account details for {user.username || user.name}.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <DialogClose asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-3 right-4"
-          >
-            <X className="h-5 w-5" />
-            <span className="sr-only">Close</span>
-          </Button>
-        </DialogClose>
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Username</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter username" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="Enter email" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Role</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={loggedInUserRole !== "admin"}
-                  >
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="max-h-[min(70vh,480px)] overflow-y-auto px-6 py-5 space-y-4">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabelDot>Username</FormLabelDot>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
+                      <Input placeholder="Enter username" {...field} className={fieldInputClass} />
                     </FormControl>
-                    <SelectContent position="popper" className="z-[70]">
-                      {roles.map((role) => (
-                        <SelectItem key={role.id} value={role.role_name.toLowerCase()}>
-                          {role.role_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone</FormLabel>
-                  <FormControl>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="px-3 py-2 border border-input rounded-l-md text-sm bg-input"
-                        style={{ borderRight: 0 }}
-                      >
-                        +91
-                      </span>
-                      <input
-                        id="phone"
-                        type="tel"
-                        placeholder="Enter 10-digit number"
-                        value={
-                          field.value ? field.value.replace(/^\+91/, "") : ""
-                        }
-                        onChange={(e) => {
-                          // Only allow 10 digits
-                          const val = e.target.value
-                            .replace(/\D/g, "")
-                            .slice(0, 10);
-                          field.onChange(val);
-                        }}
-                        className="h-9 text-sm flex-1 border border-input rounded-r-md px-3 bg-input text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        style={{ borderLeft: 0 }}
-                        maxLength={10}
-                        pattern="\d{10}"
-                        inputMode="numeric"
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabelDot color="bg-indigo-500">Email</FormLabelDot>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="Enter email address"
+                        {...field}
+                        className={fieldInputClass}
                       />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Changes"}
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabelDot color="bg-emerald-500">Role</FormLabelDot>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={loggedInUserRole !== "admin"}
+                    >
+                      <FormControl>
+                        <SelectTrigger className={fieldInputClass}>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent position="popper" className="z-[70]">
+                        {roles.map((role) => (
+                          <SelectItem key={role.id} value={role.role_name.toLowerCase()}>
+                            {role.role_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabelDot color="bg-orange-500">Phone</FormLabelDot>
+                    <FormControl>
+                      <PhoneInput value={field.value} onChange={field.onChange} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <DialogFooter className="border-t border-gray-200/50 dark:border-gray-700/50 px-6 py-4 gap-2 sm:gap-3 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={isSubmitting}
+                className="h-11 px-6 border-gray-200 dark:border-gray-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="h-11 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
               </Button>
             </DialogFooter>
           </form>

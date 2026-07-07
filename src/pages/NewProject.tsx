@@ -35,20 +35,20 @@ const NewProject = () => {
     enabled: currentUser?.role === 'admin',
   });
 
-  const { data: unassignedBugDocs = [] } = useQuery({
-    queryKey: ['project-form-unassigned-bugdocs'],
+  const { data: allBugDocs = [] } = useQuery({
+    queryKey: ['project-form-all-bugdocs'],
     queryFn: async () => {
-      const docs = await googleDocsService.listGeneralDocuments(false);
-      return docs.filter((doc) => !doc.project_id || doc.project_id.trim() === '');
+      const result = await googleDocsService.getAllDocuments(false);
+      return result.documents.flatMap((group) => group.documents);
     },
     enabled: currentUser?.role === 'admin',
   });
 
-  const { data: unassignedBugSheets = [] } = useQuery({
-    queryKey: ['project-form-unassigned-bugsheets'],
+  const { data: allBugSheets = [] } = useQuery({
+    queryKey: ['project-form-all-bugsheets'],
     queryFn: async () => {
-      const sheets = await googleSheetsService.listGeneralSheets(false);
-      return sheets.filter((sheet) => !sheet.project_id || sheet.project_id.trim() === '');
+      const result = await googleSheetsService.getAllSheets(false);
+      return result.sheets.flatMap((group) => group.sheets);
     },
     enabled: currentUser?.role === 'admin',
   });
@@ -75,7 +75,7 @@ const NewProject = () => {
       }
 
       if (selectedBugDocIds.length > 0) {
-        const docsToLink = unassignedBugDocs.filter((doc) => selectedBugDocIds.includes(doc.id));
+        const docsToLink = allBugDocs.filter((doc) => selectedBugDocIds.includes(doc.id));
         await Promise.all(
           docsToLink.map((doc) =>
             googleDocsService.updateDocument(
@@ -90,7 +90,7 @@ const NewProject = () => {
       }
 
       if (selectedBugSheetIds.length > 0) {
-        const sheetsToLink = unassignedBugSheets.filter((sheet) => selectedBugSheetIds.includes(sheet.id));
+        const sheetsToLink = allBugSheets.filter((sheet) => selectedBugSheetIds.includes(sheet.id));
         await Promise.all(
           sheetsToLink.map((sheet) =>
             googleSheetsService.updateSheet(
@@ -173,17 +173,21 @@ const NewProject = () => {
           users={users}
           attachmentFiles={attachmentFiles}
           onAttachmentFilesChange={setAttachmentFiles}
-          availableBugDocs={unassignedBugDocs.map((doc) => ({
+          availableBugDocs={allBugDocs.map((doc) => ({
             id: doc.id,
             title: doc.doc_title,
             creatorName: doc.creator_name || null,
+            projectId: doc.project_id,
+            projectName: doc.project_name,
           }))}
           selectedBugDocIds={selectedBugDocIds}
           onSelectedBugDocIdsChange={setSelectedBugDocIds}
-          availableBugSheets={unassignedBugSheets.map((sheet) => ({
+          availableBugSheets={allBugSheets.map((sheet) => ({
             id: sheet.id,
             title: sheet.sheet_title,
             creatorName: sheet.creator_name || null,
+            projectId: sheet.project_id,
+            projectName: sheet.project_name,
           }))}
           selectedBugSheetIds={selectedBugSheetIds}
           onSelectedBugSheetIdsChange={setSelectedBugSheetIds}

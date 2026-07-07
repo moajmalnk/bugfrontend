@@ -68,10 +68,7 @@ import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { ScreenshotDropZone } from "@/components/attachments/ScreenshotDropZone";
 
 // Character limits
-const TITLE_MAX = 120;
-const DESCRIPTION_MAX = 2000;
-const EXPECTED_RESULT_MAX = 1000;
-const ACTUAL_RESULT_MAX = 1000;
+const TITLE_MAX = 255;
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -104,16 +101,13 @@ const formSchema = z.object({
     .max(TITLE_MAX, `Title must be at most ${TITLE_MAX} characters`),
   description: z
     .string()
-    .min(2, "Description must be at least 2 characters")
-    .max(DESCRIPTION_MAX, `Description must be at most ${DESCRIPTION_MAX} characters`),
+    .min(2, "Description must be at least 2 characters"),
   expected_result: z
     .string()
-    .max(EXPECTED_RESULT_MAX, `Expected result must be at most ${EXPECTED_RESULT_MAX} characters`)
     .optional()
     .or(z.literal("")),
   actual_result: z
     .string()
-    .max(ACTUAL_RESULT_MAX, `Actual result must be at most ${ACTUAL_RESULT_MAX} characters`)
     .optional()
     .or(z.literal("")),
   priority: z.enum(["low", "medium", "high"] as const),
@@ -649,13 +643,11 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                     Description
                   </FormLabel>
                   <FormControl>
-                    <Textarea rows={5} {...field} maxLength={DESCRIPTION_MAX} className="min-h-[150px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800" />
+                    <Textarea rows={5} {...field} className="min-h-[150px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800" />
                   </FormControl>
                   <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span>Describe the bug in detail</span>
-                    <span className={field.value.length > DESCRIPTION_MAX * 0.9 ? 'text-blue-600 font-semibold' : ''}>
-                      {field.value.length}/{DESCRIPTION_MAX}
-                    </span>
+                    <span>Unlimited length — paste full logs or queries</span>
+                    <span className="font-semibold">{field.value.length} characters</span>
                   </div>
                   <FormMessage />
                 </FormItem>
@@ -675,7 +667,6 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                   </FormLabel>
                   <FormControl>
                     <Textarea
-                      maxLength={EXPECTED_RESULT_MAX}
                       placeholder="What should have happened? Describe the expected behavior..."
                       className="min-h-[100px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                       {...field}
@@ -683,9 +674,7 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                   </FormControl>
                   <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                     <span className="font-medium">Describe what you expected to happen</span>
-                    <span className={`font-semibold ${(field.value?.length || 0) > EXPECTED_RESULT_MAX * 0.9 ? "text-green-600" : ""}`}>
-                      {field.value?.length || 0}/{EXPECTED_RESULT_MAX}
-                    </span>
+                    <span className="font-semibold">{field.value?.length || 0} characters</span>
                   </div>
                   <FormMessage />
                 </FormItem>
@@ -705,7 +694,6 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                   </FormLabel>
                   <FormControl>
                     <Textarea
-                      maxLength={ACTUAL_RESULT_MAX}
                       placeholder="What actually happened? Describe the actual behavior..."
                       className="min-h-[100px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                       {...field}
@@ -713,9 +701,7 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                   </FormControl>
                   <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                     <span className="font-medium">Describe what actually happened instead</span>
-                    <span className={`font-semibold ${(field.value?.length || 0) > ACTUAL_RESULT_MAX * 0.9 ? "text-red-600" : ""}`}>
-                      {field.value?.length || 0}/{ACTUAL_RESULT_MAX}
-                    </span>
+                    <span className="font-semibold">{field.value?.length || 0} characters</span>
                   </div>
                   <FormMessage />
                 </FormItem>

@@ -1,4 +1,7 @@
+import { isClosedProjectStatus, isCompliancePipelineSatisfied, getPipelineStageLabel } from '@/lib/codo/complianceRules';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/use-toast';
+import { useAuth } from '@/context/AuthContext';
 import {
   Card,
   CardContent,
@@ -21,14 +24,15 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ENV } from '@/lib/env';
-import { cn } from '@/lib/utils';
+import { buildDocumentPreviewPagePath } from '@/lib/attachmentUtils';
+import { cn, getEffectiveRole } from '@/lib/utils';
 import {
   computeProjectDurationDays,
   formatProjectDate,
   getProjectStatusLabel,
   Project,
   ProjectAttachment,
+  ProjectComplianceSummaryLite,
   ProjectFormValues,
 } from '@/lib/utils/projectUtils';
 import { User } from '@/types';
@@ -45,11 +49,13 @@ import {
   Layers,
   Paperclip,
   Plus,
+  ShieldCheck,
   UserCircle,
   Users,
   X,
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, ReactNode, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -68,13 +74,27 @@ interface ProjectFormProps {
   createdByName?: string;
   attachmentFiles: FileWithPreview[];
   onAttachmentFilesChange: (files: FileWithPreview[]) => void;
-  availableBugDocs?: Array<{ id: number; title: string; creatorName?: string | null }>;
+  availableBugDocs?: Array<{
+    id: number;
+    title: string;
+    creatorName?: string | null;
+    projectId?: string | null;
+    projectName?: string | null;
+  }>;
   selectedBugDocIds?: number[];
   onSelectedBugDocIdsChange?: (ids: number[]) => void;
-  availableBugSheets?: Array<{ id: number; title: string; creatorName?: string | null }>;
+  availableBugSheets?: Array<{
+    id: number;
+    title: string;
+    creatorName?: string | null;
+    projectId?: string | null;
+    projectName?: string | null;
+  }>;
   selectedBugSheetIds?: number[];
   onSelectedBugSheetIdsChange?: (ids: number[]) => void;
+  currentProjectId?: string;
   error?: string | null;
+  complianceSummary?: ProjectComplianceSummaryLite | null;
 }
 
 const NAME_MAX = 100;
@@ -346,12 +366,32 @@ export function ProjectForm({
   availableBugSheets = [],
   selectedBugSheetIds = [],
   onSelectedBugSheetIdsChange,
+  currentProjectId,
   error,
+  complianceSummary,
 }: ProjectFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [techInput, setTechInput] = useState('');
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const effectiveRole = getEffectiveRole(currentUser || {});
 
   const setField = <K extends keyof ProjectFormValues>(key: K, value: ProjectFormValues[K]) => {
+    if (
+      key === 'status' &&
+      typeof value === 'string' &&
+      isClosedProjectStatus(value) &&
+      mode === 'edit' &&
+      !isCompliancePipelineSatisfied(complianceSummary)
+    ) {
+      toast({
+        title: 'Compliance required',
+        description:
+          'Complete the CODO Developer and QA checklists (or authorize emergency bypass) before changing to a closed status.',
+        variant: 'destructive',
+      });
+      return;
+    }
     onChange({ ...values, [key]: value });
   };
 
@@ -414,6 +454,25 @@ export function ProjectForm({
 
   const adminsAndDevs = users.filter((u) => ['admin', 'developer'].includes(u.role));
 
+  const showDocLinking =
+    onSelectedBugDocIdsChange !== undefined || onSelectedBugSheetIdsChange !== undefined;
+
+  const formatDocOptionLabel = (item: {
+    title: string;
+    creatorName?: string | null;
+    projectId?: string | null;
+    projectName?: string | null;
+  }) => {
+    const creator = item.creatorName ? ` · ${item.creatorName}` : '';
+    if (!item.projectId || item.projectId.trim() === '') {
+      return `${item.title}${creator} · Unassigned`;
+    }
+    if (currentProjectId && String(item.projectId) === String(currentProjectId)) {
+      return `${item.title}${creator} · This project`;
+    }
+    return `${item.title}${creator} · ${item.projectName || 'Other project'}`;
+  };
+
   return (
     <div className="relative">
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl" />
@@ -470,7 +529,7 @@ export function ProjectForm({
 
               <SectionBlock
                 title="Project Details"
-                description="Name, description, and status"
+                description="Name, description, status, and compliance"
                 icon={FolderKanban}
                 iconClass="bg-gradient-to-br from-blue-500 to-indigo-600"
               >
@@ -521,23 +580,83 @@ export function ProjectForm({
                   </div>
                 </div>
 
-                <div className="space-y-3 max-w-sm">
-                  <FieldLabel htmlFor="status" dotClass="from-violet-500 to-purple-600">
-                    Status
-                  </FieldLabel>
-                  <SearchableSelect
-                    id="status"
-                    value={values.status}
-                    onValueChange={(v) => setField('status', v as ProjectFormValues['status'])}
-                    placeholder="Select status"
-                    searchPlaceholder="Search status..."
-                    options={[
-                      { value: 'active', label: 'Ongoing' },
-                      { value: 'completed', label: 'Completed' },
-                      { value: 'archived', label: 'Archived' },
-                    ]}
-                    triggerClassName="focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500"
-                  />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-3">
+                    <FieldLabel htmlFor="status" dotClass="from-violet-500 to-purple-600">
+                      Status
+                    </FieldLabel>
+                    <SearchableSelect
+                      id="status"
+                      value={values.status}
+                      onValueChange={(v) => setField('status', v as ProjectFormValues['status'])}
+                      placeholder="Select status"
+                      searchPlaceholder="Search status..."
+                      options={[
+                        { value: 'active', label: 'Ongoing' },
+                        { value: 'completed', label: 'Completed' },
+                        { value: 'release_ready', label: 'Release Ready' },
+                        { value: 'archived', label: 'Archived' },
+                      ]}
+                      triggerClassName="focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500"
+                    />
+                  </div>
+
+                  {mode === 'edit' && complianceSummary && (
+                    <div className="space-y-3">
+                      <FieldLabel dotClass="from-indigo-500 to-violet-600">
+                        Compliance Pipeline
+                      </FieldLabel>
+                      <div className="rounded-xl border border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 p-4 shadow-sm space-y-3 min-h-[3rem]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="p-1.5 bg-indigo-500 rounded-lg shrink-0">
+                              <ShieldCheck className="h-4 w-4 text-white" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                {getPipelineStageLabel(
+                                  complianceSummary.pipeline_stage as Parameters<
+                                    typeof getPipelineStageLabel
+                                  >[0]
+                                )}
+                              </p>
+                              {complianceSummary.emergency_bypass && (
+                                <Badge
+                                  variant="outline"
+                                  className="mt-1 border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                                >
+                                  Emergency bypass
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          {currentProjectId && (
+                            <Button
+                              asChild
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0 rounded-lg h-9"
+                            >
+                              <Link to={`/${effectiveRole}/projects/${currentProjectId}/compliance`}>
+                                Open
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                          <span className="rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1">
+                            Dev {complianceSummary.developer_verified}/{complianceSummary.developer_total}
+                          </span>
+                          <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-1">
+                            QA {complianceSummary.tester_verified}/{complianceSummary.tester_total}
+                          </span>
+                          <span className="rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-1">
+                            Project {complianceSummary.project_verified}/{complianceSummary.project_total}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </SectionBlock>
 
@@ -755,17 +874,17 @@ export function ProjectForm({
                 </div>
               </SectionBlock>
 
-              {(availableBugDocs.length > 0 || availableBugSheets.length > 0) && (
+              {showDocLinking && (
                 <SectionBlock
                   title="Connect Existing Docs"
-                  description="Link existing BugDocs and BugSheets to this project"
+                  description="Link any BugDocs and BugSheets to this project"
                   icon={FileText}
                   iconClass="bg-gradient-to-br from-fuchsia-500 to-purple-600"
                 >
-                  {availableBugDocs.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-3">
                       <FieldLabel dotClass="from-fuchsia-500 to-purple-600">
-                        Existing BugDocs
+                        BugDocs ({availableBugDocs.length})
                       </FieldLabel>
                       <div className="flex flex-wrap gap-2 min-h-[2.75rem] p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
                         {selectedBugDocIds.length === 0 && (
@@ -777,12 +896,12 @@ export function ProjectForm({
                           const doc = availableBugDocs.find((item) => item.id === id);
                           if (!doc) return null;
                           return (
-                            <Badge key={id} variant="secondary" className="gap-1 pr-1 text-sm">
-                              {doc.title}
+                            <Badge key={id} variant="secondary" className="gap-1 pr-1 text-sm max-w-full">
+                              <span className="truncate">{doc.title}</span>
                               <button
                                 type="button"
                                 onClick={() => toggleExistingDoc(id)}
-                                className="ml-1 rounded-full hover:bg-muted p-0.5"
+                                className="ml-1 rounded-full hover:bg-muted p-0.5 shrink-0"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -793,27 +912,23 @@ export function ProjectForm({
                       <SearchableSelect
                         value=""
                         onValueChange={(v) => toggleExistingDoc(Number(v))}
-                        placeholder="Add existing BugDoc..."
-                        searchPlaceholder="Search BugDocs..."
-                        emptyMessage="No BugDocs available."
+                        placeholder="Add BugDoc..."
+                        searchPlaceholder="Search all BugDocs..."
+                        emptyMessage="No BugDocs found."
                         options={availableBugDocs
                           .filter((doc) => !selectedBugDocIds.includes(doc.id))
                           .map((doc) => ({
                             value: String(doc.id),
-                            label: doc.creatorName
-                              ? `${doc.title} (${doc.creatorName})`
-                              : doc.title,
-                            searchValue: `${doc.title} ${doc.creatorName || ''} ${doc.id}`,
+                            label: formatDocOptionLabel(doc),
+                            searchValue: `${doc.title} ${doc.creatorName || ''} ${doc.projectName || ''} ${doc.id}`,
                           }))}
                         triggerClassName="focus:ring-2 focus:ring-fuchsia-500/50"
                       />
                     </div>
-                  )}
 
-                  {availableBugSheets.length > 0 && (
                     <div className="space-y-3">
                       <FieldLabel dotClass="from-indigo-500 to-violet-600">
-                        Existing BugSheets
+                        BugSheets ({availableBugSheets.length})
                       </FieldLabel>
                       <div className="flex flex-wrap gap-2 min-h-[2.75rem] p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
                         {selectedBugSheetIds.length === 0 && (
@@ -825,12 +940,12 @@ export function ProjectForm({
                           const sheet = availableBugSheets.find((item) => item.id === id);
                           if (!sheet) return null;
                           return (
-                            <Badge key={id} variant="secondary" className="gap-1 pr-1 text-sm">
-                              {sheet.title}
+                            <Badge key={id} variant="secondary" className="gap-1 pr-1 text-sm max-w-full">
+                              <span className="truncate">{sheet.title}</span>
                               <button
                                 type="button"
                                 onClick={() => toggleExistingSheet(id)}
-                                className="ml-1 rounded-full hover:bg-muted p-0.5"
+                                className="ml-1 rounded-full hover:bg-muted p-0.5 shrink-0"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -841,22 +956,20 @@ export function ProjectForm({
                       <SearchableSelect
                         value=""
                         onValueChange={(v) => toggleExistingSheet(Number(v))}
-                        placeholder="Add existing BugSheet..."
-                        searchPlaceholder="Search BugSheets..."
-                        emptyMessage="No BugSheets available."
+                        placeholder="Add BugSheet..."
+                        searchPlaceholder="Search all BugSheets..."
+                        emptyMessage="No BugSheets found."
                         options={availableBugSheets
                           .filter((sheet) => !selectedBugSheetIds.includes(sheet.id))
                           .map((sheet) => ({
                             value: String(sheet.id),
-                            label: sheet.creatorName
-                              ? `${sheet.title} (${sheet.creatorName})`
-                              : sheet.title,
-                            searchValue: `${sheet.title} ${sheet.creatorName || ''} ${sheet.id}`,
+                            label: formatDocOptionLabel(sheet),
+                            searchValue: `${sheet.title} ${sheet.creatorName || ''} ${sheet.projectName || ''} ${sheet.id}`,
                           }))}
                         triggerClassName="focus:ring-2 focus:ring-indigo-500/50"
                       />
                     </div>
-                  )}
+                  </div>
                 </SectionBlock>
               )}
 
@@ -867,16 +980,25 @@ export function ProjectForm({
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Existing attachments</p>
                       {existingAttachments.map((att) => (
-                        <a
+                        <button
                           key={att.id}
-                          href={`${ENV.API_URL.replace('/api', '')}/${att.file_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md text-sm transition-all"
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              buildDocumentPreviewPagePath(effectiveRole, {
+                                filePath: att.file_path,
+                                fileName: att.file_name,
+                                returnTo: currentProjectId
+                                  ? `/${effectiveRole}/projects/${currentProjectId}/edit`
+                                  : `/${effectiveRole}/projects`,
+                              })
+                            )
+                          }
+                          className="flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-sm transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
                         >
                           <File className="h-4 w-4 shrink-0 text-indigo-500" />
                           <span className="truncate font-medium">{att.file_name}</span>
-                        </a>
+                        </button>
                       ))}
                     </div>
                   )}

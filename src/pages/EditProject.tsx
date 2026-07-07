@@ -4,6 +4,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { ENV } from '@/lib/env';
+import { googleDocsService } from '@/services/googleDocsService';
+import { googleSheetsService } from '@/services/googleSheetsService';
+import { complianceService } from '@/services/complianceService';
 import {
   formValuesToPayload,
   projectService,
@@ -12,7 +15,7 @@ import {
 import { userService } from '@/services/userService';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, FolderKanban, Pencil } from 'lucide-react';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 interface FileWithPreview extends File {
@@ -33,13 +36,35 @@ const EditProject = () => {
     updated_at: '',
   }));
   const [attachmentFiles, setAttachmentFiles] = useState<FileWithPreview[]>([]);
+  const [selectedBugDocIds, setSelectedBugDocIds] = useState<number[]>([]);
+  const [selectedBugSheetIds, setSelectedBugSheetIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdByName, setCreatedByName] = useState('');
+  const docsSelectionInitialized = useRef(false);
+  const sheetsSelectionInitialized = useRef(false);
 
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => projectService.getProject(projectId!),
+    enabled: !!projectId,
+  });
+
+  const { data: complianceSummary } = useQuery({
+    queryKey: ['project-compliance', projectId],
+    queryFn: async () => {
+      const data = await complianceService.getCompliance(projectId!);
+      return {
+        pipeline_stage: data.pipeline_stage,
+        developer_verified: data.developer_progress.verified,
+        developer_total: data.developer_progress.total,
+        tester_verified: data.tester_progress.verified,
+        tester_total: data.tester_progress.total,
+        project_verified: data.project_progress?.verified ?? 0,
+        project_total: data.project_progress?.total ?? 0,
+        emergency_bypass: data.emergency_bypass,
+      };
+    },
     enabled: !!projectId,
   });
 
@@ -54,6 +79,44 @@ const EditProject = () => {
     queryFn: () => projectService.getAttachments(projectId!),
     enabled: !!projectId,
   });
+
+  const { data: allBugDocs = [], isFetched: bugDocsFetched } = useQuery({
+    queryKey: ['project-form-all-bugdocs'],
+    queryFn: async () => {
+      const result = await googleDocsService.getAllDocuments(false);
+      return result.documents.flatMap((group) => group.documents);
+    },
+    enabled: currentUser?.role === 'admin',
+  });
+
+  const { data: allBugSheets = [], isFetched: bugSheetsFetched } = useQuery({
+    queryKey: ['project-form-all-bugsheets'],
+    queryFn: async () => {
+      const result = await googleSheetsService.getAllSheets(false);
+      return result.sheets.flatMap((group) => group.sheets);
+    },
+    enabled: currentUser?.role === 'admin',
+  });
+
+  useEffect(() => {
+    if (!projectId || docsSelectionInitialized.current || !bugDocsFetched) return;
+    setSelectedBugDocIds(
+      allBugDocs
+        .filter((doc) => String(doc.project_id) === String(projectId))
+        .map((doc) => doc.id)
+    );
+    docsSelectionInitialized.current = true;
+  }, [projectId, allBugDocs, bugDocsFetched]);
+
+  useEffect(() => {
+    if (!projectId || sheetsSelectionInitialized.current || !bugSheetsFetched) return;
+    setSelectedBugSheetIds(
+      allBugSheets
+        .filter((sheet) => String(sheet.project_id) === String(projectId))
+        .map((sheet) => sheet.id)
+    );
+    sheetsSelectionInitialized.current = true;
+  }, [projectId, allBugSheets, bugSheetsFetched]);
 
   useEffect(() => {
     if (project) {
@@ -119,6 +182,68 @@ const EditProject = () => {
       if (attachmentFiles.length > 0) {
         await projectService.uploadAttachments(projectId!, attachmentFiles);
       }
+
+      const previouslyLinkedDocIds = allBugDocs
+        .filter((doc) => String(doc.project_id) === String(projectId))
+        .map((doc) => doc.id);
+      const docsToLink = selectedBugDocIds.filter((id) => !previouslyLinkedDocIds.includes(id));
+      const docsToUnlink = previouslyLinkedDocIds.filter((id) => !selectedBugDocIds.includes(id));
+
+      await Promise.all([
+        ...docsToLink.map((id) => {
+          const doc = allBugDocs.find((item) => item.id === id);
+          if (!doc) return Promise.resolve();
+          return googleDocsService.updateDocument(
+            doc.id,
+            doc.doc_title,
+            projectId!,
+            null,
+            doc.role || 'all'
+          );
+        }),
+        ...docsToUnlink.map((id) => {
+          const doc = allBugDocs.find((item) => item.id === id);
+          if (!doc) return Promise.resolve();
+          return googleDocsService.updateDocument(
+            doc.id,
+            doc.doc_title,
+            null,
+            null,
+            doc.role || 'all'
+          );
+        }),
+      ]);
+
+      const previouslyLinkedSheetIds = allBugSheets
+        .filter((sheet) => String(sheet.project_id) === String(projectId))
+        .map((sheet) => sheet.id);
+      const sheetsToLink = selectedBugSheetIds.filter((id) => !previouslyLinkedSheetIds.includes(id));
+      const sheetsToUnlink = previouslyLinkedSheetIds.filter((id) => !selectedBugSheetIds.includes(id));
+
+      await Promise.all([
+        ...sheetsToLink.map((id) => {
+          const sheet = allBugSheets.find((item) => item.id === id);
+          if (!sheet) return Promise.resolve();
+          return googleSheetsService.updateSheet(
+            sheet.id,
+            sheet.sheet_title,
+            projectId!,
+            null,
+            sheet.role || 'all'
+          );
+        }),
+        ...sheetsToUnlink.map((id) => {
+          const sheet = allBugSheets.find((item) => item.id === id);
+          if (!sheet) return Promise.resolve();
+          return googleSheetsService.updateSheet(
+            sheet.id,
+            sheet.sheet_title,
+            null,
+            null,
+            sheet.role || 'all'
+          );
+        }),
+      ]);
 
       toast({
         title: 'Success',
@@ -199,7 +324,27 @@ const EditProject = () => {
           createdByName={createdByName}
           attachmentFiles={attachmentFiles}
           onAttachmentFilesChange={setAttachmentFiles}
+          currentProjectId={projectId}
+          availableBugDocs={allBugDocs.map((doc) => ({
+            id: doc.id,
+            title: doc.doc_title,
+            creatorName: doc.creator_name || null,
+            projectId: doc.project_id,
+            projectName: doc.project_name,
+          }))}
+          selectedBugDocIds={selectedBugDocIds}
+          onSelectedBugDocIdsChange={setSelectedBugDocIds}
+          availableBugSheets={allBugSheets.map((sheet) => ({
+            id: sheet.id,
+            title: sheet.sheet_title,
+            creatorName: sheet.creator_name || null,
+            projectId: sheet.project_id,
+            projectName: sheet.project_name,
+          }))}
+          selectedBugSheetIds={selectedBugSheetIds}
+          onSelectedBugSheetIdsChange={setSelectedBugSheetIds}
           error={error}
+          complianceSummary={complianceSummary ?? project?.compliance ?? null}
         />
       </section>
     </main>

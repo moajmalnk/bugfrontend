@@ -148,7 +148,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "Common Bugs",
     path: "/common-bugs",
     keywords: ["common bugs", "duplicate", "already raised", "recurring"],
-    adminOnly: true,
+    roles: ["admin", "developer"],
   },
   {
     id: "page-activity",
@@ -179,9 +179,10 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
   },
   {
     id: "page-daily-work",
-    label: "Daily Work Update",
-    path: "/daily-work-update",
-    keywords: ["daily work", "work update", "hours"],
+    label: "Work Update",
+    path: "/daily-update",
+    keywords: ["daily work", "work update", "hours", "check in", "checkout"],
+    excludeRoles: ["tester"],
   },
   {
     id: "page-notifications",
@@ -194,6 +195,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "Reports",
     path: "/reports",
     keywords: ["reports", "analytics"],
+    excludeRoles: ["tester"],
   },
 ];
 

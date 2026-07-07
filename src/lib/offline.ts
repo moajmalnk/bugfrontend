@@ -2,6 +2,7 @@ import { toast } from '@/components/ui/use-toast';
 
 // Keep track of online status
 let isOnline = navigator.onLine;
+let hasInitialized = false;
 
 // Function to check if app is online
 export const isAppOnline = () => isOnline;
@@ -12,13 +13,15 @@ export const initOfflineDetector = () => {
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
   
-  // Initial check
-  handleStatusChange();
+  // Initial check — sync state without showing a toast on first load
+  isOnline = navigator.onLine;
+  hasInitialized = true;
   
   return () => {
     // Clean up event listeners
     window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
+    hasInitialized = false;
   };
 };
 
@@ -36,6 +39,8 @@ function handleOffline() {
 
 // Handle status changes
 function handleStatusChange() {
+  if (!hasInitialized) return;
+
   if (isOnline) {
     toast({
       title: "You are online",

@@ -18,6 +18,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -66,6 +70,7 @@ import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import { ENV } from "@/lib/env";
 import { canReportBug } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import {
   Project,
@@ -1865,6 +1870,30 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
             </div>
             
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              {(currentUser?.role === "admin" || currentUser?.role === "developer") && projectId && (
+                <Button
+                  asChild
+                  variant="default"
+                  size="lg"
+                  className="h-12 px-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  <Link
+                    to={
+                      currentUser?.role
+                        ? `/${currentUser.role}/projects/${projectId}?tab=bugs`
+                        : `/projects/${projectId}?tab=bugs`
+                    }
+                    state={{
+                      from: currentUser?.role
+                        ? `/${currentUser.role}/projects/${projectId}?tab=fixes`
+                        : `/projects/${projectId}?tab=fixes`,
+                    }}
+                  >
+                    <Plus className="mr-2 h-5 w-5" />
+                    Fix Bug
+                  </Link>
+                </Button>
+              )}
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800 rounded-xl shadow-sm">
                   <div className="p-1.5 bg-green-500 rounded-lg">
@@ -2939,6 +2968,30 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
             </div>
             
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              {projectId && (
+                <Button
+                  asChild
+                  variant="default"
+                  size="lg"
+                  className="h-12 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  <Link
+                    to={
+                      currentUser?.role
+                        ? `/${currentUser.role}/new-update?projectId=${projectId}`
+                        : `/new-update?projectId=${projectId}`
+                    }
+                    state={{
+                      from: currentUser?.role
+                        ? `/${currentUser.role}/projects/${projectId}`
+                        : `/projects/${projectId}`,
+                    }}
+                  >
+                    <Plus className="mr-2 h-5 w-5" />
+                    New Update
+                  </Link>
+                </Button>
+              )}
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
                   <div className="p-1.5 bg-blue-500 rounded-lg">
@@ -3908,6 +3961,9 @@ const ProjectDetails = () => {
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
   const [taskStatusFilter, setTaskStatusFilter] = useState<string>("all");
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
+  const [sharedModalOpen, setSharedModalOpen] = useState(false);
+  const [taskAssigneeIds, setTaskAssigneeIds] = useState<string[]>([]);
+  const [submittingTask, setSubmittingTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<SharedTask | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<'details' | 'members'>('details');
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
@@ -4420,6 +4476,74 @@ const ProjectDetails = () => {
     [allDisplayMembers, memberStats]
   );
 
+  const projectTeamMembers = useMemo(() => {
+    const combined = [...admins, ...members];
+    const seen = new Set<string>();
+    return combined.filter((member) => {
+      if (seen.has(member.id)) return false;
+      seen.add(member.id);
+      return true;
+    });
+  }, [admins, members]);
+
+  const openCreateShared = () => {
+    setEditingShared({
+      title: "",
+      status: "pending",
+      priority: "medium",
+      created_by: currentUser?.id || "",
+      assigned_to: "",
+      project_ids: projectId ? [projectId] : [],
+    });
+    setTaskAssigneeIds([]);
+    setSharedModalOpen(true);
+  };
+
+  const onSaveShared = async () => {
+    if (!editingShared?.title?.trim() || taskAssigneeIds.length === 0 || !projectId) {
+      toast({
+        title: "Error",
+        description: "Title and at least one assignee are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSubmittingTask(true);
+      const selectedUserObjects = projectTeamMembers.filter((user) =>
+        taskAssigneeIds.includes(user.id)
+      );
+      const taskData = {
+        ...editingShared,
+        project_ids: [projectId],
+        assigned_to: taskAssigneeIds[0],
+        assigned_to_ids: taskAssigneeIds,
+        assigned_to_names: selectedUserObjects.map((user) => user.username),
+      };
+
+      await sharedTaskService.createSharedTask(taskData);
+      toast({ title: "Task created" });
+      setSharedModalOpen(false);
+      setTaskAssigneeIds([]);
+      await fetchProjectSharedTasks();
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: e?.message || "Failed to create task",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingTask(false);
+    }
+  };
+
+  const toggleTaskAssignee = (userId: string) => {
+    setTaskAssigneeIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
   // Task filtering helper function
   const getFilteredTasks = () => {
     return sharedTasks.filter((task) => {
@@ -4646,7 +4770,7 @@ const ProjectDetails = () => {
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-1 sm:p-2">
             {projectTabs.length > 2 ? (
               <>
-                <div className="md:hidden p-1">
+                <div className="lg:hidden p-1">
                   <Button
                     type="button"
                     variant="outline"
@@ -4661,7 +4785,7 @@ const ProjectDetails = () => {
                   </Button>
                 </div>
 
-                <TabsList className="hidden md:flex w-full gap-1 sm:gap-2 md:gap-3 p-1 bg-transparent">
+                <TabsList className="hidden lg:flex w-full gap-1 sm:gap-2 md:gap-3 p-1 bg-transparent">
                   {projectTabs.map((tab) => (
                     <TabsTrigger
                       key={tab.value}
@@ -4703,7 +4827,7 @@ const ProjectDetails = () => {
 
         {projectTabs.length > 2 && (
           <Drawer open={isMobileTabSelectorOpen} onOpenChange={setIsMobileTabSelectorOpen}>
-            <DrawerContent className="md:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+            <DrawerContent className="lg:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
               <DrawerHeader className="text-left pb-2">
                 <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">Select Section</DrawerTitle>
                 <DrawerDescription>Navigate to different project areas</DrawerDescription>
@@ -4767,40 +4891,41 @@ const ProjectDetails = () => {
         )}
 
         <TabsContent value="overview">
-          <div className="space-y-6 sm:space-y-8">
-            {/* Professional Overview Header */}
+          <div className="space-y-4 sm:space-y-6">
             <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
               <div className="relative p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                        <Code className="h-6 w-6 text-white" />
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600 shadow-lg">
+                        <Code className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                       </div>
-                      <div>
-                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
+                      <div className="min-w-0">
+                        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 dark:text-white truncate">
                           Project Overview
                         </h2>
-                        <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-1"></div>
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                          {project.name}
+                        </p>
                       </div>
                     </div>
-                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
-                      Comprehensive project statistics and recent activity
-                    </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-gradient-to-r from-blue-500 to-emerald-600 rounded-xl p-3 shadow-lg">
-                      <Code className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                        {bugs.length + sharedTasks.length + updates.length}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full lg:w-auto lg:min-w-[420px]">
+                    {[
+                      { label: 'Bugs', value: bugs.length, tone: 'text-red-600 dark:text-red-400' },
+                      { label: 'Tasks', value: sharedTasks.length, tone: 'text-orange-600 dark:text-orange-400' },
+                      { label: 'Updates', value: updates.length, tone: 'text-indigo-600 dark:text-indigo-400' },
+                      { label: 'Members', value: members.length, tone: 'text-emerald-600 dark:text-emerald-400' },
+                    ].map((stat) => (
+                      <div
+                        key={stat.label}
+                        className="rounded-xl border border-gray-200/70 bg-white/70 px-3 py-2 text-center dark:border-gray-700/70 dark:bg-gray-800/50"
+                      >
+                        <p className={cn('text-lg sm:text-xl font-bold', stat.tone)}>{stat.value}</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">{stat.label}</p>
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        Total Items
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -4808,211 +4933,84 @@ const ProjectDetails = () => {
 
             <ProjectInfoOverview project={project} createdByName={projectOwner?.username} />
 
-            {/* Enhanced Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              {/* Bugs Stats */}
-              <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-50/40 via-transparent to-pink-50/40 dark:from-red-950/15 dark:via-transparent dark:to-pink-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30" />
                 <div className="relative p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-lg flex items-center justify-center shadow-lg">
-                      <Bug className="h-5 w-5 text-white" />
-                </div>
-                    <Badge variant="outline" className="text-xs font-medium border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-                      Bugs
-                    </Badge>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Clock className="h-4 w-4 text-indigo-500" />
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+                      Recent Activity
+                    </h3>
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                      {bugs.length}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Total Bugs
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-yellow-600 dark:text-yellow-400">
-                        {bugs.filter(bug => bug.status === "pending" || bug.status === "in_progress").length} Open
-                      </span>
-                      <span className="text-gray-400">•</span>
-                      <span className="text-green-600 dark:text-green-400">
-                        {bugs.filter(bug => bug.status === "fixed").length} Fixed
-                      </span>
-                    </div>
-                  </div>
+                  <ActivityList
+                    projectId={projectId}
+                    limit={6}
+                    showPagination={false}
+                    autoRefresh={true}
+                    refreshInterval={30000}
+                  />
                 </div>
               </div>
 
-              {/* Tasks Stats */}
-              <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-yellow-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-yellow-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-lg flex items-center justify-center shadow-lg">
-                      <ListChecks className="h-5 w-5 text-white" />
-                </div>
-                    <Badge variant="outline" className="text-xs font-medium border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300">
-                      Tasks
-                    </Badge>
+              <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/30 to-emerald-50/20 dark:from-blue-950/20 dark:to-emerald-950/10" />
+                <div className="relative p-4 sm:p-6 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Plus className="h-4 w-4 text-blue-500" />
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+                      Quick Actions
+                    </h3>
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                      {sharedTasks.length}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Total Tasks
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-blue-600 dark:text-blue-400">
-                        {sharedTasks.filter(task => task.status === "in_progress").length} In Progress
-                      </span>
-                      <span className="text-gray-400">•</span>
-                      <span className="text-green-600 dark:text-green-400">
-                        {sharedTasks.filter(task => task.status === "completed").length} Completed
-                      </span>
-                    </div>
-                  </div>
-                </div>
-          </div>
-
-              {/* Updates Stats */}
-              <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-50/40 via-transparent to-purple-50/40 dark:from-indigo-950/15 dark:via-transparent dark:to-purple-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
-                      <Bell className="h-5 w-5 text-white" />
-          </div>
-                    <Badge variant="outline" className="text-xs font-medium border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                      Updates
-                    </Badge>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                      {updates.length}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Total Updates
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-blue-600 dark:text-blue-400">
-                        {updates.filter(update => update.status === "pending").length} Pending
-                      </span>
-                      <span className="text-gray-400">•</span>
-                      <span className="text-green-600 dark:text-green-400">
-                        {updates.filter(update => update.status === "published").length} Published
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Members Stats */}
-              <div className="relative overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-50/40 via-transparent to-teal-50/40 dark:from-emerald-950/15 dark:via-transparent dark:to-teal-950/15 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-lg">
-                      <Users className="h-5 w-5 text-white" />
-                </div>
-                    <Badge variant="outline" className="text-xs font-medium border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                      Members
-                    </Badge>
-              </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                      {members.length}
-                </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Team Members
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-purple-600 dark:text-purple-400">
-                        {members.filter(member => member.role === "admin").length} Admins
-                      </span>
-                      <span className="text-gray-400">•</span>
-                      <span className="text-blue-600 dark:text-blue-400">
-                        {members.filter(member => member.role === "developer").length} Developers
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                </div>
-              </div>
-
-            {/* Quick Actions Section */}
-            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30"></div>
-              <div className="relative p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                    <Plus className="h-4 w-4 text-white" />
-                      </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Quick Actions</h3>
-                      </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {/* Role-based quick actions */}
-                  {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
-                    <Button 
-                      variant="outline" 
-                      className="h-12 justify-start gap-3 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                      onClick={() => setActiveTab("bugs")}
+                  <div className="flex flex-col gap-2">
+                    {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                      <Button
+                        variant="outline"
+                        className="h-11 justify-start gap-3 border-blue-200/80 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                        onClick={() => setActiveTab("bugs")}
+                      >
+                        <Bug className="h-4 w-4 shrink-0" />
+                        View Bugs
+                      </Button>
+                    )}
+                    {(currentUser?.role === "tester" || currentUser?.role === "admin") && (
+                      <Button
+                        variant="outline"
+                        className="h-11 justify-start gap-3 border-emerald-200/80 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                        onClick={() => setActiveTab("fixes")}
+                      >
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        View Fixes
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="h-11 justify-start gap-3 border-indigo-200/80 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
+                      onClick={() => setActiveTab("updates")}
                     >
-                      <Bug className="h-4 w-4" />
-                      <span>View Bugs</span>
+                      <Bell className="h-4 w-4 shrink-0" />
+                      View Updates
                     </Button>
-                  )}
-                  
-                  {(currentUser?.role === "tester" || currentUser?.role === "admin") && (
-                            <Button
-                              variant="outline"
-                      className="h-12 justify-start gap-3 border-green-200 text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20"
-                      onClick={() => setActiveTab("fixes")}
+                    {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                      <Button
+                        variant="outline"
+                        className="h-11 justify-start gap-3 border-orange-200/80 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-950/30"
+                        onClick={() => setActiveTab("tasks")}
+                      >
+                        <ListChecks className="h-4 w-4 shrink-0" />
+                        View Tasks
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="h-11 justify-start gap-3"
+                      onClick={() => setActiveTab("members")}
                     >
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>View Fixes</span>
-                            </Button>
-                  )}
-                  
-                  <Button 
-                    variant="outline" 
-                    className="h-12 justify-start gap-3 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
-                    onClick={() => setActiveTab("updates")}
-                  >
-                    <Bell className="h-4 w-4" />
-                    <span>View Updates</span>
-                  </Button>
-                  
-                  {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
-                            <Button
-                              variant="outline"
-                      className="h-12 justify-start gap-3 border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-900/20"
-                      onClick={() => setActiveTab("tasks")}
-                    >
-                      <ListChecks className="h-4 w-4" />
-                      <span>View Tasks</span>
-                            </Button>
-                  )}
-                          </div>
-                        </div>
-                      </div>
-
-            {/* Recent Activity Section */}
-            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gray-50/30 to-indigo-50/30 dark:from-gray-800/30 dark:to-indigo-900/30"></div>
-              <div className="relative p-4 sm:p-6">
-                {/* <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                    <Clock className="h-4 w-4 text-white" />
+                      <Users className="h-4 w-4 shrink-0" />
+                      Manage Members
+                    </Button>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h3>
-                </div> */}
-                <ActivityList
-                  projectId={projectId}
-                  limit={6}
-                  showPagination={false}
-                  autoRefresh={true}
-                  refreshInterval={30000}
-                />
+                </div>
               </div>
             </div>
           </div>
@@ -5064,16 +5062,28 @@ const ProjectDetails = () => {
                       Manage and track project tasks and assignments
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-gradient-to-r from-orange-500 to-yellow-600 rounded-xl p-3 shadow-lg">
-                      <ListChecks className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                        {sharedTasks.length}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                    {projectId && (
+                      <Button
+                        onClick={openCreateShared}
+                        size="lg"
+                        className="h-12 px-6 bg-gradient-to-r from-orange-600 to-yellow-600 hover:from-orange-700 hover:to-yellow-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        <Plus className="mr-2 h-5 w-5" />
+                        New Task
+                      </Button>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="bg-gradient-to-r from-orange-500 to-yellow-600 rounded-xl p-3 shadow-lg">
+                        <ListChecks className="h-6 w-6 text-white" />
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        Total Tasks
+                      <div className="text-right">
+                        <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                          {sharedTasks.length}
+                        </div>
+                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                          Total Tasks
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -5208,9 +5218,18 @@ const ProjectDetails = () => {
                           <ListChecks className="h-8 w-8 text-gray-400" />
                   </div>
                         <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Tasks Found</h4>
-                        <p className="text-gray-600 dark:text-gray-400">
+                        <p className="text-gray-600 dark:text-gray-400 mb-4">
                           {taskSearchQuery ? "No tasks match your search criteria." : "No tasks have been created for this project yet."}
-                  </p>
+                        </p>
+                        {!taskSearchQuery && projectId && (
+                          <Button
+                            onClick={openCreateShared}
+                            className="h-11 px-6 bg-gradient-to-r from-orange-600 to-yellow-600 hover:from-orange-700 hover:to-yellow-700 text-white"
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            New Task
+                          </Button>
+                        )}
                 </div>
               ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -5794,6 +5813,165 @@ const ProjectDetails = () => {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Task Modal */}
+      <Dialog open={sharedModalOpen} onOpenChange={setSharedModalOpen}>
+        <DialogContent
+          className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-2xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar"
+          aria-describedby="create-task-description"
+        >
+          <DialogHeader className="relative">
+            <DialogTitle className="flex items-center gap-3 pr-12">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500 to-yellow-600 shadow-lg">
+                <ListChecks className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <span className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
+                  Create New Task
+                </span>
+                <p id="create-task-description" className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Create a task for {project?.name || "this project"} and assign it to team members.
+                </p>
+              </div>
+            </DialogTitle>
+            <Button
+              onClick={() => setSharedModalOpen(false)}
+              variant="ghost"
+              size="sm"
+              className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Task Title <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                value={editingShared?.title || ""}
+                onChange={(e) =>
+                  setEditingShared({ ...editingShared, title: e.target.value } as SharedTask)
+                }
+                placeholder="Enter task title..."
+                className="h-12"
+              />
+            </div>
+
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Description
+              </Label>
+              <Textarea
+                value={editingShared?.description || ""}
+                onChange={(e) =>
+                  setEditingShared({ ...editingShared, description: e.target.value } as SharedTask)
+                }
+                placeholder="Enter task description..."
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Due Date
+              </Label>
+              <DatePicker
+                value={editingShared?.due_date || ""}
+                onChange={(value) =>
+                  setEditingShared({ ...editingShared, due_date: value } as SharedTask)
+                }
+                placeholder="Select due date"
+              />
+            </div>
+
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Priority
+              </Label>
+              <Select
+                value={editingShared?.priority || "medium"}
+                onValueChange={(value) =>
+                  setEditingShared({ ...editingShared, priority: value as SharedTask["priority"] } as SharedTask)
+                }
+              >
+                <SelectTrigger className="h-12">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low Priority</SelectItem>
+                  <SelectItem value="medium">Medium Priority</SelectItem>
+                  <SelectItem value="high">High Priority</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Assign To <span className="text-red-500">*</span>
+              </Label>
+              {projectTeamMembers.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No project members available to assign.
+                </p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto space-y-2 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                  {projectTeamMembers.map((member) => (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => toggleTaskAssignee(member.id)}
+                      className={`w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+                        taskAssigneeIds.includes(member.id)
+                          ? "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {member.username}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                          {member.role}
+                        </p>
+                      </div>
+                      {taskAssigneeIds.includes(member.id) ? (
+                        <CheckCircle2 className="h-5 w-5 text-orange-600 shrink-0" />
+                      ) : (
+                        <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Button
+              onClick={onSaveShared}
+              disabled={
+                submittingTask ||
+                !editingShared?.title?.trim() ||
+                taskAssigneeIds.length === 0
+              }
+              className="w-full h-12 bg-gradient-to-r from-orange-600 to-yellow-600 hover:from-orange-700 hover:to-yellow-700 text-white font-semibold"
+            >
+              {submittingTask ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Task
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

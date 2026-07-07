@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu, Bug } from "lucide-react";
+import { Menu, Bug, Search, RefreshCw } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -14,11 +14,71 @@ import { Sidebar } from "./Sidebar";
 import FeedbackWidget from "../feedback/FeedbackWidget";
 import { BugBotFab } from "@/components/bugbot/BugBotFab";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
-import { GlobalSearchProvider } from "@/context/GlobalSearchContext";
+import { GlobalSearchProvider, useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
 
 interface MainLayoutProps {
   children: ReactNode;
+}
+
+function MobileTopBar({ onOpenSidebar }: { onOpenSidebar: () => void }) {
+  const { setOpen: setSearchOpen } = useGlobalSearchModal();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    window.location.reload();
+  };
+
+  return (
+    <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm sticky top-0 z-40">
+      <div className="flex items-center gap-3 min-w-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onOpenSidebar}
+          aria-label="Open sidebar"
+          className="h-9 w-9 shrink-0 hover:bg-accent/80"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Bug className="h-5 w-5 text-primary" />
+          </div>
+          <span className="font-bold text-lg text-foreground truncate">BugRicer</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-0.5 shrink-0">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => setSearchOpen(true)}
+          className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent/80"
+          aria-label="Search"
+          title="Search"
+        >
+          <Search className="h-5 w-5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent/80"
+          aria-label="Refresh page"
+          title="Refresh"
+        >
+          <RefreshCw className={cn("h-5 w-5", isRefreshing && "animate-spin")} />
+        </Button>
+        <NotificationPopover />
+      </div>
+    </div>
+  );
 }
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
@@ -109,28 +169,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         {/* Main content */}
         <div className={`flex-1 flex flex-col min-w-0 ${isImpersonating ? 'pt-16' : ''}`}>
           {/* Top bar with menu button on mobile/tablet */}
-          <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm sticky top-0 z-40">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(true)}
-                aria-label="Open sidebar"
-                className="h-9 w-9 hover:bg-accent/80"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Bug className="h-5 w-5 text-primary" />
-                </div>
-                <span className="font-bold text-lg text-foreground">BugRicer</span>
-              </div>
-            </div>
-            
-            {/* Notification bell - replaces close button in mobile/tablet view */}
-            <NotificationPopover />
-          </div>
+          <MobileTopBar onOpenSidebar={() => setSidebarOpen(true)} />
           
           {/* Main content area */}
           <main

@@ -55,7 +55,7 @@ import { AudioWaveform } from "./AudioWaveform";
 import { ChatHeader } from "./ChatHeader";
 import { ChatMessageImage } from "./ChatMessageImage";
 import { ForwardMessage } from "./ForwardMessage";
-import { MessageComposer } from "./MessageComposer";
+import { MessageComposer, type VoiceRecordPhase } from "./MessageComposer";
 import { MessageEditor } from "./MessageEditor";
 import { MessageInfo } from "./MessageInfo";
 import { MessageReactions } from "./MessageReactions";
@@ -218,7 +218,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<TypingIndicator[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
+  const [voicePhase, setVoicePhase] = useState<VoiceRecordPhase>("idle");
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [reviewDuration, setReviewDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState<string | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(
     null
@@ -226,9 +228,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [showReadReceipts, setShowReadReceipts] = useState(true);
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(
-    null
-  );
   const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
   const [editMessage, setEditMessage] = useState<ChatMessage | null>(null);
   const [messageInfo, setMessageInfo] = useState<ChatMessage | null>(null);
@@ -247,6 +246,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const shouldAutoScrollRef = useRef(true);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const voiceStopIntentRef = useRef<"review" | "cancel" | "send">("send");
+  const pendingVoiceBlobRef = useRef<Blob | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingStartedAtRef = useRef<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
@@ -392,15 +396,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   }, [newMessage]);
 
-  // Cleanup long press timer on unmount
-  useEffect(() => {
-    return () => {
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-      }
-    };
-  }, [longPressTimer]);
-
   const loadMessages = async (page: number = 1, append: boolean = false) => {
     if (!selectedGroup) return;
 
@@ -462,7 +457,34 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       (typingUsers) => {
         setTypingUsers(typingUsers);
       },
-      2500
+      2500,
+      (polledMessages) => {
+        const ownId = String(currentUser?.id ?? "");
+        if (!ownId) return;
+
+        setMessages((prev) => {
+          const updates = new Map(
+            polledMessages
+              .filter((message) => String(message.sender_id) === ownId)
+              .map((message) => [message.id, message])
+          );
+
+          if (updates.size === 0) return prev;
+
+          return prev.map((message) => {
+            const updated = updates.get(message.id);
+            if (!updated) return message;
+
+            return {
+              ...message,
+              delivery_status: updated.delivery_status ?? message.delivery_status,
+              read_status: updated.read_status ?? message.read_status,
+              voice_played_count:
+                updated.voice_played_count ?? message.voice_played_count,
+            };
+          });
+        });
+      }
     );
   };
 
@@ -580,16 +602,39 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  const clearRecordingTimer = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const resetVoiceRecording = () => {
+    clearRecordingTimer();
+    if (recordingStreamRef.current) {
+      recordingStreamRef.current.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    pendingVoiceBlobRef.current = null;
+    recordingStartedAtRef.current = 0;
+    setRecordingDuration(0);
+    setReviewDuration(0);
+    setVoicePhase("idle");
+  };
+
   const startRecording = async () => {
+    setIsPlaying(null);
+
     try {
-      // Request permissions immediately for faster UX
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 44100, // Higher quality
-          channelCount: 1, // Mono for smaller file size
+          sampleRate: 44100,
+          channelCount: 1,
         },
       });
 
@@ -599,33 +644,71 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType,
-        audioBitsPerSecond: 128000, // Optimize for voice
+        audioBitsPerSecond: 128000,
       });
       const audioChunks: Blob[] = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        audioChunks.push(event.data);
+        if (event.data.size > 0) {
+          audioChunks.push(event.data);
+        }
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: mimeType });
-        await sendVoiceMessage(audioBlob);
+      mediaRecorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+        clearRecordingTimer();
+
+        const intent = voiceStopIntentRef.current;
+        const blob = new Blob(audioChunks, { type: mimeType });
+        audioChunksRef.current = audioChunks;
+
+        if (intent === "cancel" || blob.size === 0) {
+          resetVoiceRecording();
+          return;
+        }
+
+        if (intent === "review") {
+          pendingVoiceBlobRef.current = blob;
+          const elapsed = Math.max(
+            1,
+            Math.round((Date.now() - recordingStartedAtRef.current) / 1000)
+          );
+          setReviewDuration(elapsed);
+          setRecordingDuration(0);
+          setVoicePhase("review");
+          mediaRecorderRef.current = null;
+          return;
+        }
+
+        void sendVoiceMessage(blob).finally(() => resetVoiceRecording());
       };
 
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = audioChunks;
-      mediaRecorder.start(1000); // Collect data every second for better UX
-      setIsRecording(true);
+      recordingStreamRef.current = stream;
+      recordingStartedAtRef.current = Date.now();
+      voiceStopIntentRef.current = "send";
+      mediaRecorder.start(250);
+      setVoicePhase("recording");
+      setRecordingDuration(0);
 
-      // Auto-stop after 2 minutes for better UX
+      clearRecordingTimer();
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(
+          Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000))
+        );
+      }, 250);
+
       setTimeout(() => {
-        if (isRecording) {
-          stopRecording();
+        if (mediaRecorderRef.current?.state === "recording") {
+          voiceStopIntentRef.current = "review";
+          mediaRecorderRef.current.stop();
         }
       }, 120000);
     } catch (error) {
       console.error("Error starting recording:", error);
+      resetVoiceRecording();
       toast({
         title: "Microphone Access Required",
         description: "Please allow microphone access to record voice messages",
@@ -634,39 +717,34 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+  const pauseRecording = () => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      voiceStopIntentRef.current = "review";
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
   };
 
-  // Long press to start recording immediately
-  const handleMicMouseDown = () => {
-    if (!isRecording) {
-      const timer = setTimeout(() => {
-        startRecording();
-      }, 500); // Start recording after 500ms long press
-      setLongPressTimer(timer);
+  const cancelVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      voiceStopIntentRef.current = "cancel";
+      mediaRecorderRef.current.stop();
+      return;
     }
+    resetVoiceRecording();
   };
 
-  const handleMicMouseUp = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
+  const sendReviewedVoice = async () => {
+    const blob = pendingVoiceBlobRef.current;
+    if (!blob) {
+      resetVoiceRecording();
+      return;
     }
-  };
-
-  const handleMicClick = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
-    }
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
+    setVoicePhase("idle");
+    pendingVoiceBlobRef.current = null;
+    try {
+      await sendVoiceMessage(blob);
+    } finally {
+      resetVoiceRecording();
     }
   };
 
@@ -706,12 +784,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const playVoiceMessage = async (message: ChatMessage) => {
     if (!message.voice_file_path) return;
 
-    // Toggle play/pause state - AudioWaveform handles the actual playback
     if (isPlaying === message.id) {
       setIsPlaying(null);
-    } else {
-      // Stop any other playing audio
-      setIsPlaying(message.id);
+      return;
+    }
+
+    setIsPlaying(message.id);
+
+    if (String(message.sender_id) !== String(currentUser?.id ?? "")) {
+      try {
+        await MessagingService.markVoicePlayed(message.id);
+      } catch (error) {
+        console.error("Failed to mark voice as played:", error);
+      }
     }
   };
 
@@ -1305,6 +1390,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             {isOwnMessage && (
                               <MessageStatus
                                 status={normalizeDeliveryStatus(message.delivery_status)}
+                                receiptLabel={
+                                  message.message_type === "voice" ? "played" : "read"
+                                }
                                 size="sm"
                               />
                             )}
@@ -1466,7 +1554,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <MessageComposer
         groupId={selectedGroup.id}
         value={newMessage}
-        isRecording={isRecording}
+        voicePhase={voicePhase}
+        recordingDuration={recordingDuration}
+        reviewDuration={reviewDuration}
         isImageDropUploading={isImageDropUploading}
         replyToMessage={replyToMessage}
         textareaRef={textareaRef}
@@ -1480,9 +1570,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           textareaRef.current?.focus();
         }}
         onUploadSuccess={handleMediaUploadSuccess}
-        onMicClick={handleMicClick}
-        onMicMouseDown={handleMicMouseDown}
-        onMicMouseUp={handleMicMouseUp}
+        onVoiceStart={startRecording}
+        onVoicePause={pauseRecording}
+        onVoiceCancel={cancelVoiceRecording}
+        onVoiceSend={sendReviewedVoice}
         onPaste={handleChatImagePaste}
       />
       </div>

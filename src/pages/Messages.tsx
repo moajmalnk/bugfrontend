@@ -9,8 +9,6 @@ import {
   MessageCircle, 
   Clock,
   Trash2,
-  ArrowLeft,
-  Menu,
   X,
   Users,
   Shield,
@@ -236,53 +234,7 @@ const Messages = () => {
       <section className="flex-1 min-h-0 flex flex-col w-full">
         {/* Main chat layout — height fills remaining viewport; only message list scrolls inside */}
         <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden bg-[#0b141a]">
-          <div
-            className={cn(
-              "flex flex-1 min-h-0 min-w-0 relative",
-              isMobile && "pt-14"
-            )}
-          >
-              {/* Mobile Header with Navigation */}
-              {isMobile && (
-                <div className="absolute top-0 left-0 right-0 z-50 bg-[#111b21] dark:bg-[#111b21] border-b border-[#2a3942] dark:border-[#2a3942] px-4 py-3 flex items-center justify-between">
-                  {selectedGroup ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleBackToChatList}
-                        className="text-[#e9edef] hover:bg-[#2a3942] p-2 rounded-lg transition-colors"
-                      >
-                        <ArrowLeft className="h-5 w-5" />
-                      </Button>
-                      <h2 className="text-[#e9edef] font-semibold text-lg truncate flex-1 text-center mx-4">
-                        {selectedGroup.name}
-                      </h2>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={toggleSidebar}
-                        className="text-[#e9edef] hover:bg-[#2a3942] p-2 rounded-lg transition-colors"
-                      >
-                        <Menu className="h-5 w-5" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <h2 className="text-[#e9edef] font-semibold text-lg">Chats</h2>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={toggleSidebar}
-                        className="text-[#e9edef] hover:bg-[#2a3942] p-2 rounded-lg transition-colors"
-                      >
-                        <X className="h-5 w-5" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-
+          <div className="flex flex-1 min-h-0 min-w-0 relative">
               {/* Chat Group Selector - Professional Sidebar */}
               <aside
                 className={cn(

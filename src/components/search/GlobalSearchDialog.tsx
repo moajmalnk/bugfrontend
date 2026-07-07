@@ -116,15 +116,18 @@ export function GlobalSearchDialog() {
         )}
       >
         <DialogTitle className="sr-only">Global search</DialogTitle>
-        <Command shouldFilter={false} className="rounded-2xl">
+        <Command
+          shouldFilter={false}
+          className="rounded-2xl [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-0 [&_[cmdk-input-wrapper]]:px-0"
+        >
           <div className="flex items-center border-b px-3">
             <CommandInput
               value={query}
               onValueChange={setQuery}
               placeholder="Search pages, users, bugs, docs…"
-              className="h-12 border-0 focus:ring-0"
+              className="h-12 border-0 focus:ring-0 shadow-none"
             />
-            <kbd className="hidden sm:inline-flex h-6 items-center rounded border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+            <kbd className="ml-2 hidden shrink-0 sm:inline-flex h-6 items-center rounded border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
               ESC
             </kbd>
           </div>
@@ -133,7 +136,7 @@ export function GlobalSearchDialog() {
             {loading ? (
               <div className="space-y-2 p-3">
                 {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={index} className="flex items-center gap-3 px-2 py-2">
+                  <div key={index} className="flex items-center gap-3 px-0 py-2">
                     <Skeleton className="h-8 w-8 rounded-lg" />
                     <div className="flex-1 space-y-1.5">
                       <Skeleton className="h-4 w-2/3" />
@@ -143,13 +146,16 @@ export function GlobalSearchDialog() {
                 ))}
               </div>
             ) : results.length === 0 ? (
-              <CommandEmpty className="py-10 text-sm text-muted-foreground">
+              <CommandEmpty className="py-10 px-3 text-left text-sm text-muted-foreground">
                 {query.trim()
                   ? "No results found. Try another keyword."
                   : "Start typing to search across the app."}
               </CommandEmpty>
             ) : (
-              <CommandGroup heading={query.trim() ? "Results" : "Suggestions"}>
+              <CommandGroup
+                heading={query.trim() ? "Results" : "Suggestions"}
+                className="p-0 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-3"
+              >
                 {results.map((result) => {
                   const Icon = CATEGORY_ICONS[result.category];
                   return (

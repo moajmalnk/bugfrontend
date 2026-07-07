@@ -1,4 +1,4 @@
-import { ENV } from '@/lib/env';
+import { apiClient } from '@/lib/axios';
 
 export interface User {
   id: string;
@@ -70,15 +70,13 @@ export interface LogActivityRequest {
   metadata?: Record<string, any>;
 }
 
-class ActivityService {
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('token');
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
-  }
+type ActivityApiResponse<T> = {
+  success: boolean;
+  data: T;
+  message?: string;
+};
 
+class ActivityService {
   /**
    * Get activities for a specific project
    */
@@ -88,27 +86,19 @@ class ActivityService {
     offset: number = 0
   ): Promise<ActivityResponse> {
     try {
-      const response = await fetch(
-        `${ENV.API_URL}/activities/project_activities.php?project_id=${projectId}&limit=${limit}&offset=${offset}`,
+      const response = await apiClient.get<ActivityApiResponse<ActivityResponse>>(
+        '/activities/project_activities.php',
         {
-          method: 'GET',
-          headers: this.getAuthHeaders(),
+          params: { project_id: projectId, limit, offset },
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch activities');
       }
 
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to fetch activities');
-      }
-
-      return result.data;
+      return response.data.data;
     } catch (error) {
-      //.error('Error fetching project activities:', error);
       throw error;
     }
   }
@@ -121,27 +111,19 @@ class ActivityService {
     offset: number = 0
   ): Promise<ActivityResponse> {
     try {
-      const response = await fetch(
-        `${ENV.API_URL}/activities/project_activities.php?limit=${limit}&offset=${offset}`,
+      const response = await apiClient.get<ActivityApiResponse<ActivityResponse>>(
+        '/activities/project_activities.php',
         {
-          method: 'GET',
-          headers: this.getAuthHeaders(),
+          params: { limit, offset },
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch activities');
       }
 
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to fetch activities');
-      }
-
-      return result.data;
+      return response.data.data;
     } catch (error) {
-      //.error('Error fetching user activities:', error);
       throw error;
     }
   }
@@ -151,35 +133,27 @@ class ActivityService {
    */
   async getUserOwnActivityCount(): Promise<number> {
     try {
-      // For now, we'll fetch a large number of activities and count them client-side
-      // In the future, this should be a dedicated API endpoint
-      const response = await fetch(
-        `${ENV.API_URL}/activities/project_activities.php?limit=1000&offset=0`,
+      const response = await apiClient.get<ActivityApiResponse<ActivityResponse>>(
+        '/activities/project_activities.php',
         {
-          method: 'GET',
-          headers: this.getAuthHeaders(),
+          params: { limit: 1000, offset: 0 },
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch activities');
       }
 
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to fetch activities');
-      }
-
-      // Get current user ID from token
-      const token = localStorage.getItem('token');
+      const token =
+        sessionStorage.getItem('token') ||
+        localStorage.getItem('auth_token') ||
+        localStorage.getItem('token');
       if (!token) return 0;
-      
+
       const payload = JSON.parse(atob(token.split('.')[1]));
       const currentUserId = payload.user_id;
 
-      // Count activities created by current user
-      const userOwnActivities = result.data.activities.filter(
+      const userOwnActivities = response.data.data.activities.filter(
         (activity: Activity) => activity.user.id === currentUserId
       );
 
@@ -195,27 +169,19 @@ class ActivityService {
    */
   async getActivityStats(projectId: string): Promise<ActivityStats> {
     try {
-      const response = await fetch(
-        `${ENV.API_URL}/activities/activity_stats.php?project_id=${projectId}`,
+      const response = await apiClient.get<ActivityApiResponse<ActivityStats>>(
+        '/activities/activity_stats.php',
         {
-          method: 'GET',
-          headers: this.getAuthHeaders(),
+          params: { project_id: projectId },
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch activity stats');
       }
 
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to fetch activity stats');
-      }
-
-      return result.data;
+      return response.data.data;
     } catch (error) {
-      //.error('Error fetching activity stats:', error);
       throw error;
     }
   }
@@ -225,28 +191,17 @@ class ActivityService {
    */
   async logActivity(activityData: LogActivityRequest): Promise<{ id: number }> {
     try {
-      const response = await fetch(
-        `${ENV.API_URL}/activities/log_activity.php`,
-        {
-          method: 'POST',
-          headers: this.getAuthHeaders(),
-          body: JSON.stringify(activityData),
-        }
+      const response = await apiClient.post<ActivityApiResponse<{ id: number }>>(
+        '/activities/log_activity.php',
+        activityData
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to log activity');
       }
 
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to log activity');
-      }
-
-      return result.data;
+      return response.data.data;
     } catch (error) {
-      //.error('Error logging activity:', error);
       throw error;
     }
   }
@@ -546,23 +501,15 @@ class ActivityService {
    */
   async deleteActivity(activityId: number): Promise<void> {
     try {
-      const response = await fetch(
-        `${ENV.API_URL}/activities/delete_activity.php?id=${activityId}`,
+      const response = await apiClient.delete<ActivityApiResponse<unknown>>(
+        '/activities/delete_activity.php',
         {
-          method: 'DELETE',
-          headers: this.getAuthHeaders(),
+          params: { id: activityId },
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to delete activity');
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to delete activity');
       }
     } catch (error) {
       console.error('Error deleting activity:', error);

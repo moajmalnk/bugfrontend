@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -29,13 +28,13 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, UserPlus, X } from "lucide-react";
+import { Eye, EyeOff, Loader2, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { permissionService } from "@/services/permissionService";
+import { cn } from "@/lib/utils";
 
-// Define the form schema - role validation will be done dynamically
 const userFormSchema = z.object({
   username: z
     .string()
@@ -59,33 +58,80 @@ type AddUserDialogProps = {
   onUserAdd: (userData: UserFormValues) => Promise<boolean>;
 };
 
+const fieldInputClass =
+  "h-11 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl shadow-sm";
+
+function FormLabelDot({
+  children,
+  color = "bg-blue-500",
+}: {
+  children: React.ReactNode;
+  color?: string;
+}) {
+  return (
+    <FormLabel className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+      <span className={cn("h-2 w-2 rounded-full shrink-0", color)} />
+      {children}
+    </FormLabel>
+  );
+}
+
+function PhoneInput({
+  value,
+  onChange,
+}: {
+  value?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex h-11 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+      <span className="flex items-center px-3 text-sm font-medium text-muted-foreground border-r border-gray-200 dark:border-gray-700 bg-muted/30 shrink-0">
+        +91
+      </span>
+      <input
+        type="tel"
+        placeholder="Enter 10-digit number"
+        value={value ? value.replace(/^\+91/, "") : ""}
+        onChange={(e) => {
+          const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+          onChange(val);
+        }}
+        className="flex-1 min-w-0 px-3 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+        maxLength={10}
+        pattern="\d{10}"
+        inputMode="numeric"
+      />
+    </div>
+  );
+}
+
 export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    username: "",
-    email: "",
-    password: "",
-    role: "tester" as UserRole,
-    phone: "",
-  });
   const [showPassword, setShowPassword] = useState(false);
   const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
 
-  // Load roles on mount
+  const form = useForm<UserFormValues>({
+    resolver: zodResolver(userFormSchema),
+    defaultValues: {
+      username: "",
+      email: "",
+      password: "",
+      role: "",
+      phone: "",
+    },
+  });
+
   useEffect(() => {
     const loadRoles = async () => {
       try {
         const data = await permissionService.getRoles();
         setRoles(data);
-        // Set default role after loading
         if (data.length > 0 && !form.getValues("role")) {
           form.setValue("role", data[data.length - 1].role_name.toLowerCase());
         }
       } catch (error) {
         console.error("Failed to load roles:", error);
-        // Fallback to basic roles if API fails
         const fallbackRoles = [
           { id: 1, role_name: "Admin" },
           { id: 2, role_name: "Developer" },
@@ -101,24 +147,12 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Initialize the form
-  const form = useForm<UserFormValues>({
-    resolver: zodResolver(userFormSchema),
-    defaultValues: {
-      username: "",
-      email: "",
-      password: "",
-      role: roles.length > 0 ? roles[0].role_name.toLowerCase() : "",
-    },
-  });
-
   const handleAddUser = async (userData: UserFormValues): Promise<boolean> => {
     try {
-      // Find the role_id from the selected role name
       const selectedRole = roles.find(
         (r) => r.role_name.toLowerCase() === userData.role.toLowerCase()
       );
-      
+
       const payload = {
         username: userData.username,
         email: userData.email,
@@ -127,10 +161,8 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         role_id: selectedRole?.id,
         phone: userData.phone && userData.phone.trim() ? "+91" + userData.phone.trim() : undefined,
       };
-      const success = await onUserAdd(payload as any);
-      return success;
-    } catch (error) {
-      // Error logic...
+      return await onUserAdd(payload as UserFormValues);
+    } catch {
       return false;
     }
   };
@@ -143,8 +175,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         form.reset();
         setOpen(false);
       }
-    } catch (error) {
-      // console.error("Error adding user:", error);
+    } catch {
       toast({
         title: "Error",
         description: "An unexpected error occurred.",
@@ -155,125 +186,127 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
     }
   };
 
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      form.reset();
+      setShowPassword(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button
-          className="h-11 sm:h-12 text-sm sm:text-base shrink-0"
+          className="h-11 sm:h-12 text-sm sm:text-base shrink-0 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg"
           aria-label="Add a new user"
         >
           <UserPlus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
           Add User
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-full max-w-xs sm:max-w-md md:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="break-words">Add New User</DialogTitle>
-          <DialogDescription className="break-words">
-            Create a new user account. Fill in all the required information
-            below.
-          </DialogDescription>
+      <DialogContent className="w-[min(96vw,520px)] max-w-none rounded-2xl p-0 gap-0 overflow-hidden">
+        <DialogHeader className="border-b border-gray-200/50 dark:border-gray-700/50 px-6 py-5 text-left">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
+              <UserPlus className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <DialogTitle className="text-lg font-bold text-gray-900 dark:text-white">
+                Add New User
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Create a new user account. Fill in all required information below.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <DialogClose asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-3 right-4"
-          >
-            <X className="h-5 w-5" />
-            <span className="sr-only">Close</span>
-          </Button>
-        </DialogClose>
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="max-h-[min(70vh,520px)] overflow-y-auto px-6 py-5 space-y-4">
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
+                  <FormItem className="space-y-2">
+                    <FormLabelDot>Username</FormLabelDot>
                     <FormControl>
-                      <Input
-                        placeholder="Username"
-                        {...field}
-                        className="w-full"
-                      />
+                      <Input placeholder="Username" {...field} className={fieldInputClass} />
                     </FormControl>
-                    <FormDescription>
-                      Username can only contain letters, numbers, and
-                      underscores
+                    <FormDescription className="text-xs">
+                      Letters, numbers, and underscores only
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="email"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
+                  <FormItem className="space-y-2">
+                    <FormLabelDot color="bg-indigo-500">Email</FormLabelDot>
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="Enter your email"
+                        placeholder="Enter email address"
                         {...field}
-                        className="w-full"
+                        className={fieldInputClass}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="password"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        {...field}
-                        className="w-full pr-10"
-                      />
-                      <button
-                        type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-                        onClick={() => setShowPassword((v) => !v)}
-                        tabIndex={-1}
-                      >
-                        {showPassword ? (
-                          <EyeOff size={18} />
-                        ) : (
-                          <Eye size={18} />
-                        )}
-                      </button>
-                    </div>
-                    <FormDescription>
-                      Password must be at least 6 characters
-                    </FormDescription>
+                  <FormItem className="space-y-2">
+                    <FormLabelDot color="bg-violet-500">Password</FormLabelDot>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Enter password"
+                          {...field}
+                          className={cn(fieldInputClass, "pr-11")}
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowPassword((v) => !v)}
+                          tabIndex={-1}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormDescription className="text-xs">At least 6 characters</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="role"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
+                  <FormItem className="space-y-2">
+                    <FormLabelDot color="bg-emerald-500">Role</FormLabelDot>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
+                      <FormControl>
+                        <SelectTrigger className={fieldInputClass}>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent position="popper" className="z-[70]">
                         {roles.map((role) => (
-                          <SelectItem
-                            key={role.id}
-                            value={role.role_name.toLowerCase()}
-                          >
+                          <SelectItem key={role.id} value={role.role_name.toLowerCase()}>
                             {role.role_name}
                           </SelectItem>
                         ))}
@@ -283,54 +316,45 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="phone"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                  <FormItem className="space-y-2">
+                    <FormLabelDot color="bg-orange-500">Phone</FormLabelDot>
                     <FormControl>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="px-3 py-2 border border-input rounded-l-md text-sm bg-input"
-                          style={{ borderRight: 0 }}
-                        >
-                          +91
-                        </span>
-                        <input
-                          id="phone"
-                          type="tel"
-                          placeholder="Enter 10-digit number"
-                          value={
-                            field.value ? field.value.replace(/^\+91/, "") : ""
-                          }
-                          onChange={(e) => {
-                            // Only allow 10 digits
-                            const val = e.target.value
-                              .replace(/\D/g, "")
-                              .slice(0, 10);
-                            field.onChange(val);
-                          }}
-                          className="h-9 text-sm flex-1 border border-input rounded-r-md px-3 bg-input text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          style={{ borderLeft: 0 }}
-                          maxLength={10}
-                          pattern="\d{10}"
-                          inputMode="numeric"
-                        />
-                      </div>
+                      <PhoneInput value={field.value} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-            <DialogFooter>
+
+            <DialogFooter className="border-t border-gray-200/50 dark:border-gray-700/50 px-6 py-4 gap-2 sm:gap-3 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={isSubmitting}
+                className="h-11 px-6 border-gray-200 dark:border-gray-700"
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full sm:w-auto"
+                className="h-11 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg"
               >
-                {isSubmitting ? "Adding..." : "Add User"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add User"
+                )}
               </Button>
             </DialogFooter>
           </form>

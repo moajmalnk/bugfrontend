@@ -32,8 +32,10 @@ import { toast, useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { ENV } from "@/lib/env";
+import { CompliancePipelineStage, getPipelineStageLabel } from "@/lib/codo/complianceRules";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { canReportBug } from "@/lib/utils";
+import { getProjectStatusLabel } from "@/lib/utils/projectUtils";
 import { bugService } from "@/services/bugService";
 import { Project, projectService } from "@/services/projectService";
 import { motion } from "framer-motion";
@@ -45,6 +47,7 @@ import {
   Code,
   FolderKanban,
   Shield,
+  ShieldCheck,
   TestTube,
   Trash2,
   Undo2,
@@ -119,9 +122,13 @@ const ProjectCardSkeleton = ({ index = 0 }: { index?: number }) => (
       </CardContent>
       
       {/* Footer skeleton */}
-      <CardFooter className="flex flex-col gap-2 sm:gap-3 sm:flex-row mt-auto p-4 sm:p-5">
-        <Skeleton className="h-11 w-full sm:flex-1" />
-        <Skeleton className="h-11 w-full sm:flex-1" />
+      <CardFooter className="mt-auto p-4 sm:p-5">
+        <div className="grid grid-cols-2 gap-2 w-full">
+          <Skeleton className="h-11 rounded-xl" />
+          <Skeleton className="h-11 rounded-xl" />
+          <Skeleton className="h-11 rounded-xl" />
+          <Skeleton className="h-11 rounded-xl" />
+        </div>
       </CardFooter>
     </Card>
   </motion.div>
@@ -792,6 +799,7 @@ const Projects = () => {
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="release_ready">Release Ready</SelectItem>
                         <SelectItem value="archived">Archived</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1156,16 +1164,27 @@ const Projects = () => {
               <Card className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex flex-col h-full shadow-sm transition-all duration-300 hover:shadow-2xl">
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-emerald-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-emerald-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <CardHeader className="pb-2 p-4 sm:p-5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                     <Badge
                       variant={
                         project.status === "active" ? "default" : "outline"
                       }
                       className="text-xs sm:text-sm px-2 py-1 mb-2 rounded-full backdrop-blur-sm"
                     >
-                      {project.status.charAt(0).toUpperCase() +
-                        project.status.slice(1)}
+                      {getProjectStatusLabel(project.status)}
                     </Badge>
+                    {project.compliance && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] sm:text-xs px-2 py-0.5 mb-2 rounded-full border-slate-600 text-slate-600 dark:text-slate-300"
+                      >
+                        {getPipelineStageLabel(
+                          project.compliance.pipeline_stage as CompliancePipelineStage
+                        )}
+                      </Badge>
+                    )}
+                    </div>
                     <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
                       <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                       {formatLocalDate(project.created_at, "date")}
@@ -1264,67 +1283,90 @@ const Projects = () => {
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="relative grid grid-cols-2 gap-2 pt-2 mt-auto p-4 sm:p-5">
-                  {/* Show View button only for assigned projects (my-projects tab) or for admins */}
-                  {((currentUser?.role === "developer" && activeTab === "my-projects") || 
-                    (currentUser?.role === "admin") || 
-                    (currentUser?.role === "tester")) && (
-                    <Button
-                      asChild
-                      variant="default"
-                      className="col-span-1 w-full h-11 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                    >
-                      <Link
-                        to={
-                          currentUser?.role
-                            ? `/${currentUser.role}/projects/${project.id}`
-                            : `/projects/${project.id}`
-                        }
-                      >
-                        View
-                      </Link>
-                    </Button>
-                  )}
-                  {canReportBug(currentUser?.role) &&
-                    ((currentUser?.role === "developer" && activeTab === "my-projects") ||
+                <CardFooter className="relative pt-2 mt-auto p-4 sm:p-5">
+                  <div className="grid grid-cols-2 gap-2 w-full">
+                    {((currentUser?.role === "developer" && activeTab === "my-projects") ||
                       currentUser?.role === "admin" ||
                       currentUser?.role === "tester") && (
+                      <Button
+                        asChild
+                        variant="default"
+                        className="h-11 w-full min-w-0 px-2 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                      >
+                        <Link
+                          to={
+                            currentUser?.role
+                              ? `/${currentUser.role}/projects/${project.id}`
+                              : `/projects/${project.id}`
+                          }
+                          className="inline-flex w-full items-center justify-center"
+                        >
+                          View
+                        </Link>
+                      </Button>
+                    )}
+                    {canReportBug(currentUser?.role) &&
+                      ((currentUser?.role === "developer" && activeTab === "my-projects") ||
+                        currentUser?.role === "admin" ||
+                        currentUser?.role === "tester") && (
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="h-11 w-full min-w-0 px-2 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20 text-orange-700 dark:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                      >
+                        <Link
+                          to={
+                            currentUser?.role
+                              ? `/${currentUser.role}/bugs/new?projectId=${project.id}`
+                              : `/bugs/new?projectId=${project.id}`
+                          }
+                          state={{
+                            from: currentUser?.role
+                              ? `/${currentUser.role}/projects`
+                              : "/projects",
+                          }}
+                          className="inline-flex w-full items-center justify-center gap-1.5"
+                        >
+                          <Bug className="h-4 w-4 shrink-0" />
+                          <span className="truncate text-xs sm:text-sm">Report</span>
+                        </Link>
+                      </Button>
+                    )}
                     <Button
                       asChild
                       variant="outline"
-                      className="col-span-1 w-full h-11 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/20 text-orange-700 dark:text-orange-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 whitespace-nowrap"
+                      className={`h-11 w-full min-w-0 px-2 rounded-xl border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/40 text-slate-700 dark:text-slate-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ${
+                        currentUser?.role === "developer" || currentUser?.role === "tester"
+                          ? "col-span-2"
+                          : ""
+                      }`}
                     >
                       <Link
                         to={
                           currentUser?.role
-                            ? `/${currentUser.role}/bugs/new?projectId=${project.id}`
-                            : `/bugs/new?projectId=${project.id}`
+                            ? `/${currentUser.role}/projects/${project.id}/compliance`
+                            : `/projects/${project.id}/compliance`
                         }
-                        state={{
-                          from: currentUser?.role
-                            ? `/${currentUser.role}/projects`
-                            : "/projects",
-                        }}
-                        className="inline-flex w-full items-center justify-center gap-2"
+                        className="inline-flex w-full items-center justify-center gap-1.5"
                       >
-                        <Bug className="h-4 w-4 shrink-0" />
-                        <span>Report Bug</span>
+                        <ShieldCheck className="h-4 w-4 shrink-0" />
+                        <span className="truncate text-xs sm:text-sm">Compliance</span>
                       </Link>
                     </Button>
-                  )}
-                  {currentUser?.role === "admin" && (
-                    <Button
-                      variant="destructive"
-                      className="col-span-2 w-full h-11 shadow-sm hover:shadow-md transition-all duration-200"
-                      title="You can only delete projects that have no team members or bugs"
-                      onClick={() => {
-                        setProjectToDelete(project.id);
-                        setIsDeleteDialogOpen(true);
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  )}
+                    {currentUser?.role === "admin" && (
+                      <Button
+                        variant="destructive"
+                        className="w-full h-11 shadow-sm hover:shadow-md transition-all duration-200"
+                        title="You can only delete projects that have no team members or bugs"
+                        onClick={() => {
+                          setProjectToDelete(project.id);
+                          setIsDeleteDialogOpen(true);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </div>
                 </CardFooter>
               </Card>
             </motion.div>

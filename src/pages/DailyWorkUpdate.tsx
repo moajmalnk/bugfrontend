@@ -1,23 +1,30 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn, notifyWorkActivity } from '@/services/todoService';
+import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn, notifyWorkActivity, parseSubmissionsListResponse } from '@/services/todoService';
+import { CheckoutProjectUpdatesCard } from '@/components/daily-work/CheckoutProjectUpdatesCard';
+import {
+  formatProjectUpdatesForText,
+  parseProjectUpdatesFromRow,
+  projectUpdatesToPayload,
+  type ProjectWorkUpdate,
+} from '@/lib/projectWorkUpdates';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Calendar, ClipboardCopy, Clock, FileText, ListTodo, Share2, User, AlertTriangle, ArrowLeft, Plus, Bell, FolderKanban, PauseCircle, PlayCircle, Search, X } from 'lucide-react';
+import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle } from 'lucide-react';
 import { projectService, Project } from '@/services/projectService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DateDropdown } from '@/components/ui/DateDropdown';
 import { HourPicker } from '@/components/ui/HourPicker';
 import { StatusDropdown, type StatusOption } from '@/components/ui/StatusDropdown';
 import { useAuth } from '@/context/AuthContext';
 import { bugService } from '@/services/bugService';
 import { updateService } from '@/services/updateService';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
+import { extractApiErrorMessage } from '@/lib/apiError';
+import { assertDeviceClockMatchesServer } from '@/lib/deviceClock';
 import {
   calendarMonthKey,
   computeMonthTotalsToDate,
@@ -45,6 +52,7 @@ type DailyWorkDraftStored = {
   approvalReason: string;
   isOnBreak: boolean;
   breakStartedAtIso: string | null;
+  projectUpdates: Record<string, ProjectWorkUpdate>;
 };
 
 function clearDailyWorkDraft(userId: string | number, date: string) {
@@ -61,6 +69,30 @@ function countTaskLines(text?: string) {
     .split('\n')
     .map((x) => x.trim())
     .filter((x) => x.length > 0).length;
+}
+
+function emptyDailyTaskFields() {
+  return {
+    completed_tasks: '',
+    pending_tasks: '',
+    ongoing_tasks: '',
+    notes: '',
+  };
+}
+
+function emptyCheckoutFormFields() {
+  return {
+    ...emptyDailyTaskFields(),
+    planned_work_notes: '',
+  };
+}
+
+function clearProjectUpdateNotes(updates: Record<string, ProjectWorkUpdate>) {
+  const next: Record<string, ProjectWorkUpdate> = {};
+  for (const [projectId, update] of Object.entries(updates)) {
+    next[projectId] = { ...update, notes: '' };
+  }
+  return next;
 }
 
 function isWorkSubmissionRowComplete(row: any) {
@@ -88,6 +120,15 @@ function parsePlannedProjectsFromRow(existingSubmission: any): string[] {
   }
 }
 
+function projectUpdatesMapFromRow(row: any): Record<string, ProjectWorkUpdate> {
+  const parsed = parseProjectUpdatesFromRow(row?.project_updates);
+  const map: Record<string, ProjectWorkUpdate> = {};
+  parsed.forEach((u) => {
+    map[u.project_id] = u;
+  });
+  return map;
+}
+
 function breakEntriesFromSubmissionRow(existingSubmission: any): string[] {
   const raw = existingSubmission?.break_entries;
   if (Array.isArray(raw)) return raw;
@@ -106,6 +147,27 @@ function todayYMD() {
   return toLocalCalendarDateString(new Date());
 }
 
+function formatAttendanceDateLabel(value?: string) {
+  if (!value) return '—';
+  const d = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString('en-IN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  });
+}
+
+function attendanceErrorToast(title: string, error: unknown) {
+  return {
+    title,
+    description: extractApiErrorMessage(error, 'An error occurred'),
+    variant: 'destructive' as const,
+  };
+}
+
 function getCurrentTime() {
   const now = new Date();
   const hours = String(now.getHours()).padStart(2, '0');
@@ -113,12 +175,33 @@ function getCurrentTime() {
   return `${hours}:${minutes}:00`;
 }
 
-export default function DailyWorkUpdate() {
+export type WorkFlowAction = 'checkin' | 'checkout';
+
+export type DailyWorkFlowPanelProps = {
+  onSaved?: () => void;
+  onCheckInTimeChange?: (checkInTime: string | null) => void;
+  editId?: string | null;
+  flowAction?: WorkFlowAction | null;
+  onFlowActionChange?: (action: WorkFlowAction | null) => void;
+  onEditClose?: () => void;
+  layout?: 'header' | 'inline';
+};
+
+export function DailyWorkFlowPanel({
+  onSaved,
+  onCheckInTimeChange,
+  editId: editIdProp,
+  flowAction = null,
+  onFlowActionChange,
+  onEditClose,
+  layout = 'inline',
+}: DailyWorkFlowPanelProps) {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const editId = searchParams.get('edit');
+  const editId = editIdProp ?? searchParams.get('edit');
   const isEditing = !!editId;
+  const isEmbedded = Boolean(onSaved);
 
   const [form, setForm] = useState<WorkSubmission>({
     submission_date: todayYMD(),
@@ -152,6 +235,7 @@ export default function DailyWorkUpdate() {
   const [loadingProjectStats, setLoadingProjectStats] = useState(false);
   const [projectStats, setProjectStats] = useState<Record<string, { bugs: number; updates: number }>>({});
   const [projectSearch, setProjectSearch] = useState('');
+  const [serverToday, setServerToday] = useState<string>(todayYMD());
   const [requestAdminApproval, setRequestAdminApproval] = useState(false);
   const [requestedExtraHours, setRequestedExtraHours] = useState<number>(0);
   const [approvalReason, setApprovalReason] = useState('');
@@ -159,6 +243,35 @@ export default function DailyWorkUpdate() {
   const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null);
   const [breakEntries, setBreakEntries] = useState<string[]>([]);
   const [draftHydrationEpoch, setDraftHydrationEpoch] = useState(0);
+  const [isCheckoutWizardOpen, setIsCheckoutWizardOpen] = useState(false);
+  const [checkoutWizardStep, setCheckoutWizardStep] = useState<'form' | 'preview'>('form');
+  const [todaySubmissionComplete, setTodaySubmissionComplete] = useState(false);
+  const [projectUpdates, setProjectUpdates] = useState<Record<string, ProjectWorkUpdate>>({});
+  const didAutoOpenEditRef = useRef(false);
+  const didAutoOpenFlowRef = useRef<string | null>(null);
+
+  const syncFlowAction = useCallback(
+    (action: WorkFlowAction | null) => {
+      onFlowActionChange?.(action);
+    },
+    [onFlowActionChange]
+  );
+
+  const clearWorkFlowUrl = useCallback(() => {
+    syncFlowAction(null);
+    onEditClose?.();
+  }, [syncFlowAction, onEditClose]);
+
+  const hasCheckedIn = !!form.check_in_time;
+  const hasActiveWorkSession = hasCheckedIn && !todaySubmissionComplete && !isEditing;
+
+  useEffect(() => {
+    if (todaySubmissionComplete && !isEditing) {
+      onCheckInTimeChange?.(null);
+      return;
+    }
+    onCheckInTimeChange?.(form.check_in_time ?? null);
+  }, [form.check_in_time, onCheckInTimeChange, todaySubmissionComplete, isEditing]);
 
   const overtimeHours = useMemo(() => requestedExtraHours, [requestedExtraHours]);
   const regularHours = useMemo(() => Math.min(Number(form.hours_today), 8), [form.hours_today]);
@@ -167,6 +280,34 @@ export default function DailyWorkUpdate() {
     if (!query) return projects;
     return projects.filter((project) => project.name.toLowerCase().includes(query));
   }, [projects, projectSearch]);
+
+  const checkoutProjects = useMemo(() => {
+    const byId = new Map(projects.map((p) => [p.id, p]));
+    const orderedIds: string[] = [];
+    selectedProjects.forEach((id) => {
+      if (!orderedIds.includes(id)) orderedIds.push(id);
+    });
+    projects.forEach((p) => {
+      if (!orderedIds.includes(p.id)) orderedIds.push(p.id);
+    });
+    return orderedIds.map((id) => byId.get(id)).filter(Boolean) as Project[];
+  }, [projects, selectedProjects]);
+
+  const updateProjectUpdate = useCallback((projectId: string, patch: Partial<ProjectWorkUpdate>) => {
+    setProjectUpdates((prev) => {
+      const current = prev[projectId] || {
+        project_id: projectId,
+        status: 'in_progress' as const,
+        progress_percentage: 0,
+        notes: '',
+      };
+      const next = { ...current, ...patch, project_id: projectId };
+      if (patch.status === 'completed') {
+        next.progress_percentage = Math.max(next.progress_percentage, 100);
+      }
+      return { ...prev, [projectId]: next };
+    });
+  }, []);
 
   const mapWithConcurrency = async <T, R>(
     items: T[],
@@ -240,6 +381,20 @@ export default function DailyWorkUpdate() {
 
     return hasDate && hasHours && hasTasks && overtimeRequestValid;
   }, [form, requestAdminApproval, requestedExtraHours, approvalReason]);
+
+  const taskCounts = useMemo(() => {
+    const completed = countTaskLines(form.completed_tasks);
+    const pending = countTaskLines(form.pending_tasks);
+    const ongoing = countTaskLines(form.ongoing_tasks);
+    const upcoming = countTaskLines(form.notes);
+    return {
+      completed,
+      pending,
+      ongoing,
+      upcoming,
+      total: completed + pending + ongoing + upcoming,
+    };
+  }, [form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes]);
 
   function countItems(text?: string) {
     return countTaskLines(text);
@@ -360,7 +515,7 @@ export default function DailyWorkUpdate() {
     };
   }, [form.submission_date]);
 
-  async function onSubmit() {
+  async function onSubmit(options?: { openPreviewAfter?: boolean }) {
     try {
       setLoading(true);
       setError(null);
@@ -391,13 +546,13 @@ export default function DailyWorkUpdate() {
         throw new Error('Please enter at least one task in Completed, Pending, Ongoing, or Upcoming fields');
       }
       
-      // Optimistic UI update - show feedback immediately for faster perceived performance
       toast({ 
-        title: isEditing ? 'Updating...' : 'Saving...',
+        title: isEditing ? 'Updating...' : 'Checking out...',
         description: 'Processing your submission'
       });
+
+      await assertDeviceClockMatchesServer(isEditing ? 'update this submission' : 'check out');
       
-      // Get planned projects and work from check-in data if available
       const noteParts: string[] = [];
       if (requestAdminApproval) {
         noteParts.push(
@@ -414,20 +569,15 @@ export default function DailyWorkUpdate() {
         break_entries: breakEntries,
         total_break_minutes: getBreakMinutes(breakEntries),
         planned_projects: selectedProjects.length > 0 ? selectedProjects : undefined,
-        planned_work: plannedWork.trim() || undefined
+        planned_work: plannedWork.trim() || undefined,
+        planned_work_status: form.planned_work_status,
+        planned_work_notes: form.planned_work_notes || undefined,
+        project_updates: projectUpdatesToPayload(projectUpdates),
       };
       
-      // Make API call (now returns immediately, notifications happen in background)
       const res = await submitWork(payload);
       if ((res as any)?.success === false) throw new Error((res as any)?.message || 'Failed');
       
-      // Update toast with success
-      toast({ 
-        title: isEditing ? 'Daily submission updated' : 'Daily submission saved',
-        description: 'Your work update has been saved successfully'
-      });
-      
-      // Reset planning details after successful submission
       setSelectedProjects([]);
       setPlannedWork('');
 
@@ -435,19 +585,101 @@ export default function DailyWorkUpdate() {
         clearDailyWorkDraft(currentUser.id, form.submission_date);
       }
 
-      // Small delay for better UX before navigation (allows user to see success message)
-      setTimeout(() => {
-        navigate(`/${currentUser?.role}/daily-update`);
-      }, 500);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to submit');
-      toast({
-        title: 'Failed to save',
-        description: e?.message || 'An error occurred while saving',
-        variant: 'destructive'
+      setTodaySubmissionComplete(true);
+      setIsOnBreak(false);
+      setBreakStartedAt(null);
+
+      if (options?.openPreviewAfter) {
+        setCheckoutWizardStep('preview');
+        setIsCheckoutWizardOpen(true);
+        toast({
+          title: 'Checked out successfully',
+          description: 'Review your daily work summary below',
+        });
+        return;
+      }
+
+      toast({ 
+        title: isEditing ? 'Daily submission updated' : 'Daily submission saved',
+        description: 'Your work update has been saved successfully'
       });
+
+      if (isEmbedded) {
+        onSaved?.();
+      } else {
+        setTimeout(() => {
+          navigate(`/${currentUser?.role}/daily-update`);
+        }, 500);
+      }
+    } catch (e: any) {
+      setError(extractApiErrorMessage(e, 'Failed to submit'));
+      toast(attendanceErrorToast('Checkout blocked', e));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onCopyPreview() {
+    const text = template || '';
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Copied to clipboard' });
+    } catch {
+      toast({
+        title: 'Could not copy',
+        description: 'Please copy the preview manually',
+        variant: 'destructive',
+      });
+    }
+  }
+
+  function openCheckInDialog() {
+    syncFlowAction('checkin');
+    setIsCheckInDialogOpen(true);
+  }
+
+  function closeCheckInDialog() {
+    setIsCheckInDialogOpen(false);
+    setProjectSearch('');
+    clearWorkFlowUrl();
+  }
+
+  function resetCheckoutFormDefaults() {
+    setForm((prev) => ({
+      ...prev,
+      ...emptyCheckoutFormFields(),
+    }));
+    setRequestAdminApproval(false);
+    setRequestedExtraHours(0);
+    setApprovalReason('');
+    setProjectUpdates((prev) => clearProjectUpdateNotes(prev));
+  }
+
+  function openCheckoutWizard() {
+    syncFlowAction('checkout');
+    setCheckoutWizardStep('form');
+    if (!isEditing) {
+      resetCheckoutFormDefaults();
+      setForm((prev) => ({
+        ...prev,
+        submission_date: prev.check_in_time ? prev.submission_date : serverToday,
+      }));
+    }
+    setIsCheckoutWizardOpen(true);
+  }
+
+  function dismissCheckoutWizard() {
+    setIsCheckoutWizardOpen(false);
+    setCheckoutWizardStep('form');
+    clearWorkFlowUrl();
+  }
+
+  function closeCheckoutWizard() {
+    dismissCheckoutWizard();
+    if (isEmbedded) {
+      onSaved?.();
+    } else {
+      navigate(`/${currentUser?.role}/daily-update`);
     }
   }
 
@@ -468,6 +700,7 @@ export default function DailyWorkUpdate() {
   const handleCheckIn = useCallback(async () => {
     try {
       setIsCheckingIn(true);
+      await assertDeviceClockMatchesServer('check in');
       
       // Optimistic UI update - show success immediately for faster perceived performance
       const optimisticCheckInTime = new Date().toISOString();
@@ -478,6 +711,7 @@ export default function DailyWorkUpdate() {
 
       // Close dialog immediately for instant feedback
       setIsCheckInDialogOpen(false);
+      syncFlowAction(null);
       
       // Show optimistic success toast
       const optimisticTime = new Date(optimisticCheckInTime).toLocaleTimeString('en-IN', {
@@ -492,12 +726,18 @@ export default function DailyWorkUpdate() {
       });
 
       // Make API call in background
-      const result = await checkIn(form.submission_date, selectedProjects, plannedWork, form.planned_work_status || 'not_started');
+      const result = await checkIn(
+        serverToday,
+        selectedProjects,
+        plannedWork,
+        form.planned_work_status || 'not_started'
+      );
 
       // Update with actual server time
       setForm((prev) => ({
         ...prev,
         check_in_time: result.check_in_time,
+        submission_date: result.submission_date || serverToday,
       }));
 
       const checkInDate = new Date(result.check_in_time);
@@ -513,6 +753,10 @@ export default function DailyWorkUpdate() {
         description: `Check-in time: ${formattedTime}`,
       });
 
+      if (isEmbedded) {
+        onSaved?.();
+      }
+
       // Keep selectedProjects and plannedWork for preview and submission
       // Don't reset them - they should persist until daily work is saved
     } catch (e: any) {
@@ -525,15 +769,11 @@ export default function DailyWorkUpdate() {
       // Reopen dialog on error
       setIsCheckInDialogOpen(true);
       
-      toast({
-        title: 'Failed to check in',
-        description: e?.message || 'An error occurred',
-        variant: 'destructive'
-      });
+      toast(attendanceErrorToast('Check-in blocked', e));
     } finally {
       setIsCheckingIn(false);
     }
-  }, [form.submission_date, selectedProjects, plannedWork, form.planned_work_status]);
+  }, [form.submission_date, selectedProjects, plannedWork, form.planned_work_status, isEmbedded, onSaved, syncFlowAction, serverToday]);
 
   function handleProjectToggle(projectId: string) {
     setSelectedProjects(prev =>
@@ -656,73 +896,113 @@ export default function DailyWorkUpdate() {
       sec.push(`📊 Planned Work Status: ${statusLabel}`);
     }
 
+    const projectUpdatePayload = projectUpdatesToPayload(projectUpdates).map((u) => ({
+      ...u,
+      project_name: projects.find((p) => p.id === u.project_id)?.name,
+    }));
+    const projectUpdatesText = formatProjectUpdatesForText(projectUpdatePayload);
+    if (projectUpdatesText) {
+      sec.push(`📂 Project Progress\n\n${projectUpdatesText}`);
+    }
+
     const text = sec.length ? header + `\n\n` + sec.join(`\n\n`) : header;
     setTemplate(text);
-  }, [form.submission_date, form.check_in_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes, form.planned_work_notes, form.planned_work_status, selectedProjects, plannedWork, projects, requestAdminApproval, requestedExtraHours, approvalReason, overtimeHours, regularHours, breakEntries, monthSubmissions]);
+  }, [form.submission_date, form.check_in_time, form.hours_today, form.completed_tasks, form.pending_tasks, form.ongoing_tasks, form.notes, form.planned_work_notes, form.planned_work_status, selectedProjects, plannedWork, projects, requestAdminApproval, requestedExtraHours, approvalReason, overtimeHours, regularHours, breakEntries, monthSubmissions, projectUpdates]);
 
-  // Load projects when check-in dialog opens or when we need them for preview
+  // Load projects when check-in or checkout dialog opens (not on each project toggle)
   useEffect(() => {
-    if (isCheckInDialogOpen || selectedProjects.length > 0) {
-      (async () => {
-        try {
-          setLoadingProjects(true);
-          const projectsData = await projectService.getProjects();
-          // Filter to show only active projects
-          const activeProjects = projectsData.filter(p => p.status === 'active' || !p.status);
-          setProjects(activeProjects);
-          fetchProjectStats(activeProjects);
-          console.log('Loaded projects:', activeProjects.length, 'out of', projectsData.length);
-        } catch (error: any) {
-          console.error('Failed to load projects:', error);
-          if (isCheckInDialogOpen) {
-            toast({
-              title: 'Error',
-              description: error?.message || 'Failed to load projects. Please try again.',
-              variant: 'destructive'
-            });
-          }
-          setProjects([]);
-          setProjectStats({});
-        } finally {
-          setLoadingProjects(false);
-        }
-      })();
-    }
-  }, [isCheckInDialogOpen, selectedProjects.length, fetchProjectStats]);
-
-  // Load server row + merge local draft so preview survives refresh (non-editing mode)
-  useEffect(() => {
-    if (isEditing || !form.submission_date || !currentUser?.id) return;
+    if (!isCheckInDialogOpen && !isCheckoutWizardOpen) return;
 
     let cancelled = false;
     (async () => {
       try {
-        const currentDate = form.submission_date;
+        setLoadingProjects(true);
+        const projectsData = await projectService.getProjects();
+        if (cancelled) return;
+        // Filter to show only active projects
+        const activeProjects = projectsData.filter(p => p.status === 'active' || !p.status);
+        setProjects(activeProjects);
+        fetchProjectStats(activeProjects);
+      } catch (error: any) {
+        if (cancelled) return;
+        console.error('Failed to load projects:', error);
+        if (isCheckInDialogOpen) {
+          toast({
+            title: 'Error',
+            description: error?.message || 'Failed to load projects. Please try again.',
+            variant: 'destructive'
+          });
+        }
+        setProjects([]);
+        setProjectStats({});
+      } finally {
+        if (!cancelled) setLoadingProjects(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCheckInDialogOpen, isCheckoutWizardOpen, fetchProjectStats]);
+
+  useEffect(() => {
+    if (!isCheckoutWizardOpen || checkoutProjects.length === 0) return;
+    setProjectUpdates((prev) => {
+      const next = { ...prev };
+      checkoutProjects.forEach((project) => {
+        if (!next[project.id]) {
+          next[project.id] = {
+            project_id: project.id,
+            status: 'in_progress',
+            progress_percentage: 0,
+            notes: '',
+          };
+        }
+      });
+      return next;
+    });
+  }, [isCheckoutWizardOpen, checkoutProjects]);
+
+  // Load server row + merge local draft so preview survives refresh (non-editing mode)
+  useEffect(() => {
+    if (isEditing || !currentUser?.id) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
         const userId = currentUser.id;
-        const submissionsRes = await listMySubmissions({
-          from: currentDate,
-          to: currentDate,
-        });
-        const submissions: any[] =
-          submissionsRes && submissionsRes.data
-            ? submissionsRes.data
-            : Array.isArray(submissionsRes)
-              ? submissionsRes
-              : [];
+        const queryAnchor = todayYMD();
+        const { from, to } = getCalendarMonthPeriod(calendarMonthKey(queryAnchor));
+        const submissionsRes = await listMySubmissions({ from, to });
+        const { submissions, serverToday: serverTodayFromApi } =
+          parseSubmissionsListResponse(submissionsRes);
+        const resolvedServerToday = serverTodayFromApi || queryAnchor;
+        if (!cancelled) {
+          setServerToday(resolvedServerToday);
+        }
+
+        const openSession = submissions.find(
+          (s) => s.check_in_time && !isWorkSubmissionRowComplete(s)
+        );
+        const attendanceDate = String(
+          openSession?.submission_date || resolvedServerToday
+        );
 
         const existingSubmission = submissions.find(
-          (s) => s.submission_date === currentDate
+          (s) => String(s.submission_date) === attendanceDate
         );
 
         let draft: DailyWorkDraftStored | null = null;
         try {
-          const raw = localStorage.getItem(dailyWorkDraftStorageKey(userId, currentDate));
+          const raw = localStorage.getItem(
+            dailyWorkDraftStorageKey(userId, attendanceDate)
+          );
           if (raw) {
             const parsed = JSON.parse(raw) as DailyWorkDraftStored;
             if (
               parsed &&
               parsed.v === DAILY_WORK_DRAFT_VERSION &&
-              parsed.submission_date === currentDate
+              parsed.submission_date === attendanceDate
             ) {
               draft = parsed;
             }
@@ -732,6 +1012,13 @@ export default function DailyWorkUpdate() {
         }
 
         if (cancelled) return;
+
+        if (!cancelled) {
+          setForm((prev) => ({
+            ...prev,
+            submission_date: attendanceDate,
+          }));
+        }
 
         if (existingSubmission && isWorkSubmissionRowComplete(existingSubmission)) {
           const parsedOvertime = parseOvertimeRequestFromNotes(
@@ -759,7 +1046,7 @@ export default function DailyWorkUpdate() {
           setForm({
             submission_date: existingSubmission.submission_date,
             check_in_time: existingSubmission.check_in_time || undefined,
-            hours_today: existingSubmission.hours_today || 8,
+            hours_today: Number(existingSubmission.hours_today) || 8,
             overtime_hours: existingSubmission.overtime_hours || 0,
             completed_tasks: existingSubmission.completed_tasks || '',
             pending_tasks: existingSubmission.pending_tasks || '',
@@ -779,9 +1066,11 @@ export default function DailyWorkUpdate() {
           );
           setSelectedProjects(parsePlannedProjectsFromRow(existingSubmission));
           setPlannedWork(existingSubmission.planned_work || '');
-          clearDailyWorkDraft(userId, currentDate);
+          setProjectUpdates(projectUpdatesMapFromRow(existingSubmission));
+          clearDailyWorkDraft(userId, attendanceDate);
           setIsOnBreak(false);
           setBreakStartedAt(null);
+          setTodaySubmissionComplete(true);
         } else if (existingSubmission) {
           const parsedBreaks = parseBreakLinesFromNotes(
             existingSubmission.notes || ''
@@ -796,10 +1085,13 @@ export default function DailyWorkUpdate() {
           if (draft) {
             setForm((prev) => ({
               ...prev,
-              ...draft.form,
-              submission_date: currentDate,
+              submission_date: attendanceDate,
               check_in_time:
                 existingSubmission.check_in_time || draft.form.check_in_time,
+              hours_today: draft.form.hours_today ?? prev.hours_today,
+              planned_work_status:
+                draft.form.planned_work_status ?? prev.planned_work_status,
+              ...emptyCheckoutFormFields(),
             }));
             setBreakEntries(
               draft.breakEntries?.length ? draft.breakEntries : serverBreaks
@@ -814,9 +1106,14 @@ export default function DailyWorkUpdate() {
                 ? draft.plannedWork
                 : serverPlannedWork
             );
-            setRequestAdminApproval(draft.requestAdminApproval);
-            setRequestedExtraHours(draft.requestedExtraHours);
-            setApprovalReason(draft.approvalReason || '');
+            setRequestAdminApproval(false);
+            setRequestedExtraHours(0);
+            setApprovalReason('');
+            const baseProjectUpdates =
+              draft.projectUpdates && Object.keys(draft.projectUpdates).length > 0
+                ? draft.projectUpdates
+                : projectUpdatesMapFromRow(existingSubmission);
+            setProjectUpdates(clearProjectUpdateNotes(baseProjectUpdates));
             if (draft.isOnBreak && draft.breakStartedAtIso) {
               setIsOnBreak(true);
               setBreakStartedAt(new Date(draft.breakStartedAtIso));
@@ -825,17 +1122,11 @@ export default function DailyWorkUpdate() {
               setBreakStartedAt(null);
             }
           } else {
-            if (existingSubmission.check_in_time) {
-              setForm((prev) => ({
-                ...prev,
-                check_in_time: existingSubmission.check_in_time,
-              }));
-            } else {
-              setForm((prev) => ({
-                ...prev,
-                check_in_time: undefined,
-              }));
-            }
+            setForm((prev) => ({
+              ...prev,
+              check_in_time: existingSubmission.check_in_time || undefined,
+              ...emptyCheckoutFormFields(),
+            }));
             setBreakEntries(serverBreaks);
             if (serverPlannedProjects.length > 0) {
               setSelectedProjects(serverPlannedProjects);
@@ -847,21 +1138,31 @@ export default function DailyWorkUpdate() {
             } else {
               setPlannedWork('');
             }
+            setProjectUpdates(clearProjectUpdateNotes(projectUpdatesMapFromRow(existingSubmission)));
+            setRequestAdminApproval(false);
+            setRequestedExtraHours(0);
+            setApprovalReason('');
             setIsOnBreak(false);
             setBreakStartedAt(null);
+            setTodaySubmissionComplete(false);
           }
         } else if (draft) {
           setForm((prev) => ({
             ...prev,
-            ...draft.form,
-            submission_date: currentDate,
+            submission_date: attendanceDate,
+            check_in_time: draft.form.check_in_time,
+            hours_today: draft.form.hours_today ?? prev.hours_today,
+            planned_work_status:
+              draft.form.planned_work_status ?? prev.planned_work_status,
+            ...emptyCheckoutFormFields(),
           }));
           setBreakEntries(draft.breakEntries || []);
           setSelectedProjects(draft.selectedProjects || []);
           setPlannedWork(draft.plannedWork || '');
-          setRequestAdminApproval(draft.requestAdminApproval);
-          setRequestedExtraHours(draft.requestedExtraHours);
-          setApprovalReason(draft.approvalReason || '');
+          setRequestAdminApproval(false);
+          setRequestedExtraHours(0);
+          setApprovalReason('');
+          setProjectUpdates(clearProjectUpdateNotes(draft.projectUpdates || {}));
           if (draft.isOnBreak && draft.breakStartedAtIso) {
             setIsOnBreak(true);
             setBreakStartedAt(new Date(draft.breakStartedAtIso));
@@ -869,9 +1170,11 @@ export default function DailyWorkUpdate() {
             setIsOnBreak(false);
             setBreakStartedAt(null);
           }
+          setTodaySubmissionComplete(false);
         } else {
           setForm((prev) => ({
             ...prev,
+            submission_date: attendanceDate,
             check_in_time: undefined,
           }));
           setSelectedProjects([]);
@@ -879,6 +1182,7 @@ export default function DailyWorkUpdate() {
           setBreakEntries([]);
           setIsOnBreak(false);
           setBreakStartedAt(null);
+          setTodaySubmissionComplete(false);
         }
       } catch (error) {
         console.error('Failed to load check-in data for date:', error);
@@ -892,7 +1196,7 @@ export default function DailyWorkUpdate() {
     return () => {
       cancelled = true;
     };
-  }, [form.submission_date, isEditing, currentUser?.id]);
+  }, [isEditing, currentUser?.id]);
 
   useEffect(() => {
     if (isEditing || !currentUser?.id || draftHydrationEpoch === 0) return;
@@ -912,6 +1216,7 @@ export default function DailyWorkUpdate() {
       approvalReason,
       isOnBreak,
       breakStartedAtIso: breakStartedAt ? breakStartedAt.toISOString() : null,
+      projectUpdates,
     };
 
     const t = window.setTimeout(() => {
@@ -938,6 +1243,7 @@ export default function DailyWorkUpdate() {
     approvalReason,
     isOnBreak,
     breakStartedAt,
+    projectUpdates,
     form.submission_date,
   ]);
 
@@ -981,7 +1287,7 @@ export default function DailyWorkUpdate() {
             setForm({
               submission_date: existingSubmission.submission_date,
               check_in_time: existingSubmission.check_in_time || undefined,
-              hours_today: existingSubmission.hours_today || 8,
+              hours_today: Number(existingSubmission.hours_today) || 8,
               overtime_hours: existingSubmission.overtime_hours || 0,
               completed_tasks: existingSubmission.completed_tasks || '',
               pending_tasks: existingSubmission.pending_tasks || '',
@@ -1023,6 +1329,9 @@ export default function DailyWorkUpdate() {
             if (existingSubmission.planned_work) {
               setPlannedWork(existingSubmission.planned_work);
             }
+
+            setProjectUpdates(projectUpdatesMapFromRow(existingSubmission));
+            setTodaySubmissionComplete(isWorkSubmissionRowComplete(existingSubmission));
           }
         }
       } catch (e) {
@@ -1033,6 +1342,43 @@ export default function DailyWorkUpdate() {
       }
     })();
   }, [isEditing, editId]);
+
+  useEffect(() => {
+    if (!editId) {
+      didAutoOpenEditRef.current = false;
+    }
+  }, [editId]);
+
+  useEffect(() => {
+    if (isEditing && editId && !tasksLoading && !didAutoOpenEditRef.current) {
+      didAutoOpenEditRef.current = true;
+      syncFlowAction('checkout');
+      setCheckoutWizardStep('form');
+      setIsCheckoutWizardOpen(true);
+    }
+  }, [isEditing, editId, tasksLoading, syncFlowAction]);
+
+  useEffect(() => {
+    const flowKey = `${flowAction || ''}:${editId || ''}`;
+    if (!flowAction) {
+      if (!editId) didAutoOpenFlowRef.current = null;
+      return;
+    }
+    if (didAutoOpenFlowRef.current === flowKey) return;
+
+    if (flowAction === 'checkin') {
+      didAutoOpenFlowRef.current = flowKey;
+      setIsCheckInDialogOpen(true);
+      return;
+    }
+
+    if (flowAction === 'checkout' && !isEditing) {
+      didAutoOpenFlowRef.current = flowKey;
+      resetCheckoutFormDefaults();
+      setCheckoutWizardStep('form');
+      setIsCheckoutWizardOpen(true);
+    }
+  }, [flowAction, editId, isEditing]);
 
   async function startEdit(t: UserTask) {
     setEditingTaskId((t.id as number) ?? null);
@@ -1063,437 +1409,104 @@ export default function DailyWorkUpdate() {
     setCompletedTasks((prev) => [updated, ...prev].slice(0, 5));
   }
 
+  const isHeaderLayout = layout === 'header';
+  const primaryBtnClass =
+    'h-12 px-6 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105';
+  const outlineBtnClass =
+    'h-12 px-6 border-2 font-semibold shadow-sm transition-all duration-300 hover:scale-105';
+
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0">
-        {/* Simplified Header */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 sm:p-6 shadow-sm min-w-0">
-          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 min-w-0">
-            <div className="space-y-1 min-w-0 flex-1">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <button
-                  onClick={() => navigate(`/${currentUser?.role}/daily-update`)}
-                  className="p-1.5 shrink-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                >
-                  <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                </button>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white min-w-0 break-words">
-                  {isEditing ? 'Edit Work Update' : 'Daily Work Update'}
-                </h1>
+    <>
+      <div
+        className={
+          isHeaderLayout
+            ? 'flex flex-col items-stretch gap-3 sm:items-end'
+            : 'flex flex-wrap items-center gap-2 sm:gap-3'
+        }
+      >
+        {isEditing && (
+          <span
+            className={
+              isHeaderLayout
+                ? 'text-xs font-medium text-gray-500 dark:text-gray-400 sm:text-right'
+                : 'w-full text-xs font-medium text-gray-500 dark:text-gray-400 sm:mr-1 sm:w-auto'
+            }
+          >
+            Editing submission
+          </span>
+        )}
+        <div className={`flex flex-wrap items-center gap-3 ${isHeaderLayout ? 'sm:justify-end' : ''}`}>
+        {hasActiveWorkSession && (
+          <Button
+            onClick={onToggleBreak}
+            type="button"
+            variant={isOnBreak ? 'destructive' : 'outline'}
+            className={`${outlineBtnClass} shrink-0`}
+          >
+            {isOnBreak ? (
+              <div className="flex items-center gap-3">
+                <PlayCircle className="h-5 w-5" />
+                <span>End Break</span>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 pl-9 sm:ml-11 sm:pl-0">
-                Fill out your daily work progress and tasks
-              </p>
+            ) : (
+              <div className="flex items-center gap-3">
+                <PauseCircle className="h-5 w-5" />
+                <span>Break</span>
+              </div>
+            )}
+          </Button>
+        )}
+        {!isEditing && !hasCheckedIn && !todaySubmissionComplete ? (
+          <Button
+            onClick={openCheckInDialog}
+            disabled={isCheckingIn}
+            className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-blue-600 to-emerald-700 text-white hover:from-blue-700 hover:to-emerald-800`}
+          >
+            {isCheckingIn ? (
+              <div className="flex items-center gap-3">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <span>Checking in...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Clock className="h-5 w-5" />
+                <span>Check-in</span>
+              </div>
+            )}
+          </Button>
+        ) : null}
+        {hasActiveWorkSession ? (
+          <Button
+            onClick={openCheckoutWizard}
+            className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700`}
+          >
+            <div className="flex items-center gap-3">
+              <LogOut className="h-5 w-5" />
+              <span>Checkout</span>
             </div>
-
-            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end sm:w-auto sm:gap-3">
-              <Button
-                onClick={onToggleBreak}
-                type="button"
-                variant={isOnBreak ? 'destructive' : 'outline'}
-                className="w-full sm:w-auto shrink-0 border-2 transition-all duration-200 hover:scale-[1.02] sm:hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
-              >
-                {isOnBreak ? (
-                  <>
-                    <PlayCircle className="h-4 w-4 mr-2" />
-                    End Break
-                  </>
-                ) : (
-                  <>
-                    <PauseCircle className="h-4 w-4 mr-2" />
-                    Break
-                  </>
-                )}
-              </Button>
-              <Button
-                onClick={() => setIsCheckInDialogOpen(true)}
-                disabled={isCheckingIn}
-                variant="outline"
-                className="w-full sm:w-auto shrink-0 border-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all duration-200 hover:scale-[1.02] sm:hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
-              >
-                {isCheckingIn ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Checking in...
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-4 w-4 mr-2" />
-                    Check-in
-                  </>
-                )}
-              </Button>
-              <Button
-                disabled={!canSubmit || loading}
-                onClick={onSubmit}
-                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold transition-all duration-200 hover:scale-[1.02] sm:hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>{isEditing ? 'Updating...' : 'Saving...'}</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    <span>{isEditing ? 'Update' : 'Save'}</span>
-                  </div>
-                )}
-              </Button>
+          </Button>
+        ) : null}
+        {isEditing ? (
+          <Button
+            onClick={openCheckoutWizard}
+            className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-blue-600 to-emerald-700 text-white hover:from-blue-700 hover:to-emerald-800`}
+          >
+            <div className="flex items-center gap-3">
+              <FileText className="h-5 w-5" />
+              <span>Update Submission</span>
             </div>
-          </div>
+          </Button>
+        ) : null}
         </div>
-
-        {/* Main Form Content */}
-        <div className="space-y-6 sm:space-y-8">
-          {error && (
-            <div className="relative overflow-hidden rounded-2xl border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 p-6">
-              <div className="absolute inset-0 bg-red-500/5"></div>
-              <div className="relative flex items-start gap-4">
-                <div className="p-2 bg-red-500 rounded-lg">
-                  <FileText className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-1">Error</h3>
-                  <p className="text-red-700 dark:text-red-300 leading-relaxed">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-6 sm:space-y-8 lg:space-y-10">
-            {/* Basic Information Card */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 sm:p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <Calendar className="h-5 w-5 text-blue-600" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Basic Information</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="work-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Work Date <span className="text-red-500">*</span>
-                  </Label>
-                  <DateDropdown
-                    value={form.submission_date}
-                    onChange={(v) => setForm((p) => ({ ...p, submission_date: v }))}
-                    placeholder="Select date"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="hours-worked" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Hours Worked <span className="text-red-500">*</span>
-                  </Label>
-                  <HourPicker
-                    value={form.hours_today}
-                    onChange={(v) => setForm((p) => ({ ...p, hours_today: v }))}
-                    min={1}
-                    max={8}
-                    step={0.25}
-                    placeholder="Select hours"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 p-3 sm:p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <div className="flex items-start sm:items-center gap-3">
-                  <Checkbox
-                    id="request-admin-approval"
-                    checked={requestAdminApproval}
-                    onCheckedChange={(checked) => {
-                      const enabled = Boolean(checked);
-                      setRequestAdminApproval(enabled);
-                      if (!enabled) {
-                        setRequestedExtraHours(0);
-                        setApprovalReason('');
-                      }
-                    }}
-                  />
-                  <div className="space-y-1 min-w-0">
-                    <Label htmlFor="request-admin-approval" className="text-sm font-semibold text-blue-900 dark:text-blue-200 cursor-pointer">
-                      Worked more than 8 hours? Request Admin Approval
-                    </Label>
-                    <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300">
-                      Daily hours are capped at 8. Use this option to request extra-hour approval.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {requestAdminApproval && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                  <div className="space-y-2 md:col-span-4">
-                    <Label htmlFor="requested-extra-hours" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Requested Extra Hours
-                    </Label>
-                    <Input
-                      id="requested-extra-hours"
-                      type="number"
-                      min={0.25}
-                      max={16}
-                      step={0.25}
-                      value={requestedExtraHours || ''}
-                      onChange={(e) => {
-                        const next = Number(e.target.value || 0);
-                        setRequestedExtraHours(Math.max(0, Math.min(16, next)));
-                      }}
-                      placeholder="e.g. 2"
-                      className="h-[110px] text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      Range: 0.25 to 16 hours
-                    </p>
-                  </div>
-                  <div className="space-y-2 md:col-span-8">
-                    <Label htmlFor="approval-reason" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Reason for Approval
-                    </Label>
-                    <Textarea
-                      id="approval-reason"
-                      className="min-h-[110px] border-2 border-orange-200 dark:border-orange-800 focus:border-orange-500 dark:focus:border-orange-400 rounded-xl text-sm leading-relaxed resize-none"
-                      value={approvalReason}
-                      onChange={(e) => setApprovalReason(e.target.value)}
-                      placeholder="Explain why extra hours are needed..."
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Overtime Breakdown - Compact */}
-              {requestAdminApproval && overtimeHours > 0 && (
-                <div className="mt-4 p-3 sm:p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Regular Hours:</span>
-                    <span className="font-semibold text-gray-900 dark:text-white text-right sm:text-left">{regularHours}h</span>
-                    <span className="text-gray-600 dark:text-gray-400">Requested Extra:</span>
-                    <span className="font-semibold text-orange-600 dark:text-orange-400 text-right sm:text-left">{overtimeHours}h</span>
-                  </div>
-                </div>
-              )}
-
-              {!canSubmit && (
-                <div className="mt-4 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <p className="text-sm text-red-700 dark:text-red-300">
-                    Please complete: Date, Hours (1–8), and at least one task field.
-                    {requestAdminApproval && ' For approval requests, add requested extra hours and a detailed reason.'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Tasks and Preview Grid - Left: Tasks (8 cols), Right: Preview (4 cols) */}
-            <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 lg:gap-10 lg:items-stretch">
-              {/* Today's Tasks Section - Left Side, 8 columns equivalent */}
-              <div className="flex-1 lg:flex-[8] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 sm:p-6 shadow-sm lg:h-full flex flex-col">
-                <div className="flex items-center gap-3 mb-6 flex-shrink-0">
-                  <ListTodo className="h-5 w-5 text-emerald-600" />
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Today's Tasks</h2>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">One task per line</span>
-                </div>
-
-                  <div className="grid grid-cols-12 gap-6 sm:gap-8 lg:gap-10">
-                    {/* Completed Tasks */}
-                    <div className="col-span-12 lg:col-span-6 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 bg-green-500 rounded-full shadow-lg"></div>
-                        <Label htmlFor="completed-tasks" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <span className="text-green-600">✅</span>
-                          Completed Tasks
-                        </Label>
-                        <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-bold rounded-full">
-                          {countItems(form.completed_tasks)}
-                        </span>
-                      </div>
-                      <Textarea
-                        id="completed-tasks"
-                        className="min-h-[160px] lg:min-h-[180px] border-2 border-green-200 dark:border-green-800 focus:border-green-500 dark:focus:border-green-400 rounded-xl text-sm leading-relaxed resize-none"
-                        value={form.completed_tasks || ''}
-                        onChange={(e) => setForm((p) => ({ ...p, completed_tasks: e.target.value }))}
-                        placeholder="✅ What did you accomplish today?
-
-Example:
-• Fixed user authentication bug
-• Completed code review for PR #123
-• Updated project documentation
-• Deployed new feature to staging"
-                      />
-                    </div>
-
-                    {/* Pending Tasks */}
-                    <div className="col-span-12 lg:col-span-6 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 bg-yellow-500 rounded-full shadow-lg"></div>
-                        <Label htmlFor="pending-tasks" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <span className="text-yellow-600">⏳</span>
-                          Pending Tasks
-                        </Label>
-                        <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 text-xs font-bold rounded-full">
-                          {countItems(form.pending_tasks)}
-                        </span>
-                      </div>
-                      <Textarea
-                        id="pending-tasks"
-                        className="min-h-[160px] lg:min-h-[180px] border-2 border-yellow-200 dark:border-yellow-800 focus:border-yellow-500 dark:focus:border-yellow-400 rounded-xl text-sm leading-relaxed resize-none"
-                        value={form.pending_tasks || ''}
-                        onChange={(e) => setForm((p) => ({ ...p, pending_tasks: e.target.value }))}
-                        placeholder="⏳ What needs to be done?
-
-Example:
-• Write unit tests for new feature
-• Update API documentation
-• Fix responsive design issues
-• Review teammate's pull request"
-                      />
-                    </div>
-
-                    {/* Ongoing Tasks */}
-                    <div className="col-span-12 lg:col-span-6 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 bg-blue-500 rounded-full shadow-lg"></div>
-                        <Label htmlFor="ongoing-tasks" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <span className="text-blue-600">🔄</span>
-                          Ongoing Tasks
-                        </Label>
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-bold rounded-full">
-                          {countItems(form.ongoing_tasks)}
-                        </span>
-                      </div>
-                      <Textarea
-                        id="ongoing-tasks"
-                        className="min-h-[160px] lg:min-h-[180px] border-2 border-blue-200 dark:border-blue-800 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl text-sm leading-relaxed resize-none"
-                        value={form.ongoing_tasks || ''}
-                        onChange={(e) => setForm((p) => ({ ...p, ongoing_tasks: e.target.value }))}
-                        placeholder="🔄 What are you currently working on?
-
-Example:
-• Refactoring authentication system
-• Implementing new dashboard design
-• Optimizing database queries
-• Writing integration tests"
-                      />
-                    </div>
-
-                    {/* Upcoming Tasks */}
-                    <div className="col-span-12 lg:col-span-6 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 bg-purple-500 rounded-full shadow-lg"></div>
-                        <Label htmlFor="upcoming-tasks" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <span className="text-purple-600">🔥</span>
-                          Upcoming Tasks
-                        </Label>
-                        <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-bold rounded-full">
-                          {countItems(form.notes)}
-                        </span>
-                      </div>
-                      <Textarea
-                        id="upcoming-tasks"
-                        className="min-h-[160px] lg:min-h-[180px] border-2 border-purple-200 dark:border-purple-800 focus:border-purple-500 dark:focus:border-purple-400 rounded-xl text-sm leading-relaxed resize-none"
-                        value={form.notes || ''}
-                        onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-                        placeholder="🔥 What's coming up next?
-
-Example:
-• Prepare release notes for v2.1
-• Estimate new feature requirements
-• Team sync meeting tomorrow
-• Plan sprint retrospective"
-                      />
-                    </div>
-
-                    {/* Work Notes */}
-                    <div className="col-span-12 lg:col-span-6 space-y-4 flex flex-col">
-                      <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 bg-teal-500 rounded-full shadow-lg"></div>
-                        <Label htmlFor="planned-work-notes" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <span className="text-teal-600">📝</span>
-                          Work Notes
-                        </Label>
-                      </div>
-                      <Textarea
-                        id="planned-work-notes"
-                        className="h-[180px] border-2 border-teal-200 dark:border-teal-800 focus:border-teal-500 dark:focus:border-teal-400 rounded-xl text-sm leading-relaxed resize-none"
-                        value={form.planned_work_notes || ''}
-                        onChange={(e) => setForm((p) => ({ ...p, planned_work_notes: e.target.value }))}
-                        placeholder="📝 Add notes about the status (optional)...
-
-Example:
-• Waiting for API documentation
-• Blocked by database migration
-• Need code review before proceeding
-• Dependencies not yet available"
-                      />
-                    </div>
-
-                    {/* Planned Work Status */}
-                    <div className="col-span-12 lg:col-span-6 space-y-4 flex flex-col">
-                      <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 bg-indigo-500 rounded-full shadow-lg"></div>
-                        <Label htmlFor="planned-work-status" className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <span className="text-indigo-600">📊</span>
-                          Planned Work Status
-                        </Label>
-                      </div>
-                      <div className="h-[180px] p-4 border-2 border-indigo-200 dark:border-indigo-800 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/10 flex flex-col justify-between">
-                        <div>
-                          <StatusDropdown
-                            value={form.planned_work_status || 'not_started'}
-                            onChange={(value) => setForm((p) => ({ ...p, planned_work_status: value }))}
-                            placeholder="Select status"
-                            className="w-full"
-                          />
-                        </div>
-                        <div className="mt-4 space-y-2">
-                          <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                            Update the status to reflect your current progress on planned tasks.
-                          </p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                            This helps track progress from planning to completion and provides visibility into your work status throughout the day.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Preview Section - Right Side, 4 columns equivalent, Matches Today's Tasks Height */}
-              <div className="flex-1 lg:flex-[4] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 sm:p-6 shadow-sm lg:h-full flex flex-col">
-                <div className="flex items-center justify-between mb-6 flex-shrink-0">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-purple-600" />
-                    Preview
-                  </h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onSharePreview}
-                    className="h-8 text-xs transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-                  >
-                    <Share2 className="h-3 w-3 mr-1.5" />
-                    Share
-                  </Button>
-                </div>
-
-                {/* Scrollable Preview Content - Matches Tasks Section Height with Internal Scrolling */}
-                <div className="flex-1 overflow-y-auto overflow-x-hidden rounded-lg bg-gray-50 dark:bg-gray-800/50 p-4 border border-gray-200 dark:border-gray-700 min-h-0" style={{ scrollbarWidth: 'thin', scrollbarColor: '#9CA3AF transparent' }}>
-                  <pre className="text-xs whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed font-mono m-0">
-                    {template || 'Start filling the form to see preview...'}
-                  </pre>
-                </div>
-              </div>
-            </div>
-          </div>
-      </section>
+      </div>
 
       {/* Professional Check-in Dialog */}
       <Dialog open={isCheckInDialogOpen} onOpenChange={(open) => {
-        setIsCheckInDialogOpen(open);
-        if (!open) {
-          setProjectSearch('');
+        if (open) {
+          setIsCheckInDialogOpen(true);
+          return;
         }
-        // Don't reset selectedProjects and plannedWork when dialog closes
-        // They should persist for preview and submission
+        closeCheckInDialog();
       }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 [&>button[data-radix-dialog-close]]:hidden">
           {/* Header with gradient background */}
@@ -1504,8 +1517,7 @@ Example:
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setIsCheckInDialogOpen(false);
-                // Don't reset selectedProjects and plannedWork - keep them for preview
+                closeCheckInDialog();
               }}
               className="absolute top-3 right-3 z-[100] p-2.5 bg-white/25 hover:bg-white/40 rounded-lg transition-all duration-200 group backdrop-blur-md border-2 border-white/40 hover:border-white/60 shadow-2xl hover:shadow-white/20 hover:scale-110 active:scale-95"
               aria-label="Close dialog"
@@ -1708,6 +1720,401 @@ Example:
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </main>
+
+      <Dialog
+        open={isCheckoutWizardOpen}
+        onOpenChange={(open) => {
+          if (!open && checkoutWizardStep === 'preview') {
+            closeCheckoutWizard();
+            return;
+          }
+          setIsCheckoutWizardOpen(open);
+          if (!open) {
+            setCheckoutWizardStep('form');
+            clearWorkFlowUrl();
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden p-0 [&>button[data-radix-dialog-close]]:hidden">
+          {/* Header */}
+          <div
+            className={`relative overflow-visible p-6 text-white ${
+              checkoutWizardStep === 'form'
+                ? 'bg-gradient-to-br from-amber-500 via-orange-600 to-red-600'
+                : 'bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600'
+            }`}
+          >
+            <div className="absolute inset-0 bg-black/10" />
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (checkoutWizardStep === 'preview') {
+                  closeCheckoutWizard();
+                } else {
+                  dismissCheckoutWizard();
+                }
+              }}
+              className="absolute top-3 right-3 z-[100] rounded-lg border-2 border-white/40 bg-white/25 p-2.5 shadow-2xl backdrop-blur-md transition-all duration-200 hover:scale-110 hover:border-white/60 hover:bg-white/40 active:scale-95"
+              aria-label="Close dialog"
+              type="button"
+            >
+              <X className="h-5 w-5 text-white transition-transform duration-200 group-hover:rotate-90" strokeWidth={3} />
+            </button>
+            <div className="relative z-10">
+              <DialogHeader className="space-y-2 pr-14 text-left">
+                <DialogTitle className="flex items-center gap-3 text-2xl font-bold">
+                  <div className="rounded-xl bg-white/20 p-2 backdrop-blur-sm">
+                    {checkoutWizardStep === 'form' ? (
+                      <LogOut className="h-6 w-6" />
+                    ) : (
+                      <FileText className="h-6 w-6" />
+                    )}
+                  </div>
+                  {checkoutWizardStep === 'form'
+                    ? isEditing
+                      ? 'Update Work Submission'
+                      : 'Complete Checkout'
+                    : 'Daily Work Preview'}
+                </DialogTitle>
+                <DialogDescription className="text-base text-white/90">
+                  {checkoutWizardStep === 'form'
+                    ? isEditing
+                      ? 'Review and update your daily work submission.'
+                      : 'Review and submit your daily work before checking out.'
+                    : 'Copy or share your daily work update.'}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+          </div>
+
+          {checkoutWizardStep === 'form' ? (
+            <>
+              <div className="flex-1 overflow-y-auto bg-gray-50/50 p-5 dark:bg-gray-900/50 sm:p-6">
+                <div className="space-y-6">
+                  {/* Basic Information */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="mb-5 flex items-center gap-3">
+                      <div className="rounded-lg bg-blue-100 p-1.5 dark:bg-blue-900/30">
+                        <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Basic Information</h3>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:items-stretch">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="checkout-work-date" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                          Work Date <span className="text-red-500">*</span>
+                        </Label>
+                        <div
+                          id="checkout-work-date"
+                          className="flex h-11 items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-100"
+                        >
+                          <Calendar className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                          <span className="truncate">{formatAttendanceDateLabel(form.submission_date)}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="checkout-hours" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                          Hours Worked <span className="text-red-500">*</span>
+                        </Label>
+                        <HourPicker
+                          value={form.hours_today}
+                          onChange={(v) => setForm((p) => ({ ...p, hours_today: v }))}
+                          min={1}
+                          max={8}
+                          step={0.25}
+                          placeholder="Select hours"
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 sm:col-span-2 md:col-span-1">
+                        <Label htmlFor="checkout-planned-status" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                          Planned Work Status
+                        </Label>
+                        <StatusDropdown
+                          value={form.planned_work_status || 'not_started'}
+                          onChange={(value) => setForm((p) => ({ ...p, planned_work_status: value }))}
+                          placeholder="Select status"
+                          className="h-11 w-full"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="checkout-request-admin-approval"
+                          checked={requestAdminApproval}
+                          onCheckedChange={(checked) => {
+                            const enabled = Boolean(checked);
+                            setRequestAdminApproval(enabled);
+                            if (!enabled) {
+                              setRequestedExtraHours(0);
+                              setApprovalReason('');
+                            }
+                          }}
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 space-y-1">
+                          <Label
+                            htmlFor="checkout-request-admin-approval"
+                            className="cursor-pointer text-sm font-semibold text-blue-900 dark:text-blue-200"
+                          >
+                            Worked more than 8 hours? Request Admin Approval
+                          </Label>
+                          <p className="text-xs text-blue-700 dark:text-blue-300">
+                            Daily hours are capped at 8. Use this to request extra-hour approval.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {requestAdminApproval ? (
+                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-stretch">
+                        <div className="flex min-w-0 flex-col gap-2">
+                          <Label htmlFor="checkout-extra-hours" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                            Requested Extra Hours
+                          </Label>
+                          <Input
+                            id="checkout-extra-hours"
+                            type="number"
+                            min={0.25}
+                            max={16}
+                            step={0.25}
+                            value={requestedExtraHours || ''}
+                            onChange={(e) => {
+                              const next = Number(e.target.value || 0);
+                              setRequestedExtraHours(Math.max(0, Math.min(16, next)));
+                            }}
+                            placeholder="e.g. 2"
+                            className="h-11 border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-2">
+                          <Label htmlFor="checkout-approval-reason" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                            Reason for Approval
+                          </Label>
+                          <Input
+                            id="checkout-approval-reason"
+                            value={approvalReason}
+                            onChange={(e) => setApprovalReason(e.target.value)}
+                            placeholder="Explain why extra hours are needed..."
+                            className="h-11 border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Daily Tasks */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="mb-5 flex items-center gap-3">
+                      <div className="rounded-lg bg-emerald-100 p-1.5 dark:bg-emerald-900/30">
+                        <ListTodo className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Daily Tasks</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Fill at least one task field to complete checkout
+                          {taskCounts.total > 0 ? (
+                            <span className="ml-1 font-medium text-emerald-600 dark:text-emerald-400">
+                              · {taskCounts.total} {taskCounts.total === 1 ? 'item' : 'items'} total
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                      {taskCounts.total > 0 ? (
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                          {taskCounts.total}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex min-h-5 items-center justify-between gap-2">
+                          <Label htmlFor="checkout-completed" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                            Completed Tasks
+                          </Label>
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            {taskCounts.completed}
+                          </span>
+                        </div>
+                        <Textarea
+                          id="checkout-completed"
+                          value={form.completed_tasks || ''}
+                          onChange={(e) => setForm((p) => ({ ...p, completed_tasks: e.target.value }))}
+                          className="min-h-[120px] flex-1 resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                          placeholder="List completed tasks..."
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex min-h-5 items-center justify-between gap-2">
+                          <Label htmlFor="checkout-pending" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                            Pending Tasks
+                          </Label>
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            {taskCounts.pending}
+                          </span>
+                        </div>
+                        <Textarea
+                          id="checkout-pending"
+                          value={form.pending_tasks || ''}
+                          onChange={(e) => setForm((p) => ({ ...p, pending_tasks: e.target.value }))}
+                          className="min-h-[120px] flex-1 resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                          placeholder="List pending tasks..."
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex min-h-5 items-center justify-between gap-2">
+                          <Label htmlFor="checkout-ongoing" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                            Ongoing Tasks
+                          </Label>
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                            {taskCounts.ongoing}
+                          </span>
+                        </div>
+                        <Textarea
+                          id="checkout-ongoing"
+                          value={form.ongoing_tasks || ''}
+                          onChange={(e) => setForm((p) => ({ ...p, ongoing_tasks: e.target.value }))}
+                          className="min-h-[120px] flex-1 resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                          placeholder="List ongoing tasks..."
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex min-h-5 items-center justify-between gap-2">
+                          <Label htmlFor="checkout-upcoming" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                            Upcoming Tasks
+                          </Label>
+                          <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                            {taskCounts.upcoming}
+                          </span>
+                        </div>
+                        <Textarea
+                          id="checkout-upcoming"
+                          value={form.notes || ''}
+                          onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+                          className="min-h-[120px] flex-1 resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                          placeholder="List upcoming tasks..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <CheckoutProjectUpdatesCard
+                    projects={checkoutProjects}
+                    projectUpdates={projectUpdates}
+                    onChange={updateProjectUpdate}
+                    loading={loadingProjects && checkoutProjects.length === 0}
+                  />
+
+                  {/* Work Notes */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="mb-5 flex items-center gap-3">
+                      <div className="rounded-lg bg-purple-100 p-1.5 dark:bg-purple-900/30">
+                        <FileText className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Work Notes</h3>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="checkout-work-notes" className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                        Additional notes about your work today
+                      </Label>
+                      <Textarea
+                        id="checkout-work-notes"
+                        value={form.planned_work_notes || ''}
+                        onChange={(e) => setForm((p) => ({ ...p, planned_work_notes: e.target.value }))}
+                        className="min-h-[120px] w-full resize-none border-2 border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                        placeholder="Additional notes about your work today..."
+                      />
+                    </div>
+                  </div>
+
+                  {!canSubmit ? (
+                    <div className="flex items-start gap-3 rounded-xl border-2 border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/20">
+                      <div className="rounded-lg bg-red-500 p-1.5 shrink-0">
+                        <AlertTriangle className="h-4 w-4 text-white" />
+                      </div>
+                      <p className="text-sm leading-relaxed text-red-700 dark:text-red-300">
+                        Please complete date, hours (1–8), and at least one task field before checkout.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <DialogFooter className="border-t border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 sm:px-6">
+                <Button
+                  disabled={!canSubmit || loading}
+                  onClick={() => void onSubmit({ openPreviewAfter: true })}
+                  className="h-11 w-full bg-gradient-to-r from-amber-600 to-orange-600 font-semibold text-white hover:from-amber-700 hover:to-orange-700"
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Submitting...
+                    </span>
+                  ) : isEditing ? (
+                    'Update Submission'
+                  ) : (
+                    'Complete Checkout'
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="flex-1 overflow-y-auto bg-gray-50/50 p-5 dark:bg-gray-900/50 sm:p-6">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                  <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Submission Summary</h3>
+                  <div className="max-h-[50vh] overflow-y-auto overflow-x-hidden rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
+                    <pre className="m-0 whitespace-pre-wrap font-mono text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+                      {template || 'No preview available.'}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter className="border-t border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800 sm:px-6">
+                <div className="grid w-full grid-cols-2 gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => void onCopyPreview()}
+                    className="h-11 w-full border-2"
+                  >
+                    <ClipboardCopy className="mr-2 h-4 w-4" />
+                    Copy
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void onSharePreview()}
+                    className="h-11 w-full border-2"
+                  >
+                    <Share2 className="mr-2 h-4 w-4" />
+                    Share
+                  </Button>
+                </div>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
+}
+
+export default function DailyWorkUpdate() {
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const edit = searchParams.get('edit');
+    const action = searchParams.get('action');
+    const params = new URLSearchParams();
+    if (edit) params.set('edit', edit);
+    if (action === 'checkin' || action === 'checkout') params.set('action', action);
+    const qs = params.toString();
+    const role = currentUser?.role || 'developer';
+    navigate(`/${role}/daily-update${qs ? `?${qs}` : ''}`, { replace: true });
+  }, [navigate, currentUser?.role, searchParams]);
+
+  return null;
 }

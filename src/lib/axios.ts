@@ -92,6 +92,11 @@ apiClient.interceptors.response.use(
       error.message = 'Network error - please check your internet connection';
     } else if (error.response?.status === 0) {
       error.message = 'Cannot connect to server - please check if the API is running';
+    } else {
+      const apiMessage = extractApiErrorMessage(error, '');
+      if (apiMessage) {
+        error.message = apiMessage;
+      }
     }
 
     const status = error.response?.status;

@@ -14,7 +14,9 @@ export type UserTask = {
   updated_at?: string;
 };
 
-export type StatusOption = 'not_started' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
+export type { StatusOption, ProjectWorkUpdate } from '@/lib/projectWorkUpdates';
+import type { StatusOption, ProjectWorkUpdate } from '@/lib/projectWorkUpdates';
+import { readApiJson } from '@/lib/apiError';
 
 export type WorkSubmission = {
   submission_date: string; // YYYY-MM-DD
@@ -34,6 +36,9 @@ export type WorkSubmission = {
   notes?: string;
   planned_work_status?: StatusOption;
   planned_work_notes?: string;
+  planned_projects?: string[];
+  planned_work?: string;
+  project_updates?: ProjectWorkUpdate[];
 };
 
 import { ENV } from '@/lib/env';
@@ -174,8 +179,11 @@ export async function submitWork(payload: WorkSubmission) {
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error('Failed to submit work');
-  return res.json();
+  const data = await readApiJson<{ success?: boolean; message?: string }>(res);
+  if (!res.ok || data.success === false) {
+    throw new Error(data.message || 'Failed to submit work');
+  }
+  return data;
 }
 
 export async function getTemplate(date: string, since?: string) {
@@ -225,6 +233,23 @@ export async function listMySubmissions(params: { from?: string; to?: string } =
   const data = await res.json();
   // console.log('Submissions response:', data);
   return data;
+}
+
+export function parseSubmissionsListResponse(res: unknown): {
+  submissions: any[];
+  serverToday?: string;
+} {
+  const payload = res as { data?: unknown; server_today?: string };
+  const submissions = Array.isArray(payload?.data)
+    ? payload.data
+    : Array.isArray(res)
+      ? res
+      : [];
+  const serverToday =
+    typeof payload?.server_today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.server_today)
+      ? payload.server_today
+      : undefined;
+  return { submissions, serverToday };
 }
 
 export async function listAllRequestSubmissions(
@@ -334,12 +359,12 @@ export async function checkIn(
     throw new Error('Empty response from server');
   }
 
-  let responseData;
+  let responseData: { success?: boolean; message?: string; data?: Record<string, unknown>; check_in_time?: string; submission_date?: string };
   try {
     responseData = JSON.parse(responseText);
-  } catch (e) {
+  } catch {
     console.error('Failed to parse JSON response:', responseText);
-    throw new Error('Invalid JSON response from server: ' + responseText.substring(0, 100));
+    throw new Error('Invalid response from server. Please try again.');
   }
 
   if (!res.ok || !responseData.success) {
@@ -347,11 +372,14 @@ export async function checkIn(
   }
 
   // Extract data from response (responseData.data contains the actual data)
-  const data = responseData.data || responseData;
+  const data = (responseData.data || responseData) as {
+    check_in_time?: string;
+    submission_date?: string;
+  };
   return {
-    success: responseData.success,
-    check_in_time: data.check_in_time || responseData.check_in_time,
-    submission_date: data.submission_date || responseData.submission_date,
+    success: Boolean(responseData.success),
+    check_in_time: String(data.check_in_time || responseData.check_in_time || ''),
+    submission_date: String(data.submission_date || responseData.submission_date || ''),
     message: responseData.message
   };
 }

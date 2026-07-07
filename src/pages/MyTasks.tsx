@@ -20,6 +20,14 @@ import { projectService, Project } from '@/services/projectService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import {
+  TaskFormActions,
+  TaskFormDialogShell,
+  TaskFormField,
+  TaskFormSection,
+  taskFieldControlClass,
+  taskTextareaClass,
+} from '@/components/tasks/TaskFormDialogShell';
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
@@ -1781,219 +1789,175 @@ export default function MyTasks() {
         </TabsContent>
         </Tabs>
 
-        {/* Professional Modal for Create/Edit Task */}
-        <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-          <DialogContent 
-            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-2xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !ml-0"
-            style={{ marginLeft: '0 !important' }}
-            aria-describedby="task-edit-description"
-          >
-            <DialogHeader className="relative">
-              <DialogTitle className="flex items-center gap-3 pr-12">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600">
-                  <ListChecks className="h-5 w-5 text-white" />
-                </div>
-                <span className="text-lg sm:text-xl font-semibold">
-                  {editing?.id ? 'Edit Task' : 'Create New Task'}
-                </span>
-              </DialogTitle>
-              <p id="task-edit-description" className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                {editing?.id ? 'Update your task details and settings.' : 'Create a new task with title, description, and other details.'}
-              </p>
-              <Button
-                onClick={() => setModalOpen(false)}
-                variant="ghost"
-                size="sm"
-                className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
-              >
-                <X className="h-4 w-4" />
-                </Button>
-            </DialogHeader>
-
-            <div className="space-y-6">
-              <div className="space-y-4 sm:space-y-5">
-                {/* Title */}
-                <div>
-                  <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Task Title <span className="text-red-500">*</span>
-                  </Label>
+        {/* Create / Edit personal task */}
+        <TaskFormDialogShell
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          title={editing?.id ? 'Edit Task' : 'Create New Task'}
+          description={
+            editing?.id
+              ? 'Update your task details and settings.'
+              : 'Create a new task with title, description, and other details.'
+          }
+          icon={<ListChecks className="h-5 w-5 text-white" />}
+          footer={
+            <TaskFormActions
+              onCancel={() => setModalOpen(false)}
+              onSubmit={onSave}
+              submitting={submitting}
+              submitLabel={editing?.id ? 'Update Task' : 'Create Task'}
+              disabled={!editing?.title?.trim()}
+            />
+          }
+        >
+          <div className="space-y-5">
+            <TaskFormSection
+              title="Basic Information"
+              subtitle="What needs to be done"
+              icon={<FileText className="h-4 w-4" />}
+            >
+              <div className="space-y-4">
+                <TaskFormField label="Task Title" required htmlFor="edit-task-title">
                   <Input
                     id="edit-task-title"
                     value={editing?.title || ''}
                     onChange={(e) => setEditing((prev) => ({ ...(prev as UserTask), title: e.target.value }))}
                     placeholder="Enter task title..."
-                    className="h-11"
+                    className={taskFieldControlClass}
                   />
-                </div>
-
-                {/* Description */}
-                <div>
-                  <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Description
-                  </Label>
+                </TaskFormField>
+                <TaskFormField label="Description" htmlFor="edit-task-description">
                   <Textarea
                     id="edit-task-description"
-                    className="min-h-[80px] sm:min-h-[100px] resize-none"
+                    className={taskTextareaClass}
                     value={editing?.description || ''}
                     onChange={(e) => setEditing((prev) => ({ ...(prev as UserTask), description: e.target.value }))}
                     placeholder="Describe what needs to be done..."
                   />
-                </div>
+                </TaskFormField>
+              </div>
+            </TaskFormSection>
 
-                {/* Status and Priority */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Status
-                    </Label>
-                    <Select
-                      value={editing?.status || 'todo'}
-                      onValueChange={(value) =>
-                        setEditing((prev) => ({
-                          ...(prev as UserTask),
-                          status: value as UserTask['status'],
-                        }))
-                      }
-                    >
-                      <SelectTrigger id="edit-task-status" className="h-11 w-full">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-[80]">
-                        {statuses.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s.replace('_', ' ')}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                </div>
-
-                <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Priority
-                    </Label>
-                    <Select
-                      value={editing?.priority || 'medium'}
-                      onValueChange={(value) =>
-                        setEditing((prev) => ({
-                          ...(prev as UserTask),
-                          priority: value as UserTask['priority'],
-                        }))
-                      }
-                    >
-                      <SelectTrigger id="edit-task-priority" className="h-11 w-full">
-                        <SelectValue placeholder="Select priority" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-[80]">
-                        {['low', 'medium', 'high'].map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Due Date and Period */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Due Date
-                    </Label>
-                    <DatePicker
+            <TaskFormSection
+              title="Task Settings"
+              subtitle="Status, priority, schedule"
+              icon={<Calendar className="h-4 w-4" />}
+              accent="emerald"
+            >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <TaskFormField label="Status">
+                  <Select
+                    value={editing?.status || 'todo'}
+                    onValueChange={(value) =>
+                      setEditing((prev) => ({
+                        ...(prev as UserTask),
+                        status: value as UserTask['status'],
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="edit-task-status" className={`w-full ${taskFieldControlClass}`}>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[80]">
+                      {statuses.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s.replace('_', ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TaskFormField>
+                <TaskFormField label="Priority">
+                  <Select
+                    value={editing?.priority || 'medium'}
+                    onValueChange={(value) =>
+                      setEditing((prev) => ({
+                        ...(prev as UserTask),
+                        priority: value as UserTask['priority'],
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="edit-task-priority" className={`w-full ${taskFieldControlClass}`}>
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[80]">
+                      {['low', 'medium', 'high'].map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TaskFormField>
+                <TaskFormField label="Due Date">
+                  <DatePicker
                     value={editing?.due_date || ''}
-                      onChange={(value) => setEditing((prev) => ({ ...(prev as UserTask), due_date: value }))}
-                      placeholder="Select due date"
+                    onChange={(value) => setEditing((prev) => ({ ...(prev as UserTask), due_date: value }))}
+                    placeholder="Select due date"
                   />
-                </div>
+                </TaskFormField>
+                <TaskFormField label="Period">
+                  <Select
+                    value={editing?.period || 'daily'}
+                    onValueChange={(value) =>
+                      setEditing((prev) => ({
+                        ...(prev as UserTask),
+                        period: value as UserTask['period'],
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="edit-task-period" className={`w-full ${taskFieldControlClass}`}>
+                      <SelectValue placeholder="Select period" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[80]">
+                      {['daily', 'weekly', 'monthly', 'yearly', 'custom'].map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TaskFormField>
+              </div>
+            </TaskFormSection>
 
-                <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Period
-                    </Label>
-                    <Select
-                      value={editing?.period || 'daily'}
-                      onValueChange={(value) =>
-                        setEditing((prev) => ({
-                          ...(prev as UserTask),
-                          period: value as UserTask['period'],
-                        }))
-                      }
-                    >
-                      <SelectTrigger id="edit-task-period" className="h-11 w-full">
-                        <SelectValue placeholder="Select period" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-[80]">
-                        {['daily', 'weekly', 'monthly', 'yearly', 'custom'].map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Hours */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Expected Hours
-                    </Label>
+            <TaskFormSection
+              title="Time Tracking"
+              subtitle="Expected and spent hours"
+              icon={<Clock className="h-4 w-4" />}
+              accent="amber"
+            >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <TaskFormField label="Expected Hours" htmlFor="edit-task-expected-hours">
                   <Input
                     id="edit-task-expected-hours"
                     type="number"
                     step="0.25"
                     value={editing?.expected_hours ?? ''}
-                    onChange={(e) => setEditing((prev) => ({ ...(prev as UserTask), expected_hours: Number(e.target.value) }))}
-                      placeholder="0"
-                      className="h-11"
+                    onChange={(e) =>
+                      setEditing((prev) => ({ ...(prev as UserTask), expected_hours: Number(e.target.value) }))
+                    }
+                    placeholder="0"
+                    className={taskFieldControlClass}
                   />
-                </div>
-
-                <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Spent Hours
-                    </Label>
+                </TaskFormField>
+                <TaskFormField label="Spent Hours" htmlFor="edit-task-spent-hours">
                   <Input
                     id="edit-task-spent-hours"
                     type="number"
                     step="0.25"
                     value={editing?.spent_hours ?? ''}
-                    onChange={(e) => setEditing((prev) => ({ ...(prev as UserTask), spent_hours: Number(e.target.value) }))}
-                      placeholder="0"
-                      className="h-11"
+                    onChange={(e) =>
+                      setEditing((prev) => ({ ...(prev as UserTask), spent_hours: Number(e.target.value) }))
+                    }
+                    placeholder="0"
+                    className={taskFieldControlClass}
                   />
-                  </div>
-                </div>
+                </TaskFormField>
               </div>
-
-              {/* Actions */}
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <Button 
-                  onClick={onSave} 
-                    disabled={submitting || !editing?.title?.trim()}
-                    className={`flex-1 h-11 sm:h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
-                      "bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white"
-                    }`}
-                  >
-                    {submitting ? (
-                      <>
-                        <Clock className="mr-2 h-4 w-4 animate-spin" />
-                        <span className="text-sm">Saving…</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="mr-2 h-4 w-4" />
-                        <span className="text-sm">{editing?.id ? 'Update Task' : 'Create Task'}</span>
-                      </>
-                    )}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </TaskFormSection>
+          </div>
+        </TaskFormDialogShell>
 
         {/* Professional Detail Modal */}
         <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
@@ -2197,428 +2161,403 @@ export default function MyTasks() {
           </DialogContent>
         </Dialog>
 
-        {/* Professional Shared Task Creation/Edit Modal */}
-        <Dialog open={sharedModalOpen} onOpenChange={setSharedModalOpen}>
-          <DialogContent 
-            className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 sm:max-w-2xl sm:w-full sm:max-h-[85vh] rounded-xl hide-scrollbar fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !ml-0"
-            style={{ marginLeft: '0 !important' }}
-            aria-describedby="shared-task-edit-description"
-          >
-            <DialogHeader className="relative">
-              <DialogTitle className="flex items-center gap-3 pr-12">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600 shadow-lg">
-                  <ListChecks className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <span className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
-                  {editingShared?.id ? 'Edit Shared Task' : 'Create New Shared Task'}
-                      </span>
-                  <p id="shared-task-edit-description" className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {editingShared?.id ? 'Update the shared task details and assignee.' : 'Create a new shared task that can be assigned to team members.'}
-              </p>
-                </div>
-              </DialogTitle>
-                      <Button 
-                onClick={() => setSharedModalOpen(false)}
-                variant="ghost"
-                        size="sm" 
-                className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors duration-200"
-                      >
-                <X className="h-4 w-4" />
-                      </Button>
-            </DialogHeader>
-
-            <div className="space-y-6">
-                <div className="space-y-4 sm:space-y-5">
-                  {/* Title */}
-                  <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Task Title <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
+        {/* Create / Edit shared task */}
+        <TaskFormDialogShell
+          open={sharedModalOpen}
+          onOpenChange={setSharedModalOpen}
+          title={editingShared?.id ? 'Edit Shared Task' : 'Create New Shared Task'}
+          description={
+            editingShared?.id
+              ? 'Update the shared task details and assignee.'
+              : 'Create a new shared task that can be assigned to team members.'
+          }
+          icon={<Share2 className="h-5 w-5 text-white" />}
+          headerClassName="bg-gradient-to-br from-indigo-600 via-blue-600 to-emerald-600"
+          footer={
+            <TaskFormActions
+              onCancel={() => setSharedModalOpen(false)}
+              onSubmit={onSaveShared}
+              submitting={submitting}
+              submitLabel={editingShared?.id ? 'Update Task' : 'Create Task'}
+              disabled={
+                !editingShared?.title?.trim() || selectedUsers.length === 0 || !editingShared?.project_ids?.length
+              }
+            />
+          }
+        >
+          <div className="space-y-5">
+            <TaskFormSection
+              title="Basic Information"
+              subtitle="Title and description for the team"
+              icon={<FileText className="h-4 w-4" />}
+            >
+              <div className="space-y-4">
+                <TaskFormField label="Task Title" required htmlFor="edit-shared-task-title">
+                  <Input
                     id="edit-shared-task-title"
-                    value={editingShared?.title || ""}
+                    value={editingShared?.title || ''}
                     onChange={(e) => setEditingShared({ ...editingShared, title: e.target.value } as SharedTask)}
-                      placeholder="Enter task title..."
-                    className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200"
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Description
-                    </Label>
-                    <Textarea
+                    placeholder="Enter task title..."
+                    className={taskFieldControlClass}
+                  />
+                </TaskFormField>
+                <TaskFormField label="Description" htmlFor="edit-shared-task-description">
+                  <Textarea
                     id="edit-shared-task-description"
-                    value={editingShared?.description || ""}
-                    onChange={(e) => setEditingShared({ ...editingShared, description: e.target.value } as SharedTask)}
+                    value={editingShared?.description || ''}
+                    onChange={(e) =>
+                      setEditingShared({ ...editingShared, description: e.target.value } as SharedTask)
+                    }
                     placeholder="Enter task description..."
-                    rows={3}
-                    className="w-full border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200 resize-none"
-                    />
-                  </div>
+                    className={taskTextareaClass}
+                  />
+                </TaskFormField>
+              </div>
+            </TaskFormSection>
 
-                {/* Project Selection */}
-                  <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Project <span className="text-red-500">*</span>
-                    </Label>
-                    <Popover open={sharedProjectPickerOpen} onOpenChange={setSharedProjectPickerOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={sharedProjectPickerOpen}
-                          className="w-full h-12 justify-between border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
-                        >
-                          <span className="truncate flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600"></div>
-                            {editingShared?.project_ids?.[0]
-                              ? projects.find((p) => p.id === editingShared.project_ids?.[0])?.name || "Select a project"
-                              : "Select a project"}
-                          </span>
-                          <ChevronsUpDown className="h-4 w-4 opacity-60" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[90]" align="start">
-                        <Command>
-                          <CommandInput placeholder="Search project..." />
-                          <CommandList className="max-h-64">
-                            <CommandEmpty>No project found.</CommandEmpty>
-                            <CommandGroup>
-                              {projects.map((project) => (
-                                <CommandItem
-                                  key={project.id}
-                                  value={`${project.name} ${project.id}`}
-                                  onSelect={() => {
-                                    setEditingShared({
-                                      ...editingShared,
-                                      project_ids: project.id ? [project.id] : [],
-                                    } as SharedTask);
-                                    setSharedProjectPickerOpen(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={`mr-2 h-4 w-4 ${
-                                      editingShared?.project_ids?.[0] === project.id ? "opacity-100" : "opacity-0"
-                                    }`}
-                                  />
-                                  <div className="flex items-center gap-2 truncate">
-                                    <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600"></div>
-                                    <span className="truncate">{project.name}</span>
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+            <TaskFormSection
+              title="Project & Schedule"
+              subtitle="Project, due date, and priority"
+              icon={<Calendar className="h-4 w-4" />}
+              accent="indigo"
+            >
+              <div className="space-y-4">
+                <TaskFormField label="Project" required>
+                  <Popover open={sharedProjectPickerOpen} onOpenChange={setSharedProjectPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={sharedProjectPickerOpen}
+                        className={`w-full justify-between ${taskFieldControlClass}`}
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          <div className="h-3 w-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600" />
+                          {editingShared?.project_ids?.[0]
+                            ? projects.find((p) => p.id === editingShared.project_ids?.[0])?.name || 'Select a project'
+                            : 'Select a project'}
+                        </span>
+                        <ChevronsUpDown className="h-4 w-4 opacity-60" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="z-[90] w-[--radix-popover-trigger-width] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search project..." />
+                        <CommandList className="max-h-64">
+                          <CommandEmpty>No project found.</CommandEmpty>
+                          <CommandGroup>
+                            {projects.map((project) => (
+                              <CommandItem
+                                key={project.id}
+                                value={`${project.name} ${project.id}`}
+                                onSelect={() => {
+                                  setEditingShared({
+                                    ...editingShared,
+                                    project_ids: project.id ? [project.id] : [],
+                                  } as SharedTask);
+                                  setSharedProjectPickerOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    editingShared?.project_ids?.[0] === project.id ? 'opacity-100' : 'opacity-0'
+                                  }`}
+                                />
+                                <div className="flex items-center gap-2 truncate">
+                                  <div className="h-3 w-3 rounded-full bg-gradient-to-br from-blue-500 to-emerald-600" />
+                                  <span className="truncate">{project.name}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </TaskFormField>
 
-                {/* Due Date */}
-                  <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Due Date
-                    </Label>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <TaskFormField label="Due Date">
                     <DatePicker
                       value={editingShared?.due_date || ''}
                       onChange={(value) => setEditingShared({ ...editingShared, due_date: value } as SharedTask)}
                       placeholder="Select due date"
-                  />
-                  </div>
-
-                {/* Priority */}
-                    <div>
-                      <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Priority
-                      </Label>
-                  <Select
-                    value={editingShared?.priority || "medium"}
-                    onValueChange={(value) => setEditingShared({ ...editingShared, priority: value } as SharedTask)}
-                  >
-                    <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
-                      <SelectValue>
-                        {editingShared?.priority && (
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${
-                              editingShared.priority === 'low' ? 'bg-green-500' :
-                              editingShared.priority === 'medium' ? 'bg-yellow-500' :
-                              'bg-red-500'
-                            }`}></div>
-                            <span className="capitalize">{editingShared.priority} Priority</span>
-                          </div>
-                        )}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low" className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span>Low Priority</span>
-                      </SelectItem>
-                      <SelectItem value="medium" className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        <span>Medium Priority</span>
-                      </SelectItem>
-                      <SelectItem value="high" className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span>High Priority</span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  </div>
-
-                {/* Status - Only visible when editing */}
-                {editingShared?.id && (
-                  <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Status
-                    </Label>
+                    />
+                  </TaskFormField>
+                  <TaskFormField label="Priority">
                     <Select
-                      value={editingShared?.status || "pending"}
-                      onValueChange={(value) => setEditingShared({ ...editingShared, status: value } as SharedTask)}
+                      value={editingShared?.priority || 'medium'}
+                      onValueChange={(value) =>
+                        setEditingShared({ ...editingShared, priority: value } as SharedTask)
+                      }
                     >
-                      <SelectTrigger className="w-full h-12 border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
+                      <SelectTrigger className={`w-full ${taskFieldControlClass}`}>
+                        <SelectValue>
+                          {editingShared?.priority && (
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`h-3 w-3 rounded-full ${
+                                  editingShared.priority === 'low'
+                                    ? 'bg-green-500'
+                                    : editingShared.priority === 'medium'
+                                      ? 'bg-yellow-500'
+                                      : 'bg-red-500'
+                                }`}
+                              />
+                              <span className="capitalize">{editingShared.priority} Priority</span>
+                            </div>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low" className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-green-500" />
+                          <span>Low Priority</span>
+                        </SelectItem>
+                        <SelectItem value="medium" className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-yellow-500" />
+                          <span>Medium Priority</span>
+                        </SelectItem>
+                        <SelectItem value="high" className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-red-500" />
+                          <span>High Priority</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TaskFormField>
+                </div>
+
+                {editingShared?.id ? (
+                  <TaskFormField label="Status">
+                    <Select
+                      value={editingShared?.status || 'pending'}
+                      onValueChange={(value) =>
+                        setEditingShared({ ...editingShared, status: value } as SharedTask)
+                      }
+                    >
+                      <SelectTrigger className={`w-full ${taskFieldControlClass}`}>
                         <SelectValue>
                           {editingShared?.status && (
                             <div className="flex items-center gap-2">
-                              <div className={`w-3 h-3 rounded-full ${
-                                editingShared.status === 'pending' ? 'bg-gray-500' :
-                                editingShared.status === 'in_progress' ? 'bg-blue-500' :
-                                editingShared.status === 'completed' ? 'bg-green-500' :
-                                'bg-purple-500'
-                              }`}></div>
+                              <div
+                                className={`h-3 w-3 rounded-full ${
+                                  editingShared.status === 'pending'
+                                    ? 'bg-gray-500'
+                                    : editingShared.status === 'in_progress'
+                                      ? 'bg-blue-500'
+                                      : editingShared.status === 'completed'
+                                        ? 'bg-green-500'
+                                        : 'bg-purple-500'
+                                }`}
+                              />
                               <span className="capitalize">{editingShared.status.replace('_', ' ')}</span>
                             </div>
                           )}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending" className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                          <span>Pending</span>
-                        </SelectItem>
-                        <SelectItem value="in_progress" className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                          <span>In Progress</span>
-                        </SelectItem>
-                        <SelectItem value="completed" className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                          <span>Completed</span>
-                        </SelectItem>
-                        <SelectItem value="approved" className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                          <span>Approved</span>
-                        </SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                )}
-
-                {/* Assign To */}
-                  <div>
-                    <Label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Assign To <span className="text-red-500">*</span>
-                    </Label>
-                    
-                    {/* Role Tabs */}
-                    <div className="mb-4">
-                      <div className="flex gap-1 sm:gap-2 overflow-x-auto pb-2 justify-center">
-                        <button
-                          onClick={() => setSelectedUserTab('all')}
-                          className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                            selectedUserTab === 'all'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                          }`}
-                        >
-                          <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-                          <span className="hidden sm:inline">All</span>
-                          <span className="sm:hidden">All</span>
-                          <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full ${
-                            selectedUserTab === 'all'
-                              ? 'bg-blue-200 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300'
-                              : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                          }`}>
-                            {userCounts.all}
-                          </span>
-                        </button>
-                        
-                        <button
-                          onClick={() => setSelectedUserTab('admin')}
-                          className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                            selectedUserTab === 'admin'
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                          }`}
-                        >
-                          <User className="h-3 w-3 sm:h-4 sm:w-4" />
-                          <span className="hidden sm:inline">Admins</span>
-                          <span className="sm:hidden">Admin</span>
-                          <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full ${
-                            selectedUserTab === 'admin'
-                              ? 'bg-red-200 text-red-800 dark:bg-red-800/30 dark:text-red-300'
-                              : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                          }`}>
-                            {userCounts.admin}
-                          </span>
-                        </button>
-                        
-                        <button
-                          onClick={() => setSelectedUserTab('developer')}
-                          className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                            selectedUserTab === 'developer'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                          }`}
-                        >
-                          <User className="h-3 w-3 sm:h-4 sm:w-4" />
-                          <span className="hidden sm:inline">Devs</span>
-                          <span className="sm:hidden">Dev</span>
-                          <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full ${
-                            selectedUserTab === 'developer'
-                              ? 'bg-blue-200 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300'
-                              : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                          }`}>
-                            {userCounts.developer}
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Multi-select Controls */}
-                    {filteredUsers.length > 0 && (
-                      <div className="flex items-center justify-between mb-3 p-3 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className={`h-4 w-4 ${selectedUsers.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`} />
-                          <span className={`text-sm font-medium ${selectedUsers.length > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>
-                            {selectedUsers.length} {selectedUsers.length === 1 ? 'user' : 'users'} selected
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={selectAllUsers}
-                            disabled={selectedUsers.length === filteredUsers.length}
-                            className="text-xs px-3 py-1.5 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                          >
-                            Select All
-                          </button>
-                          <button
-                            onClick={clearAllSelections}
-                            disabled={selectedUsers.length === 0}
-                            className="text-xs px-3 py-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* User Selection List */}
-                    <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg hide-scrollbar">
-                      {filteredUsers.length === 0 ? (
-                        <div className="p-8 text-center">
-                          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                            <Users className="h-6 w-6 text-gray-400" />
-                          </div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                            No users found
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Try selecting a different role filter
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2 p-3">
-                          {filteredUsers.map((user) => (
-                            <button
-                              key={user.id}
-                              onClick={() => toggleUserSelection(user.id)}
-                              className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all duration-200 group ${
-                                selectedUsers.includes(user.id)
-                                  ? 'bg-gradient-to-r from-blue-50 to-blue-50/50 dark:from-blue-900/20 dark:to-blue-900/10 border-2 border-blue-300 dark:border-blue-700 shadow-sm'
-                                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700'
-                              }`}
-                            >
-                              <div className={`p-1.5 sm:p-2 rounded-lg ${
-                                user.role === 'admin' ? 'bg-red-100 dark:bg-red-900/20' :
-                                user.role === 'developer' ? 'bg-blue-100 dark:bg-blue-900/20' :
-                                'bg-green-100 dark:bg-green-900/20'
-                              }`}>
-                                {user.role === 'admin' ? (
-                                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-red-600 dark:text-red-400" />
-                                ) : user.role === 'developer' ? (
-                                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
-                                ) : (
-                                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 dark:text-green-400" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                  <span className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">
-                                    {user.name}
-                                  </span>
-                                  <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-medium rounded-full self-start ${
-                                    user.role === 'admin' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
-                                    user.role === 'developer' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' :
-                                    'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                                  }`}>
-                                    {user.role === 'admin' ? 'Admin' : 
-                                     user.role === 'developer' ? 'Developer' : 'Tester'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1 mt-1">
-                                  <User className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-gray-400" />
-                                  <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
-                                    {user.email}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex items-center flex-shrink-0">
-                                {selectedUsers.includes(user.id) ? (
-                                  <div className="relative">
-                                    <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20"></div>
-                                    <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-blue-400 relative" />
-                                  </div>
-                                ) : (
-                                  <div className="h-5 w-5 border-2 border-gray-300 dark:border-gray-600 rounded-full group-hover:border-blue-400 dark:group-hover:border-blue-500 transition-colors"></div>
-                                )}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                  <Button 
-                    onClick={onSaveShared} 
-                  disabled={submitting || !editingShared?.title?.trim() || selectedUsers.length === 0 || !editingShared?.project_ids?.length}
-                  className={`flex-1 h-11 sm:h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
-                    "bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white"
-                  }`}
-                >
-                  {submitting ? (
-                    <>
-                      <Clock className="mr-2 h-4 w-4 animate-spin" />
-                      <span className="text-sm">Saving…</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4" />
-                      <span className="text-sm">{editingShared?.id ? 'Update Task' : 'Create Task'}</span>
-                    </>
-                  )}
-                  </Button>
-                </div>
+                  </TaskFormField>
+                ) : null}
               </div>
-          </DialogContent>
-        </Dialog>
+            </TaskFormSection>
+
+            <TaskFormSection
+              title="Team Assignment"
+              subtitle="Select who should work on this task"
+              icon={<Users className="h-4 w-4" />}
+              accent="purple"
+            >
+              <TaskFormField label="Assign To" required>
+                <div className="mb-4 flex justify-center gap-1 overflow-x-auto pb-2 sm:gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserTab('all')}
+                    className={`flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-4 sm:text-sm ${
+                      selectedUserTab === 'all'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                    All
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-xs sm:px-2 sm:py-1 ${
+                        selectedUserTab === 'all'
+                          ? 'bg-blue-200 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300'
+                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                      }`}
+                    >
+                      {userCounts.all}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserTab('admin')}
+                    className={`flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-4 sm:text-sm ${
+                      selectedUserTab === 'admin'
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                    Admins
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-xs sm:px-2 sm:py-1 ${
+                        selectedUserTab === 'admin'
+                          ? 'bg-red-200 text-red-800 dark:bg-red-800/30 dark:text-red-300'
+                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                      }`}
+                    >
+                      {userCounts.admin}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserTab('developer')}
+                    className={`flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-4 sm:text-sm ${
+                      selectedUserTab === 'developer'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                    Devs
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-xs sm:px-2 sm:py-1 ${
+                        selectedUserTab === 'developer'
+                          ? 'bg-blue-200 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300'
+                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                      }`}
+                    >
+                      {userCounts.developer}
+                    </span>
+                  </button>
+                </div>
+
+                {filteredUsers.length > 0 ? (
+                  <div className="mb-3 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/30">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2
+                        className={`h-4 w-4 ${selectedUsers.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}
+                      />
+                      <span
+                        className={`text-sm font-medium ${selectedUsers.length > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}
+                      >
+                        {selectedUsers.length} {selectedUsers.length === 1 ? 'user' : 'users'} selected
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={selectAllUsers}
+                        disabled={selectedUsers.length === filteredUsers.length}
+                        className="rounded-md bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearAllSelections}
+                        disabled={selectedUsers.length === 0}
+                        className="rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 hide-scrollbar">
+                  {filteredUsers.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                        <Users className="h-6 w-6 text-gray-400" />
+                      </div>
+                      <p className="mb-1 text-sm font-medium text-gray-900 dark:text-white">No users found</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Try selecting a different role filter</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 p-3">
+                      {filteredUsers.map((user) => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => toggleUserSelection(user.id)}
+                          className={`group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-all ${
+                            selectedUsers.includes(user.id)
+                              ? 'border-2 border-blue-300 bg-gradient-to-r from-blue-50 to-blue-50/50 shadow-sm dark:border-blue-700 dark:from-blue-900/20 dark:to-blue-900/10'
+                              : 'border border-gray-200 bg-white hover:border-blue-200 hover:bg-gray-50 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-700 dark:hover:bg-gray-800/50'
+                          }`}
+                        >
+                          <div
+                            className={`rounded-lg p-1.5 sm:p-2 ${
+                              user.role === 'admin'
+                                ? 'bg-red-100 dark:bg-red-900/20'
+                                : user.role === 'developer'
+                                  ? 'bg-blue-100 dark:bg-blue-900/20'
+                                  : 'bg-green-100 dark:bg-green-900/20'
+                            }`}
+                          >
+                            <User
+                              className={`h-3 w-3 sm:h-4 sm:w-4 ${
+                                user.role === 'admin'
+                                  ? 'text-red-600 dark:text-red-400'
+                                  : user.role === 'developer'
+                                    ? 'text-blue-600 dark:text-blue-400'
+                                    : 'text-green-600 dark:text-green-400'
+                              }`}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                              <span className="truncate text-sm font-medium text-gray-900 dark:text-white sm:text-base">
+                                {user.name}
+                              </span>
+                              <span
+                                className={`self-start rounded-full px-1.5 py-0.5 text-xs font-medium sm:px-2 sm:py-1 ${
+                                  user.role === 'admin'
+                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                                    : user.role === 'developer'
+                                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                                      : 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                                }`}
+                              >
+                                {user.role === 'admin' ? 'Admin' : user.role === 'developer' ? 'Developer' : 'Tester'}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex items-center gap-1">
+                              <User className="h-2.5 w-2.5 text-gray-400 sm:h-3 sm:w-3" />
+                              <span className="truncate text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+                                {user.email}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center">
+                            {selectedUsers.includes(user.id) ? (
+                              <div className="relative">
+                                <div className="absolute inset-0 animate-ping rounded-full bg-blue-500 opacity-20" />
+                                <CheckCircle2 className="relative h-5 w-5 text-blue-600 dark:text-blue-400" />
+                              </div>
+                            ) : (
+                              <div className="h-5 w-5 rounded-full border-2 border-gray-300 transition-colors group-hover:border-blue-400 dark:border-gray-600 dark:group-hover:border-blue-500" />
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TaskFormField>
+            </TaskFormSection>
+          </div>
+        </TaskFormDialogShell>
 
         {/* Professional Shared Task Detail Modal */}
         <Dialog open={sharedDetailOpen} onOpenChange={(open) => {

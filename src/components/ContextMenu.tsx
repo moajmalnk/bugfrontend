@@ -6,17 +6,42 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
     DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/context/ThemeContext';
-import { Laptop, Moon, Sun, Folder, Bug, CheckSquare, Users, Settings, User as UserIcon, RefreshCw, Lock, Bell, Rss, PlusSquare, ClipboardCopy, ClipboardPaste, Scissors } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import { translateToMalayalam } from '@/lib/malayalamUtils';
+import {
+    Moon,
+    Sun,
+    Folder,
+    FolderPlus,
+    Bug,
+    CheckSquare,
+    Users,
+    Settings,
+    User as UserIcon,
+    RefreshCw,
+    Lock,
+    Rss,
+    PlusSquare,
+    ClipboardCopy,
+    ClipboardPaste,
+    Scissors,
+} from 'lucide-react';
 
-interface ContextMenuItem {
+interface ContextMenuActionItem {
     label: string;
-    action: () => void;
+    action: () => void | Promise<void>;
     shortcut?: string;
     icon?: React.ReactNode;
     disabled?: boolean;
+}
+
+interface MenuSection {
+    label?: string;
+    items: ContextMenuActionItem[];
 }
 
 interface ContextMenuProps {
@@ -25,16 +50,29 @@ interface ContextMenuProps {
     onClose: () => void;
 }
 
+const MalayalamBadge = () => (
+    <span
+        className="text-[11px] font-bold leading-none text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 rounded px-1 py-0.5"
+        aria-hidden="true"
+    >
+        മ
+    </span>
+);
+
 const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) => {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     const { toggleTheme, theme } = useTheme();
 
-    // Utilities for clipboard and editable detection
     const getActiveEditable = () => {
         const active = document.activeElement as HTMLElement | null;
         if (!active) return null;
-        if (active instanceof HTMLInputElement && (active.type === 'text' || active.type === 'search' || active.type === 'url' || active.type === 'tel' || active.type === 'password' || active.type === 'email')) return active;
+        if (
+            active instanceof HTMLInputElement &&
+            ['text', 'search', 'url', 'tel', 'password', 'email'].includes(active.type)
+        ) {
+            return active;
+        }
         if (active instanceof HTMLTextAreaElement) return active;
         if (active.isContentEditable) return active;
         return null;
@@ -51,11 +89,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
         return sel && sel.rangeCount > 0 && !sel.isCollapsed ? sel.toString() : '';
     };
 
-    const canCopy = () => getSelectedText().length > 0;
-    const canCut = () => {
-        const editable = getActiveEditable();
-        return !!editable && getSelectedText().length > 0;
-    };
+    const selectedText = getSelectedText();
+    const hasSelection = selectedText.trim().length > 0;
+
+    const canCopy = () => hasSelection;
+    const canCut = () => !!getActiveEditable() && hasSelection;
     const canPaste = () => !!getActiveEditable();
 
     const copyAction = async () => {
@@ -110,16 +148,13 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
             editable.setSelectionRange(caret, caret);
             editable.dispatchEvent(new Event('input', { bubbles: true }));
             editable.focus();
-        } else {
-            // contenteditable
-            if (!document.execCommand('insertText', false, text)) {
-                const sel = window.getSelection();
-                if (!sel) return;
-                const range = sel.getRangeAt(0);
-                range.deleteContents();
-                range.insertNode(document.createTextNode(text));
-                range.collapse(false);
-            }
+        } else if (!document.execCommand('insertText', false, text)) {
+            const sel = window.getSelection();
+            if (!sel) return;
+            const range = sel.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(document.createTextNode(text));
+            range.collapse(false);
         }
     };
 
@@ -128,17 +163,40 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
             const text = await navigator.clipboard.readText();
             if (text) insertTextAtCursor(text);
         } catch {
-            // Fallback: attempt execCommand paste (may be blocked by browser)
             document.execCommand('paste');
         } finally {
             onClose();
         }
     };
 
-    // Define menu items based on user role
-    // Production-safe navigation helper
+    const translateAction = async () => {
+        const text = getSelectedText().trim();
+        if (!text) {
+            onClose();
+            return;
+        }
+
+        try {
+            const translated = await translateToMalayalam(text);
+            await navigator.clipboard.writeText(translated);
+            const preview =
+                translated.length > 120 ? `${translated.slice(0, 120)}…` : translated;
+            toast({
+                title: 'Translated to Malayalam',
+                description: preview,
+            });
+        } catch {
+            toast({
+                title: 'Translation failed',
+                description: 'Could not translate the selected text. Please try again.',
+                variant: 'destructive',
+            });
+        } finally {
+            onClose();
+        }
+    };
+
     const safeNavigate = (path: string) => {
-        // In production, use window.location for reliable navigation from BugDetails
         if (import.meta.env.PROD && window.location.pathname.includes('/bugs/')) {
             window.location.href = path;
         } else {
@@ -147,94 +205,269 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
         onClose();
     };
 
-    const getMenuItems = (role: User['role'] | undefined): ContextMenuItem[] => {
-        const commonItems: ContextMenuItem[] = [
-            { label: 'Copy', action: copyAction, icon: <ClipboardCopy className="h-4 w-4" />, shortcut: 'Ctrl+C', disabled: !canCopy() },
-            { label: 'Cut', action: cutAction, icon: <Scissors className="h-4 w-4" />, shortcut: 'Ctrl+X', disabled: !canCut() },
-            { label: 'Paste', action: pasteAction, icon: <ClipboardPaste className="h-4 w-4" />, shortcut: 'Ctrl+V', disabled: !canPaste() },
-            { label: 'Privacy Mode', action: () => { /* TODO: Implement privacy mode toggle */ onClose(); }, shortcut: 'Ctrl+Space', icon: <Lock className="h-4 w-4" /> },
-            { label: 'Profile', action: () => safeNavigate(`/${role}/profile`), icon: <UserIcon className="h-4 w-4" />, shortcut: 'Ctrl+Shift+P' },
-            { label: 'Refresh', action: () => { window.location.reload(); onClose(); }, icon: <RefreshCw className="h-4 w-4" />, shortcut: 'Ctrl+R' },
-            { label: 'Dark or Light', action: () => { toggleTheme(); onClose(); }, shortcut: 'Shift+Space', icon: theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" /> },
+    const getMenuSections = (role: User['role'] | undefined): MenuSection[] => {
+        const clipboardItems: ContextMenuActionItem[] = [
+            {
+                label: 'Copy',
+                action: copyAction,
+                icon: <ClipboardCopy className="h-4 w-4" />,
+                shortcut: 'Ctrl+C',
+                disabled: !canCopy(),
+            },
+            {
+                label: 'Cut',
+                action: cutAction,
+                icon: <Scissors className="h-4 w-4" />,
+                shortcut: 'Ctrl+X',
+                disabled: !canCut(),
+            },
+            {
+                label: 'Paste',
+                action: pasteAction,
+                icon: <ClipboardPaste className="h-4 w-4" />,
+                shortcut: 'Ctrl+V',
+                disabled: !canPaste(),
+            },
         ];
+
+        if (hasSelection) {
+            clipboardItems.push({
+                label: 'Translate',
+                action: translateAction,
+                icon: <MalayalamBadge />,
+            });
+        }
+
+        const appSection: MenuSection = {
+            label: 'App',
+            items: [
+                {
+                    label: 'Privacy Mode',
+                    action: () => onClose(),
+                    shortcut: 'Ctrl+Space',
+                    icon: <Lock className="h-4 w-4" />,
+                },
+                {
+                    label: 'Profile',
+                    action: () => safeNavigate(`/${role}/profile`),
+                    icon: <UserIcon className="h-4 w-4" />,
+                    shortcut: 'Ctrl+Shift+P',
+                },
+                {
+                    label: 'Refresh',
+                    action: () => {
+                        window.location.reload();
+                        onClose();
+                    },
+                    icon: <RefreshCw className="h-4 w-4" />,
+                    shortcut: 'Ctrl+R',
+                },
+                {
+                    label: theme === 'dark' ? 'Light Mode' : 'Dark Mode',
+                    action: () => {
+                        toggleTheme();
+                        onClose();
+                    },
+                    shortcut: 'Shift+Space',
+                    icon:
+                        theme === 'dark' ? (
+                            <Sun className="h-4 w-4" />
+                        ) : (
+                            <Moon className="h-4 w-4" />
+                        ),
+                },
+            ],
+        };
 
         if (role === 'admin') {
             return [
-                { label: 'New Bug', action: () => safeNavigate(`/${role}/bugs/new`), shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
-                { label: 'Fix Bugs', action: () => safeNavigate(`/${role}/bugs`), shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
-                { label: 'New Update', action: () => safeNavigate(`/${role}/new-update`), shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
-                { label: 'Projects', action: () => safeNavigate(`/${role}/projects`), icon: <Folder className="h-4 w-4" /> },
-                { label: 'Bugs', action: () => safeNavigate(`/${role}/bugs`), icon: <Bug className="h-4 w-4" />, shortcut: 'Ctrl+Shift+B' },
-                { label: 'Fixes', action: () => safeNavigate(`/${role}/fixes`), shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
-                { label: 'Updates', action: () => safeNavigate(`/${role}/updates`), shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
-                { label: 'Users', action: () => safeNavigate(`/${role}/users`), icon: <Users className="h-4 w-4" /> },
-                { label: 'Settings', action: () => safeNavigate(`/${role}/settings`), icon: <Settings className="h-4 w-4" />, shortcut: 'Ctrl+Shift+S' },
-                ...commonItems,
-            ];
-        } else if (role === 'developer') {
-            return [
-                { label: 'New Bug', action: () => safeNavigate(`/${role}/bugs/new`), shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
-                { label: 'Fixes', action: () => safeNavigate(`/${role}/fixes`), icon: <CheckSquare className="h-4 w-4" /> },
-                { label: 'Fix Bugs', action: () => safeNavigate(`/${role}/bugs`), shortcut: 'Ctrl+Shift+F', icon: <CheckSquare className="h-4 w-4" /> },
-                { label: 'New Update', action: () => safeNavigate(`/${role}/new-update`), shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
-                { label: 'Updates', action: () => safeNavigate(`/${role}/updates`), shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
-                ...commonItems,
-            ];
-        } else if (role === 'tester') {
-            return [
-                { label: 'Bugs', action: () => safeNavigate(`/${role}/bugs`), icon: <Bug className="h-4 w-4" />, shortcut: 'Ctrl+Shift+B' },
-                { label: 'New Bug', action: () => safeNavigate(`/${role}/bugs/new`), shortcut: 'Ctrl+B', icon: <Bug className="h-4 w-4" /> },
-                { label: 'New Update', action: () => safeNavigate(`/${role}/new-update`), shortcut: 'Ctrl+U', icon: <PlusSquare className="h-4 w-4" /> },
-                { label: 'Updates', action: () => safeNavigate(`/${role}/updates`), shortcut: 'Ctrl+Shift+U', icon: <Rss className="h-4 w-4" /> },
-                ...commonItems,
+                {
+                    label: 'Create',
+                    items: [
+                        {
+                            label: 'New Bug',
+                            action: () => safeNavigate(`/${role}/bugs/new`),
+                            shortcut: 'Ctrl+B',
+                            icon: <Bug className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'New Project',
+                            action: () => safeNavigate(`/${role}/projects/new`),
+                            icon: <FolderPlus className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'New Update',
+                            action: () => safeNavigate(`/${role}/new-update`),
+                            shortcut: 'Ctrl+U',
+                            icon: <PlusSquare className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'Fix Bugs',
+                            action: () => safeNavigate(`/${role}/bugs`),
+                            shortcut: 'Ctrl+Shift+F',
+                            icon: <CheckSquare className="h-4 w-4" />,
+                        },
+                    ],
+                },
+                {
+                    label: 'Navigate',
+                    items: [
+                        {
+                            label: 'Projects',
+                            action: () => safeNavigate(`/${role}/projects`),
+                            icon: <Folder className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'Bugs',
+                            action: () => safeNavigate(`/${role}/bugs`),
+                            icon: <Bug className="h-4 w-4" />,
+                            shortcut: 'Ctrl+Shift+B',
+                        },
+                        {
+                            label: 'Fixes',
+                            action: () => safeNavigate(`/${role}/fixes`),
+                            icon: <CheckSquare className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'Updates',
+                            action: () => safeNavigate(`/${role}/updates`),
+                            shortcut: 'Ctrl+Shift+U',
+                            icon: <Rss className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'Users',
+                            action: () => safeNavigate(`/${role}/users`),
+                            icon: <Users className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'Settings',
+                            action: () => safeNavigate(`/${role}/settings`),
+                            icon: <Settings className="h-4 w-4" />,
+                            shortcut: 'Ctrl+Shift+S',
+                        },
+                    ],
+                },
+                { label: 'Clipboard', items: clipboardItems },
+                appSection,
             ];
         }
-        // Default for unauthenticated or other roles
-        return [
-            ...commonItems,
-        ];
+
+        if (role === 'developer') {
+            return [
+                {
+                    label: 'Create',
+                    items: [
+                        {
+                            label: 'New Bug',
+                            action: () => safeNavigate(`/${role}/bugs/new`),
+                            shortcut: 'Ctrl+B',
+                            icon: <Bug className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'New Update',
+                            action: () => safeNavigate(`/${role}/new-update`),
+                            shortcut: 'Ctrl+U',
+                            icon: <PlusSquare className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'Fix Bugs',
+                            action: () => safeNavigate(`/${role}/bugs`),
+                            shortcut: 'Ctrl+Shift+F',
+                            icon: <CheckSquare className="h-4 w-4" />,
+                        },
+                    ],
+                },
+                {
+                    label: 'Navigate',
+                    items: [
+                        {
+                            label: 'Fixes',
+                            action: () => safeNavigate(`/${role}/fixes`),
+                            icon: <CheckSquare className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'Updates',
+                            action: () => safeNavigate(`/${role}/updates`),
+                            shortcut: 'Ctrl+Shift+U',
+                            icon: <Rss className="h-4 w-4" />,
+                        },
+                    ],
+                },
+                { label: 'Clipboard', items: clipboardItems },
+                appSection,
+            ];
+        }
+
+        if (role === 'tester') {
+            return [
+                {
+                    label: 'Create',
+                    items: [
+                        {
+                            label: 'New Bug',
+                            action: () => safeNavigate(`/${role}/bugs/new`),
+                            shortcut: 'Ctrl+B',
+                            icon: <Bug className="h-4 w-4" />,
+                        },
+                        {
+                            label: 'New Update',
+                            action: () => safeNavigate(`/${role}/new-update`),
+                            shortcut: 'Ctrl+U',
+                            icon: <PlusSquare className="h-4 w-4" />,
+                        },
+                    ],
+                },
+                {
+                    label: 'Navigate',
+                    items: [
+                        {
+                            label: 'Bugs',
+                            action: () => safeNavigate(`/${role}/bugs`),
+                            icon: <Bug className="h-4 w-4" />,
+                            shortcut: 'Ctrl+Shift+B',
+                        },
+                        {
+                            label: 'Updates',
+                            action: () => safeNavigate(`/${role}/updates`),
+                            shortcut: 'Ctrl+Shift+U',
+                            icon: <Rss className="h-4 w-4" />,
+                        },
+                    ],
+                },
+                { label: 'Clipboard', items: clipboardItems },
+                appSection,
+            ];
+        }
+
+        return [{ label: 'Clipboard', items: clipboardItems }, appSection];
     };
 
-    const menuItems = getMenuItems(currentUser?.role);
+    const menuSections = getMenuSections(currentUser?.role);
 
-    // Use the mouse position to control the open state
     const isOpen = mouseX !== null && mouseY !== null;
+    const itemCount = menuSections.reduce((sum, section) => sum + section.items.length, 0);
 
-    // If no menu items or not open, render nothing
-    if (!isOpen || menuItems.length === 0) {
+    if (!isOpen || itemCount === 0) {
         return null;
     }
 
-    // Calculate position to keep menu within viewport
-    const menuWidth = 200; // Approximate width, or measure dynamically if needed
-    const estimatedMenuHeight = menuItems.length * 30 + 20; // Estimate height (approx 30px per item + padding)
+    const menuWidth = 272;
+    const estimatedMenuHeight = itemCount * 36 + menuSections.length * 28 + 16;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const buffer = 10;
 
     let finalX = mouseX || 0;
     let finalY = mouseY || 0;
 
-    const buffer = 10; // px buffer from viewport edges
-
-    // Adjust if it goes off the right edge
     if (finalX + menuWidth > viewportWidth - buffer) {
         finalX = viewportWidth - menuWidth - buffer;
     }
-
-    // Adjust if it goes off the bottom edge
     if (finalY + estimatedMenuHeight > viewportHeight - buffer) {
         finalY = viewportHeight - estimatedMenuHeight - buffer;
     }
-
-    // Ensure it doesn't go off the left edge
-    if (finalX < buffer) {
-        finalX = buffer;
-    }
-
-    // Ensure it doesn't go off the top edge
-    if (finalY < buffer) {
-        finalY = buffer;
-    }
+    if (finalX < buffer) finalX = buffer;
+    if (finalY < buffer) finalY = buffer;
 
     return (
         <DropdownMenu open={isOpen} onOpenChange={onClose}>
@@ -244,23 +477,43 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ mouseX, mouseY, onClose }) =>
                     position: 'fixed',
                     top: finalY,
                     left: finalX,
-                    maxHeight: `calc(100vh - ${finalY}px - ${buffer}px)`, // Adjust max height based on final position and buffer
+                    maxHeight: `calc(100vh - ${finalY}px - ${buffer}px)`,
                     overflowY: 'auto',
-                    minWidth: menuWidth, // Keep previous width control
-                    maxWidth: 300, // Keep previous max width control
+                    minWidth: menuWidth,
+                    maxWidth: 320,
                 }}
-                className="custom-scrollbar"
+                className="custom-scrollbar p-1.5"
                 onCloseAutoFocus={(e) => e.preventDefault()}
                 onContextMenu={(e) => e.preventDefault()}
             >
-                {menuItems.map((item, index) => (
-                    <React.Fragment key={index}>
-                        <DropdownMenuItem onClick={item.action} disabled={item.disabled}>
-                            {item.icon && <span className="mr-2 flex h-4 w-4 items-center justify-center">{item.icon}</span>}
-                            {item.label}
-                            {item.shortcut && <span className="ml-auto text-xs text-muted-foreground">{item.shortcut}</span>}
-                        </DropdownMenuItem>
-                        {index === 2 && <DropdownMenuSeparator />}
+                {menuSections.map((section, sectionIndex) => (
+                    <React.Fragment key={section.label ?? sectionIndex}>
+                        {sectionIndex > 0 && <DropdownMenuSeparator className="my-1.5" />}
+                        {section.label && (
+                            <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                {section.label}
+                            </DropdownMenuLabel>
+                        )}
+                        {section.items.map((item) => (
+                            <DropdownMenuItem
+                                key={item.label}
+                                onClick={item.action}
+                                disabled={item.disabled}
+                                className="gap-2 rounded-md px-2 py-2 text-sm focus:bg-accent/80 data-[disabled]:opacity-40"
+                            >
+                                {item.icon && (
+                                    <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
+                                        {item.icon}
+                                    </span>
+                                )}
+                                <span className="flex-1 truncate">{item.label}</span>
+                                {item.shortcut && (
+                                    <span className="ml-2 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                                        {item.shortcut}
+                                    </span>
+                                )}
+                            </DropdownMenuItem>
+                        ))}
                     </React.Fragment>
                 ))}
             </DropdownMenuContent>

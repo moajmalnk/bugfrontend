@@ -231,6 +231,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 label="BugMessage"
               />
             )}
+
+            {(role === "admin" || role === "developer") && (
+              <NavLink
+                to="/common-bugs"
+                icon={<Repeat className="h-5 w-5" />}
+                label="Common Bugs"
+              />
+            )}
             
           </div>
 
@@ -277,14 +285,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/overtime-requests"
                       icon={<Timer className="h-5 w-5" />}
                       label="OT requests"
-                    />
-                  )}
-
-                  {hasUsersPermission && (
-                    <NavLink
-                      to="/common-bugs"
-                      icon={<Repeat className="h-5 w-5" />}
-                      label="Common Bugs"
                     />
                   )}
 

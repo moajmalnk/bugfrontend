@@ -111,14 +111,14 @@ export function PeriodDetailsFilterBar({
           ) : null}
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative w-full">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search users, projects, tasks, notes..."
+            placeholder="Search submissions..."
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
-            className="pl-9"
+            className="h-10 w-full pl-9"
           />
         </div>
 
@@ -132,15 +132,15 @@ export function PeriodDetailsFilterBar({
           }`}
         >
           {showUserFilter ? (
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Team member
               </label>
               <Select
                 value={filters.userId}
                 onValueChange={(userId) => onChange({ ...filters, userId })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 w-full">
                   <SelectValue placeholder="All members" />
                 </SelectTrigger>
                 <SelectContent>
@@ -156,15 +156,15 @@ export function PeriodDetailsFilterBar({
           ) : null}
 
           {showRoleFilter ? (
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Role
               </label>
               <Select
                 value={filters.role}
                 onValueChange={(role) => onChange({ ...filters, role })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 w-full">
                   <SelectValue placeholder="All roles" />
                 </SelectTrigger>
                 <SelectContent>
@@ -177,15 +177,15 @@ export function PeriodDetailsFilterBar({
             </div>
           ) : null}
 
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Project
             </label>
             <Select
               value={filters.project}
               onValueChange={(project) => onChange({ ...filters, project })}
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-10 w-full">
                 <SelectValue placeholder="All projects" />
               </SelectTrigger>
               <SelectContent>
@@ -199,12 +199,12 @@ export function PeriodDetailsFilterBar({
             </Select>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Day
             </label>
             <Select value={filters.day} onValueChange={(day) => onChange({ ...filters, day })}>
-              <SelectTrigger>
+              <SelectTrigger className="h-10 w-full">
                 <SelectValue placeholder="All days" />
               </SelectTrigger>
               <SelectContent>

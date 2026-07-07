@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { Card, CardContent } from "@/components/ui/card";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
@@ -13,16 +14,17 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { AddUserDialog } from "@/components/users/AddUserDialog";
+import { ActiveTodayWorkSummary } from "@/components/users/ActiveTodayWorkSummary";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { ENV } from "@/lib/env";
-import { getEffectiveRole } from "@/lib/utils";
+import { cn, getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
-import { Bug, Check, ChevronDown, Code2, Shield, UserRound } from "lucide-react";
+import { Bug, Check, ChevronDown, Code2, Shield, UserCheck, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -129,7 +131,7 @@ const Users = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get("tab") || "admins";
+  const tabFromUrl = searchParams.get("tab") || "active";
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
 
@@ -208,6 +210,11 @@ const Users = () => {
       setUsers(
         data.data.map((user: any) => ({
           ...user,
+          checked_in_today: Boolean(user.checked_in_today),
+          check_in_time: user.check_in_time || null,
+          today_hours_worked: Number(user.today_hours_worked || 0),
+          today_break_minutes: Number(user.today_break_minutes || 0),
+          checkout_time: user.checkout_time || null,
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
             user.username || user.name || "?"
           )}&background=3b82f6&color=fff`,
@@ -272,7 +279,9 @@ const Users = () => {
 
     // Role tabs apply only when not searching (search spans all users)
     if (!query) {
-      if (tabFromUrl === "developers") {
+      if (tabFromUrl === "active") {
+        filtered = filtered.filter((user) => user.checked_in_today);
+      } else if (tabFromUrl === "developers") {
         filtered = filtered.filter(user => user.role === "developer");
       } else if (tabFromUrl === "testers") {
         filtered = filtered.filter(user => user.role === "tester");
@@ -417,9 +426,10 @@ const Users = () => {
   const developerCount = users.filter(u => u.role === "developer").length;
   const testerCount = users.filter(u => u.role === "tester").length;
   const othersCount = users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length;
+  const activeTodayCount = users.filter((u) => u.checked_in_today).length;
 
   // Determine which tabs to show
-  const visibleTabs = [];
+  const visibleTabs = [{ value: "active", count: activeTodayCount }];
   if (adminCount > 0) visibleTabs.push({ value: "admins", count: adminCount });
   if (developerCount > 0) visibleTabs.push({ value: "developers", count: developerCount });
   if (testerCount > 0) visibleTabs.push({ value: "testers", count: testerCount });
@@ -427,9 +437,17 @@ const Users = () => {
 
   // Get the first visible tab if current tab has no users
   const isValidTab = visibleTabs.some(tab => tab.value === tabFromUrl);
-  const defaultTab = visibleTabs.length > 0 ? visibleTabs[0].value : "admins";
+  const defaultTab = visibleTabs.length > 0 ? visibleTabs[0].value : "active";
   const activeTab = isValidTab ? tabFromUrl : defaultTab;
   const roleTabs = [
+    {
+      value: "active",
+      label: "Active",
+      shortLabel: "Active",
+      icon: UserCheck,
+      count: activeTodayCount,
+      countClass: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300",
+    },
     ...(adminCount > 0
       ? [{ value: "admins", label: "Admins", shortLabel: "Admins", icon: Shield, count: adminCount, countClass: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" }]
       : []),
@@ -444,6 +462,40 @@ const Users = () => {
       : []),
   ];
   const activeRoleTab = roleTabs.find((tab) => tab.value === activeTab) ?? roleTabs[0];
+  const roleTabGridClass =
+    roleTabs.length <= 1
+      ? "grid-cols-1"
+      : roleTabs.length === 2
+        ? "grid-cols-2"
+        : roleTabs.length === 3
+          ? "grid-cols-3"
+          : roleTabs.length === 4
+            ? "grid-cols-2 lg:grid-cols-4"
+            : "grid-cols-2 lg:grid-cols-5";
+
+  const renderRoleTabsList = (listClassName: string) => (
+    <TabsList className={listClassName}>
+      {roleTabs.map((tab) => (
+        <TabsTrigger
+          key={tab.value}
+          value={tab.value}
+          className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+        >
+          <tab.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 shrink-0" />
+          <span className="hidden sm:inline">{tab.label}</span>
+          <span className="sm:hidden">{tab.shortLabel}</span>
+          <span
+            className={cn(
+              "ml-1 sm:ml-2 px-2 py-1 rounded-full text-xs font-bold tabular-nums",
+              tab.countClass
+            )}
+          >
+            {tab.count}
+          </span>
+        </TabsTrigger>
+      ))}
+    </TabsList>
+  );
 
   // Redirect to valid tab if current tab has no users
   useEffect(() => {
@@ -551,69 +603,40 @@ const Users = () => {
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
           <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              {roleTabs.length > 2 ? (
-                <>
-                  <div className="md:hidden p-1">
-                    <button
-                      type="button"
-                      className="w-full h-12 rounded-2xl px-4 border border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70 flex items-center justify-between"
-                      onClick={() => setIsMobileTabSelectorOpen(true)}
-                    >
-                      <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        {activeRoleTab?.icon && <activeRoleTab.icon className="h-4 w-4" />}
-                        {activeRoleTab?.label}
-                      </span>
-                      <ChevronDown className="h-4 w-4 opacity-70" />
-                    </button>
-                  </div>
-                  <div className="hidden md:block -mx-2 px-2 overflow-x-auto custom-scrollbar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <TabsList className="flex w-max min-w-full h-12 sm:h-14 bg-transparent p-1 gap-1">
-                      {roleTabs.map((tab) => (
-                        <TabsTrigger
-                          key={tab.value}
-                          value={tab.value}
-                          className="shrink-0 px-3 sm:px-4 text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                        >
-                          <tab.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                          <span className="hidden sm:inline">{tab.label}</span>
-                          <span className="sm:hidden">{tab.shortLabel}</span>
-                          <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold tabular-nums ${tab.countClass}`}>
-                            {tab.count}
-                          </span>
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </div>
-                </>
-              ) : (
-                <div className="-mx-2 px-2 overflow-x-auto custom-scrollbar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <TabsList className="flex w-max min-w-full h-12 sm:h-14 bg-transparent p-1 gap-1">
-                    {roleTabs.map((tab) => (
-                      <TabsTrigger
-                        key={tab.value}
-                        value={tab.value}
-                        className="shrink-0 px-3 sm:px-4 text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                      >
-                        <tab.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                        <span className="hidden sm:inline">{tab.label}</span>
-                        <span className="sm:hidden">{tab.shortLabel}</span>
-                        <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold tabular-nums ${tab.countClass}`}>
-                          {tab.count}
-                        </span>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
+            {roleTabs.length > 2 ? (
+              <>
+                <div className="lg:hidden p-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12 rounded-2xl justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
+                    onClick={() => setIsMobileTabSelectorOpen(true)}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      {activeRoleTab?.icon && <activeRoleTab.icon className="h-4 w-4" />}
+                      {activeRoleTab?.label}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-70" />
+                  </Button>
                 </div>
-              )}
+                {renderRoleTabsList(
+                  cn("hidden lg:grid w-full h-14 bg-transparent p-1", roleTabGridClass)
+                )}
+              </>
+            ) : (
+              renderRoleTabsList(cn("grid w-full h-14 bg-transparent p-1", roleTabGridClass))
+            )}
           </div>
         </div>
 
           {roleTabs.length > 2 && (
             <Drawer open={isMobileTabSelectorOpen} onOpenChange={setIsMobileTabSelectorOpen}>
-              <DrawerContent className="md:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+              <DrawerContent className="lg:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
                 <DrawerHeader className="text-left pb-2">
                   <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">Select Section</DrawerTitle>
-                  <DrawerDescription>Navigate to different user roles</DrawerDescription>
+                  <DrawerDescription>
+                    Navigate between active check-ins and user roles
+                  </DrawerDescription>
                 </DrawerHeader>
                 <div className="px-4 pb-6 space-y-3 max-h-[65vh] overflow-y-auto">
                   {roleTabs.map((tab) => {
@@ -650,6 +673,9 @@ const Users = () => {
           )}
 
         {/* Only show TabsContent for tabs that have users */}
+        <TabsContent value="active" className="space-y-6 sm:space-y-8">
+          {renderUsersContent()}
+        </TabsContent>
         {developerCount > 0 && (
           <TabsContent value="developers" className="space-y-6 sm:space-y-8">
             {renderUsersContent()}
@@ -674,6 +700,21 @@ const Users = () => {
     </section>
   </main>
   );
+
+  function renderUserWorkSection(user: User) {
+    if (activeTab === "active") {
+      return (
+        <ActiveTodayWorkSummary
+          checkInTime={user.check_in_time}
+          breakMinutes={user.today_break_minutes}
+          hoursWorked={user.today_hours_worked}
+          checkoutTime={user.checkout_time}
+        />
+      );
+    }
+
+    return <UserWorkStats userId={user.id} compact={true} />;
+  }
 
   function renderUsersContent() {
     return (
@@ -943,7 +984,19 @@ const Users = () => {
         </div>
         )}
 
+        {!isLoading && totalFiltered === 0 && (
+          <div className="rounded-2xl border border-dashed border-gray-300/80 bg-gray-50/40 px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-800/20">
+            <UserCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              {activeTab === "active" && !searchTerm.trim()
+                ? "No team members have checked in for work today yet."
+                : "No users match your current filters."}
+            </p>
+          </div>
+        )}
+
         {/* User list */}
+        {totalFiltered > 0 && (
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
@@ -1042,7 +1095,7 @@ const Users = () => {
                             <StatusBadge status={user.status || 'offline'} lastSeen={user.last_active_at} />
                           </TableCell>
                           <TableCell className="w-[20%] px-6 py-5">
-                            <UserWorkStats userId={user.id} compact={true} />
+                            {renderUserWorkSection(user)}
                           </TableCell>
                           <TableCell className="w-[20%] px-6 py-5 text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -1098,7 +1151,7 @@ const Users = () => {
 
                     {/* Work Stats */}
                     <div className="bg-gray-50/50 dark:bg-gray-800/30 rounded-lg p-3">
-                      <UserWorkStats userId={user.id} compact={true} />
+                      {renderUserWorkSection(user)}
                     </div>
 
                     {/* Contact Info */}
@@ -1123,6 +1176,7 @@ const Users = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* User details now use route: /:role/users/:userId */}
       </>

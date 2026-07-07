@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE_URL } from "@/lib/env";
+import { extractApiErrorMessage } from "@/lib/apiError";
+import { assertDeviceClockMatchesServer, getDeviceClockSkewDetails } from "@/lib/deviceClock";
 import axios from "axios";
 import { 
   AlertCircle, 
@@ -69,6 +71,7 @@ const Login = () => {
   const [checkingMagicEmail, setCheckingMagicEmail] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showTermsOfUse, setShowTermsOfUse] = useState(false);
+  const [deviceClockWarning, setDeviceClockWarning] = useState<string | null>(null);
   const {
     login,
     register,
@@ -95,6 +98,23 @@ const Login = () => {
     }
     return () => clearInterval(interval);
   }, [otpCountdown]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const skew = await getDeviceClockSkewDetails();
+      if (cancelled || !skew?.mismatched) return;
+      setDeviceClockWarning(skew.message);
+      toast({
+        title: "Device date is incorrect",
+        description: skew.message,
+        variant: "destructive",
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -203,6 +223,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
+      await assertDeviceClockMatchesServer('sign in');
       let success = false;
       let user = null;
 
@@ -309,12 +330,15 @@ const Login = () => {
         }, 1500);
       }
     } catch (error: any) {
+      const description = extractApiErrorMessage(error, "An error occurred during login");
+      if (description.toLowerCase().includes('device shows')) {
+        setDeviceClockWarning(description);
+      }
       toast({
-        title: "Error",
-        description:
-          error?.response?.data?.message ||
-          error.message ||
-          "An error occurred during login",
+        title: description.toLowerCase().includes('device shows')
+          ? "Login blocked"
+          : "Error",
+        description,
         variant: "destructive",
       });
     } finally {
@@ -987,6 +1011,17 @@ const Login = () => {
             <p className="text-slate-600 dark:text-slate-400 text-sm sm:text-base leading-relaxed px-2">
               Sign in to your account to continue
             </p>
+            {deviceClockWarning ? (
+              <Alert className="mt-4 text-left border-amber-300 bg-amber-50/90 dark:border-amber-800 dark:bg-amber-950/30">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-amber-900 dark:text-amber-100">
+                  Automatic date &amp; time is off
+                </AlertTitle>
+                <AlertDescription className="text-amber-800 dark:text-amber-200 text-xs sm:text-sm">
+                  {deviceClockWarning}
+                </AlertDescription>
+              </Alert>
+            ) : null}
           </div>
           <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="px-4 sm:px-6 md:px-8 pb-6 sm:pb-8">
             <div className="space-y-4 sm:space-y-5 md:space-y-6">
