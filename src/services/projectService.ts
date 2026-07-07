@@ -1,91 +1,95 @@
 import { apiClient } from '@/lib/axios';
-import { ENV } from '@/lib/env';
+import {
+  CreateProjectData,
+  Project,
+  ProjectAttachment,
+  UpdateProjectData,
+} from '@/lib/utils/projectUtils';
 
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  status: 'active' | 'completed' | 'archived';
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
+export type {
+  CreateProjectData,
+  Project,
+  ProjectAttachment,
+  ProjectFormValues,
+  ProjectMemberDetail,
+  ProjectMemberInput,
+  ProjectStatus,
+  UpdateProjectData,
+} from '@/lib/utils/projectUtils';
 
-export interface CreateProjectData {
-  name: string;
-  description: string;
-}
-
-export interface UpdateProjectData {
-  name?: string;
-  description?: string;
-  status?: 'active' | 'completed' | 'archived';
-}
-
-const API_URL = `${ENV.API_URL}/projects`;
+export {
+  emptyProjectFormValues,
+  formValuesToPayload,
+  projectToFormValues,
+  getProjectStatusLabel,
+  computeProjectDurationDays,
+  formatProjectDate,
+} from '@/lib/utils/projectUtils';
 
 class ProjectService {
   async getProjects(): Promise<Project[]> {
     try {
       const response = await apiClient.get<{ success: boolean; data: Project[]; message?: string }>('/projects/getAll.php');
-      console.log('Projects API response:', response.data);
-      
       if (response.data.success) {
-        const projects = response.data.data || [];
-        console.log('Projects loaded:', projects.length);
-        return projects;
+        return response.data.data || [];
       }
-      
-      console.warn('Projects API returned success=false:', response.data.message);
       return [];
-    } catch (error: any) {
-      console.error('Error fetching projects:', error);
-      console.error('Error details:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status
-      });
+    } catch (error) {
       throw error;
     }
   }
 
   async getProject(id: string): Promise<Project> {
-    try {
-      const response = await apiClient.get<{ success: boolean; data: Project }>(`/projects/get.php?id=${id}`);
-      if (response.data.success) {
-        return response.data.data;
-      }
-      throw new Error('Failed to fetch project');
-    } catch (error) {
-      // // console.error('Error fetching project:', error);
-      throw error;
+    const response = await apiClient.get<{ success: boolean; data: Project }>(`/projects/get.php?id=${id}`);
+    if (response.data.success) {
+      return response.data.data;
     }
+    throw new Error('Failed to fetch project');
   }
 
   async createProject(projectData: CreateProjectData): Promise<Project> {
-    try {
-      const response = await apiClient.post<{ success: boolean; data: Project }>('/projects/create.php', projectData);
-      if (response.data.success) {
-        return response.data.data;
-      }
-      throw new Error('Failed to create project');
-    } catch (error) {
-      // // console.error('Error creating project:', error);
-      throw error;
+    const response = await apiClient.post<{ success: boolean; data: Project }>('/projects/create.php', projectData);
+    if (response.data.success) {
+      return response.data.data;
     }
+    throw new Error('Failed to create project');
   }
 
   async updateProject(id: string, projectData: UpdateProjectData): Promise<void> {
-    try {
-      const response = await apiClient.put<{ success: boolean }>(`/projects/update.php?id=${id}`, projectData);
-      if (!response.data.success) {
-        throw new Error('Failed to update project');
-      }
-    } catch (error) {
-      // // console.error('Error updating project:', error);
-      throw error;
+    const response = await apiClient.put<{ success: boolean }>(`/projects/update.php?id=${id}`, projectData);
+    if (!response.data.success) {
+      throw new Error('Failed to update project');
     }
+  }
+
+  async getAttachments(projectId: string): Promise<ProjectAttachment[]> {
+    const response = await apiClient.get<{ success: boolean; data: ProjectAttachment[] }>(
+      `/projects/get_attachments.php?project_id=${projectId}`
+    );
+    if (response.data.success) {
+      return response.data.data || [];
+    }
+    return [];
+  }
+
+  async uploadAttachments(projectId: string, files: File[]): Promise<ProjectAttachment[]> {
+    if (files.length === 0) return [];
+
+    const formData = new FormData();
+    formData.append('project_id', projectId);
+    files.forEach((file) => formData.append('files[]', file));
+
+    const response = await apiClient.post<{ success: boolean; data: ProjectAttachment[] }>(
+      '/projects/upload_attachment.php',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+
+    if (response.data.success) {
+      return response.data.data || [];
+    }
+    throw new Error('Failed to upload attachments');
   }
 }
 
-export const projectService = new ProjectService(); 
+export const projectService = new ProjectService();

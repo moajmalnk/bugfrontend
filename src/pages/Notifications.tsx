@@ -649,25 +649,7 @@ export default function Notifications() {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
-                      <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                        <Calendar className="h-4 w-4 text-white" />
-                      </div>
-                      <Select value={dateFilter} onValueChange={setDateFilter}>
-                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                          <SelectValue placeholder="Date" />
-                        </SelectTrigger>
-                        <SelectContent position="popper" className="z-[60]">
-                          <SelectItem value="all">All Time</SelectItem>
-                          <SelectItem value="today">Today</SelectItem>
-                          <SelectItem value="yesterday">Yesterday</SelectItem>
-                          <SelectItem value="this_week">This Week</SelectItem>
-                          <SelectItem value="this_month">This Month</SelectItem>
-                          <SelectItem value="last_month">Last Month</SelectItem>
-                          <SelectItem value="this_year">This Year</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    
 
                     {hasActiveFilters && (
                       <Button

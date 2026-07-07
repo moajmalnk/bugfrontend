@@ -1,6 +1,6 @@
 import { ActivityList } from "@/components/activities/ActivityList";
 import { BugCard } from "@/components/bugs/BugCard";
-import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
+import { ProjectInfoOverview } from "@/components/projects/ProjectInfoOverview";
 import Bugs from "@/pages/Bugs";
 import Fixes from "@/pages/Fixes";
 import MyTasks from "@/pages/MyTasks";
@@ -56,7 +56,6 @@ import { bugService, Bug as BugType } from "@/services/bugService";
 import {
   Project,
   projectService,
-  UpdateProjectData,
 } from "@/services/projectService";
 import { updateService } from "@/services/updateService";
 import { motion } from "framer-motion";
@@ -78,6 +77,7 @@ import {
   ListChecks,
   Lock,
   Loader2,
+  Pencil,
   Plus,
   Search,
   Share2,
@@ -4287,49 +4287,6 @@ const ProjectDetails = () => {
     }
   };
 
-  const handleUpdateProject = async (
-    updateData: UpdateProjectData
-  ): Promise<boolean> => {
-    try {
-      await projectService.updateProject(projectId!, updateData);
-
-      // Update the local project state with the new data
-      if (project) {
-        setProject({
-          ...project,
-          ...updateData,
-          updated_at: new Date().toISOString(),
-        });
-      }
-
-      // Log the project update activity
-      if (projectId) {
-        await logProjectActivity(
-          "project_updated",
-          projectId,
-          "updated project details",
-          {
-            updated_fields: Object.keys(updateData),
-          }
-        );
-      }
-
-      toast({
-        title: "Success",
-        description: "Project updated successfully",
-      });
-
-      return true;
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update project. Please try again.",
-        variant: "destructive",
-      });
-      return false;
-    }
-  };
-
   // Filter members based on search query - with safe array handling
   const filteredMembers = Array.isArray(members)
     ? members
@@ -4601,7 +4558,11 @@ const ProjectDetails = () => {
               <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full"></div>
             </div>
             {currentUser?.role === "admin" && (
-              <EditProjectDialog project={project} onSubmit={handleUpdateProject} />
+              <Button asChild className="w-full md:w-auto mt-2 md:mt-0 flex-shrink-0" size="sm">
+                <Link to={`/${currentUser.role}/projects/${projectId}/edit`}>
+                  <Pencil className="mr-2 h-4 w-4" /> Edit Project
+                </Link>
+              </Button>
             )}
           </div>
         </div>
@@ -4700,6 +4661,8 @@ const ProjectDetails = () => {
                 </div>
               </div>
             </div>
+
+            <ProjectInfoOverview project={project} createdByName={projectOwner?.username} />
 
             {/* Enhanced Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">

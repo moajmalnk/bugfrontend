@@ -63,6 +63,8 @@ const ProtectedRoleLayout = () => (
 // Lazy loaded pages
 const Projects = lazy(() => import("@/pages/Projects"));
 const ProjectDetails = lazy(() => import("@/pages/ProjectDetails"));
+const NewProject = lazy(() => import("@/pages/NewProject"));
+const EditProject = lazy(() => import("@/pages/EditProject"));
 const Bugs = lazy(() => import("@/pages/Bugs"));
 const BugDetails = lazy(() => import("@/pages/BugDetails"));
 const BugDetailsDiagnostic = lazy(() => 
@@ -315,6 +317,8 @@ const RouteConfig = () => {
       {isAuthenticated && role && (
         <Route path={`/${role}`} element={<ProtectedRoleLayout />}>
           <Route path="projects" element={<Projects />} />
+          <Route path="projects/new" element={<NewProject />} />
+          <Route path="projects/:projectId/edit" element={<EditProject />} />
           <Route path="projects/:projectId" element={<ProjectDetails />} />
           <Route path="bugs" element={<Bugs />} />
           <Route path="bugs/new" element={<NewBug />} />

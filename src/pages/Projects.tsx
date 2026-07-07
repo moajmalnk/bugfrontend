@@ -1,5 +1,4 @@
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
-import { NewProjectDialog } from "@/components/projects/NewProjectDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,6 +49,7 @@ import {
   Trash2,
   Undo2,
   Users,
+  Plus,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
@@ -497,30 +497,6 @@ const Projects = () => {
       setProjectFixedBugsCount(fixedCounts);
     } catch (error) {
       console.error("Error fetching bug counts:", error);
-    }
-  };
-
-  const handleCreateProject = async (projectData: {
-    name: string;
-    description: string;
-  }) => {
-    try {
-      const newProject = await projectService.createProject(projectData);
-      setProjects([...projects, newProject]);
-      toast({
-        title: "Success",
-        description: "Project created successfully",
-      });
-      await fetchProjectMembershipAndCounts();
-      applyFilters();
-      return true;
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create project. Please try again.",
-        variant: "destructive",
-      });
-      return false;
     }
   };
 
@@ -1386,9 +1362,15 @@ const Projects = () => {
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 {currentUser?.role === "admin" && (
-                  <div className="group">
-                    <NewProjectDialog onSubmit={handleCreateProject} />
-                  </div>
+                  <Button
+                    asChild
+                    className="h-11 sm:h-12 text-sm sm:text-base shrink-0"
+                    aria-label="Create a new project"
+                  >
+                    <Link to={`/${currentUser.role}/projects/new`}>
+                      <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> New Project
+                    </Link>
+                  </Button>
                 )}
 
                 <div className="flex items-center gap-4">
