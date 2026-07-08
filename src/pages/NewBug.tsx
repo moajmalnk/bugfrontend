@@ -490,13 +490,6 @@ const NewBug = () => {
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    className="flex items-center text-muted-foreground hover:text-foreground p-2"
-                    onClick={() => navigate(-1)}
-                  >
-                    <ArrowLeft className="h-5 w-5" />
-                  </Button>
                   <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
                     <Bug className="h-6 w-6 text-white" />
                   </div>

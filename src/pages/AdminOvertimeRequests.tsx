@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { listAllRequestSubmissions, normalizeAllRequestSubmissionsResponse } from '@/services/todoService';
+import { userService } from '@/services/userService';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { ENV } from '@/lib/env';
@@ -14,7 +16,7 @@ import {
   groupAdminHoursByUser,
   type OvertimeRow,
 } from '@/pages/adminOvertimeShared';
-import { ArrowLeft, ChevronRight, FileText, Timer, User, Users } from 'lucide-react';
+import { ChevronRight, FileText, Search, Timer, User, Users } from 'lucide-react';
 
 function userSubmissionDateRange(g: UserRequestGroup): { min: string; max: string } | null {
   const dates = g.list.map((r) => String(r.submission_date || '').trim()).filter(Boolean).sort();
@@ -113,16 +115,38 @@ export default function AdminOvertimeRequests() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<OvertimeRow[]>([]);
   const [adminHoursRows, setAdminHoursRows] = useState<OvertimeRow[]>([]);
+  const [allUsers, setAllUsers] = useState<
+    Array<{ id: string; username: string; role: string; accountActive?: number }>
+  >([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'developer' | 'tester' | 'user'>('all');
+  const [activityFilter, setActivityFilter] = useState<
+    'all' | 'pending' | 'with_submissions' | 'without_submissions' | 'admin_entries'
+  >('all');
   const [queryWindow, setQueryWindow] = useState<{ from: string; to: string }>(() => getSubmissionWindow());
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const fallback = getSubmissionWindow();
-      const res = await listAllRequestSubmissions({});
+      const [res, users] = await Promise.all([
+        listAllRequestSubmissions({}),
+        userService.getUsers().catch(() => []),
+      ]);
       const { submissions, adminHoursSubmissions, window } = normalizeAllRequestSubmissionsResponse(res, fallback);
       setRows(submissions as OvertimeRow[]);
       setAdminHoursRows(adminHoursSubmissions as OvertimeRow[]);
+      setAllUsers(
+        (Array.isArray(users) ? users : []).map((u) => ({
+          id: String(u.id ?? '').trim(),
+          username: String(u.username || u.name || '').trim(),
+          role: String(u.role || '').trim(),
+          accountActive:
+            u.account_active !== undefined && u.account_active !== null
+              ? Number(u.account_active)
+              : undefined,
+        }))
+      );
       setQueryWindow(window);
     } catch (e) {
       toast({
@@ -132,6 +156,7 @@ export default function AdminOvertimeRequests() {
       });
       setRows([]);
       setAdminHoursRows([]);
+      setAllUsers([]);
     } finally {
       setLoading(false);
     }
@@ -149,8 +174,21 @@ export default function AdminOvertimeRequests() {
 
   const displayUsers = useMemo(() => {
     const map = new Map<string, UserRequestGroup & { adminHoursCount: number }>();
+    for (const u of allUsers) {
+      if (!u.id || !u.username) continue;
+      if (u.accountActive === 0) continue;
+      map.set(u.id, {
+        userId: u.id,
+        username: u.username,
+        role: u.role,
+        list: [],
+        pending: 0,
+        adminHoursCount: 0,
+      });
+    }
     for (const g of byUser) {
-      map.set(g.userId, { ...g, adminHoursCount: 0 });
+      const existing = map.get(g.userId);
+      map.set(g.userId, existing ? { ...existing, ...g } : { ...g, adminHoursCount: 0 });
     }
     for (const g of adminByUser) {
       const existing = map.get(g.userId);
@@ -170,12 +208,44 @@ export default function AdminOvertimeRequests() {
     return Array.from(map.values()).sort((a, b) =>
       a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })
     );
-  }, [byUser, adminByUser]);
+  }, [allUsers, byUser, adminByUser]);
 
   const pendingTotal = useMemo(
     () => rows.filter((r) => String(r.extra_hours_approval_status || '').toLowerCase() === 'pending').length,
     [rows]
   );
+
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return displayUsers.filter((u) => {
+      const userRole = String(u.role || '').toLowerCase();
+      const matchesRole = roleFilter === 'all' ? true : userRole === roleFilter;
+      if (!matchesRole) return false;
+
+      const hasPending = u.pending > 0;
+      const hasSubmissions = u.list.length > 0;
+      const hasAdminEntries = (u as { adminHoursCount?: number }).adminHoursCount ? (u as { adminHoursCount?: number }).adminHoursCount! > 0 : false;
+
+      const matchesActivity =
+        activityFilter === 'all'
+          ? true
+          : activityFilter === 'pending'
+            ? hasPending
+            : activityFilter === 'with_submissions'
+              ? hasSubmissions
+              : activityFilter === 'without_submissions'
+                ? !hasSubmissions
+                : hasAdminEntries;
+      if (!matchesActivity) return false;
+
+      if (!query) return true;
+      return (
+        String(u.username || '').toLowerCase().includes(query) ||
+        String(u.userId || '').toLowerCase().includes(query) ||
+        userRole.includes(query)
+      );
+    });
+  }, [displayUsers, searchQuery, roleFilter, activityFilter]);
 
   const openUser = (userId: string) => {
     const enc = encodeURIComponent(userId);
@@ -243,7 +313,7 @@ export default function AdminOvertimeRequests() {
                         Users
                       </div>
                       <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 tabular-nums leading-none">
-                        {byUser.length}
+                        {displayUsers.length}
                       </div>
                     </div>
                   </div>
@@ -268,16 +338,79 @@ export default function AdminOvertimeRequests() {
               </div>
             </div>
 
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by username, role, or user ID..."
+                  className="pl-9 h-11 rounded-xl border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(['all', 'admin', 'developer', 'tester', 'user'] as const).map((rf) => (
+                  <Button
+                    key={rf}
+                    type="button"
+                    variant={roleFilter === rf ? 'default' : 'outline'}
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => setRoleFilter(rf)}
+                  >
+                    {rf === 'all' ? 'All roles' : rf}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ['all', 'All activity'],
+                    ['pending', 'Pending'],
+                    ['with_submissions', 'With submissions'],
+                    ['without_submissions', 'No submissions'],
+                    ['admin_entries', 'Admin entries'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <Button
+                    key={key}
+                    type="button"
+                    variant={activityFilter === key ? 'default' : 'outline'}
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => setActivityFilter(key)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+                {(searchQuery || roleFilter !== 'all' || activityFilter !== 'all') && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setRoleFilter('all');
+                      setActivityFilter('all');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                )}
+              </div>
+            </div>
+
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <Skeleton key={i} className="h-56 w-full rounded-2xl" />
                 ))}
               </div>
-            ) : displayUsers.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <div className="text-center py-12 sm:py-16 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/30 px-4">
                 <FileText className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-                <p className="text-base font-medium text-gray-700 dark:text-gray-300">No extra-hour or admin hours entries in this window.</p>
+                <p className="text-base font-medium text-gray-700 dark:text-gray-300">No users match this search/filter.</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 max-w-lg mx-auto leading-relaxed break-words">
                   API range: {queryWindow.from} → {queryWindow.to}. Endpoint{' '}
                   <span className="font-mono">{ENV.API_URL}/tasks/all_request_submissions.php</span>
@@ -285,7 +418,7 @@ export default function AdminOvertimeRequests() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-                {displayUsers.map((g) => (
+                {filteredUsers.map((g) => (
                   <UserRequestCard
                     key={g.userId}
                     group={g}

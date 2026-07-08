@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Clock, Loader2, Save, Timer, User } from 'lucide-react';
+import { ArrowLeft, Clock, File, Loader2, RefreshCw, Save, Timer, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -181,57 +182,73 @@ export default function AdminAddWorkHours() {
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
-      <section className="max-w-2xl mx-auto min-w-0 space-y-6 sm:space-y-8">
+      <section className="max-w mx-auto min-w-0 space-y-6 sm:space-y-8">
         <div className="relative min-w-0 overflow-hidden rounded-2xl">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
-                  <Timer className="h-6 w-6 text-white" aria-hidden />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20" />
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+              <div className="space-y-3 min-w-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
+                    <Timer className="h-6 w-6 text-white" aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
+                      Add / fix work hours
+                    </h1>
+                    <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2" />
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
-                    Add / fix work hours
-                  </h1>
-                  <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2" />
-                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-2 leading-relaxed">
-                    {loadingUser
-                      ? 'Loading user…'
-                      : `Record hours for ${displayName} when they forgot to check out.`}
-                  </p>
-                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                  {loadingUser
+                    ? 'Loading user…'
+                    : `Record hours for ${displayName} when they forgot to check out.`}
+                </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 w-full sm:w-auto shrink-0 rounded-xl border-gray-200/70 dark:border-gray-700/70"
-                onClick={() => navigate(backPath)}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4 shrink-0" />
-                Back
-              </Button>
             </div>
           </div>
         </div>
 
         {!loadingUser && userInfo ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm px-4 py-3">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm px-4 py-3">
             <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
               <User className="h-5 w-5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="font-semibold text-foreground truncate">{displayName}</p>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 {userInfo.role || 'user'}
               </p>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 rounded-lg border-gray-200/70 dark:border-gray-700/70"
+              onClick={() => navigate(`/${role}/overtime-requests`)}
+            >
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              Switch user
+            </Button>
           </div>
         ) : null}
 
-        <div className="relative overflow-hidden rounded-2xl shadow-lg border border-gray-200/40 dark:border-gray-700/40 min-w-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 pointer-events-none" />
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 md:p-8 space-y-6 min-w-0">
+        <div className="relative overflow-hidden rounded-2xl shadow-xl border border-gray-200/40 dark:border-gray-700/40 min-w-0">
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30" />
+          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden min-w-0">
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardHeader className="p-6 sm:p-8 pb-2">
+                <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shrink-0">
+                    <File className="h-5 w-5 text-white" />
+                  </div>
+                  Work Hours Form
+                </CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400 text-base mt-2">
+                  Add one-time hours for users who forgot checkout, with a required admin reason
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 p-6 sm:p-8 pt-4">
             <div className="space-y-2">
               <Label htmlFor="admin-hours-date" className="text-sm font-semibold">
                 Date
@@ -332,6 +349,8 @@ export default function AdminAddWorkHours() {
                 Save hours
               </Button>
             </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
