@@ -920,43 +920,52 @@ export function DailyWorkFlowPanel({
         const projectsData = await projectService.getProjects();
         if (cancelled) return;
 
-        // Role-based project visibility:
+        // Role-based project visibility for check-in/checkout:
         // - admin: all active projects
-        // - developer/tester: only assigned/active projects
+        // - developer/tester: assigned active projects
         //
-        // getAll.php already scopes non-admin users to assigned projects via project_members.
-        // When an admin impersonates a developer, getAll may return all projects, so we still
-        // membership-filter client-side when member data is present.
+        // getAll.php already returns only assigned projects for a real developer/tester.
+        // Extra client filtering is only needed when membership arrays are present
+        // (e.g. admin impersonating a developer, where getAll may return every project).
         const role = String(currentUser?.role || '').toLowerCase();
         const currentUserId = String(currentUser?.id || '').trim();
 
-        const isUserAssigned = (project: Project): boolean => {
-          if (!currentUserId) return false;
-
-          if (Array.isArray(project.members) && project.members.length > 0) {
-            return project.members.some((id) => String(id || '').trim() === currentUserId);
-          }
-
-          if (Array.isArray(project.members_detail) && project.members_detail.length > 0) {
-            return project.members_detail.some(
-              (m) => String(m.user_id || '').trim() === currentUserId
-            );
-          }
-
-          // No membership payload: trust API-scoped list for non-admins.
-          return role !== 'admin';
-        };
-
-        const roleScopedProjects =
-          role === 'admin'
-            ? projectsData
-            : projectsData.filter(isUserAssigned);
-
-        const activeProjects = roleScopedProjects.filter(
+        const activeProjects = projectsData.filter(
           (p) => p.status === 'active' || !p.status
         );
-        setProjects(activeProjects);
-        fetchProjectStats(activeProjects);
+
+        if (role === 'admin') {
+          setProjects(activeProjects);
+          fetchProjectStats(activeProjects);
+          return;
+        }
+
+        const hasMembershipPayload = activeProjects.some(
+          (project) =>
+            (Array.isArray(project.members) && project.members.length > 0) ||
+            (Array.isArray(project.members_detail) && project.members_detail.length > 0)
+        );
+
+        const assignedProjects =
+          !currentUserId || !hasMembershipPayload
+            ? activeProjects
+            : activeProjects.filter((project) => {
+                if (Array.isArray(project.members) && project.members.length > 0) {
+                  return project.members.some(
+                    (id) => String(id || '').trim() === currentUserId
+                  );
+                }
+                if (Array.isArray(project.members_detail) && project.members_detail.length > 0) {
+                  return project.members_detail.some(
+                    (m) => String(m.user_id || '').trim() === currentUserId
+                  );
+                }
+                // Keep API-scoped projects that lack member arrays
+                return true;
+              });
+
+        setProjects(assignedProjects);
+        fetchProjectStats(assignedProjects);
       } catch (error: any) {
         if (cancelled) return;
         console.error('Failed to load projects:', error);
