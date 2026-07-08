@@ -919,8 +919,19 @@ export function DailyWorkFlowPanel({
         setLoadingProjects(true);
         const projectsData = await projectService.getProjects();
         if (cancelled) return;
-        // Filter to show only active projects
-        const activeProjects = projectsData.filter(p => p.status === 'active' || !p.status);
+        // Role-based project visibility:
+        // - admin: all active projects
+        // - developer/tester: only assigned projects
+        const role = String(currentUser?.role || '').toLowerCase();
+        const currentUserId = String(currentUser?.id || '').trim();
+        const roleScopedProjects = projectsData.filter((project) => {
+          if (role === 'admin') return true;
+          if (!currentUserId) return false;
+          const members = Array.isArray(project.members_detail) ? project.members_detail : [];
+          return members.some((m) => String(m.user_id || '').trim() === currentUserId);
+        });
+        // Keep only active projects after role scoping
+        const activeProjects = roleScopedProjects.filter((p) => p.status === 'active' || !p.status);
         setProjects(activeProjects);
         fetchProjectStats(activeProjects);
       } catch (error: any) {
@@ -943,7 +954,7 @@ export function DailyWorkFlowPanel({
     return () => {
       cancelled = true;
     };
-  }, [isCheckInDialogOpen, isCheckoutWizardOpen, fetchProjectStats]);
+  }, [isCheckInDialogOpen, isCheckoutWizardOpen, fetchProjectStats, currentUser?.id, currentUser?.role]);
 
   useEffect(() => {
     if (!isCheckoutWizardOpen || checkoutProjects.length === 0) return;
