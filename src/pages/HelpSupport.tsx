@@ -34,7 +34,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { HelpShareActions } from "@/components/help/HelpShareActions";
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   admin: "Step-by-step guides, every BugRicer feature explained.",
@@ -87,7 +86,6 @@ export default function HelpSupport() {
         title="Help & Support"
         description={headerDescription}
       >
-        <HelpShareActions title="Help & Support" />
         <div className="flex h-12 items-center gap-3 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 shadow-sm dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30">
           <div className="rounded-lg bg-blue-500 p-1.5">
             <Sparkles className="h-5 w-5 text-white" />

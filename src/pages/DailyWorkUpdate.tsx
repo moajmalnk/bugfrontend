@@ -25,6 +25,7 @@ import { updateService } from '@/services/updateService';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
 import { extractApiErrorMessage } from '@/lib/apiError';
 import { assertDeviceClockMatchesServer } from '@/lib/deviceClock';
+import { ENV } from '@/lib/env';
 import {
   calendarMonthKey,
   computeMonthTotalsToDate,
@@ -920,50 +921,92 @@ export function DailyWorkFlowPanel({
         const projectsData = await projectService.getProjects();
         if (cancelled) return;
 
-        // Role-based project visibility for check-in/checkout:
+        // Same visibility rules as Projects page "Assigned Projects":
         // - admin: all active projects
-        // - developer/tester: assigned active projects
-        //
-        // getAll.php already returns only assigned projects for a real developer/tester.
-        // Extra client filtering is only needed when membership arrays are present
-        // (e.g. admin impersonating a developer, where getAll may return every project).
+        // - developer/tester: membership via get_members.php (getAll may return more than assigned)
         const role = String(currentUser?.role || '').toLowerCase();
         const currentUserId = String(currentUser?.id || '').trim();
-
         const activeProjects = projectsData.filter(
           (p) => p.status === 'active' || !p.status
         );
 
-        if (role === 'admin') {
+        if (role === 'admin' || !currentUserId) {
           setProjects(activeProjects);
           fetchProjectStats(activeProjects);
           return;
         }
 
-        const hasMembershipPayload = activeProjects.some(
-          (project) =>
-            (Array.isArray(project.members) && project.members.length > 0) ||
-            (Array.isArray(project.members_detail) && project.members_detail.length > 0)
-        );
+        const token =
+          sessionStorage.getItem('token') ||
+          localStorage.getItem('auth_token') ||
+          localStorage.getItem('token');
 
-        const assignedProjects =
-          !currentUserId || !hasMembershipPayload
-            ? activeProjects
-            : activeProjects.filter((project) => {
-                if (Array.isArray(project.members) && project.members.length > 0) {
-                  return project.members.some(
-                    (id) => String(id || '').trim() === currentUserId
-                  );
-                }
-                if (Array.isArray(project.members_detail) && project.members_detail.length > 0) {
-                  return project.members_detail.some(
-                    (m) => String(m.user_id || '').trim() === currentUserId
-                  );
-                }
-                // Keep API-scoped projects that lack member arrays
-                return true;
-              });
+        // Prefer getAll members arrays when present (fast path).
+        // Fall back to get_members.php for projects missing membership data
+        // — same source of truth as Projects "Assigned Projects".
+        const needsMembershipLookup: Project[] = [];
+        const quickAssigned: Project[] = [];
 
+        for (const project of activeProjects) {
+          if (Array.isArray(project.members) && project.members.length > 0) {
+            if (project.members.some((id) => String(id || '').trim() === currentUserId)) {
+              quickAssigned.push(project);
+            }
+            continue;
+          }
+          if (Array.isArray(project.members_detail) && project.members_detail.length > 0) {
+            if (
+              project.members_detail.some(
+                (m) => String(m.user_id || '').trim() === currentUserId
+              )
+            ) {
+              quickAssigned.push(project);
+            }
+            continue;
+          }
+          needsMembershipLookup.push(project);
+        }
+
+        let assignedProjects = [...quickAssigned];
+
+        if (needsMembershipLookup.length > 0 && token) {
+          const membershipResults = await mapWithConcurrency(
+            needsMembershipLookup,
+            5,
+            async (project) => {
+              try {
+                const response = await fetch(
+                  `${ENV.API_URL}/projects/get_members.php?project_id=${project.id}`,
+                  {
+                    headers: {
+                      Accept: 'application/json',
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                  }
+                );
+                if (!response.ok) {
+                  return { project, isMember: false };
+                }
+                const data = await response.json();
+                const members: Array<{ id?: string | number }> = data?.data?.members || [];
+                const isMember = members.some(
+                  (member) => String(member.id || '').trim() === currentUserId
+                );
+                return { project, isMember };
+              } catch {
+                return { project, isMember: false };
+              }
+            }
+          );
+
+          assignedProjects = [
+            ...assignedProjects,
+            ...membershipResults.filter((result) => result.isMember).map((result) => result.project),
+          ];
+        }
+
+        if (cancelled) return;
         setProjects(assignedProjects);
         fetchProjectStats(assignedProjects);
       } catch (error: any) {
