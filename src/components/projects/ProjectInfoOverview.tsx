@@ -360,6 +360,10 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
         </SectionShell>
       </div>
 
+      <SectionShell title="Reference Sites / Themes" icon={ExternalLink} accent="slate">
+        {renderDescription(project.reference_sites_or_themes)}
+      </SectionShell>
+
       <SectionShell title="Attachments" icon={Paperclip} accent="slate">
         {attachments.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">

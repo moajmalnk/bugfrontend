@@ -799,7 +799,7 @@ export function ProjectForm({
 
               <SectionBlock
                 title="Technology Stack"
-                description="Languages, frameworks, and tools used"
+                description="Languages, frameworks, tools, and design references"
                 icon={Layers}
                 iconClass="bg-gradient-to-br from-cyan-500 to-blue-600"
               >
@@ -836,6 +836,23 @@ export function ProjectForm({
                   <Button type="button" variant="outline" onClick={addTechItem} className="h-12 px-5 rounded-xl">
                     Add
                   </Button>
+                </div>
+
+                <div className="space-y-3">
+                  <FieldLabel
+                    htmlFor="reference_sites_or_themes"
+                    dotClass="from-blue-500 to-indigo-600"
+                    hint="Add inspiration links, UI theme notes, or reference websites."
+                  >
+                    Reference Sites / Themes
+                  </FieldLabel>
+                  <Textarea
+                    id="reference_sites_or_themes"
+                    placeholder="e.g. https://dribbble.com/shots/... or 'Use clean SaaS dashboard style'"
+                    value={values.reference_sites_or_themes}
+                    onChange={(e) => setField('reference_sites_or_themes', e.target.value)}
+                    className={cn(textareaClass, 'min-h-[110px] focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500')}
+                  />
                 </div>
               </SectionBlock>
 

@@ -919,19 +919,42 @@ export function DailyWorkFlowPanel({
         setLoadingProjects(true);
         const projectsData = await projectService.getProjects();
         if (cancelled) return;
+
         // Role-based project visibility:
         // - admin: all active projects
-        // - developer/tester: only assigned projects
+        // - developer/tester: only assigned/active projects
+        //
+        // getAll.php already scopes non-admin users to assigned projects via project_members.
+        // When an admin impersonates a developer, getAll may return all projects, so we still
+        // membership-filter client-side when member data is present.
         const role = String(currentUser?.role || '').toLowerCase();
         const currentUserId = String(currentUser?.id || '').trim();
-        const roleScopedProjects = projectsData.filter((project) => {
-          if (role === 'admin') return true;
+
+        const isUserAssigned = (project: Project): boolean => {
           if (!currentUserId) return false;
-          const members = Array.isArray(project.members_detail) ? project.members_detail : [];
-          return members.some((m) => String(m.user_id || '').trim() === currentUserId);
-        });
-        // Keep only active projects after role scoping
-        const activeProjects = roleScopedProjects.filter((p) => p.status === 'active' || !p.status);
+
+          if (Array.isArray(project.members) && project.members.length > 0) {
+            return project.members.some((id) => String(id || '').trim() === currentUserId);
+          }
+
+          if (Array.isArray(project.members_detail) && project.members_detail.length > 0) {
+            return project.members_detail.some(
+              (m) => String(m.user_id || '').trim() === currentUserId
+            );
+          }
+
+          // No membership payload: trust API-scoped list for non-admins.
+          return role !== 'admin';
+        };
+
+        const roleScopedProjects =
+          role === 'admin'
+            ? projectsData
+            : projectsData.filter(isUserAssigned);
+
+        const activeProjects = roleScopedProjects.filter(
+          (p) => p.status === 'active' || !p.status
+        );
         setProjects(activeProjects);
         fetchProjectStats(activeProjects);
       } catch (error: any) {

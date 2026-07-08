@@ -45,6 +45,7 @@ export interface Project {
   client_phone?: string | null;
   client_account_status?: ClientAccountStatus;
   technology_stack?: string | null;
+  reference_sites_or_themes?: string | null;
   start_date?: string | null;
   deadline_date?: string | null;
   expected_publish_date?: string | null;
@@ -52,6 +53,7 @@ export interface Project {
   testing_end_date?: string | null;
   frontend_finish_date?: string | null;
   backend_finish_date?: string | null;
+  members?: string[];
   members_detail?: ProjectMemberDetail[];
   attachments?: ProjectAttachment[];
   compliance?: ProjectComplianceSummaryLite;
@@ -73,6 +75,7 @@ export interface CreateProjectData {
   client_phone?: string;
   client_account_status?: ClientAccountStatus;
   technology_stack?: string;
+  reference_sites_or_themes?: string;
   start_date?: string;
   deadline_date?: string;
   expected_publish_date?: string;
@@ -96,6 +99,7 @@ export interface ProjectFormValues {
   client_phone: string;
   client_account_status: ClientAccountStatus;
   technology_stack: string;
+  reference_sites_or_themes: string;
   start_date: string;
   deadline_date: string;
   expected_publish_date: string;
@@ -119,6 +123,7 @@ export const emptyProjectFormValues = (): ProjectFormValues => ({
   client_phone: '',
   client_account_status: 'active',
   technology_stack: '',
+  reference_sites_or_themes: '',
   start_date: '',
   deadline_date: '',
   expected_publish_date: '',
@@ -144,6 +149,7 @@ export function projectToFormValues(project: Project): ProjectFormValues {
     client_phone: project.client_phone || '',
     client_account_status: project.client_account_status || 'active',
     technology_stack: project.technology_stack || '',
+    reference_sites_or_themes: project.reference_sites_or_themes || '',
     start_date: project.start_date || '',
     deadline_date: project.deadline_date || '',
     expected_publish_date: project.expected_publish_date || '',
@@ -180,6 +186,7 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
     client_phone: values.client_phone.trim() || undefined,
     client_account_status: values.client_account_status,
     technology_stack: values.technology_stack.trim() || undefined,
+    reference_sites_or_themes: values.reference_sites_or_themes.trim() || undefined,
     start_date: values.start_date || undefined,
     deadline_date: values.deadline_date || undefined,
     expected_publish_date: values.expected_publish_date || undefined,
