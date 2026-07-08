@@ -24,6 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { HelpArticleSkeleton } from "@/components/help/HelpSkeletons";
+import { HelpShareActions } from "@/components/help/HelpShareActions";
 
 export default function HelpArticlePage() {
   const { articleId } = useParams<{ articleId: string }>();
@@ -49,29 +50,32 @@ export default function HelpArticlePage() {
 
   return (
     <HelpPageShell>
-      {/* Breadcrumb */}
+      {/* Breadcrumb + share */}
       <nav
-        className={`${helpGlassCard} px-4 py-3 flex items-center gap-1 text-sm text-muted-foreground flex-wrap`}
+        className={`${helpGlassCard} px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}
       >
-        <Link
-          to={`/${role}/help`}
-          className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
-        >
-          Help
-        </Link>
-        {category && (
-          <>
-            <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />
-            <Link
-              to={`/${role}/help?category=${category.id}`}
-              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              {category.title}
-            </Link>
-          </>
-        )}
-        <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />
-        <span className="text-foreground font-semibold truncate">{article.title}</span>
+        <div className="flex items-center gap-1 text-sm text-muted-foreground flex-wrap min-w-0">
+          <Link
+            to={`/${role}/help`}
+            className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
+          >
+            Help
+          </Link>
+          {category && (
+            <>
+              <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />
+              <Link
+                to={`/${role}/help?category=${category.id}`}
+                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                {category.title}
+              </Link>
+            </>
+          )}
+          <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />
+          <span className="text-foreground font-semibold truncate">{article.title}</span>
+        </div>
+        <HelpShareActions articleId={article.id} title={article.title} />
       </nav>
 
       <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
