@@ -30,6 +30,47 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 
+const parseCheckInToMinutes = (value?: string | null): number | null => {
+  if (!value) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+
+  // Handles "HH:mm:ss" or "HH:mm"
+  const timeMatch = text.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (timeMatch) {
+    const h = Number(timeMatch[1]);
+    const m = Number(timeMatch[2]);
+    if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m;
+  }
+
+  const dt = new Date(text);
+  if (!Number.isNaN(dt.getTime())) {
+    return dt.getHours() * 60 + dt.getMinutes();
+  }
+  return null;
+};
+
+const compareEarlyCheckInFirst = (a: User, b: User): number => {
+  const aMinutes = parseCheckInToMinutes(a.check_in_time);
+  const bMinutes = parseCheckInToMinutes(b.check_in_time);
+  const aHas = a.checked_in_today && aMinutes !== null;
+  const bHas = b.checked_in_today && bMinutes !== null;
+
+  // Checked-in users first
+  if (aHas && !bHas) return -1;
+  if (!aHas && bHas) return 1;
+
+  // Earlier check-in time first
+  if (aHas && bHas && aMinutes !== bMinutes) {
+    return (aMinutes as number) - (bMinutes as number);
+  }
+
+  // Stable fallback by username
+  return String(a.username || "").localeCompare(String(b.username || ""), undefined, {
+    sensitivity: "base",
+  });
+};
+
 // Enhanced Status Badge Component with professional tooltips
 const StatusBadge = ({ status, lastSeen }: { status: string; lastSeen?: string }) => {
   const config = {
@@ -129,7 +170,7 @@ const Users = () => {
   // User detail is now a dedicated page route; no modal state here.
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(12);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "active";
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -296,7 +337,8 @@ const Users = () => {
       }
     }
 
-    setFilteredUsers(filtered);
+    // Requirement: show earliest check-in users first.
+    setFilteredUsers([...filtered].sort(compareEarlyCheckInFirst));
   };
 
   const handleTabChange = (tab: string) => {
