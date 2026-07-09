@@ -3,6 +3,7 @@ import { app } from "@/firebase-config";
 import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
 const TOKEN_CACHE_KEY = "fcm_registration_signature";
+const TOKEN_PWA_STATE_KEY = "fcm_registration_pwa_state";
 const MAIN_SW_URL = "/service-worker.js";
 const MAIN_SW_SCOPE = "/";
 /** @deprecated Legacy FCM-only worker — desktop Chrome push is unreliable with a second SW */
@@ -91,6 +92,7 @@ export function clearFcmRegistrationCache() {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(TOKEN_CACHE_KEY);
+    localStorage.removeItem(TOKEN_PWA_STATE_KEY);
   } catch {
     // ignore
   }
@@ -233,10 +235,13 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
 
   const deviceType = detectDeviceType();
   const browserInfo = parseBrowserInfo();
+  const pwaInstalled = isPwaInstalledMode();
   const currentSignature = getRegistrationSignature(userToken, token, deviceType);
   const previousSignature = localStorage.getItem(TOKEN_CACHE_KEY);
+  const previousPwaState = localStorage.getItem(TOKEN_PWA_STATE_KEY);
+  const pwaStateChanged = previousPwaState !== String(pwaInstalled);
 
-  if (!options?.force && previousSignature === currentSignature) {
+  if (!options?.force && previousSignature === currentSignature && !pwaStateChanged) {
     return true;
   }
 
@@ -248,7 +253,7 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
     browser_name: browserInfo.browser_name,
     os_name: browserInfo.os_name,
     device_label: browserInfo.device_label,
-    pwa_installed: isPwaInstalledMode(),
+    pwa_installed: pwaInstalled,
   });
 
   // Fallback chain for older cached builds / environment mismatch.
@@ -275,6 +280,7 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
 
       if (response.ok) {
         localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
+        localStorage.setItem(TOKEN_PWA_STATE_KEY, String(pwaInstalled));
         return true;
       }
 
