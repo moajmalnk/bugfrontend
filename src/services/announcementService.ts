@@ -11,7 +11,9 @@ export interface Announcement {
   last_broadcast_at: string | null;
 }
 
-export type AnnouncementPayload = Omit<Announcement, 'id' | 'created_at' | 'last_broadcast_at'>;
+export type AnnouncementPayload = Omit<Announcement, 'id' | 'created_at' | 'last_broadcast_at'> & {
+  recipient_user_ids?: string[];
+};
 
 class AnnouncementService {
   async getLatestActive(): Promise<Announcement | null> {

@@ -28,6 +28,7 @@ import {
   Repeat,
   Search,
   LifeBuoy,
+  Signal,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -326,6 +327,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/activity"
                       icon={<Activity className="h-5 w-5" />}
                       label="Activities"
+                    />
+                  )}
+
+                  {hasUsersPermission && (
+                    <NavLink
+                      to="/push-coverage"
+                      icon={<Signal className="h-5 w-5" />}
+                      label="Push Coverage"
                     />
                   )}
 

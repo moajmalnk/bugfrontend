@@ -48,6 +48,8 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { toast } from '../ui/use-toast';
+import { userService } from '@/services/userService';
+import { User } from '@/types';
 
 interface AnnouncementDialogProps {
   open: boolean;
@@ -102,6 +104,11 @@ export const AnnouncementDialog = ({
   onSave,
 }: AnnouncementDialogProps) => {
   const [selectedRoles, setSelectedRoles] = useState<string[]>(['all']);
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [recipientSearch, setRecipientSearch] = useState('');
+  const [recipientRoleFilter, setRecipientRoleFilter] = useState<'all' | 'admin' | 'developer' | 'tester'>('all');
 
   const form = useForm<z.infer<typeof announcementSchema>>({
     resolver: zodResolver(announcementSchema),
@@ -127,6 +134,7 @@ export const AnnouncementDialog = ({
         expiry_date: announcement.expiry_date ? parseISO(announcement.expiry_date) : null,
         role,
       });
+      setSelectedRecipients([]);
     } else {
       setSelectedRoles(['all']);
       form.reset({
@@ -136,8 +144,40 @@ export const AnnouncementDialog = ({
         expiry_date: null,
         role: 'all',
       });
+      setSelectedRecipients([]);
     }
   }, [announcement, form, open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let isMounted = true;
+    const loadUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const allUsers = await userService.getUsers();
+        if (!isMounted) return;
+        setUsers(allUsers.filter((user) => Number(user.account_active ?? 1) === 1));
+      } catch {
+        if (!isMounted) return;
+        setUsers([]);
+        toast({
+          title: 'Could not load users',
+          description: 'Recipient list is unavailable right now.',
+          variant: 'destructive',
+        });
+      } finally {
+        if (isMounted) {
+          setLoadingUsers(false);
+        }
+      }
+    };
+
+    loadUsers();
+    return () => {
+      isMounted = false;
+    };
+  }, [open]);
 
   const onSubmit = async (values: z.infer<typeof announcementSchema>) => {
     try {
@@ -154,6 +194,7 @@ export const AnnouncementDialog = ({
           ? format(values.expiry_date, 'yyyy-MM-dd HH:mm:ss')
           : null,
         role: roleValue,
+        recipient_user_ids: selectedRecipients,
       };
 
       if (announcement) {
@@ -181,6 +222,32 @@ export const AnnouncementDialog = ({
   };
 
   const isEditing = !!announcement;
+  const filteredUsers = users.filter((user) => {
+    const userRole = String(user.role || '').toLowerCase();
+    const byRole = recipientRoleFilter === 'all' || userRole === recipientRoleFilter;
+    const query = recipientSearch.trim().toLowerCase();
+    const bySearch =
+      query === '' ||
+      String(user.name || user.username || '')
+        .toLowerCase()
+        .includes(query) ||
+      String(user.username || '')
+        .toLowerCase()
+        .includes(query) ||
+      String(user.email || '')
+        .toLowerCase()
+        .includes(query);
+
+    return byRole && bySearch;
+  });
+
+  const roleBadgeClass = (role: string) => {
+    const normalized = role.toLowerCase();
+    if (normalized === 'admin') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
+    if (normalized === 'developer') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+    if (normalized === 'tester') return 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300';
+    return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+  };
 
   return (
     <TaskFormDialogShell
@@ -194,7 +261,7 @@ export const AnnouncementDialog = ({
       }
       icon={<Megaphone className="h-6 w-6" />}
       headerClassName="bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-600"
-      maxWidthClassName="max-w-2xl"
+      maxWidthClassName="max-w-4xl"
       footer={
         <TaskFormActions
           onCancel={() => onOpenChange(false)}
@@ -206,7 +273,7 @@ export const AnnouncementDialog = ({
       }
     >
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 md:space-y-6">
           <TaskFormSection
             title="Announcement Details"
             subtitle="Title and message shown to users"
@@ -418,6 +485,109 @@ export const AnnouncementDialog = ({
                   it to target specific teams.
                 </p>
               </div>
+            </div>
+          </TaskFormSection>
+
+          <TaskFormSection
+            title="Delivery Recipients"
+            subtitle="Users who will receive push and email on create"
+            icon={<Users className="h-4 w-4" />}
+            accent="emerald"
+          >
+            <div className="space-y-4">
+              <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+                <Input
+                  value={recipientSearch}
+                  onChange={(event) => setRecipientSearch(event.target.value)}
+                  placeholder="Search by name, username, or email"
+                  className={taskFieldControlClass}
+                />
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  {[
+                    { value: 'all', label: 'All Roles' },
+                    { value: 'admin', label: 'Admins' },
+                    { value: 'developer', label: 'Developers' },
+                    { value: 'tester', label: 'Testers' },
+                  ].map((roleOption) => (
+                    <Button
+                      key={roleOption.value}
+                      type="button"
+                      variant={recipientRoleFilter === roleOption.value ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-9 min-w-[90px] rounded-md"
+                      onClick={() =>
+                        setRecipientRoleFilter(
+                          roleOption.value as 'all' | 'admin' | 'developer' | 'tester'
+                        )
+                      }
+                    >
+                      {roleOption.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Selected Users
+                </p>
+                <Badge variant="secondary" className="text-xs">
+                  {selectedRecipients.length} selected
+                </Badge>
+              </div>
+
+              <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl border-2 border-gray-200 bg-white/90 p-3.5 shadow-sm dark:border-gray-700 dark:bg-gray-900/90">
+                {loadingUsers ? (
+                  <p className="text-sm text-muted-foreground">Loading users...</p>
+                ) : filteredUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No active users available.</p>
+                ) : (
+                  filteredUsers.map((user) => {
+                    const userId = String(user.id);
+                    const isSelected = selectedRecipients.includes(userId);
+                    const userRole = String(user.role || 'user');
+                    return (
+                      <div
+                        key={userId}
+                        className={cn(
+                          'flex items-center space-x-3 rounded-lg border p-3 transition-all',
+                          isSelected
+                            ? 'border-emerald-200 bg-emerald-50/80 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/30'
+                            : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-800/60'
+                        )}
+                      >
+                        <Checkbox
+                          id={`announcement-recipient-${userId}`}
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedRecipients((prev) => Array.from(new Set([...prev, userId])));
+                            } else {
+                              setSelectedRecipients((prev) => prev.filter((id) => id !== userId));
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`announcement-recipient-${userId}`}
+                          className="flex flex-1 cursor-pointer items-center justify-between gap-3 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium">{user.name || user.username}</p>
+                            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                          </div>
+                          <Badge variant="secondary" className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] uppercase ${roleBadgeClass(userRole)}`}>
+                            {userRole}
+                          </Badge>
+                        </label>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                If none are selected, notifications go to the role-based audience.
+              </p>
             </div>
           </TaskFormSection>
         </form>
