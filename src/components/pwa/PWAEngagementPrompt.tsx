@@ -107,9 +107,10 @@ export function PWAEngagementPrompt() {
   const pushNeedsRegistration = needsPushRegistrationOnThisDevice();
   const canEnablePush =
     notificationState === "default" || pushNeedsRegistration;
-  // UX rule: if browser permission is already granted, do not keep showing
-  // the floating prompt/modal. Device token retries continue silently.
-  const needsNotifications = notificationState === "default" || notificationState === "denied";
+  const needsNotifications =
+    notificationState === "default" ||
+    notificationState === "denied" ||
+    (notificationState === "granted" && pushNeedsRegistration);
 
   const setInstalled = useCallback(() => {
     markInstalled();
@@ -124,7 +125,12 @@ export function PWAEngagementPrompt() {
   }, []);
 
   const openNotificationPrompt = useCallback(() => {
-    if (!(getNotificationPermissionState() === "default" || getNotificationPermissionState() === "denied")) return;
+    const permission = getNotificationPermissionState();
+    const needsSetup =
+      permission === "default" ||
+      permission === "denied" ||
+      (permission === "granted" && needsPushRegistrationOnThisDevice());
+    if (!needsSetup) return;
     clearDismissed(NOTIF_DISMISS_KEY);
     clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);
     setForceNotifPrompt(true);
@@ -216,10 +222,14 @@ export function PWAEngagementPrompt() {
         (Boolean(deferredPrompt) || ios) &&
         !wasDismissed(INSTALL_DISMISS_KEY, INSTALL_DISMISS_DAYS * 24 * 60 * 60 * 1000);
 
+      const pushNeedsSetup = needsPushRegistrationOnThisDevice();
       const showNotifications =
-        (permission === "default" || permission === "denied") &&
+        (permission === "default" ||
+          permission === "denied" ||
+          (permission === "granted" && pushNeedsSetup)) &&
         (forceNotifPrompt ||
           installed ||
+          pushNeedsSetup ||
           (permission === "denied"
             ? !wasDismissed(NOTIF_BLOCKED_DISMISS_KEY, NOTIF_BLOCKED_DISMISS_HOURS * 60 * 60 * 1000)
             : !wasDismissed(NOTIF_DISMISS_KEY, NOTIF_DISMISS_HOURS * 60 * 60 * 1000)));

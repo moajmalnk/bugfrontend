@@ -28,7 +28,6 @@ import { projectService } from "@/services/projectService";
 import { format } from "date-fns";
 import {
   AlertCircle,
-  ArrowLeft,
   Calendar,
   CalendarDays,
   CheckCircle2,
@@ -552,7 +551,6 @@ export default function UserWorkStatsPeriod() {
     };
   }, [periodSummary, filters, filteredSubmissions, filteredTasks]);
 
-  const goBack = () => navigate(`/${effectiveRole}/users/${userId}`);
   const displaySummary = filteredPeriodSummary ?? periodSummary;
   const filtersActive = isPeriodFiltersActive(filters);
 
@@ -631,14 +629,6 @@ export default function UserWorkStatsPeriod() {
                     Add / fix hours
                   </Button>
                 ) : null}
-                <button
-                  type="button"
-                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-gray-200/60 bg-white/60 px-4 text-sm font-medium text-foreground backdrop-blur transition-colors hover:bg-white/80 dark:border-gray-700/60 dark:bg-gray-900/40 dark:hover:bg-gray-900/60 sm:w-auto"
-                  onClick={goBack}
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to user
-                </button>
               </div>
             </div>
           </div>

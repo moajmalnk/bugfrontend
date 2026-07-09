@@ -337,21 +337,35 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
       });
 
       if (response.ok) {
-        localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
-        localStorage.setItem(TOKEN_PWA_STATE_KEY, String(pwaInstalled));
-        return true;
-      }
+        let savedToTable = true;
+        try {
+          const body = await response.json();
+          if (body?.success === false) {
+            savedToTable = false;
+            lastError = body?.error || body?.message || `API rejected token from ${base}`;
+          } else if (body?.saved_to_table === false) {
+            savedToTable = false;
+            lastError = `Token not saved to user_fcm_tokens from ${base}`;
+          }
+        } catch {
+          // Non-JSON success — still treat as saved
+        }
 
-      lastError = `HTTP ${response.status} from ${base}`;
+        if (savedToTable) {
+          localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
+          localStorage.setItem(TOKEN_PWA_STATE_KEY, String(pwaInstalled));
+          return true;
+        }
+      } else {
+        lastError = `HTTP ${response.status} from ${base}`;
+      }
     } catch (err) {
       lastError = `Fetch failed for ${base}: ${String(err)}`;
     }
   }
 
   clearFcmRegistrationCache();
-  if (import.meta.env.DEV) {
-    console.warn("[FCM] save-fcm-token failed across all endpoints:", lastError);
-  }
+  console.warn("[FCM] save-fcm-token failed across all endpoints:", lastError);
   return false;
 }
 
@@ -477,9 +491,7 @@ export async function requestNotificationPermission(options?: {
 
     return "granted";
   } catch (error) {
-    if (import.meta.env.DEV) {
-      console.warn("[FCM] Token registration failed:", error);
-    }
+    console.warn("[FCM] Token registration failed:", error);
     return "skipped";
   }
 }
