@@ -80,6 +80,13 @@ function parseBrowserInfo() {
   };
 }
 
+function isPwaInstalledMode(): boolean {
+  if (typeof window === "undefined") return false;
+  const displayMode = window.matchMedia("(display-mode: standalone)").matches;
+  const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  return displayMode || iosStandalone;
+}
+
 export function clearFcmRegistrationCache() {
   if (typeof window === "undefined") return;
   try {
@@ -167,7 +174,7 @@ export async function getFirebaseMessagingInstance() {
   if (!registration) {
     return null;
   }
-  return getMessaging(app, { serviceWorkerRegistration: registration });
+  return getMessaging(app);
 }
 
 export function getNotificationPermissionState(): NotificationPermission | "unsupported" {
@@ -241,6 +248,7 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
     browser_name: browserInfo.browser_name,
     os_name: browserInfo.os_name,
     device_label: browserInfo.device_label,
+    pwa_installed: isPwaInstalledMode(),
   });
 
   // Fallback chain for older cached builds / environment mismatch.
@@ -388,7 +396,7 @@ export async function requestNotificationPermission(options?: {
     if (!registration) {
       return "skipped";
     }
-    const messaging = getMessaging(app, { serviceWorkerRegistration: registration });
+    const messaging = getMessaging(app);
     const token = await getToken(messaging, {
       vapidKey,
       serviceWorkerRegistration: registration,

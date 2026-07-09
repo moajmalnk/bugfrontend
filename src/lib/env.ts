@@ -4,10 +4,12 @@ const isLocalhost = typeof window !== 'undefined' &&
    window.location.hostname === '127.0.0.1' ||
    window.location.hostname.includes('localhost'));
 
-const getApiUrl = () => {
-  const configured = import.meta.env.VITE_API_URL as string | undefined;
+const PRODUCTION_API_URL = 'https://bugbackend.bugricer.com/api';
 
-  // Local dev against a remote API: route through Vite proxy (/api) to avoid CORS
+const getApiUrl = () => {
+  const configured = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '');
+
+  // Local dev: proxy /api -> production backend (see vite.config.ts) to avoid CORS
   if (
     import.meta.env.DEV &&
     isLocalhost &&
@@ -19,26 +21,11 @@ const getApiUrl = () => {
     return '/api';
   }
 
-  // Check for environment variable first
   if (configured) {
     return configured;
   }
-  
-  // Auto-detect based on current URL
-  if (isLocalhost) {
-    return 'http://localhost/BugRicer/backend/api';
-  }
-  
-  // Production detection - check if we're on the bug tracker domain
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname.includes('bugs.moajmalnk.in') || hostname.includes('bugricer.com') || hostname.includes('bugs.bugricer.com')) {
-      return 'https://bugbackend.bugricer.com/api';
-    }
-  }
-  
-  // Default production fallback
-  return 'https://bugbackend.bugricer.com/api';
+
+  return PRODUCTION_API_URL;
 };
 
 export const ENV = {
