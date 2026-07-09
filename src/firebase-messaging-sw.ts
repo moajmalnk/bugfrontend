@@ -3,8 +3,11 @@ import { app } from "@/firebase-config";
 import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
 const TOKEN_CACHE_KEY = "fcm_registration_signature";
-const FCM_SW_URL = "/firebase-messaging-sw.js";
-const FCM_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
+const MAIN_SW_URL = "/service-worker.js";
+const MAIN_SW_SCOPE = "/";
+/** @deprecated Legacy FCM-only worker — desktop Chrome push is unreliable with a second SW */
+const LEGACY_FCM_SW_URL = "/firebase-messaging-sw.js";
+const LEGACY_FCM_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
 
 export type NotificationPermissionResult =
   | "granted"
@@ -56,14 +59,64 @@ function getRegistrationSignature(userToken: string, fcmToken: string, deviceTyp
   return `${userToken.slice(0, 16)}:${deviceType}:${fcmToken}`;
 }
 
+async function unregisterLegacyFcmWorker(): Promise<void> {
+  if (!navigator?.serviceWorker?.getRegistration) {
+    return;
+  }
+  try {
+    const legacy = await navigator.serviceWorker.getRegistration(LEGACY_FCM_SW_SCOPE);
+    if (legacy) {
+      await legacy.unregister();
+    }
+  } catch {
+    // Non-fatal — old worker may already be gone
+  }
+}
+
+/** Use the main PWA service worker so Chrome on Mac receives background push reliably. */
 export async function getFirebaseServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === "undefined" || !navigator?.serviceWorker) {
     return null;
   }
+
   try {
-    return await navigator.serviceWorker.register(FCM_SW_URL, { scope: FCM_SW_SCOPE });
+    let registration = await navigator.serviceWorker.getRegistration(MAIN_SW_SCOPE);
+
+    if (!registration) {
+      registration = await navigator.serviceWorker.register(MAIN_SW_URL, {
+        scope: MAIN_SW_SCOPE,
+        updateViaCache: "none",
+      });
+    }
+
+    await navigator.serviceWorker.ready;
+
+    if (registration.installing) {
+      await new Promise<void>((resolve) => {
+        const worker = registration!.installing!;
+        const onStateChange = () => {
+          if (worker.state === "activated" || worker.state === "redundant") {
+            worker.removeEventListener("statechange", onStateChange);
+            resolve();
+          }
+        };
+        worker.addEventListener("statechange", onStateChange);
+        if (worker.state === "activated") {
+          resolve();
+        }
+      });
+    }
+
+    await unregisterLegacyFcmWorker();
+    return registration;
   } catch {
-    return null;
+    try {
+      return await navigator.serviceWorker.register(LEGACY_FCM_SW_URL, {
+        scope: LEGACY_FCM_SW_SCOPE,
+      });
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -86,6 +139,23 @@ export function getNotificationPermissionState(): NotificationPermission | "unsu
   return Notification.permission;
 }
 
+export function hasFcmTokenOnThisDevice(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    return Boolean(localStorage.getItem(TOKEN_CACHE_KEY));
+  } catch {
+    return false;
+  }
+}
+
+export function needsPushRegistrationOnThisDevice(): boolean {
+  return (
+    getNotificationPermissionState() === "granted" && !hasFcmTokenOnThisDevice()
+  );
+}
+
 export function canRequestNotificationPermission(): boolean {
   return getNotificationPermissionState() === "default";
 }
@@ -96,7 +166,10 @@ export function isNotificationPermissionBlocked(): boolean {
 
 export function needsNotificationPermission(): boolean {
   const state = getNotificationPermissionState();
-  return state === "default" || state === "denied";
+  if (state === "default" || state === "denied") {
+    return true;
+  }
+  return needsPushRegistrationOnThisDevice();
 }
 
 function getAuthToken(): string | null {
@@ -190,7 +263,6 @@ export async function requestNotificationPermission(options?: {
     }
     permission = await Notification.requestPermission();
   } else if (permission === "denied") {
-    // Browsers do not re-show the permission dialog once blocked.
     return "denied";
   }
 
@@ -213,9 +285,16 @@ export async function requestNotificationPermission(options?: {
       return "skipped";
     }
 
-    await saveFcmToken(token);
+    const saved = await saveFcmToken(token);
+    if (!saved) {
+      return "skipped";
+    }
+
     return "granted";
-  } catch {
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn("[FCM] Token registration failed:", error);
+    }
     return "skipped";
   }
 }

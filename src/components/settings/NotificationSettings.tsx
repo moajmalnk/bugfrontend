@@ -24,7 +24,9 @@ import { Bell, BellRing, Mail, MessageCircle, Smartphone, Volume2, AlertTriangle
 import { useEffect, useState } from "react";
 import {
   getNotificationPermissionState,
+  hasFcmTokenOnThisDevice,
   isNotificationPermissionBlocked,
+  needsPushRegistrationOnThisDevice,
   registerPushOnThisDevice,
 } from "@/firebase-messaging-sw";
 
@@ -55,9 +57,15 @@ export function NotificationSettingsCard() {
   );
   const [registeringPush, setRegisteringPush] = useState(false);
   const [browserPermission, setBrowserPermission] = useState(() => getNotificationPermissionState());
+  const [pushRegistered, setPushRegistered] = useState(() => hasFcmTokenOnThisDevice());
+
+  const refreshPushStatus = () => {
+    setBrowserPermission(getNotificationPermissionState());
+    setPushRegistered(hasFcmTokenOnThisDevice());
+  };
 
   useEffect(() => {
-    const refresh = () => setBrowserPermission(getNotificationPermissionState());
+    const refresh = () => refreshPushStatus();
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") refresh();
@@ -150,15 +158,24 @@ export function NotificationSettingsCard() {
       }
 
       const result = await registerPushOnThisDevice();
+      refreshPushStatus();
       const permission = getNotificationPermissionState();
-      setBrowserPermission(permission);
       if (result === "granted" || permission === "granted") {
-        handleSettingChange("browserNotifications", true);
-        toast({
-          title: "Push enabled on this device",
-          description:
-            "This phone, tablet, or computer can now receive BugRicer alerts. Repeat on each device you use.",
-        });
+        if (hasFcmTokenOnThisDevice()) {
+          handleSettingChange("browserNotifications", true);
+          toast({
+            title: "Push enabled on this device",
+            description:
+              "This phone, tablet, or computer can now receive BugRicer alerts. Repeat on each device you use.",
+          });
+        } else {
+          toast({
+            title: "Permission granted but push not registered",
+            description:
+              "Chrome on Mac needs a moment — refresh the page, then tap “Enable on this device” again.",
+            variant: "destructive",
+          });
+        }
       } else if (result === "denied" || permission === "denied") {
         toast({
           title: "Notifications blocked",
@@ -336,6 +353,28 @@ export function NotificationSettingsCard() {
                           </ol>
                         </div>
                       </div>
+                    </div>
+                  )}
+                  {needsPushRegistrationOnThisDevice() && (
+                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+                        <div className="space-y-2 text-sm">
+                          <p className="font-semibold text-blue-800 dark:text-blue-200">
+                            This Mac/PC is not registered for push yet
+                          </p>
+                          <p className="text-blue-900/90 dark:text-blue-100/90">
+                            Browser permission is ON, but Chrome on desktop still needs{" "}
+                            <strong>Enable on this device</strong> once. Your iPhone/iPad uses a
+                            separate token — that is why alerts work there but not here.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {pushRegistered && browserPermission === "granted" && (
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+                      Push is registered on this browser. You should receive alerts here.
                     </div>
                   )}
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
