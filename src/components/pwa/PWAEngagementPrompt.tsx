@@ -106,7 +106,9 @@ export function PWAEngagementPrompt() {
   const pushNeedsRegistration = needsPushRegistrationOnThisDevice();
   const canEnablePush =
     notificationState === "default" || pushNeedsRegistration;
-  const needsNotifications = needsNotificationPermission();
+  // UX rule: if browser permission is already granted, do not keep showing
+  // the floating prompt/modal. Device token retries continue silently.
+  const needsNotifications = notificationState === "default" || notificationState === "denied";
 
   const setInstalled = useCallback(() => {
     markInstalled();
@@ -121,7 +123,7 @@ export function PWAEngagementPrompt() {
   }, []);
 
   const openNotificationPrompt = useCallback(() => {
-    if (!needsNotificationPermission()) return;
+    if (!(getNotificationPermissionState() === "default" || getNotificationPermissionState() === "denied")) return;
     clearDismissed(NOTIF_DISMISS_KEY);
     clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);
     setForceNotifPrompt(true);
@@ -214,7 +216,7 @@ export function PWAEngagementPrompt() {
         !wasDismissed(INSTALL_DISMISS_KEY, INSTALL_DISMISS_DAYS * 24 * 60 * 60 * 1000);
 
       const showNotifications =
-        needsNotificationPermission() &&
+        (permission === "default" || permission === "denied") &&
         (forceNotifPrompt ||
           installed ||
           (permission === "denied"
@@ -425,7 +427,7 @@ export function PWAEngagementPrompt() {
           <Bell className="h-4 w-4" />
           {notificationsBlocked
             ? "Notifications blocked"
-            : pushNeedsRegistration && notificationState === "granted"
+            : pushNeedsRegistration
               ? "Finish notification setup"
               : "Enable notifications"}
         </button>
