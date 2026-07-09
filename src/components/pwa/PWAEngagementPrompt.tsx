@@ -382,10 +382,15 @@ export function PWAEngagementPrompt() {
     setStatusMessage(null);
     try {
       const permission = refreshPermission();
-      if (permission === "granted") {
-        const result = await requestNotificationPermission({ interactive: false });
+      if (permission === "granted" || permission === "default") {
+        // After user clicks "Reset permission" in browser site settings,
+        // Chrome usually moves from denied -> default. Re-trigger prompt here.
+        const result = await requestNotificationPermission({
+          interactive: permission === "default",
+        });
         if (result === "granted" || hasFcmTokenOnThisDevice()) {
           clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);
+          clearDismissed(NOTIF_DISMISS_KEY);
           setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
           window.setTimeout(() => {
             setOpen(false);
@@ -396,7 +401,7 @@ export function PWAEngagementPrompt() {
       }
 
       setStatusMessage(
-        "Still blocked. Click the lock/tune icon next to bugs.bugricer.com → Notifications → turn ON → then try again."
+        "Still blocked. Click the lock/tune icon next to bugs.bugricer.com -> Reset permission (or turn Notifications ON), then tap this button again."
       );
     } finally {
       setEnablingNotifications(false);
@@ -527,7 +532,7 @@ export function PWAEngagementPrompt() {
                         onClick={handleRecheckBlockedPermission}
                         disabled={enablingNotifications}
                       >
-                        {enablingNotifications ? "Checking…" : "I've enabled them"}
+                        {enablingNotifications ? "Checking..." : "Try browser popup again"}
                       </Button>
                     </>
                   ) : (
