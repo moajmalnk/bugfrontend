@@ -320,6 +320,7 @@ export function PWAEngagementPrompt() {
         setInstalled();
         setStatusMessage("App installed. Next: enable notifications.");
         clearDismissed(NOTIF_DISMISS_KEY);
+        void syncFcmTokenForSession({ force: true, interactive: false, retries: 5 });
         if (getNotificationPermissionState() === "default") {
           setForceNotifPrompt(true);
           setOpen(true);

@@ -4,6 +4,7 @@ import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
 const TOKEN_CACHE_KEY = "fcm_registration_signature";
 const TOKEN_PWA_STATE_KEY = "fcm_registration_pwa_state";
+const FCM_EPOCH_KEY = "fcm_token_epoch_seen";
 const MAIN_SW_URL = "/service-worker.js";
 const MAIN_SW_SCOPE = "/";
 /** @deprecated Legacy FCM-only worker — desktop Chrome push is unreliable with a second SW */
@@ -96,6 +97,63 @@ export function clearFcmRegistrationCache() {
   } catch {
     // ignore
   }
+}
+
+/** Clear local FCM cache when server bumps FCM_TOKEN_EPOCH after a DB reset. */
+export function applyServerFcmEpoch(
+  serverEpoch: string | number | undefined | null
+): boolean {
+  if (serverEpoch === undefined || serverEpoch === null || serverEpoch === "") {
+    return false;
+  }
+
+  const epoch = String(serverEpoch);
+  try {
+    const seen = localStorage.getItem(FCM_EPOCH_KEY);
+    if (seen === epoch) {
+      return false;
+    }
+    localStorage.setItem(FCM_EPOCH_KEY, epoch);
+  } catch {
+    // ignore storage errors and still clear token cache
+  }
+
+  clearFcmRegistrationCache();
+  return true;
+}
+
+/** Re-sync token when PWA is installed or opened in standalone mode. */
+export function setupFcmPwaAutoSync(): () => void {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const syncIfGranted = () => {
+    if (getNotificationPermissionState() !== "granted") {
+      return;
+    }
+    void syncFcmTokenForSession({ force: true, interactive: false, retries: 3 });
+  };
+
+  const onInstalled = () => syncIfGranted();
+  window.addEventListener("appinstalled", onInstalled);
+
+  const standaloneMq = window.matchMedia("(display-mode: standalone)");
+  const onDisplayMode = () => {
+    if (isPwaInstalledMode()) {
+      syncIfGranted();
+    }
+  };
+
+  standaloneMq.addEventListener?.("change", onDisplayMode);
+  if (isPwaInstalledMode()) {
+    syncIfGranted();
+  }
+
+  return () => {
+    window.removeEventListener("appinstalled", onInstalled);
+    standaloneMq.removeEventListener?.("change", onDisplayMode);
+  };
 }
 
 function sleep(ms: number) {

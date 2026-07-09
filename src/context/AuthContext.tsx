@@ -1,6 +1,6 @@
 import { toast } from "@/components/ui/use-toast";
 import { ENV } from "@/lib/env";
-import { syncFcmTokenForSession, clearFcmRegistrationCache } from "@/firebase-messaging-sw";
+import { syncFcmTokenForSession, clearFcmRegistrationCache, applyServerFcmEpoch, setupFcmPwaAutoSync } from "@/firebase-messaging-sw";
 import { User } from "@/types";
 import {
   createContext,
@@ -40,6 +40,15 @@ const AUTH_ENDPOINTS = {
   register: `${API_URL}/register.php`,
   me: `${API_URL}/me.php`,
 };
+
+function handleAuthFcmSync(payload?: {
+  fcm_token_epoch?: string | number;
+  user?: { fcm_token_epoch?: string | number };
+}) {
+  const epoch = payload?.fcm_token_epoch ?? payload?.user?.fcm_token_epoch;
+  applyServerFcmEpoch(epoch);
+  void syncFcmTokenForSession({ force: true, retries: 5 });
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -118,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         
         setCurrentUser(data.data);
-        void syncFcmTokenForSession({ force: true, retries: 5 });
+        handleAuthFcmSync({ user: data.data, fcm_token_epoch: data.data?.fcm_token_epoch });
       } else {
         if (data?.error_code === "ACCOUNT_REVOKED") {
           revokeSessionForced();
@@ -141,7 +150,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Refresh FCM token whenever a user session is active and permission is granted
   useEffect(() => {
     if (!currentUser) return;
-    void syncFcmTokenForSession({ force: true, retries: 5 });
+    handleAuthFcmSync({ user: currentUser as { fcm_token_epoch?: string | number } });
+    const cleanupPwaSync = setupFcmPwaAutoSync();
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
@@ -156,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.clearInterval(intervalId);
+      cleanupPwaSync();
     };
   }, [currentUser?.id]);
 
@@ -246,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("token", data.token);
         const user = data.user;
         setCurrentUser(user);
-        void syncFcmTokenForSession({ force: true, retries: 5 });
+        handleAuthFcmSync({ user, fcm_token_epoch: data.fcm_token_epoch });
 
         // Start activity session tracking on login
         try {
@@ -308,7 +319,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("token", result.data.token);
         const user = result.data.user;
         setCurrentUser(user);
-        void syncFcmTokenForSession({ force: true, retries: 5 });
+        handleAuthFcmSync({ user, fcm_token_epoch: user?.fcm_token_epoch ?? result.fcm_token_epoch });
         navigate(`/${user.role}/projects`, { replace: true });
         return true;
       }
@@ -367,7 +378,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithToken = async (user: User, token: string) => {
     localStorage.setItem("token", token);
     setCurrentUser(user);
-    void syncFcmTokenForSession({ force: true, retries: 5 });
+    handleAuthFcmSync({ user: user as { fcm_token_epoch?: string | number } });
 
     // Start activity session tracking on login
     try {

@@ -4,15 +4,28 @@ import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/components/ui/use-toast";
 import {
   AlertTriangle,
   CheckCircle2,
+  Copy,
   RefreshCw,
   ShieldAlert,
   Smartphone,
+  Trash2,
   Users,
   UserX,
 } from "lucide-react";
+
+const TEAM_ROLLOUT_MESSAGE = `Hi team — please re-enable BugRicer push notifications on each device you use:
+
+1. Open BugRicer and log in
+2. Go to Settings → Notifications
+3. Tap "Enable on this device" and allow notifications
+4. Keep the app open for 15 seconds
+5. Install the PWA if offered (optional, improves reliability)
+
+Thank you!`;
 
 type PushSummary = {
   active_users: number;
@@ -23,6 +36,8 @@ type PushSummary = {
   pwa_installed_users: number;
   notification_enabled_users: number;
   notification_disabled_users: number;
+  stale_tokens_30d?: number;
+  legacy_recovered_tokens?: number;
 };
 
 type MissingUser = {
@@ -45,7 +60,10 @@ type DeviceRow = {
   browser_name?: string;
   os_name?: string;
   device_label?: string;
+  platform?: string;
   last_used?: string;
+  is_stale?: number;
+  is_legacy?: number;
 };
 
 const defaultSummary: PushSummary = {
@@ -57,28 +75,33 @@ const defaultSummary: PushSummary = {
   pwa_installed_users: 0,
   notification_enabled_users: 0,
   notification_disabled_users: 0,
+  stale_tokens_30d: 0,
+  legacy_recovered_tokens: 0,
 };
 
 export default function AdminPushCoverage() {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [cleaning, setCleaning] = useState(false);
   const [summary, setSummary] = useState<PushSummary>(defaultSummary);
   const [missingUsers, setMissingUsers] = useState<MissingUser[]>([]);
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [pwaInstalledUsers, setPwaInstalledUsers] = useState<UserWithDevices[]>([]);
   const [notificationEnabledUsers, setNotificationEnabledUsers] = useState<UserWithDevices[]>([]);
   const [notificationDisabledUsers, setNotificationDisabledUsers] = useState<MissingUser[]>([]);
+  const [fcmTokenEpoch, setFcmTokenEpoch] = useState<string>("1");
   const [error, setError] = useState<string | null>(null);
+
+  const getAuthToken = () =>
+    sessionStorage.getItem("token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("auth_token");
 
   const fetchCoverage = async () => {
     setLoading(true);
     setError(null);
     try {
-      const token =
-        sessionStorage.getItem("token") ||
-        localStorage.getItem("token") ||
-        localStorage.getItem("auth_token");
-
+      const token = getAuthToken();
       if (!token) {
         setError("Missing auth token. Please login again.");
         return;
@@ -104,6 +127,9 @@ export default function AdminPushCoverage() {
       setPwaInstalledUsers(json.data?.pwa_installed_users || []);
       setNotificationEnabledUsers(json.data?.notification_enabled_users || []);
       setNotificationDisabledUsers(json.data?.notification_disabled_users || []);
+      if (json.data?.fcm_token_epoch) {
+        setFcmTokenEpoch(String(json.data.fcm_token_epoch));
+      }
     } catch {
       setError("Failed to fetch push coverage data");
     } finally {
@@ -120,12 +146,83 @@ export default function AdminPushCoverage() {
     return Math.round((summary.users_with_tokens / summary.active_users) * 100);
   }, [summary.active_users, summary.users_with_tokens]);
 
+  const copyRolloutMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(TEAM_ROLLOUT_MESSAGE);
+      toast({
+        title: "Copied",
+        description: "Team rollout message copied to clipboard.",
+      });
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Could not copy to clipboard. Select and copy manually from Team Rollout Steps.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const runLegacyCleanup = async (fullReset: boolean) => {
+    if (fullReset) {
+      const confirmed = window.confirm(
+        "This deletes ALL device tokens and clears users.fcm_token. Users must re-enable notifications on every device. Continue?"
+      );
+      if (!confirmed) return;
+    }
+
+    setCleaning(true);
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        setError("Missing auth token. Please login again.");
+        return;
+      }
+
+      const res = await fetch(`${ENV.API_URL}/notifications/cleanup_legacy_fcm_tokens.php`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ full_reset: fullReset }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        toast({
+          title: "Cleanup failed",
+          description: json?.message || "Could not clean legacy tokens.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: fullReset ? "Full reset complete" : "Legacy tokens removed",
+        description: `Deleted ${json.data?.deleted_token_rows ?? 0} rows. Bump FCM_TOKEN_EPOCH in backend/.env after deploy.`,
+      });
+      await fetchCoverage();
+    } catch {
+      toast({
+        title: "Cleanup failed",
+        description: "Network error while cleaning tokens.",
+        variant: "destructive",
+      });
+    } finally {
+      setCleaning(false);
+    }
+  };
+
   const metricCards = [
     { label: "Active Users", value: summary.active_users, tone: "text-gray-900 dark:text-white" },
     { label: "With Tokens", value: summary.users_with_tokens, tone: "text-emerald-600 dark:text-emerald-400" },
     { label: "Without Tokens", value: summary.users_without_tokens, tone: "text-rose-600 dark:text-rose-400" },
     { label: "Device Tokens", value: summary.total_device_tokens, tone: "text-cyan-600 dark:text-cyan-400" },
     { label: "Coverage", value: `${coveragePct}%`, tone: "text-indigo-600 dark:text-indigo-400" },
+    { label: "Fresh (24h)", value: summary.recent_tokens_24h, tone: "text-emerald-600 dark:text-emerald-400" },
+    { label: "Stale (30d+)", value: summary.stale_tokens_30d ?? 0, tone: "text-amber-600 dark:text-amber-400" },
+    { label: "Legacy Rows", value: summary.legacy_recovered_tokens ?? 0, tone: "text-rose-600 dark:text-rose-400" },
     { label: "PWA Installed", value: summary.pwa_installed_users, tone: "text-violet-600 dark:text-violet-400" },
     { label: "Notif Enabled", value: summary.notification_enabled_users, tone: "text-emerald-600 dark:text-emerald-400" },
     { label: "Notif Disabled", value: summary.notification_disabled_users, tone: "text-rose-600 dark:text-rose-400" },
@@ -165,8 +262,29 @@ export default function AdminPushCoverage() {
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
                   Monitor FCM token adoption across active users and devices.
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  Server token epoch: <span className="font-mono font-semibold">{fcmTokenEpoch}</span>
+                  {" "}— bump <span className="font-mono">FCM_TOKEN_EPOCH</span> in backend/.env after a DB reset.
+                </p>
               </div>
-              <div className="shrink-0">
+              <div className="shrink-0 flex flex-wrap gap-2">
+                <Button
+                  onClick={() => void copyRolloutMessage()}
+                  variant="outline"
+                  className="h-11 px-5 rounded-xl"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Rollout Message
+                </Button>
+                <Button
+                  onClick={() => void runLegacyCleanup(false)}
+                  variant="outline"
+                  disabled={cleaning || loading}
+                  className="h-11 px-5 rounded-xl"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clean Legacy Tokens
+                </Button>
                 <Button
                   onClick={() => void fetchCoverage()}
                   variant="outline"
@@ -191,7 +309,20 @@ export default function AdminPushCoverage() {
           </div>
         )}
 
-        <section className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-4">
+        {(summary.legacy_recovered_tokens ?? 0) > 0 && (
+          <div className="rounded-2xl border border-amber-200/70 dark:border-amber-800/70 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-sm text-amber-800 dark:text-amber-200 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Legacy recovered tokens detected ({summary.legacy_recovered_tokens})</p>
+              <p className="mt-1">
+                These were copied from old data, not live browsers. Use &quot;Clean Legacy Tokens&quot;, bump
+                FCM_TOKEN_EPOCH, then ask users to re-enable notifications.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <section className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
           {metricCards.map((metric) => (
             <Card
               key={metric.label}
@@ -265,14 +396,24 @@ export default function AdminPushCoverage() {
                     key={`${d.user_id}-${idx}`}
                     className="rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-background/70 p-3"
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                       <p className="font-semibold truncate">{d.username || "Unknown user"}</p>
-                      <Badge variant="secondary" className="whitespace-nowrap rounded-full">
-                        {d.browser_name || "Unknown"} / {d.os_name || "Unknown"}
-                      </Badge>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {d.is_legacy === 1 ? (
+                          <Badge variant="destructive" className="rounded-full text-xs">Legacy</Badge>
+                        ) : null}
+                        {d.is_stale === 1 ? (
+                          <Badge variant="outline" className="rounded-full text-xs border-amber-500 text-amber-700 dark:text-amber-300">
+                            Stale 30d+
+                          </Badge>
+                        ) : null}
+                        <Badge variant="secondary" className="whitespace-nowrap rounded-full">
+                          {d.browser_name || "Unknown"} / {d.os_name || "Unknown"}
+                        </Badge>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-1">
-                      {d.device_label || "Unknown device"} • {d.last_used || "N/A"}
+                      {d.device_label || "Unknown device"} • Last used: {d.last_used || "N/A"}
                     </p>
                   </div>
                 ))
@@ -326,6 +467,9 @@ export default function AdminPushCoverage() {
                       </Badge>
                     </div>
                     {u.email ? <p className="text-xs text-muted-foreground truncate mt-1">{u.email}</p> : null}
+                    {u.last_used ? (
+                      <p className="text-xs text-muted-foreground truncate mt-1">Last token: {u.last_used}</p>
+                    ) : null}
                   </div>
                 ))
               )}
@@ -364,14 +508,28 @@ export default function AdminPushCoverage() {
               Team Rollout Steps
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>1) Ask users to login and open Settings → Notifications.</p>
-            <p>2) Tap “Enable on this device” and keep app open 15 seconds.</p>
-            <p>3) Refresh this page to monitor coverage percentage.</p>
+          <CardContent className="text-sm text-muted-foreground space-y-3">
+            <pre className="whitespace-pre-wrap rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-background/70 p-4 text-xs sm:text-sm text-foreground">
+              {TEAM_ROLLOUT_MESSAGE}
+            </pre>
+            <p>After cleanup: set <span className="font-mono">FCM_TOKEN_EPOCH=2</span> in backend/.env (or higher), deploy backend, then send the rollout message.</p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button size="sm" variant="outline" onClick={() => void copyRolloutMessage()}>
+                <Copy className="h-4 w-4 mr-2" />
+                Copy message
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={cleaning}
+                onClick={() => void runLegacyCleanup(true)}
+              >
+                Full token reset (all devices)
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </section>
     </main>
   );
 }
-
