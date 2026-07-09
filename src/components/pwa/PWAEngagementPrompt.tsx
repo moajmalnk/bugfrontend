@@ -286,7 +286,7 @@ export function PWAEngagementPrompt() {
   useEffect(() => {
     if (!currentUser) return;
     if (getNotificationPermissionState() !== "granted") return;
-    void syncFcmTokenForSession({ force: true });
+    void syncFcmTokenForSession({ force: true, retries: 5 });
   }, [currentUser]);
 
   const closePrompt = useCallback(
@@ -350,7 +350,7 @@ export function PWAEngagementPrompt() {
 
       const alreadyGranted = getNotificationPermissionState() === "granted";
       const result = alreadyGranted
-        ? await syncFcmTokenForSession({ force: true, interactive: false })
+        ? await syncFcmTokenForSession({ force: true, interactive: false, retries: 5 })
         : await registerPushOnThisDevice();
       refreshPermission();
 
@@ -389,6 +389,7 @@ export function PWAEngagementPrompt() {
         const result = await syncFcmTokenForSession({
           force: true,
           interactive: permission === "default",
+          retries: 5,
         });
         if (result === "granted" || hasFcmTokenOnThisDevice()) {
           clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);

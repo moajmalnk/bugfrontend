@@ -158,7 +158,7 @@ export function NotificationSettingsCard() {
         return;
       }
 
-      const result = await syncFcmTokenForSession({ force: true, interactive: true });
+      const result = await syncFcmTokenForSession({ force: true, interactive: true, retries: 5 });
       refreshPushStatus();
       const permission = getNotificationPermissionState();
       if (result === "granted" || permission === "granted") {

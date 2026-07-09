@@ -16,6 +16,8 @@ export type NotificationPermissionResult =
   | "unsupported"
   | "skipped";
 
+const FCM_SYNC_IN_FLIGHT_KEY = "__bugricer_fcm_sync_in_flight__";
+
 function isMessagingAllowedDomain() {
   if (typeof window === "undefined") {
     return false;
@@ -85,6 +87,10 @@ export function clearFcmRegistrationCache() {
   } catch {
     // ignore
   }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getRegistrationSignature(userToken: string, fcmToken: string, deviceType: string) {
@@ -284,14 +290,42 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
 export async function syncFcmTokenForSession(options?: {
   force?: boolean;
   interactive?: boolean;
+  retries?: number;
 }): Promise<NotificationPermissionResult> {
+  if ((window as any)[FCM_SYNC_IN_FLIGHT_KEY]) {
+    return "skipped";
+  }
+  (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = true;
+
+  const retries = Math.max(0, options?.retries ?? 3);
   if (options?.force) {
     clearFcmRegistrationCache();
   }
-  return requestNotificationPermission({
-    interactive: options?.interactive ?? false,
-    forceSave: options?.force ?? false,
-  });
+  try {
+    const interactive = options?.interactive ?? false;
+    const forceSave = options?.force ?? false;
+
+    let result = await requestNotificationPermission({
+      interactive,
+      forceSave,
+    });
+
+    // Reliability path: on some devices/browsers, SW/token setup lags behind login.
+    // Retry a few times when permission is granted but token save was skipped.
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      if (result !== "skipped") break;
+      if (getNotificationPermissionState() !== "granted") break;
+      await sleep(attempt * 1200);
+      result = await requestNotificationPermission({
+        interactive: false,
+        forceSave: true,
+      });
+    }
+
+    return result;
+  } finally {
+    (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = false;
+  }
 }
 
 /** Re-register push token on this browser/device (call after user enables notifications). */

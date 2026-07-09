@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         
         setCurrentUser(data.data);
-        void syncFcmTokenForSession({ force: true });
+        void syncFcmTokenForSession({ force: true, retries: 5 });
       } else {
         if (data?.error_code === "ACCOUNT_REVOKED") {
           revokeSessionForced();
@@ -141,15 +141,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Refresh FCM token whenever a user session is active and permission is granted
   useEffect(() => {
     if (!currentUser) return;
-    void syncFcmTokenForSession({ force: true });
+    void syncFcmTokenForSession({ force: true, retries: 5 });
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        void syncFcmTokenForSession({ force: true });
+        void syncFcmTokenForSession({ force: true, retries: 5 });
       }
     };
     const intervalId = window.setInterval(() => {
-      void syncFcmTokenForSession({ force: false });
+      void syncFcmTokenForSession({ force: false, retries: 2 });
     }, 5 * 60 * 1000);
 
     document.addEventListener("visibilitychange", onVisible);
@@ -246,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("token", data.token);
         const user = data.user;
         setCurrentUser(user);
-        void syncFcmTokenForSession({ force: true });
+        void syncFcmTokenForSession({ force: true, retries: 5 });
 
         // Start activity session tracking on login
         try {
@@ -308,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("token", result.data.token);
         const user = result.data.user;
         setCurrentUser(user);
-        void syncFcmTokenForSession({ force: true });
+        void syncFcmTokenForSession({ force: true, retries: 5 });
         navigate(`/${user.role}/projects`, { replace: true });
         return true;
       }
@@ -367,7 +367,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithToken = async (user: User, token: string) => {
     localStorage.setItem("token", token);
     setCurrentUser(user);
-    void syncFcmTokenForSession({ force: true });
+    void syncFcmTokenForSession({ force: true, retries: 5 });
 
     // Start activity session tracking on login
     try {
