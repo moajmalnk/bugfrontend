@@ -28,6 +28,7 @@ import {
   isNotificationPermissionBlocked,
   needsPushRegistrationOnThisDevice,
   registerPushOnThisDevice,
+  syncFcmTokenForSession,
 } from "@/firebase-messaging-sw";
 
 const updateGlobalEmailSetting = async (enabled: boolean) => {
@@ -157,7 +158,7 @@ export function NotificationSettingsCard() {
         return;
       }
 
-      const result = await registerPushOnThisDevice();
+      const result = await syncFcmTokenForSession({ force: true, interactive: true });
       refreshPushStatus();
       const permission = getNotificationPermissionState();
       if (result === "granted" || permission === "granted") {

@@ -55,6 +55,38 @@ function detectDeviceType(): "android" | "ios" | "desktop" {
   return "desktop";
 }
 
+function parseBrowserInfo() {
+  const ua = navigator.userAgent;
+  let browser = "Unknown";
+  let os = "Unknown";
+
+  if (/Edg\//i.test(ua)) browser = "Edge";
+  else if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) browser = "Chrome";
+  else if (/Firefox\//i.test(ua)) browser = "Firefox";
+  else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) browser = "Safari";
+
+  if (/Android/i.test(ua)) os = "Android";
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = "iOS";
+  else if (/Mac OS X|Macintosh/i.test(ua)) os = "macOS";
+  else if (/Windows/i.test(ua)) os = "Windows";
+  else if (/Linux/i.test(ua)) os = "Linux";
+
+  return {
+    browser_name: browser,
+    os_name: os,
+    device_label: `${browser} on ${os}`,
+  };
+}
+
+export function clearFcmRegistrationCache() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(TOKEN_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 function getRegistrationSignature(userToken: string, fcmToken: string, deviceType: string) {
   return `${userToken.slice(0, 16)}:${deviceType}:${fcmToken}`;
 }
@@ -180,17 +212,18 @@ function getAuthToken(): string | null {
   );
 }
 
-async function saveFcmToken(token: string): Promise<boolean> {
+async function saveFcmToken(token: string, options?: { force?: boolean }): Promise<boolean> {
   const userToken = getAuthToken();
   if (!userToken) {
     return false;
   }
 
   const deviceType = detectDeviceType();
+  const browserInfo = parseBrowserInfo();
   const currentSignature = getRegistrationSignature(userToken, token, deviceType);
   const previousSignature = localStorage.getItem(TOKEN_CACHE_KEY);
 
-  if (previousSignature === currentSignature) {
+  if (!options?.force && previousSignature === currentSignature) {
     return true;
   }
 
@@ -205,11 +238,18 @@ async function saveFcmToken(token: string): Promise<boolean> {
       device_type: deviceType,
       platform: navigator.platform || "unknown",
       user_agent: navigator.userAgent,
+      browser_name: browserInfo.browser_name,
+      os_name: browserInfo.os_name,
+      device_label: browserInfo.device_label,
     }),
   });
 
   if (!response.ok) {
-    localStorage.removeItem(TOKEN_CACHE_KEY);
+    clearFcmRegistrationCache();
+    if (import.meta.env.DEV) {
+      const errText = await response.text().catch(() => "");
+      console.warn("[FCM] save-fcm-token failed:", response.status, errText);
+    }
     return false;
   }
 
@@ -217,10 +257,27 @@ async function saveFcmToken(token: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Sync FCM for the active logged-in session.
+ * Call on login and when permission is already granted.
+ */
+export async function syncFcmTokenForSession(options?: {
+  force?: boolean;
+  interactive?: boolean;
+}): Promise<NotificationPermissionResult> {
+  if (options?.force) {
+    clearFcmRegistrationCache();
+  }
+  return requestNotificationPermission({
+    interactive: options?.interactive ?? false,
+    forceSave: options?.force ?? false,
+  });
+}
+
 /** Re-register push token on this browser/device (call after user enables notifications). */
 export async function registerPushOnThisDevice(): Promise<NotificationPermissionResult> {
-  localStorage.removeItem(TOKEN_CACHE_KEY);
-  return requestNotificationPermission({ interactive: true });
+  clearFcmRegistrationCache();
+  return requestNotificationPermission({ interactive: true, forceSave: true });
 }
 
 /**
@@ -230,8 +287,10 @@ export async function registerPushOnThisDevice(): Promise<NotificationPermission
  */
 export async function requestNotificationPermission(options?: {
   interactive?: boolean;
+  forceSave?: boolean;
 }): Promise<NotificationPermissionResult> {
   const interactive = options?.interactive ?? false;
+  const forceSave = options?.forceSave ?? false;
 
   if (typeof window === "undefined") {
     return "unsupported";
@@ -285,7 +344,7 @@ export async function requestNotificationPermission(options?: {
       return "skipped";
     }
 
-    const saved = await saveFcmToken(token);
+    const saved = await saveFcmToken(token, { force: forceSave });
     if (!saved) {
       return "skipped";
     }

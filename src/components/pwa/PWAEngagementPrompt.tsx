@@ -9,6 +9,7 @@ import {
   needsPushRegistrationOnThisDevice,
   hasFcmTokenOnThisDevice,
   registerPushOnThisDevice,
+  syncFcmTokenForSession,
 } from "@/firebase-messaging-sw";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -285,7 +286,7 @@ export function PWAEngagementPrompt() {
   useEffect(() => {
     if (!currentUser) return;
     if (getNotificationPermissionState() !== "granted") return;
-    void requestNotificationPermission({ interactive: false });
+    void syncFcmTokenForSession({ force: true });
   }, [currentUser]);
 
   const closePrompt = useCallback(
@@ -349,8 +350,8 @@ export function PWAEngagementPrompt() {
 
       const alreadyGranted = getNotificationPermissionState() === "granted";
       const result = alreadyGranted
-        ? await registerPushOnThisDevice()
-        : await requestNotificationPermission({ interactive: true });
+        ? await syncFcmTokenForSession({ force: true, interactive: false })
+        : await registerPushOnThisDevice();
       refreshPermission();
 
       if ((result === "granted" || alreadyGranted) && hasFcmTokenOnThisDevice()) {
@@ -385,7 +386,8 @@ export function PWAEngagementPrompt() {
       if (permission === "granted" || permission === "default") {
         // After user clicks "Reset permission" in browser site settings,
         // Chrome usually moves from denied -> default. Re-trigger prompt here.
-        const result = await requestNotificationPermission({
+        const result = await syncFcmTokenForSession({
+          force: true,
           interactive: permission === "default",
         });
         if (result === "granted" || hasFcmTokenOnThisDevice()) {

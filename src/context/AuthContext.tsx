@@ -1,6 +1,6 @@
 import { toast } from "@/components/ui/use-toast";
 import { ENV } from "@/lib/env";
-import { requestNotificationPermission } from "@/firebase-messaging-sw";
+import { syncFcmTokenForSession, clearFcmRegistrationCache } from "@/firebase-messaging-sw";
 import { User } from "@/types";
 import {
   createContext,
@@ -118,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         
         setCurrentUser(data.data);
+        void syncFcmTokenForSession({ force: true });
       } else {
         if (data?.error_code === "ACCOUNT_REVOKED") {
           revokeSessionForced();
@@ -140,15 +141,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Refresh FCM token whenever a user session is active and permission is granted
   useEffect(() => {
     if (!currentUser) return;
-    void requestNotificationPermission({ interactive: false });
+    void syncFcmTokenForSession({ force: true });
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        void requestNotificationPermission({ interactive: false });
+        void syncFcmTokenForSession({ force: true });
       }
     };
+    const intervalId = window.setInterval(() => {
+      void syncFcmTokenForSession({ force: false });
+    }, 5 * 60 * 1000);
+
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(intervalId);
+    };
   }, [currentUser?.id]);
 
   // Run auth check on mount and token change
@@ -238,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("token", data.token);
         const user = data.user;
         setCurrentUser(user);
+        void syncFcmTokenForSession({ force: true });
 
         // Start activity session tracking on login
         try {
@@ -299,6 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("token", result.data.token);
         const user = result.data.user;
         setCurrentUser(user);
+        void syncFcmTokenForSession({ force: true });
         navigate(`/${user.role}/projects`, { replace: true });
         return true;
       }
@@ -349,6 +359,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem("token");
     localStorage.removeItem("intendedDestination");
     localStorage.removeItem("bugricer_feedback_submitted");
+    clearFcmRegistrationCache();
     setCurrentUser(null);
     navigate("/login", { replace: true });
   };
@@ -356,6 +367,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithToken = async (user: User, token: string) => {
     localStorage.setItem("token", token);
     setCurrentUser(user);
+    void syncFcmTokenForSession({ force: true });
 
     // Start activity session tracking on login
     try {
