@@ -339,6 +339,65 @@ const MemberCard = ({
   );
 };
 
+const ProjectSummaryStat = ({
+  icon: Icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  value: number;
+  label: string;
+  tone: "red" | "green" | "indigo" | "purple";
+}) => {
+  const tones = {
+    red: {
+      wrap: "from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30 border-red-200 dark:border-red-800",
+      icon: "bg-red-500",
+      value: "text-red-700 dark:text-red-300",
+    },
+    green: {
+      wrap: "from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800",
+      icon: "bg-green-500",
+      value: "text-green-700 dark:text-green-300",
+    },
+    indigo: {
+      wrap: "from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border-indigo-200 dark:border-indigo-800",
+      icon: "bg-indigo-500",
+      value: "text-indigo-700 dark:text-indigo-300",
+    },
+    purple: {
+      wrap: "from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border-purple-200 dark:border-purple-800",
+      icon: "bg-purple-500",
+      value: "text-purple-700 dark:text-purple-300",
+    },
+  };
+  const theme = tones[tone];
+
+  return (
+    <div
+      className={`flex items-center gap-2.5 px-3 py-2.5 bg-gradient-to-r ${theme.wrap} border rounded-xl shadow-sm min-w-[5.5rem]`}
+    >
+      <div className={`p-1.5 ${theme.icon} rounded-lg shrink-0`}>
+        <Icon className="h-4 w-4 text-white" />
+      </div>
+      <div className="min-w-0">
+        <div className={`text-xl font-bold leading-none ${theme.value}`}>{value}</div>
+        <div className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium mt-0.5">
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PROJECT_TAB_COUNT_STYLES: Record<string, string> = {
+  bugs: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300",
+  fixes: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
+  updates: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300",
+  tasks: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300",
+};
+
 const TaskCard = ({ 
   task, 
   onView, 
@@ -4474,6 +4533,16 @@ const ProjectDetails = () => {
         .filter(() => roleFilter === "all" || roleFilter === "admin")
     : [];
 
+  const projectTabCounts = useMemo(
+    () => ({
+      bugs: bugs.length,
+      fixes: bugs.filter((bug) => bug.status === "fixed").length,
+      updates: updates.length,
+      tasks: sharedTasks.length,
+    }),
+    [bugs, updates, sharedTasks]
+  );
+
   const memberStats = useMemo(() => {
     const stats: Record<string, { bugs: number; fixes: number }> = {};
     [...members, ...admins].forEach((member) => {
@@ -4483,8 +4552,9 @@ const ProjectDetails = () => {
       if (bug.reported_by && stats[bug.reported_by]) {
         stats[bug.reported_by].bugs += 1;
       }
-      if (bug.updated_by && bug.status === "fixed" && stats[bug.updated_by]) {
-        stats[bug.updated_by].fixes += 1;
+      const fixerId = bug.fixed_by || bug.updated_by;
+      if (fixerId && bug.status === "fixed" && stats[fixerId]) {
+        stats[fixerId].fixes += 1;
       }
     });
     return stats;
@@ -4514,20 +4584,6 @@ const ProjectDetails = () => {
       return (a.username || "").localeCompare(b.username || "");
     });
   }, [filteredAdmins, filteredMembers, memberStats]);
-
-  const totalDisplayStats = useMemo(
-    () =>
-      allDisplayMembers.reduce(
-        (acc, m) => {
-          const s = memberStats[m.id] ?? { bugs: 0, fixes: 0 };
-          acc.bugs += s.bugs;
-          acc.fixes += s.fixes;
-          return acc;
-        },
-        { bugs: 0, fixes: 0 }
-      ),
-    [allDisplayMembers, memberStats]
-  );
 
   const projectTeamMembers = useMemo(() => {
     const combined = [...admins, ...members];
@@ -4702,6 +4758,23 @@ const ProjectDetails = () => {
       title: "Edit Task",
       description: "Edit task functionality will be available soon.",
     });
+  };
+
+  const renderProjectTabBadge = (tabValue: string) => {
+    const count = projectTabCounts[tabValue as keyof typeof projectTabCounts];
+    if (count === undefined) return null;
+    const style = PROJECT_TAB_COUNT_STYLES[tabValue];
+    if (!style) return null;
+    return (
+      <span
+        className={cn(
+          "ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold flex-shrink-0 tabular-nums",
+          style
+        )}
+      >
+        {count}
+      </span>
+    );
   };
 
   // Render skeleton loading UI
@@ -4898,8 +4971,10 @@ const ProjectDetails = () => {
                             >
                               {isActive ? (
                                 <Check className="h-5 w-5" />
-                              ) : tab.value === "tasks" ? (
-                                <span className="text-sm font-bold">{sharedTasks.length}</span>
+                              ) : projectTabCounts[tab.value as keyof typeof projectTabCounts] !== undefined ? (
+                                <span className="text-sm font-bold tabular-nums">
+                                  {projectTabCounts[tab.value as keyof typeof projectTabCounts]}
+                                </span>
                               ) : (
                                 <ChevronDown className="h-4 w-4 -rotate-90 opacity-80" />
                               )}
@@ -4920,11 +4995,7 @@ const ProjectDetails = () => {
                     >
                       <tab.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 flex-shrink-0" />
                       <span className="truncate">{tab.label}</span>
-                      {tab.value === "tasks" && (
-                        <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold flex-shrink-0">
-                          {sharedTasks.length}
-                        </span>
-                      )}
+                      {renderProjectTabBadge(tab.value)}
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -4939,11 +5010,7 @@ const ProjectDetails = () => {
                   >
                     <tab.icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
                     <span className="truncate">{tab.label}</span>
-                    {tab.value === "tasks" && (
-                      <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold flex-shrink-0">
-                        {sharedTasks.length}
-                      </span>
-                    )}
+                    {renderProjectTabBadge(tab.value)}
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -4972,12 +5039,13 @@ const ProjectDetails = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full xl:w-auto xl:min-w-[20rem] shrink-0">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3 w-full xl:w-auto xl:min-w-[20rem] shrink-0">
                     {[
-                      { label: 'Bugs', value: bugs.length, tone: 'text-red-600 dark:text-red-400' },
-                      { label: 'Tasks', value: sharedTasks.length, tone: 'text-orange-600 dark:text-orange-400' },
-                      { label: 'Updates', value: updates.length, tone: 'text-indigo-600 dark:text-indigo-400' },
-                      { label: 'Members', value: members.length, tone: 'text-emerald-600 dark:text-emerald-400' },
+                      { label: 'Bugs', value: projectTabCounts.bugs, tone: 'text-red-600 dark:text-red-400' },
+                      { label: 'Fixes', value: projectTabCounts.fixes, tone: 'text-green-600 dark:text-green-400' },
+                      { label: 'Updates', value: projectTabCounts.updates, tone: 'text-indigo-600 dark:text-indigo-400' },
+                      { label: 'Tasks', value: projectTabCounts.tasks, tone: 'text-orange-600 dark:text-orange-400' },
+                      { label: 'Members', value: members.length + admins.length, tone: 'text-emerald-600 dark:text-emerald-400' },
                     ].map((stat) => (
                       <div
                         key={stat.label}
@@ -5648,24 +5716,42 @@ const ProjectDetails = () => {
                       <p className="text-sm text-gray-600 dark:text-gray-400">Admins, developers, and testers on this project</p>
                     </div>
                   </div>
-                  <div className="text-left sm:text-right">
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {allDisplayMembers.length}
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">Showing</div>
-                    {allDisplayMembers.length > 0 && (
-                      <div className="flex items-center sm:justify-end gap-2 mt-1.5">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                          <Bug className="h-3 w-3" />
-                          {totalDisplayStats.bugs} bugs
-                        </span>
-                        <span className="text-gray-300 dark:text-gray-600">·</span>
-                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                          <CheckCircle2 className="h-3 w-3" />
-                          {totalDisplayStats.fixes} fixes
+                  <div className="flex flex-col sm:items-end gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
+                        <span className="text-lg font-bold text-white tabular-nums">
+                          {allDisplayMembers.length}
                         </span>
                       </div>
-                    )}
+                      <div className="text-left sm:text-right">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                          Team Members
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          Showing {allDisplayMembers.length} of {members.length + admins.length}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                      <ProjectSummaryStat
+                        icon={Bug}
+                        value={projectTabCounts.bugs}
+                        label="Bugs"
+                        tone="red"
+                      />
+                      <ProjectSummaryStat
+                        icon={CheckCircle2}
+                        value={projectTabCounts.fixes}
+                        label="Fixes"
+                        tone="green"
+                      />
+                      <ProjectSummaryStat
+                        icon={Bell}
+                        value={projectTabCounts.updates}
+                        label="Updates"
+                        tone="indigo"
+                      />
+                    </div>
                   </div>
                 </div>
 

@@ -6,7 +6,9 @@ import {
   getNotificationPermissionState,
   needsNotificationPermission,
   isNotificationPermissionBlocked,
-  canRequestNotificationPermission,
+  needsPushRegistrationOnThisDevice,
+  hasFcmTokenOnThisDevice,
+  registerPushOnThisDevice,
 } from "@/firebase-messaging-sw";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -101,7 +103,9 @@ export function PWAEngagementPrompt() {
   const ios = useMemo(() => isIosDevice(), []);
   const canInstall = Boolean(deferredPrompt) && !installDone;
   const notificationsBlocked = notificationState === "denied";
-  const canRequestNotifications = notificationState === "default";
+  const pushNeedsRegistration = needsPushRegistrationOnThisDevice();
+  const canEnablePush =
+    notificationState === "default" || pushNeedsRegistration;
   const needsNotifications = needsNotificationPermission();
 
   const setInstalled = useCallback(() => {
@@ -199,7 +203,7 @@ export function PWAEngagementPrompt() {
       const permission = refreshPermission();
 
       // Fully set up — never show install/notification modal
-      if (installed && permission === "granted") {
+      if (installed && permission === "granted" && !needsPushRegistrationOnThisDevice()) {
         setOpen(false);
         return;
       }
@@ -235,13 +239,28 @@ export function PWAEngagementPrompt() {
     const recheck = () => {
       const previous = notificationState;
       const permission = refreshPermission();
-      if (previous === "denied" && permission === "granted") {
-        void requestNotificationPermission({ interactive: false });
-        setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
-        window.setTimeout(() => {
-          setOpen(false);
-          setForceNotifPrompt(false);
-        }, 1500);
+
+      if (permission === "granted") {
+        if (needsPushRegistrationOnThisDevice()) {
+          void requestNotificationPermission({ interactive: false }).then((result) => {
+            if (result === "granted" || hasFcmTokenOnThisDevice()) {
+              setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
+              window.setTimeout(() => {
+                setOpen(false);
+                setForceNotifPrompt(false);
+              }, 1500);
+            }
+          });
+          return;
+        }
+
+        if (previous === "denied") {
+          setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
+          window.setTimeout(() => {
+            setOpen(false);
+            setForceNotifPrompt(false);
+          }, 1500);
+        }
       }
     };
 
@@ -326,9 +345,13 @@ export function PWAEngagementPrompt() {
         return;
       }
 
-      const result = await requestNotificationPermission({ interactive: true });
-      const permission = refreshPermission();
-      if (result === "granted" || permission === "granted") {
+      const alreadyGranted = getNotificationPermissionState() === "granted";
+      const result = alreadyGranted
+        ? await registerPushOnThisDevice()
+        : await requestNotificationPermission({ interactive: true });
+      refreshPermission();
+
+      if ((result === "granted" || alreadyGranted) && hasFcmTokenOnThisDevice()) {
         clearDismissed(NOTIF_DISMISS_KEY);
         clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);
         setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
@@ -336,9 +359,13 @@ export function PWAEngagementPrompt() {
           setOpen(false);
           setForceNotifPrompt(false);
         }, 1200);
-      } else if (result === "denied" || permission === "denied") {
+      } else if (getNotificationPermissionState() === "denied") {
         setStatusMessage(
           "Notifications are blocked. Open site settings (lock icon in the address bar) and allow notifications for BugRicer."
+        );
+      } else if (alreadyGranted || getNotificationPermissionState() === "granted") {
+        setStatusMessage(
+          "Browser allows notifications, but this device could not finish setup. Refresh the page, then tap the button again."
         );
       } else {
         setStatusMessage("Could not enable notifications on this device.");
@@ -355,7 +382,7 @@ export function PWAEngagementPrompt() {
       const permission = refreshPermission();
       if (permission === "granted") {
         const result = await requestNotificationPermission({ interactive: false });
-        if (result === "granted") {
+        if (result === "granted" || hasFcmTokenOnThisDevice()) {
           clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);
           setStatusMessage("Notifications enabled. You will get bug alerts on this device.");
           window.setTimeout(() => {
@@ -396,7 +423,11 @@ export function PWAEngagementPrompt() {
           )}
         >
           <Bell className="h-4 w-4" />
-          {notificationsBlocked ? "Notifications blocked" : "Enable notifications"}
+          {notificationsBlocked
+            ? "Notifications blocked"
+            : pushNeedsRegistration && notificationState === "granted"
+              ? "Finish notification setup"
+              : "Enable notifications"}
         </button>
       )}
 
@@ -500,14 +531,20 @@ export function PWAEngagementPrompt() {
                   ) : (
                     <>
                       <p className="mt-1.5 text-sm text-slate-400">
-                        Get alerts for bugs and important project updates. Tap the button to allow.
+                        {pushNeedsRegistration
+                          ? "Notifications are allowed in your browser. Tap below to finish registering this device for push alerts."
+                          : "Get alerts for bugs and important project updates. Tap the button to allow."}
                       </p>
                       <Button
                         className="mt-3 w-full bg-violet-600 hover:bg-violet-500"
                         onClick={handleEnableNotifications}
-                        disabled={enablingNotifications || !canRequestNotifications}
+                        disabled={enablingNotifications || !canEnablePush}
                       >
-                        {enablingNotifications ? "Requesting…" : "Enable notifications"}
+                        {enablingNotifications
+                          ? "Registering…"
+                          : pushNeedsRegistration
+                            ? "Finish setup on this device"
+                            : "Enable notifications"}
                       </Button>
                     </>
                   )}
