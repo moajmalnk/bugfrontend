@@ -227,34 +227,54 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
     return true;
   }
 
-  const response = await fetch(`${ENV.API_URL}/save-fcm-token.php`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${userToken}`,
-    },
-    body: JSON.stringify({
-      token,
-      device_type: deviceType,
-      platform: navigator.platform || "unknown",
-      user_agent: navigator.userAgent,
-      browser_name: browserInfo.browser_name,
-      os_name: browserInfo.os_name,
-      device_label: browserInfo.device_label,
-    }),
+  const payload = JSON.stringify({
+    token,
+    device_type: deviceType,
+    platform: navigator.platform || "unknown",
+    user_agent: navigator.userAgent,
+    browser_name: browserInfo.browser_name,
+    os_name: browserInfo.os_name,
+    device_label: browserInfo.device_label,
   });
 
-  if (!response.ok) {
-    clearFcmRegistrationCache();
-    if (import.meta.env.DEV) {
-      const errText = await response.text().catch(() => "");
-      console.warn("[FCM] save-fcm-token failed:", response.status, errText);
+  // Fallback chain for older cached builds / environment mismatch.
+  const candidateBases = Array.from(
+    new Set(
+      [
+        ENV.API_URL?.replace(/\/$/, ""),
+        "https://bugbackend.bugricer.com/api",
+      ].filter(Boolean)
+    )
+  );
+
+  let lastError = "";
+  for (const base of candidateBases) {
+    try {
+      const response = await fetch(`${base}/save-fcm-token.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: payload,
+      });
+
+      if (response.ok) {
+        localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
+        return true;
+      }
+
+      lastError = `HTTP ${response.status} from ${base}`;
+    } catch (err) {
+      lastError = `Fetch failed for ${base}: ${String(err)}`;
     }
-    return false;
   }
 
-  localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
-  return true;
+  clearFcmRegistrationCache();
+  if (import.meta.env.DEV) {
+    console.warn("[FCM] save-fcm-token failed across all endpoints:", lastError);
+  }
+  return false;
 }
 
 /**
