@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { userService } from "@/services/userService";
 import { permissionService } from "@/services/permissionService";
 import { User, UserRole } from "@/types";
@@ -157,6 +158,8 @@ export function EditUserDialog({
     });
   }, [user, form]);
 
+  const isAdminEditor = String(loggedInUserRole || "").toLowerCase() === "admin";
+
   const onSubmit = async (data: UserFormValues) => {
     setIsSubmitting(true);
     try {
@@ -164,14 +167,18 @@ export function EditUserDialog({
         (r) => r.role_name.toLowerCase() === data.role.toLowerCase()
       );
 
-      const updatedUser = await userService.updateUser(user.id, {
+      const payload: Parameters<typeof userService.updateUser>[1] = {
         username: data.username,
         email: data.email,
         role: data.role as UserRole,
         role_id: selectedRole?.id,
         phone: data.phone ? "+91" + data.phone : "",
-        joining_date: data.joining_date?.trim() || null,
-      });
+      };
+      if (isAdminEditor) {
+        payload.joining_date = data.joining_date?.trim() || null;
+      }
+
+      const updatedUser = await userService.updateUser(user.id, payload);
 
       const updatedRole = (updatedUser.role || data.role) as UserRole;
       const finalUpdatedUser: User = {
@@ -330,24 +337,27 @@ export function EditUserDialog({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="joining_date"
-                render={({ field }) => (
-                  <FormItem className="space-y-2">
-                    <FormLabelDot color="bg-teal-500">Joining date</FormLabelDot>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        value={field.value || ""}
-                        className={fieldInputClass}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {isAdminEditor ? (
+                <FormField
+                  control={form.control}
+                  name="joining_date"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabelDot color="bg-teal-500">Joining date</FormLabelDot>
+                      <FormControl>
+                        <DatePicker
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          placeholder="Pick joining date"
+                          className={fieldInputClass}
+                          disableFuture
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : null}
             </div>
 
             <DialogFooter className="border-t border-gray-200/50 dark:border-gray-700/50 px-6 py-4 gap-2 sm:gap-3 sm:justify-end">

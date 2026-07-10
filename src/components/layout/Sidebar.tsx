@@ -3,6 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
 import { cn, getEffectiveRole, showBugMessageInMainNav } from "@/lib/utils";
+import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -30,6 +31,7 @@ import {
   LifeBuoy,
   Signal,
   PlaneTakeoff,
+  ClipboardCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -251,6 +253,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
+            {(role === "admin" || role === "developer" || role === "tester") && (
+              <NavLink
+                to="/common-codo"
+                icon={<ClipboardCheck className="h-5 w-5" />}
+                label="CODO Rules"
+              />
+            )}
+
             <NavLink
               to="/help"
               icon={<LifeBuoy className="h-5 w-5" />}
@@ -395,7 +405,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                 alt="User avatar"
                 className="h-10 w-10 rounded-xl object-cover ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200"
               />
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
+              {isFullFledgedUser(currentUser) ? (
+                <VerifiedBlueTick
+                  size="sm"
+                  className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full ring-2 ring-background shadow-sm"
+                />
+              ) : (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+              )}
             </div>
             <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5 py-0.5">
               <p className="text-sm font-semibold text-foreground truncate leading-tight">

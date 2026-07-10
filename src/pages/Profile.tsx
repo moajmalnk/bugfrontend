@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
+import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import {
   Dialog,
   DialogContent,
@@ -481,14 +482,22 @@ export default function Profile() {
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden shadow-lg">
-                    <img
-                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                        currentUser.name || currentUser.username
-                      )}&background=8b5cf6&color=fff&size=128`}
-                      alt={currentUser.name || currentUser.username}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 shrink-0">
+                    <div className="w-full h-full rounded-full overflow-hidden shadow-lg">
+                      <img
+                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                          currentUser.name || currentUser.username
+                        )}&background=8b5cf6&color=fff&size=128`}
+                        alt={currentUser.name || currentUser.username}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {isFullFledgedUser(currentUser) ? (
+                      <VerifiedBlueTick
+                        size="lg"
+                        className="absolute -bottom-0.5 -right-0.5 h-5 w-5 sm:h-6 sm:w-6 rounded-full ring-2 ring-white dark:ring-gray-900 shadow-md"
+                      />
+                    ) : null}
                   </div>
                   <div>
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">

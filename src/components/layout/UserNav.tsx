@@ -11,6 +11,7 @@ import {
 import { UserIcon, LogOut, Settings, User as UserAvatar, Shield, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { VerifiedBlueTick, isFullFledgedUser } from '@/components/ui/VerifiedBlueTick';
 
 export function UserNav() {
   const { currentUser, logout } = useAuth();
@@ -72,8 +73,11 @@ export function UserNav() {
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">
-                {currentUser?.name || "User"}
+              <p className="text-sm font-semibold text-foreground truncate inline-flex items-center gap-1 min-w-0">
+                <span className="truncate">{currentUser?.name || currentUser?.username || "User"}</span>
+                {isFullFledgedUser(currentUser) ? (
+                  <VerifiedBlueTick size="sm" className="shrink-0" />
+                ) : null}
               </p>
               <p className="text-xs text-muted-foreground truncate">
                 {currentUser?.email || "No email"}

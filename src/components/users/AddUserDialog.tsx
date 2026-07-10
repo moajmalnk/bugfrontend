@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2, UserPlus } from "lucide-react";
@@ -346,15 +347,16 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                   <FormItem className="space-y-2">
                     <FormLabelDot color="bg-teal-500">Joining date</FormLabelDot>
                     <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
+                      <DatePicker
                         value={field.value || ""}
+                        onChange={field.onChange}
+                        placeholder="Pick joining date"
                         className={fieldInputClass}
+                        disableFuture
                       />
                     </FormControl>
                     <FormDescription className="text-xs">
-                      Attendance is blocked before this date
+                      Attendance is blocked before this date (admins only)
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

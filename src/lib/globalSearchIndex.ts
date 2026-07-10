@@ -187,6 +187,13 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     keywords: ["common bugs", "duplicate", "already raised", "recurring"],
     roles: ["admin", "developer"],
   },
+  {
+    id: "page-common-codo",
+    label: "Common CODO",
+    path: "/common-codo",
+    keywords: ["codo", "common codo", "compliance", "rules", "qa", "developer matrix"],
+    roles: ["admin", "developer", "tester"],
+  },
 
   // —— Messaging ——
   {

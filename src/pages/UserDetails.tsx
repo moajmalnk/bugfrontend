@@ -23,6 +23,7 @@ import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
+import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { userService } from "@/services/userService";
 import type { User } from "@/types";
 import { useQuery } from "@tanstack/react-query";
@@ -321,8 +322,9 @@ export default function UserDetails() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h2 className="text-xl sm:text-2xl font-bold break-words">
-                            {user.name}
+                            {user.name || user.username}
                           </h2>
+                          {isFullFledgedUser(user) ? <VerifiedBlueTick size="md" /> : null}
                           <span
                             className={cn(
                               "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-white shrink-0",
@@ -403,23 +405,25 @@ export default function UserDetails() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <Calendar className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs text-muted-foreground">
-                            Joining date
+                      {effectiveRole === "admin" ? (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <Calendar className="h-5 w-5 text-primary" />
                           </div>
-                          <div className="font-semibold truncate">
-                            {user.joining_date
-                              ? new Date(user.joining_date).toLocaleDateString()
-                              : user.created_at
-                                ? new Date(user.created_at).toLocaleDateString()
-                                : "—"}
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-muted-foreground">
+                              Joining date
+                            </div>
+                            <div className="font-semibold truncate">
+                              {user.joining_date
+                                ? new Date(user.joining_date).toLocaleDateString()
+                                : user.created_at
+                                  ? new Date(user.created_at).toLocaleDateString()
+                                  : "—"}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ) : null}
                     </div>
                   </div>
 

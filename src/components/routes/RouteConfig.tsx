@@ -183,6 +183,7 @@ const AdminLeaveRequests = lazy(() => import("@/pages/AdminLeaveRequests"));
 const AdminLeaveUserDetail = lazy(() => import("@/pages/AdminLeaveUserDetail"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const CommonBugs = lazy(() => import("@/pages/CommonBugs"));
+const CommonCodoRules = lazy(() => import("@/pages/CommonCodoRules"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
 const DocsSetupError = lazy(() => import("@/pages/DocsSetupError"));
 const BugDocsPage = lazy(() => import("@/pages/BugDocsPage"));
@@ -318,6 +319,7 @@ const RouteConfig = () => {
       <Route path="/leave-requests" element={<RolePathRedirect suffix="leave-requests" />} />
       <Route path="/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
       <Route path="/common-bugs" element={<RolePathRedirect suffix="common-bugs" />} />
+      <Route path="/common-codo" element={<RolePathRedirect suffix="common-codo" />} />
       <Route path="/users/:userId" element={<RolePathRedirect suffix="users/:userId" />} />
       <Route path="/users" element={<RolePathRedirect suffix="users" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
@@ -372,6 +374,7 @@ const RouteConfig = () => {
           <Route path="leave-requests" element={<AdminLeaveRequests />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
           <Route path="common-bugs" element={<CommonBugs />} />
+          <Route path="common-codo" element={<CommonCodoRules />} />
           <Route path="bugdocs" element={<BugDocsPage />} />
           <Route path="bugdocs/project/:projectId" element={<ProjectDocumentsPage />} />
           <Route path="bugsheets" element={<BugSheetsPage />} />

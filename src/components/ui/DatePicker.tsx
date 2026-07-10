@@ -46,7 +46,7 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-auto p-0 max-w-[calc(100vw-2rem)] sm:max-w-[350px] overflow-hidden" 
+        className="w-auto p-0 max-w-[calc(100vw-2rem)] sm:max-w-[350px] overflow-hidden z-[200]" 
         align="start" 
         side="bottom" 
         alignOffset={0}
@@ -68,6 +68,36 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
           disabled={disabled}
           initialFocus
         />
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 px-3 py-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-xs text-blue-600 dark:text-blue-400"
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+            }}
+          >
+            Clear
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-xs text-blue-600 dark:text-blue-400"
+            onClick={() => {
+              const t = new Date();
+              const iso = new Date(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()))
+                .toISOString()
+                .slice(0, 10);
+              onChange(iso);
+              setOpen(false);
+            }}
+          >
+            Today
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
