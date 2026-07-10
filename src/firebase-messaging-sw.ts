@@ -11,6 +11,10 @@ const MAIN_SW_SCOPE = "/";
 /** @deprecated Legacy FCM-only worker — desktop Chrome push is unreliable with a second SW */
 const LEGACY_FCM_SW_URL = "/firebase-messaging-sw.js";
 const LEGACY_FCM_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
+const FCM_TOKEN_TIMEOUT_MS = 12_000;
+const FCM_SYNC_TIMEOUT_MS = 20_000;
+
+type SwPrefer = "auto" | "main" | "legacy";
 
 export type NotificationPermissionResult =
   | "granted"
@@ -25,7 +29,6 @@ const FCM_SYNC_PROMISE_KEY = "__bugricer_fcm_sync_promise__";
 const FCM_STORAGE_RECOVERY_KEY = "fcm_storage_recovery_at";
 /** Chrome push storage needs time to release after SW/subscription teardown. */
 const FCM_STORAGE_RECOVERY_COOLDOWN_MS = 15 * 60 * 1000;
-const FCM_POST_RESET_DELAY_MS = 2000;
 
 const FIREBASE_IDB_NAMES = [
   "firebase-messaging-database",
@@ -152,7 +155,7 @@ export function setupFcmPwaAutoSync(): () => void {
     if (getNotificationPermissionState() !== "granted") {
       return;
     }
-    void syncFcmTokenForSession({ force: true, interactive: false, retries: 3 });
+    void syncFcmTokenForSession({ force: true, interactive: false, retries: 1, timeoutMs: 15_000 });
   };
 
   const onInstalled = () => syncIfGranted();
@@ -178,6 +181,42 @@ export function setupFcmPwaAutoSync(): () => void {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise
+      .then((value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+/** Chrome/Edge desktop: lightweight FCM-only SW avoids push storage errors from the PWA cache worker. */
+function prefersLegacyFcmWorker(): boolean {
+  if (isPwaInstalledMode()) {
+    return false;
+  }
+  if (isSafariBrowser()) {
+    return false;
+  }
+  if (detectDeviceType() !== "desktop") {
+    return false;
+  }
+  const ua = navigator.userAgent;
+  return (/Chrome/i.test(ua) && !/Edg/i.test(ua)) || /Edg\//i.test(ua);
+}
+
+function getSwAttemptOrder(): SwPrefer[] {
+  return prefersLegacyFcmWorker() ? ["legacy", "main"] : ["main", "legacy"];
 }
 
 function isFcmStorageError(error: unknown): boolean {
@@ -268,52 +307,160 @@ async function clearFirebaseMessagingDatabases(): Promise<void> {
   );
 }
 
-/** Clear broken push state. Safari: never unregister the main SW (causes reload loops). */
-export async function resetPushBrowserState(): Promise<void> {
+/** Soft reset — never unregister the PWA service worker (that causes Chrome storage errors). */
+async function softResetPushState(): Promise<void> {
   clearFcmRegistrationCache();
   await unsubscribeAllPushSubscriptions();
   await clearFirebaseMessagingDatabases();
+  await sleep(1000);
+}
 
-  const preserveServiceWorker = isSafariBrowser();
+/** Clear broken push subscription / Firebase IDB state. */
+export async function resetPushBrowserState(): Promise<void> {
+  await softResetPushState();
+}
 
-  if (!preserveServiceWorker && navigator?.serviceWorker?.getRegistrations) {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.unregister()));
+async function waitForServiceWorkerActive(registration: ServiceWorkerRegistration): Promise<void> {
+  await navigator.serviceWorker.ready;
+  if (!registration.installing) {
+    return;
   }
 
-  if (!preserveServiceWorker && "caches" in window) {
-    const cacheNames = await caches.keys();
-    await Promise.all(cacheNames.map((name) => caches.delete(name)));
+  await new Promise<void>((resolve) => {
+    const worker = registration.installing!;
+    const onStateChange = () => {
+      if (worker.state === "activated" || worker.state === "redundant") {
+        worker.removeEventListener("statechange", onStateChange);
+        resolve();
+      }
+    };
+    worker.addEventListener("statechange", onStateChange);
+    if (worker.state === "activated") {
+      resolve();
+    }
+  });
+}
+
+async function registerLegacyFcmWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (!navigator?.serviceWorker) {
+    return null;
   }
 
-  await sleep(preserveServiceWorker ? 800 : FCM_POST_RESET_DELAY_MS);
+  try {
+    let registration = await navigator.serviceWorker.getRegistration(LEGACY_FCM_SW_SCOPE);
+    if (!registration) {
+      registration = await navigator.serviceWorker.register(LEGACY_FCM_SW_URL, {
+        scope: LEGACY_FCM_SW_SCOPE,
+      });
+    }
+    await waitForServiceWorkerActive(registration);
+    return registration;
+  } catch {
+    return null;
+  }
+}
+
+async function registerMainPwaWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (!navigator?.serviceWorker) {
+    return null;
+  }
+
+  try {
+    let registration = await navigator.serviceWorker.getRegistration(MAIN_SW_SCOPE);
+    if (!registration) {
+      registration = await navigator.serviceWorker.register(MAIN_SW_URL, {
+        scope: MAIN_SW_SCOPE,
+        updateViaCache: "none",
+      });
+    }
+    await waitForServiceWorkerActive(registration);
+
+    // Keep legacy worker on Chrome desktop — it is used for reliable token registration.
+    if (!prefersLegacyFcmWorker()) {
+      await unregisterLegacyFcmWorker();
+    }
+    return registration;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveServiceWorkerRegistration(
+  prefer: SwPrefer
+): Promise<ServiceWorkerRegistration | null> {
+  const useLegacy =
+    prefer === "legacy" || (prefer === "auto" && prefersLegacyFcmWorker());
+
+  if (useLegacy) {
+    const legacy = await registerLegacyFcmWorker();
+    if (legacy) {
+      return legacy;
+    }
+    if (prefer === "legacy") {
+      return null;
+    }
+  }
+
+  return registerMainPwaWorker();
 }
 
 async function acquireFcmToken(vapidKey: string, allowRecovery: boolean): Promise<string | null> {
-  const attempt = async () => {
-    const registration = await getFirebaseServiceWorkerRegistration();
+  const requestToken = async (prefer: SwPrefer): Promise<string | null> => {
+    const registration = await resolveServiceWorkerRegistration(prefer);
     if (!registration) {
       return null;
     }
     const messaging = getMessaging(app);
-    return getToken(messaging, {
-      vapidKey,
-      serviceWorkerRegistration: registration,
-    });
+    return withTimeout(
+      getToken(messaging, {
+        vapidKey,
+        serviceWorkerRegistration: registration,
+      }),
+      FCM_TOKEN_TIMEOUT_MS,
+      "FCM getToken"
+    );
   };
 
-  try {
-    return await attempt();
-  } catch (error) {
-    if (!allowRecovery || !isFcmStorageError(error) || wasRecentStorageRecovery()) {
-      throw error;
-    }
+  const order = getSwAttemptOrder();
+  let lastError: unknown;
 
-    markStorageRecoveryAttempt();
-    console.warn("[FCM] Storage error detected — resetting browser push state and retrying once");
-    await resetPushBrowserState();
-    return attempt();
+  for (const prefer of order) {
+    try {
+      const token = await requestToken(prefer);
+      if (token) {
+        return token;
+      }
+    } catch (error) {
+      lastError = error;
+      if (!isFcmStorageError(error)) {
+        throw error;
+      }
+    }
   }
+
+  if (!allowRecovery || !lastError || !isFcmStorageError(lastError) || wasRecentStorageRecovery()) {
+    throw lastError ?? new Error("FCM token unavailable");
+  }
+
+  markStorageRecoveryAttempt();
+  console.warn("[FCM] Storage error — clearing push subscription cache and retrying once");
+  await softResetPushState();
+
+  for (const prefer of order) {
+    try {
+      const token = await requestToken(prefer);
+      if (token) {
+        return token;
+      }
+    } catch (error) {
+      lastError = error;
+      if (!isFcmStorageError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError ?? new Error("FCM token unavailable after recovery");
 }
 
 function getRegistrationSignature(userToken: string, fcmToken: string, deviceType: string) {
@@ -334,51 +481,25 @@ async function unregisterLegacyFcmWorker(): Promise<void> {
   }
 }
 
-/** Use the main PWA service worker so Chrome on Mac receives background push reliably. */
-export async function getFirebaseServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
+/** Resolve the service worker used for Firebase Cloud Messaging. */
+export async function getFirebaseServiceWorkerRegistration(
+  options?: { prefer?: SwPrefer }
+): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === "undefined" || !navigator?.serviceWorker) {
     return null;
   }
 
-  try {
-    let registration = await navigator.serviceWorker.getRegistration(MAIN_SW_SCOPE);
-
-    if (!registration) {
-      registration = await navigator.serviceWorker.register(MAIN_SW_URL, {
-        scope: MAIN_SW_SCOPE,
-        updateViaCache: "none",
-      });
-    }
-
-    await navigator.serviceWorker.ready;
-
-    if (registration.installing) {
-      await new Promise<void>((resolve) => {
-        const worker = registration!.installing!;
-        const onStateChange = () => {
-          if (worker.state === "activated" || worker.state === "redundant") {
-            worker.removeEventListener("statechange", onStateChange);
-            resolve();
-          }
-        };
-        worker.addEventListener("statechange", onStateChange);
-        if (worker.state === "activated") {
-          resolve();
-        }
-      });
-    }
-
-    await unregisterLegacyFcmWorker();
+  const prefer = options?.prefer ?? "auto";
+  const registration = await resolveServiceWorkerRegistration(prefer);
+  if (registration) {
     return registration;
-  } catch {
-    try {
-      return await navigator.serviceWorker.register(LEGACY_FCM_SW_URL, {
-        scope: LEGACY_FCM_SW_SCOPE,
-      });
-    } catch {
-      return null;
-    }
   }
+
+  if (prefer === "auto") {
+    return resolveServiceWorkerRegistration(prefersLegacyFcmWorker() ? "main" : "legacy");
+  }
+
+  return null;
 }
 
 export async function getFirebaseMessagingInstance() {
@@ -531,6 +652,7 @@ export async function syncFcmTokenForSession(options?: {
   force?: boolean;
   interactive?: boolean;
   retries?: number;
+  timeoutMs?: number;
 }): Promise<NotificationPermissionResult> {
   const existing = (window as any)[FCM_SYNC_PROMISE_KEY] as
     | Promise<NotificationPermissionResult>
@@ -539,37 +661,48 @@ export async function syncFcmTokenForSession(options?: {
     return existing;
   }
 
-  const run = (async (): Promise<NotificationPermissionResult> => {
-    (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = true;
-    const retries = Math.max(0, options?.retries ?? 3);
-    try {
-      const interactive = options?.interactive ?? false;
-      const forceSave = options?.force ?? false;
+  const timeoutMs = options?.timeoutMs ?? FCM_SYNC_TIMEOUT_MS;
 
-      let result = await requestNotificationPermission({
-        interactive,
-        forceSave,
-      });
+  const run = withTimeout(
+    (async (): Promise<NotificationPermissionResult> => {
+      (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = true;
+      const retries = Math.max(0, options?.retries ?? 1);
+      try {
+        const interactive = options?.interactive ?? false;
+        const forceSave = options?.force ?? false;
 
-      // Retry when permission is granted but token save was skipped.
-      // Do not hammer Chrome when push storage is corrupted — one recovery per cooldown window.
-      for (let attempt = 1; attempt <= retries; attempt++) {
-        if (result !== "skipped") break;
-        if (getNotificationPermissionState() !== "granted") break;
-        if (wasRecentStorageRecovery() && !hasFcmTokenOnThisDevice()) break;
-        await sleep(attempt * 1200);
-        result = await requestNotificationPermission({
-          interactive: false,
-          forceSave: true,
+        let result = await requestNotificationPermission({
+          interactive,
+          forceSave,
         });
-      }
 
-      return result;
-    } finally {
-      (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = false;
-      (window as any)[FCM_SYNC_PROMISE_KEY] = undefined;
+        for (let attempt = 1; attempt <= retries; attempt++) {
+          if (result !== "skipped") break;
+          if (getNotificationPermissionState() !== "granted") break;
+          if (wasRecentStorageRecovery() && !hasFcmTokenOnThisDevice()) break;
+          await sleep(attempt * 800);
+          result = await requestNotificationPermission({
+            interactive: false,
+            forceSave: true,
+          });
+        }
+
+        return result;
+      } finally {
+        (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = false;
+        (window as any)[FCM_SYNC_PROMISE_KEY] = undefined;
+      }
+    })(),
+    timeoutMs,
+    "FCM sync"
+  ).catch((error) => {
+    (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = false;
+    (window as any)[FCM_SYNC_PROMISE_KEY] = undefined;
+    if (isFcmStorageError(error) || String(error).includes("timed out")) {
+      return "storage_error" as const;
     }
-  })();
+    return "skipped" as const;
+  });
 
   (window as any)[FCM_SYNC_PROMISE_KEY] = run;
   return run;
@@ -579,12 +712,20 @@ export async function syncFcmTokenForSession(options?: {
 export async function registerPushOnThisDevice(): Promise<NotificationPermissionResult> {
   clearFcmRegistrationCache();
   try {
-    // User explicitly retried — allow one fresh storage recovery attempt.
     sessionStorage.removeItem(FCM_STORAGE_RECOVERY_KEY);
   } catch {
     // ignore
   }
-  return requestNotificationPermission({ interactive: true, forceSave: true });
+  return withTimeout(
+    requestNotificationPermission({ interactive: true, forceSave: true }),
+    FCM_SYNC_TIMEOUT_MS,
+    "FCM register"
+  ).catch((error) => {
+    if (isFcmStorageError(error) || String(error).includes("timed out")) {
+      return "storage_error" as const;
+    }
+    return "skipped" as const;
+  });
 }
 
 /**

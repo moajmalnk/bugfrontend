@@ -218,7 +218,8 @@ export function PWAEngagementPrompt() {
         const result = await syncFcmTokenForSession({
           force: true,
           interactive: false,
-          retries: 5,
+          retries: 1,
+          timeoutMs: 15_000,
         });
         if (cancelled) return;
         permission = refreshPermission();
@@ -323,7 +324,7 @@ export function PWAEngagementPrompt() {
   useEffect(() => {
     if (!currentUser) return;
     if (getNotificationPermissionState() !== "granted") return;
-    void syncFcmTokenForSession({ force: true, retries: 5 }).then((result) => {
+    void syncFcmTokenForSession({ force: true, retries: 1, timeoutMs: 15_000 }).then((result) => {
       if (result === "granted" || hasFcmTokenOnThisDevice()) {
         setOpen(false);
         setForceNotifPrompt(false);
@@ -362,7 +363,7 @@ export function PWAEngagementPrompt() {
         setInstalled();
         setStatusMessage("App installed. Next: enable notifications.");
         clearDismissed(NOTIF_DISMISS_KEY);
-        void syncFcmTokenForSession({ force: true, interactive: false, retries: 5 });
+        void syncFcmTokenForSession({ force: true, interactive: false, retries: 1, timeoutMs: 15_000 });
         if (getNotificationPermissionState() === "default") {
           setForceNotifPrompt(true);
           setOpen(true);
@@ -400,7 +401,7 @@ export function PWAEngagementPrompt() {
         }
       }
       const result = alreadyGranted
-        ? await syncFcmTokenForSession({ force: true, interactive: false, retries: 5 })
+        ? await syncFcmTokenForSession({ force: true, interactive: false, retries: 1, timeoutMs: 20_000 })
         : await registerPushOnThisDevice();
       refreshPermission();
 
@@ -443,7 +444,8 @@ export function PWAEngagementPrompt() {
         const result = await syncFcmTokenForSession({
           force: true,
           interactive: permission === "default",
-          retries: 5,
+          retries: 1,
+          timeoutMs: 20_000,
         });
         if (result === "granted" || hasFcmTokenOnThisDevice()) {
           clearDismissed(NOTIF_BLOCKED_DISMISS_KEY);
