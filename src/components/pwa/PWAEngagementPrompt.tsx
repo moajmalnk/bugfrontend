@@ -13,6 +13,7 @@ import {
   hadRecentFcmStorageRecovery,
   isSafariWebBrowser,
   needsSafariPwaForPush,
+  resetPushBrowserState,
 } from "@/firebase-messaging-sw";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -223,7 +224,7 @@ export function PWAEngagementPrompt() {
           force: true,
           interactive: false,
           retries: 1,
-          timeoutMs: 15_000,
+          timeoutMs: 30_000,
         });
         if (cancelled) return;
         permission = refreshPermission();
@@ -404,9 +405,27 @@ export function PWAEngagementPrompt() {
           // ignore
         }
       }
-      const result = alreadyGranted
-        ? await syncFcmTokenForSession({ force: true, interactive: false, retries: 1, timeoutMs: 20_000 })
+
+      let result = alreadyGranted
+        ? await syncFcmTokenForSession({ force: true, interactive: false, retries: 1, timeoutMs: 30_000 })
         : await registerPushOnThisDevice();
+
+      // If permission is granted but token never landed, soft-reset once and retry.
+      if (
+        alreadyGranted &&
+        result !== "granted" &&
+        !hasFcmTokenOnThisDevice() &&
+        getNotificationPermissionState() === "granted"
+      ) {
+        await resetPushBrowserState();
+        result = await syncFcmTokenForSession({
+          force: true,
+          interactive: false,
+          retries: 1,
+          timeoutMs: 30_000,
+        });
+      }
+
       refreshPermission();
 
       if ((result === "granted" || alreadyGranted) && hasFcmTokenOnThisDevice()) {
@@ -423,15 +442,11 @@ export function PWAEngagementPrompt() {
         );
       } else if (result === "storage_error" || (alreadyGranted && hadRecentFcmStorageRecovery())) {
         setStatusMessage(
-          safari
-            ? "Setup didn't finish. Log out and log back in, then tap Finish setup once more."
-            : "Setup didn't finish. Log out and log back in, then try again."
+          "Push setup timed out. Check your internet connection, wait a few seconds, then tap Finish setup again. Logging out is not required."
         );
       } else if (alreadyGranted || getNotificationPermissionState() === "granted") {
         setStatusMessage(
-          safari
-            ? "Almost done — log out and log back in, then tap Finish setup once more."
-            : "Browser allows notifications, but this device could not finish setup. Log out and log back in, then try again."
+          "Browser allows notifications, but Firebase did not finish registering this device. Wait a moment and tap Finish setup again."
         );
       } else {
         setStatusMessage("Could not enable notifications on this device.");

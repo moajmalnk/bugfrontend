@@ -11,8 +11,8 @@ const MAIN_SW_SCOPE = "/";
 /** @deprecated Legacy FCM-only worker — desktop Chrome push is unreliable with a second SW */
 const LEGACY_FCM_SW_URL = "/firebase-messaging-sw.js";
 const LEGACY_FCM_SW_SCOPE = "/firebase-cloud-messaging-push-scope";
-const FCM_TOKEN_TIMEOUT_MS = 12_000;
-const FCM_SYNC_TIMEOUT_MS = 20_000;
+const FCM_TOKEN_TIMEOUT_MS = 20_000;
+const FCM_SYNC_TIMEOUT_MS = 30_000;
 
 type SwPrefer = "auto" | "main" | "legacy";
 
@@ -126,22 +126,17 @@ export function needsSafariPwaForPush(): boolean {
 }
 
 /**
- * Run on every login — clears stale local FCM state so registration works
- * without users manually clearing browser cache (especially Safari).
+ * Run on login / session restore.
+ * Do NOT wipe push subscriptions or Firebase IndexedDB here — that forces a full
+ * re-register every login and often makes getToken hang/timeout, leaving the
+ * "Finish setup" popup stuck forever.
  */
 export async function prepareFcmOnLogin(): Promise<void> {
-  clearFcmRegistrationCache();
   try {
     sessionStorage.removeItem(FCM_STORAGE_RECOVERY_KEY);
   } catch {
     // ignore
   }
-
-  if (getNotificationPermissionState() !== "granted") {
-    return;
-  }
-
-  await softResetPushState();
 }
 
 export function clearFcmRegistrationCache() {
@@ -354,23 +349,38 @@ export async function resetPushBrowserState(): Promise<void> {
 
 async function waitForServiceWorkerActive(registration: ServiceWorkerRegistration): Promise<void> {
   await navigator.serviceWorker.ready;
-  if (!registration.installing) {
+
+  const active = registration.active;
+  if (active?.state === "activated") {
     return;
   }
 
-  await new Promise<void>((resolve) => {
-    const worker = registration.installing!;
-    const onStateChange = () => {
+  const worker = registration.installing || registration.waiting || active;
+  if (!worker) {
+    return;
+  }
+
+  if (worker.state === "activated") {
+    return;
+  }
+
+  await withTimeout(
+    new Promise<void>((resolve) => {
+      const onStateChange = () => {
+        if (worker.state === "activated" || worker.state === "redundant") {
+          worker.removeEventListener("statechange", onStateChange);
+          resolve();
+        }
+      };
+      worker.addEventListener("statechange", onStateChange);
       if (worker.state === "activated" || worker.state === "redundant") {
         worker.removeEventListener("statechange", onStateChange);
         resolve();
       }
-    };
-    worker.addEventListener("statechange", onStateChange);
-    if (worker.state === "activated") {
-      resolve();
-    }
-  });
+    }),
+    8_000,
+    "Service worker activate"
+  ).catch(() => undefined);
 }
 
 async function registerLegacyFcmWorker(): Promise<ServiceWorkerRegistration | null> {
@@ -439,9 +449,11 @@ async function resolveServiceWorkerRegistration(
 async function acquireFcmToken(vapidKey: string, allowRecovery: boolean): Promise<string | null> {
   const requestToken = async (prefer: SwPrefer): Promise<string | null> => {
     const registration = await resolveServiceWorkerRegistration(prefer);
-    if (!registration) {
+    if (!registration?.active) {
       return null;
     }
+    // Let the active worker settle before talking to FCM (avoids hung getToken).
+    await sleep(250);
     const messaging = getMessaging(app);
     return withTimeout(
       getToken(messaging, {
@@ -748,10 +760,28 @@ export async function registerPushOnThisDevice(): Promise<NotificationPermission
   } catch {
     // ignore
   }
-  return withTimeout(
+
+  const first = await withTimeout(
     requestNotificationPermission({ interactive: true, forceSave: true }),
     FCM_SYNC_TIMEOUT_MS,
     "FCM register"
+  ).catch((error) => {
+    if (isFcmStorageError(error) || String(error).includes("timed out")) {
+      return "storage_error" as const;
+    }
+    return "skipped" as const;
+  });
+
+  if (first === "granted" || first === "denied" || first === "default" || first === "unsupported") {
+    return first;
+  }
+
+  // One recovery pass for hung getToken / broken IndexedDB — no logout required.
+  await softResetPushState();
+  return withTimeout(
+    requestNotificationPermission({ interactive: false, forceSave: true }),
+    FCM_SYNC_TIMEOUT_MS,
+    "FCM register retry"
   ).catch((error) => {
     if (isFcmStorageError(error) || String(error).includes("timed out")) {
       return "storage_error" as const;

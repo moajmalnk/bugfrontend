@@ -50,7 +50,7 @@ function handleAuthFcmSync(payload?: {
   applyServerFcmEpoch(epoch);
   void (async () => {
     await prepareFcmOnLogin();
-    await syncFcmTokenForSession({ force: true, retries: 1, timeoutMs: 25_000 });
+    await syncFcmTokenForSession({ force: true, retries: 1, timeoutMs: 30_000 });
   })();
 }
 
