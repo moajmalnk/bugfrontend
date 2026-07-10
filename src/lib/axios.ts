@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { ENV } from './env';
+import { extractApiErrorMessage, getNetworkErrorMessage } from './apiError';
 
 export const apiClient = axios.create({
   baseURL: ENV.API_URL,
@@ -87,11 +88,8 @@ apiClient.interceptors.response.use(
     //   message: error.message
     // });
     
-    // Add specific handling for common production issues
-    if (error.code === 'ERR_NETWORK') {
-      error.message = 'Network error - please check your internet connection';
-    } else if (error.response?.status === 0) {
-      error.message = 'Cannot connect to server - please check if the API is running';
+    if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED' || error.response?.status === 0) {
+      error.message = getNetworkErrorMessage(error);
     } else {
       const apiMessage = extractApiErrorMessage(error, '');
       if (apiMessage) {

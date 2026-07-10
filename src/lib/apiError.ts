@@ -57,6 +57,33 @@ export function extractApiErrorMessage(
   return fallback;
 }
 
+export function getNetworkErrorMessage(
+  error: unknown,
+  fallback = 'Cannot reach the server. Please check your connection and try again.'
+): string {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return 'You appear to be offline. Turn on mobile data or connect to a working network.';
+  }
+
+  const axiosLike = error as { code?: string; message?: string };
+  const code = axiosLike?.code ?? '';
+  const message = (axiosLike?.message ?? '').trim();
+
+  if (code === 'ERR_NETWORK' || message === 'Network Error') {
+    return 'Cannot reach the server. Some Wi-Fi networks block external sites — try mobile data, another network, or complete the Wi-Fi sign-in page if your browser opened one.';
+  }
+
+  if (code === 'ECONNABORTED' || /timeout/i.test(message)) {
+    return 'Connection timed out. This network may be slow or unstable — try again or switch networks.';
+  }
+
+  if (message) {
+    return extractApiErrorMessage(error, fallback);
+  }
+
+  return fallback;
+}
+
 export async function readApiJson<T = Record<string, unknown>>(response: Response): Promise<T> {
   const text = await response.text();
   if (!text.trim()) {

@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE_URL } from "@/lib/env";
-import { extractApiErrorMessage } from "@/lib/apiError";
+import { extractApiErrorMessage, getNetworkErrorMessage } from "@/lib/apiError";
 import { assertDeviceClockMatchesServer, getDeviceClockSkewDetails } from "@/lib/deviceClock";
 import axios from "axios";
 import { 
@@ -73,7 +73,6 @@ const Login = () => {
   const [showTermsOfUse, setShowTermsOfUse] = useState(false);
   const [deviceClockWarning, setDeviceClockWarning] = useState<string | null>(null);
   const {
-    login,
     register,
     isAuthenticated,
     isLoading: isAuthLoading,
@@ -253,8 +252,9 @@ const Login = () => {
           );
           const data = response.data as any;
           if (data.success && data.token && data.user) {
-            localStorage.setItem("token", data.token);
-            login(identifier, password);
+            await loginWithToken(data.user, data.token);
+            success = true;
+            user = data.user;
           } else {
             toast({
               title: "Login failed",
@@ -330,7 +330,7 @@ const Login = () => {
         }, 1500);
       }
     } catch (error: any) {
-      const description = extractApiErrorMessage(error, "An error occurred during login");
+      const description = getNetworkErrorMessage(error, extractApiErrorMessage(error, "An error occurred during login"));
       if (description.toLowerCase().includes('device shows')) {
         setDeviceClockWarning(description);
       }

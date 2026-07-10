@@ -1,4 +1,5 @@
 import { toast } from "@/components/ui/use-toast";
+import { getNetworkErrorMessage } from "@/lib/apiError";
 import { ENV } from "@/lib/env";
 import { syncFcmTokenForSession, clearFcmRegistrationCache, applyServerFcmEpoch, setupFcmPwaAutoSync, prepareFcmOnLogin } from "@/firebase-messaging-sw";
 import { User } from "@/types";
@@ -298,7 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to connect to the server",
+        description: getNetworkErrorMessage(error),
         variant: "destructive",
       });
       return false;
@@ -341,7 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // console.error("Registration error:", error);
       toast({
         title: "Error",
-        description: "Failed to connect to the server",
+        description: getNetworkErrorMessage(error),
         variant: "destructive",
       });
       return false;
