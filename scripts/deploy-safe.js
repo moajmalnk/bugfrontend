@@ -83,6 +83,21 @@ if (!fs.existsSync(assetsPath)) {
   console.warn('⚠️  Assets directory not found - this might cause issues');
 }
 
+// Ensure FCM VAPID key was baked into the bundle correctly
+const mainBundle = fs
+  .readdirSync(assetsPath)
+  .find((name) => name.startsWith('index-') && name.endsWith('.js'));
+if (mainBundle) {
+  const bundleSource = fs.readFileSync(path.join(assetsPath, mainBundle), 'utf8');
+  if (bundleSource.includes('VITE_FIREBASE_VAPID_KEY=')) {
+    console.error(
+      '❌ Invalid VITE_FIREBASE_VAPID_KEY in build output. In Vercel/hosting, set the value to the key only (BBXS...), not the full .env line.'
+    );
+    process.exit(1);
+  }
+  console.log('✅ FCM VAPID key looks valid in build output');
+}
+
 console.log('✅ Build verification completed');
 
 // Step 6: Deploy to Vercel

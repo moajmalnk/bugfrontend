@@ -28,9 +28,48 @@ const getApiUrl = () => {
   return PRODUCTION_API_URL;
 };
 
+/** Strip common misconfigurations (e.g. pasting a full .env line into Vercel). */
+export function normalizeVapidKey(raw: string | undefined): string {
+  if (!raw) return "";
+
+  let key = raw.trim();
+
+  const envLineMatch = key.match(/^(?:export\s+)?VITE_FIREBASE_VAPID_KEY=(.+)$/i);
+  if (envLineMatch) {
+    key = envLineMatch[1].trim();
+  }
+
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim();
+  }
+
+  return key;
+}
+
+export function isValidVapidKey(key: string): boolean {
+  if (!/^[A-Za-z0-9_-]+$/.test(key)) {
+    return false;
+  }
+
+  if (typeof atob !== "function") {
+    return key.length >= 80 && key.length <= 90;
+  }
+
+  try {
+    const padding = "=".repeat((4 - (key.length % 4)) % 4);
+    const base64 = (key + padding).replace(/-/g, "+").replace(/_/g, "/");
+    return atob(base64).length === 65;
+  } catch {
+    return false;
+  }
+}
+
 export const ENV = {
   API_URL: getApiUrl(),
-  FIREBASE_VAPID_KEY: import.meta.env.VITE_FIREBASE_VAPID_KEY || "",
+  FIREBASE_VAPID_KEY: normalizeVapidKey(import.meta.env.VITE_FIREBASE_VAPID_KEY),
 };
 
 // Log the current environment for debugging

@@ -1,4 +1,4 @@
-import { ENV } from "@/lib/env";
+import { ENV, isValidVapidKey } from "@/lib/env";
 import { app } from "@/firebase-config";
 import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
@@ -509,6 +509,12 @@ export async function requestNotificationPermission(options?: {
 
   const vapidKey = ENV.FIREBASE_VAPID_KEY;
   if (!vapidKey) {
+    return "skipped";
+  }
+  if (!isValidVapidKey(vapidKey)) {
+    console.warn(
+      "[FCM] Invalid VAPID key in build config. Set VITE_FIREBASE_VAPID_KEY to the Web Push key only (from Firebase Console → Cloud Messaging), not the full .env line."
+    );
     return "skipped";
   }
 
