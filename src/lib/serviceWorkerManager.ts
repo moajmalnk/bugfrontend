@@ -20,6 +20,9 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
   private offlineCallbacks: (() => void)[] = [];
   private onlineCallbacks: (() => void)[] = [];
   private updateCheckIntervalId: number | null = null;
+  private controllerChangeListenerAttached = false;
+
+  private static readonly RELOAD_PENDING_KEY = 'bugricer_sw_reload_pending';
 
   constructor() {
     this.setupNetworkListeners();
@@ -201,13 +204,23 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
       });
     });
 
-    // Listen for controller change (new service worker activated)
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // console.log('[SW Manager] Service worker controller changed');
-      // Optionally reload the page - this maintains the current route structure
-      // In the future, this could be enhanced to preserve role-based routes
-      window.location.reload();
-    });
+    // Only reload when the user (or explicit update flow) requested it.
+    // FCM recovery and background SW churn must not reload the page — Safari aborts
+    // in-flight API calls and shows false CORS errors when the page reloads mid-fetch.
+    if (!this.controllerChangeListenerAttached) {
+      this.controllerChangeListenerAttached = true;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        try {
+          if (sessionStorage.getItem(BugricerServiceWorkerManager.RELOAD_PENDING_KEY) !== '1') {
+            return;
+          }
+          sessionStorage.removeItem(BugricerServiceWorkerManager.RELOAD_PENDING_KEY);
+        } catch {
+          return;
+        }
+        window.location.reload();
+      });
+    }
 
     // Check for updates periodically - FIXED: Increased interval to prevent freezes
     // Changed from 60s to 5 minutes (300000ms) to prevent main thread blocking
@@ -266,6 +279,11 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
    * Skip waiting and activate new service worker
    */
   async skipWaiting(): Promise<void> {
+    try {
+      sessionStorage.setItem(BugricerServiceWorkerManager.RELOAD_PENDING_KEY, '1');
+    } catch {
+      // ignore storage errors
+    }
     if (this.registration?.waiting) {
       this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
     }

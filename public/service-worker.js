@@ -149,9 +149,10 @@ self.addEventListener('notificationclick', function (event) {
   event.waitUntil(fcmOpenTargetUrl(targetUrl));
 });
 
-// Dynamic cache versioning based on build time (include timestamp for uniqueness)
-const BUILD_TIME = new Date().toISOString(); // e.g. 2025-11-11T09:30:12.123Z
-const CACHE_SUFFIX = BUILD_TIME.replace(/[:.]/g, "-"); // Safe for cache names
+// Stable per deploy — must NOT use new Date() here (causes endless SW updates + page reload loops).
+// Keep in sync with public/version.json when you bump releases.
+const APP_CACHE_VERSION = '1.0.12';
+const CACHE_SUFFIX = APP_CACHE_VERSION.replace(/[^a-zA-Z0-9._-]/g, '-');
 const CACHE_NAME = `bugricer-v${CACHE_SUFFIX}`;
 const STATIC_CACHE = `bugricer-static-v${CACHE_SUFFIX}`;
 const DYNAMIC_CACHE = `bugricer-dynamic-v${CACHE_SUFFIX}`;

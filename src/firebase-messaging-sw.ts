@@ -1,4 +1,5 @@
 import { ENV, isValidVapidKey } from "@/lib/env";
+import { apiClient } from "@/lib/axios";
 import { app } from "@/firebase-config";
 import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
@@ -100,6 +101,12 @@ function isPwaInstalledMode(): boolean {
   const displayMode = window.matchMedia("(display-mode: standalone)").matches;
   const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
   return displayMode || iosStandalone;
+}
+
+function isSafariBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/i.test(ua);
 }
 
 export function clearFcmRegistrationCache() {
@@ -261,24 +268,25 @@ async function clearFirebaseMessagingDatabases(): Promise<void> {
   );
 }
 
-/** Clear broken service worker / cache state that causes Chrome push storage errors. */
+/** Clear broken push state. Safari: never unregister the main SW (causes reload loops). */
 export async function resetPushBrowserState(): Promise<void> {
   clearFcmRegistrationCache();
   await unsubscribeAllPushSubscriptions();
   await clearFirebaseMessagingDatabases();
 
-  if (navigator?.serviceWorker?.getRegistrations) {
+  const preserveServiceWorker = isSafariBrowser();
+
+  if (!preserveServiceWorker && navigator?.serviceWorker?.getRegistrations) {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map((registration) => registration.unregister()));
   }
 
-  if ("caches" in window) {
+  if (!preserveServiceWorker && "caches" in window) {
     const cacheNames = await caches.keys();
     await Promise.all(cacheNames.map((name) => caches.delete(name)));
   }
 
-  // Give Chrome time to release push subscription storage before re-registering.
-  await sleep(FCM_POST_RESET_DELAY_MS);
+  await sleep(preserveServiceWorker ? 800 : FCM_POST_RESET_DELAY_MS);
 }
 
 async function acquireFcmToken(vapidKey: string, allowRecovery: boolean): Promise<string | null> {
@@ -451,7 +459,7 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
     return true;
   }
 
-  const payload = JSON.stringify({
+  const payload = {
     token,
     device_type: deviceType,
     platform: navigator.platform || "unknown",
@@ -460,57 +468,49 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
     os_name: browserInfo.os_name,
     device_label: browserInfo.device_label,
     pwa_installed: pwaInstalled,
-  });
+  };
 
-  // Fallback chain for older cached builds / environment mismatch.
-  const candidateBases = Array.from(
-    new Set(
-      [
-        ENV.API_URL?.replace(/\/$/, ""),
-        "https://bugbackend.bugricer.com/api",
-      ].filter(Boolean)
-    )
-  );
+  const savePaths = [
+    "/save-fcm-token.php",
+    "https://bugbackend.bugricer.com/api/save-fcm-token.php",
+  ];
 
   let lastError = "";
-  for (const base of candidateBases) {
+  for (const path of savePaths) {
     try {
-      const response = await fetch(`${base}/save-fcm-token.php`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-        body: payload,
+      const response = await apiClient.post(path, payload, {
+        headers: { Authorization: `Bearer ${userToken}` },
+        timeout: 20000,
       });
 
-      if (response.ok) {
-        let accepted = true;
-        try {
-          const body = await response.json();
-          if (body?.success === false) {
-            accepted = false;
-            lastError = body?.error || body?.message || `API rejected token from ${base}`;
-          } else if (body?.saved_to_table === false) {
-            // Legacy users.fcm_token path still counts as registered for this device.
-            console.warn(
-              `[FCM] Token saved to users.fcm_token but not user_fcm_tokens from ${base}`
-            );
-          }
-        } catch {
-          // Non-JSON success — still treat as saved
-        }
-
-        if (accepted) {
-          localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
-          localStorage.setItem(TOKEN_PWA_STATE_KEY, String(pwaInstalled));
-          return true;
-        }
-      } else {
-        lastError = `HTTP ${response.status} from ${base}`;
+      const body = response.data as {
+        success?: boolean;
+        error?: string;
+        message?: string;
+        saved_to_table?: boolean;
+      };
+      let accepted = true;
+      if (body?.success === false) {
+        accepted = false;
+        lastError = body?.error || body?.message || `API rejected token (${path})`;
+      } else if (body?.saved_to_table === false) {
+        console.warn(
+          `[FCM] Token saved to users.fcm_token but not user_fcm_tokens (${path})`
+        );
       }
-    } catch (err) {
-      lastError = `Fetch failed for ${base}: ${String(err)}`;
+
+      if (accepted) {
+        localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
+        localStorage.setItem(TOKEN_PWA_STATE_KEY, String(pwaInstalled));
+        return true;
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number }; message?: string };
+      if (axiosErr.response?.status) {
+        lastError = `HTTP ${axiosErr.response.status} (${path})`;
+      } else {
+        lastError = `Request failed (${path}): ${String(axiosErr.message || err)}`;
+      }
     }
   }
 
