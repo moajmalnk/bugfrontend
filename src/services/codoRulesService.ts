@@ -2,6 +2,33 @@ import { ENV } from '@/lib/env';
 
 export type CodoRulePhase = 'developer' | 'tester' | 'project';
 
+export type CodoAckStatus = 'acknowledged' | 'doubt' | 'not_required';
+
+export type CodoAckUser = {
+  id: string;
+  username: string;
+  role: string;
+  status?: CodoAckStatus;
+  acknowledged_at?: string | null;
+};
+
+export type CodoRuleAcknowledgements = {
+  required_total: number;
+  responded_count?: number;
+  acknowledged_count: number;
+  doubt_count?: number;
+  not_required_count?: number;
+  pending_count: number;
+  current_user_status?: CodoAckStatus | null;
+  current_user_acknowledged_at?: string | null;
+  current_user_acknowledged: boolean;
+  current_user_must_acknowledge: boolean;
+  acknowledged: CodoAckUser[];
+  doubt?: CodoAckUser[];
+  not_required?: CodoAckUser[];
+  pending: CodoAckUser[];
+};
+
 export type CodoCommonRule = {
   id: number;
   phase: CodoRulePhase;
@@ -17,6 +44,9 @@ export type CodoCommonRule = {
   updated_at?: string | null;
   created_by_username?: string | null;
   updated_by_username?: string | null;
+  project_ids?: string[];
+  projects?: Array<{ id: string; name: string }>;
+  acknowledgements?: CodoRuleAcknowledgements;
 };
 
 export type CodoRuleCounts = {
@@ -48,7 +78,7 @@ export async function listCodoRules(opts?: {
   phase?: CodoRulePhase | '';
   q?: string;
   include_inactive?: boolean;
-}): Promise<{ rules: CodoCommonRule[]; counts: CodoRuleCounts }> {
+}): Promise<{ rules: CodoCommonRule[]; counts: CodoRuleCounts; ack_table_ready: boolean }> {
   const params = new URLSearchParams();
   if (opts?.phase) params.set('phase', opts.phase);
   if (opts?.q) params.set('q', opts.q);
@@ -61,7 +91,21 @@ export async function listCodoRules(opts?: {
   return {
     rules: Array.isArray(data?.data?.rules) ? data.data.rules : [],
     counts: data?.data?.counts || { all: 0, developer: 0, tester: 0, project: 0 },
+    ack_table_ready: Boolean(data?.data?.ack_table_ready),
   };
+}
+
+export async function acknowledgeCodoRule(
+  ruleId: number,
+  status: CodoAckStatus = 'acknowledged'
+): Promise<{ rule_id: number; status: CodoAckStatus; acknowledgements: CodoRuleAcknowledgements }> {
+  const res = await fetch(`${API}/acknowledge.php`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ rule_id: ruleId, status }),
+  });
+  const data = await parseJson(res);
+  return data.data;
 }
 
 export async function createCodoRule(body: {
@@ -71,6 +115,7 @@ export async function createCodoRule(body: {
   subtitle?: string;
   rule_key?: string;
   sort_order?: number;
+  project_ids?: string[];
 }): Promise<CodoCommonRule> {
   const res = await fetch(`${API}/create.php`, {
     method: 'POST',
@@ -89,6 +134,7 @@ export async function updateCodoRule(body: {
   subtitle?: string | null;
   sort_order?: number;
   is_active?: boolean;
+  project_ids?: string[];
 }): Promise<CodoCommonRule> {
   const res = await fetch(`${API}/update.php`, {
     method: 'POST',
