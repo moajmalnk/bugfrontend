@@ -16,10 +16,22 @@ export type NotificationPermissionResult =
   | "denied"
   | "default"
   | "unsupported"
-  | "skipped";
+  | "skipped"
+  | "storage_error";
 
 const FCM_SYNC_IN_FLIGHT_KEY = "__bugricer_fcm_sync_in_flight__";
 const FCM_SYNC_PROMISE_KEY = "__bugricer_fcm_sync_promise__";
+const FCM_STORAGE_RECOVERY_KEY = "fcm_storage_recovery_at";
+/** Chrome push storage needs time to release after SW/subscription teardown. */
+const FCM_STORAGE_RECOVERY_COOLDOWN_MS = 15 * 60 * 1000;
+const FCM_POST_RESET_DELAY_MS = 2000;
+
+const FIREBASE_IDB_NAMES = [
+  "firebase-messaging-database",
+  "fcm_token_details_db",
+  "firebase-installations-database",
+  "firebase-heartbeat-database",
+];
 
 function isMessagingAllowedDomain() {
   if (typeof window === "undefined") {
@@ -166,9 +178,94 @@ function isFcmStorageError(error: unknown): boolean {
   return text.includes("storage error") || text.includes("aborterror");
 }
 
+export function hadRecentFcmStorageRecovery(): boolean {
+  return wasRecentStorageRecovery();
+}
+
+function wasRecentStorageRecovery(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = sessionStorage.getItem(FCM_STORAGE_RECOVERY_KEY);
+    if (!raw) return false;
+    return Date.now() - Number(raw) < FCM_STORAGE_RECOVERY_COOLDOWN_MS;
+  } catch {
+    return false;
+  }
+}
+
+function markStorageRecoveryAttempt(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(FCM_STORAGE_RECOVERY_KEY, String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+async function unsubscribeAllPushSubscriptions(): Promise<void> {
+  if (!navigator?.serviceWorker?.getRegistrations) {
+    return;
+  }
+
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(
+    registrations.map(async (registration) => {
+      try {
+        const subscription = await registration.pushManager?.getSubscription?.();
+        if (subscription) {
+          await subscription.unsubscribe();
+        }
+      } catch {
+        // Non-fatal — subscription may already be gone
+      }
+    })
+  );
+}
+
+async function clearFirebaseMessagingDatabases(): Promise<void> {
+  if (typeof window === "undefined" || !("indexedDB" in window)) {
+    return;
+  }
+
+  const dbNames = new Set<string>(FIREBASE_IDB_NAMES);
+
+  try {
+    const listFn = (indexedDB as IDBFactory & { databases?: () => Promise<Array<{ name?: string }>> })
+      .databases;
+    if (typeof listFn === "function") {
+      const listed = await listFn.call(indexedDB);
+      for (const entry of listed) {
+        if (entry?.name?.startsWith("firebase-") || entry?.name?.includes("fcm")) {
+          dbNames.add(entry.name);
+        }
+      }
+    }
+  } catch {
+    // databases() is not available in every browser
+  }
+
+  await Promise.all(
+    Array.from(dbNames).map(
+      (name) =>
+        new Promise<void>((resolve) => {
+          try {
+            const request = indexedDB.deleteDatabase(name);
+            request.onsuccess = () => resolve();
+            request.onerror = () => resolve();
+            request.onblocked = () => resolve();
+          } catch {
+            resolve();
+          }
+        })
+    )
+  );
+}
+
 /** Clear broken service worker / cache state that causes Chrome push storage errors. */
 export async function resetPushBrowserState(): Promise<void> {
   clearFcmRegistrationCache();
+  await unsubscribeAllPushSubscriptions();
+  await clearFirebaseMessagingDatabases();
 
   if (navigator?.serviceWorker?.getRegistrations) {
     const registrations = await navigator.serviceWorker.getRegistrations();
@@ -179,6 +276,9 @@ export async function resetPushBrowserState(): Promise<void> {
     const cacheNames = await caches.keys();
     await Promise.all(cacheNames.map((name) => caches.delete(name)));
   }
+
+  // Give Chrome time to release push subscription storage before re-registering.
+  await sleep(FCM_POST_RESET_DELAY_MS);
 }
 
 async function acquireFcmToken(vapidKey: string, allowRecovery: boolean): Promise<string | null> {
@@ -197,9 +297,11 @@ async function acquireFcmToken(vapidKey: string, allowRecovery: boolean): Promis
   try {
     return await attempt();
   } catch (error) {
-    if (!allowRecovery || !isFcmStorageError(error)) {
+    if (!allowRecovery || !isFcmStorageError(error) || wasRecentStorageRecovery()) {
       throw error;
     }
+
+    markStorageRecoveryAttempt();
     console.warn("[FCM] Storage error detected — resetting browser push state and retrying once");
     await resetPushBrowserState();
     return attempt();
@@ -449,11 +551,12 @@ export async function syncFcmTokenForSession(options?: {
         forceSave,
       });
 
-      // Reliability path: on some devices/browsers, SW/token setup lags behind login.
-      // Retry a few times when permission is granted but token save was skipped.
+      // Retry when permission is granted but token save was skipped.
+      // Do not hammer Chrome when push storage is corrupted — one recovery per cooldown window.
       for (let attempt = 1; attempt <= retries; attempt++) {
         if (result !== "skipped") break;
         if (getNotificationPermissionState() !== "granted") break;
+        if (wasRecentStorageRecovery() && !hasFcmTokenOnThisDevice()) break;
         await sleep(attempt * 1200);
         result = await requestNotificationPermission({
           interactive: false,
@@ -475,6 +578,12 @@ export async function syncFcmTokenForSession(options?: {
 /** Re-register push token on this browser/device (call after user enables notifications). */
 export async function registerPushOnThisDevice(): Promise<NotificationPermissionResult> {
   clearFcmRegistrationCache();
+  try {
+    // User explicitly retried — allow one fresh storage recovery attempt.
+    sessionStorage.removeItem(FCM_STORAGE_RECOVERY_KEY);
+  } catch {
+    // ignore
+  }
   return requestNotificationPermission({ interactive: true, forceSave: true });
 }
 
@@ -551,11 +660,11 @@ export async function requestNotificationPermission(options?: {
       console.warn(
         "[FCM] Token registration failed after recovery:",
         error,
-        "— clear site data in Chrome (Application → Clear site data) or test on https://bugs.bugricer.com"
+        "— In Chrome: DevTools → Application → Storage → Clear site data, then refresh and tap Finish setup once."
       );
-    } else {
-      console.warn("[FCM] Token registration failed:", error);
+      return "storage_error";
     }
+    console.warn("[FCM] Token registration failed:", error);
     return "skipped";
   }
 }

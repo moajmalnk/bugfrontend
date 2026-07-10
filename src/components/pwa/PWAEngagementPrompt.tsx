@@ -10,6 +10,7 @@ import {
   hasFcmTokenOnThisDevice,
   registerPushOnThisDevice,
   syncFcmTokenForSession,
+  hadRecentFcmStorageRecovery,
 } from "@/firebase-messaging-sw";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -391,6 +392,13 @@ export function PWAEngagementPrompt() {
       }
 
       const alreadyGranted = getNotificationPermissionState() === "granted";
+      if (alreadyGranted) {
+        try {
+          sessionStorage.removeItem("fcm_storage_recovery_at");
+        } catch {
+          // ignore
+        }
+      }
       const result = alreadyGranted
         ? await syncFcmTokenForSession({ force: true, interactive: false, retries: 5 })
         : await registerPushOnThisDevice();
@@ -407,6 +415,10 @@ export function PWAEngagementPrompt() {
       } else if (getNotificationPermissionState() === "denied") {
         setStatusMessage(
           "Notifications are blocked. Open site settings (lock icon in the address bar) and allow notifications for BugRicer."
+        );
+      } else if (result === "storage_error" || (alreadyGranted && hadRecentFcmStorageRecovery())) {
+        setStatusMessage(
+          "Chrome blocked push storage on this device. Open DevTools → Application → Storage → Clear site data, refresh the page, then tap Finish setup once."
         );
       } else if (alreadyGranted || getNotificationPermissionState() === "granted") {
         setStatusMessage(

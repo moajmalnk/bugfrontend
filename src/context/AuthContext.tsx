@@ -47,7 +47,7 @@ function handleAuthFcmSync(payload?: {
 }) {
   const epoch = payload?.fcm_token_epoch ?? payload?.user?.fcm_token_epoch;
   applyServerFcmEpoch(epoch);
-  void syncFcmTokenForSession({ force: true, retries: 5 });
+  void syncFcmTokenForSession({ force: true, retries: 2 });
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -155,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        void syncFcmTokenForSession({ force: true, retries: 5 });
+        void syncFcmTokenForSession({ force: true, retries: 2 });
       }
     };
     const intervalId = window.setInterval(() => {
