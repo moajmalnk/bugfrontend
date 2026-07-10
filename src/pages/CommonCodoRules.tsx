@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { CodoAnalyticsPanel, computeAnalyticsCompletion } from '@/components/codo/CodoAnalyticsPanel';
 import { CodoRuleDialog } from '@/components/codo/CodoRuleDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,6 +43,7 @@ import {
   type CodoRulePhase,
 } from '@/services/codoRulesService';
 import {
+  BarChart3,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -65,7 +67,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, parseISO, isValid } from 'date-fns';
 
-type TabKey = 'all' | CodoRulePhase;
+type TabKey = 'all' | CodoRulePhase | 'analytics';
+
+const VALID_TABS: TabKey[] = ['all', 'developer', 'tester', 'project', 'analytics'];
 
 const PHASE_META: Record<
   CodoRulePhase,
@@ -199,7 +203,7 @@ export default function CommonCodoRules() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = (searchParams.get('tab') || 'all') as TabKey;
   const [activeTab, setActiveTab] = useState<TabKey>(
-    ['all', 'developer', 'tester', 'project'].includes(tabParam) ? tabParam : 'all'
+    VALID_TABS.includes(tabParam) ? tabParam : 'all'
   );
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -258,7 +262,7 @@ export default function CommonCodoRules() {
 
   useEffect(() => {
     const t = (searchParams.get('tab') || 'all') as TabKey;
-    if (['all', 'developer', 'tester', 'project'].includes(t) && t !== activeTab) {
+    if (VALID_TABS.includes(t) && t !== activeTab) {
       setActiveTab(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -275,6 +279,7 @@ export default function CommonCodoRules() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rules.filter((r) => {
+      if (activeTab === 'analytics') return true;
       if (activeTab !== 'all' && r.phase !== activeTab) return false;
       if (!q) return true;
       return (
@@ -286,6 +291,18 @@ export default function CommonCodoRules() {
     });
   }, [rules, activeTab, search]);
 
+  const listFiltered = useMemo(() => {
+    if (activeTab === 'analytics') return [];
+    return filtered;
+  }, [filtered, activeTab]);
+
+  const analyticsCompletion = useMemo(() => computeAnalyticsCompletion(rules), [rules]);
+
+  const pdfRules = useMemo(() => {
+    if (activeTab === 'analytics') return rules;
+    return filtered;
+  }, [activeTab, rules, filtered]);
+
   const handleDownloadPdf = async () => {
     try {
       setIsDownloadingReport(true);
@@ -296,12 +313,12 @@ export default function CommonCodoRules() {
         generatedByRole: role,
         filePrefix: 'codo-common-rules',
         summary: [
-          { label: 'Filtered Rules', value: filtered.length },
+          { label: 'Filtered Rules', value: pdfRules.length },
           { label: 'Developer', value: counts.developer },
           { label: 'Tester / QA', value: counts.tester },
           { label: 'Project', value: counts.project },
         ],
-        rules: filtered.map((r) => ({
+        rules: pdfRules.map((r) => ({
           phase: r.phase,
           ruleKey: r.rule_key,
           title: r.title,
@@ -415,7 +432,7 @@ export default function CommonCodoRules() {
       label: 'All rules',
       shortLabel: 'All',
       icon: ClipboardCheck,
-      count: counts.all,
+      count: String(counts.all),
       countClass:
         'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300',
     },
@@ -424,7 +441,7 @@ export default function CommonCodoRules() {
       label: 'Developer',
       shortLabel: 'Dev',
       icon: Code2,
-      count: counts.developer,
+      count: String(counts.developer),
       countClass:
         'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
     },
@@ -433,7 +450,7 @@ export default function CommonCodoRules() {
       label: 'Tester / QA',
       shortLabel: 'QA',
       icon: ShieldCheck,
-      count: counts.tester,
+      count: String(counts.tester),
       countClass:
         'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
     },
@@ -442,15 +459,25 @@ export default function CommonCodoRules() {
       label: 'Project',
       shortLabel: 'Project',
       icon: FolderKanban,
-      count: counts.project,
+      count: String(counts.project),
       countClass:
         'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',
+    },
+    {
+      value: 'analytics' as TabKey,
+      label: 'Analytics',
+      shortLabel: 'Stats',
+      icon: BarChart3,
+      count: `${analyticsCompletion}%`,
+      countClass:
+        'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
     },
   ];
   const activeCodoTab = codoTabs.find((t) => t.value === activeTab) ?? codoTabs[0];
 
   const defaultPhase: CodoRulePhase =
     activeTab === 'tester' || activeTab === 'project' ? activeTab : 'developer';
+  const isAnalytics = activeTab === 'analytics';
 
   const renderRuleCard = (rule: CodoCommonRule) => {
     const meta = PHASE_META[rule.phase];
@@ -800,7 +827,7 @@ export default function CommonCodoRules() {
                   variant="outline"
                   size="lg"
                   onClick={handleDownloadPdf}
-                  disabled={isDownloadingReport || filtered.length === 0}
+                  disabled={isDownloadingReport || pdfRules.length === 0}
                   className="h-12 px-6 border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 font-semibold"
                 >
                   {isDownloadingReport ? (
@@ -862,18 +889,18 @@ export default function CommonCodoRules() {
                 </Button>
               </div>
 
-              <TabsList className="hidden lg:grid w-full grid-cols-4 h-14 bg-transparent p-1">
+              <TabsList className="hidden lg:grid w-full grid-cols-5 h-14 bg-transparent p-1 gap-1">
                 {codoTabs.map((tab) => (
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                    className="min-w-0 px-1.5 sm:px-2 text-xs sm:text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 flex items-center justify-center gap-1"
                   >
-                    <tab.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 shrink-0" />
-                    <span className="hidden xl:inline">{tab.label}</span>
-                    <span className="xl:hidden">{tab.shortLabel}</span>
+                    <tab.icon className="h-4 w-4 shrink-0" />
+                    <span className="hidden xl:inline truncate">{tab.label}</span>
+                    <span className="xl:hidden truncate">{tab.shortLabel}</span>
                     <span
-                      className={`ml-1 sm:ml-2 px-2 py-1 rounded-full text-xs font-bold ${tab.countClass}`}
+                      className={`shrink-0 min-w-[1.75rem] px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold tabular-nums text-center ${tab.countClass}`}
                     >
                       {tab.count}
                     </span>
@@ -892,7 +919,9 @@ export default function CommonCodoRules() {
                 <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
                   Select Section
                 </DrawerTitle>
-                <DrawerDescription>Filter CODO rules by phase</DrawerDescription>
+                <DrawerDescription>
+                  {isAnalytics ? 'Open analytics or filter by phase' : 'Filter CODO rules by phase'}
+                </DrawerDescription>
               </DrawerHeader>
               <div className="px-4 pb-6 space-y-3 max-h-[65vh] overflow-y-auto">
                 {codoTabs.map((tab) => {
@@ -963,7 +992,11 @@ export default function CommonCodoRules() {
                         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-cyan-500 transition-colors" />
                         <input
                           type="text"
-                          placeholder="Search rules by title, description, or key…"
+                          placeholder={
+                            isAnalytics
+                              ? 'Search analytics by rule title or key…'
+                              : 'Search rules by title, description, or key…'
+                          }
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
                           className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
@@ -991,7 +1024,13 @@ export default function CommonCodoRules() {
                   <Skeleton key={i} className="h-36 w-full rounded-2xl" />
                 ))}
               </div>
-            ) : filtered.length === 0 ? (
+            ) : isAnalytics ? (
+              <CodoAnalyticsPanel
+                rules={rules}
+                canViewDetails={canViewAckDetails}
+                search={search}
+              />
+            ) : listFiltered.length === 0 ? (
               <div className="relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/50 via-blue-50/30 to-indigo-50/50 dark:from-cyan-950/20 dark:via-blue-950/10 dark:to-indigo-950/20 rounded-2xl" />
                 <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-10 sm:p-12 text-center">
@@ -1018,7 +1057,7 @@ export default function CommonCodoRules() {
               </div>
             ) : (
               <div className="grid gap-4 grid-cols-1" aria-label="CODO rules list">
-                {filtered.map((rule) => renderRuleCard(rule))}
+                {listFiltered.map((rule) => renderRuleCard(rule))}
               </div>
             )}
           </TabsContent>
