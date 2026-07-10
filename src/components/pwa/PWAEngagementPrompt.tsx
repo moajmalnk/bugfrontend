@@ -11,6 +11,8 @@ import {
   registerPushOnThisDevice,
   syncFcmTokenForSession,
   hadRecentFcmStorageRecovery,
+  isSafariWebBrowser,
+  needsSafariPwaForPush,
 } from "@/firebase-messaging-sw";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -102,12 +104,14 @@ export function PWAEngagementPrompt() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [forceNotifPrompt, setForceNotifPrompt] = useState(false);
 
+  const safari = useMemo(() => isSafariWebBrowser(), []);
+  const safariNeedsPwa = useMemo(() => needsSafariPwaForPush(), []);
   const ios = useMemo(() => isIosDevice(), []);
   const canInstall = Boolean(deferredPrompt) && !installDone;
   const notificationsBlocked = notificationState === "denied";
   const pushNeedsRegistration = needsPushRegistrationOnThisDevice();
   const canEnablePush =
-    notificationState === "default" || pushNeedsRegistration;
+    !safariNeedsPwa && (notificationState === "default" || pushNeedsRegistration);
   const needsNotifications =
     notificationState === "default" ||
     notificationState === "denied" ||
@@ -419,11 +423,15 @@ export function PWAEngagementPrompt() {
         );
       } else if (result === "storage_error" || (alreadyGranted && hadRecentFcmStorageRecovery())) {
         setStatusMessage(
-          "Chrome blocked push storage on this device. Open DevTools → Application → Storage → Clear site data, refresh the page, then tap Finish setup once."
+          safari
+            ? "Setup didn't finish. Log out and log back in, then tap Finish setup once more."
+            : "Setup didn't finish. Log out and log back in, then try again."
         );
       } else if (alreadyGranted || getNotificationPermissionState() === "granted") {
         setStatusMessage(
-          "Browser allows notifications, but this device could not finish setup. In Chrome: DevTools → Application → Clear site data, then refresh. For best results test on https://bugs.bugricer.com (HTTPS), not localhost."
+          safari
+            ? "Almost done — log out and log back in, then tap Finish setup once more."
+            : "Browser allows notifications, but this device could not finish setup. Log out and log back in, then try again."
         );
       } else {
         setStatusMessage("Could not enable notifications on this device.");
@@ -597,9 +605,11 @@ export function PWAEngagementPrompt() {
                   ) : (
                     <>
                       <p className="mt-1.5 text-sm text-slate-400">
-                        {pushNeedsRegistration
-                          ? "Notifications are allowed in your browser. Tap below to finish registering this device for push alerts."
-                          : "Get alerts for bugs and important project updates. Tap the button to allow."}
+                        {safariNeedsPwa
+                          ? "On iPhone/iPad, add BugRicer to your Home Screen first (Share → Add to Home Screen), then open the app and enable notifications."
+                          : pushNeedsRegistration
+                            ? "Notifications are allowed in your browser. Tap below to finish registering this device for push alerts."
+                            : "Get alerts for bugs and important project updates. Tap the button to allow."}
                       </p>
                       <Button
                         className="mt-3 w-full bg-violet-600 hover:bg-violet-500"
@@ -607,10 +617,14 @@ export function PWAEngagementPrompt() {
                         disabled={enablingNotifications || !canEnablePush}
                       >
                         {enablingNotifications
-                          ? "Registering…"
-                          : pushNeedsRegistration
-                            ? "Finish setup on this device"
-                            : "Enable notifications"}
+                          ? notificationState === "default"
+                            ? "Waiting for permission…"
+                            : "Registering…"
+                          : safariNeedsPwa
+                            ? "Install to Home Screen first"
+                            : pushNeedsRegistration
+                              ? "Finish setup on this device"
+                              : "Enable notifications"}
                       </Button>
                     </>
                   )}

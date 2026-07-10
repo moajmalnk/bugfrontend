@@ -112,6 +112,38 @@ function isSafariBrowser(): boolean {
   return /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/i.test(ua);
 }
 
+function getFcmSyncTimeoutMs(): number {
+  return isSafariBrowser() ? 25_000 : 15_000;
+}
+
+export function isSafariWebBrowser(): boolean {
+  return isSafariBrowser();
+}
+
+/** Safari iOS needs Add to Home Screen before web push works. */
+export function needsSafariPwaForPush(): boolean {
+  return isSafariBrowser() && detectDeviceType() === "ios" && !isPwaInstalledMode();
+}
+
+/**
+ * Run on every login — clears stale local FCM state so registration works
+ * without users manually clearing browser cache (especially Safari).
+ */
+export async function prepareFcmOnLogin(): Promise<void> {
+  clearFcmRegistrationCache();
+  try {
+    sessionStorage.removeItem(FCM_STORAGE_RECOVERY_KEY);
+  } catch {
+    // ignore
+  }
+
+  if (getNotificationPermissionState() !== "granted") {
+    return;
+  }
+
+  await softResetPushState();
+}
+
 export function clearFcmRegistrationCache() {
   if (typeof window === "undefined") return;
   try {
@@ -752,6 +784,10 @@ export async function requestNotificationPermission(options?: {
     return "skipped";
   }
 
+  if (needsSafariPwaForPush()) {
+    return "unsupported";
+  }
+
   const messagingSupported = await isSupported().catch(() => false);
   if (!messagingSupported) {
     return "unsupported";
@@ -798,11 +834,7 @@ export async function requestNotificationPermission(options?: {
     return "granted";
   } catch (error) {
     if (isFcmStorageError(error)) {
-      console.warn(
-        "[FCM] Token registration failed after recovery:",
-        error,
-        "— In Chrome: DevTools → Application → Storage → Clear site data, then refresh and tap Finish setup once."
-      );
+      console.warn("[FCM] Token registration failed after recovery:", error);
       return "storage_error";
     }
     console.warn("[FCM] Token registration failed:", error);

@@ -1,6 +1,6 @@
 import { toast } from "@/components/ui/use-toast";
 import { ENV } from "@/lib/env";
-import { syncFcmTokenForSession, clearFcmRegistrationCache, applyServerFcmEpoch, setupFcmPwaAutoSync } from "@/firebase-messaging-sw";
+import { syncFcmTokenForSession, clearFcmRegistrationCache, applyServerFcmEpoch, setupFcmPwaAutoSync, prepareFcmOnLogin } from "@/firebase-messaging-sw";
 import { User } from "@/types";
 import {
   createContext,
@@ -47,7 +47,10 @@ function handleAuthFcmSync(payload?: {
 }) {
   const epoch = payload?.fcm_token_epoch ?? payload?.user?.fcm_token_epoch;
   applyServerFcmEpoch(epoch);
-  void syncFcmTokenForSession({ force: true, retries: 2 });
+  void (async () => {
+    await prepareFcmOnLogin();
+    await syncFcmTokenForSession({ force: true, retries: 1, timeoutMs: 25_000 });
+  })();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
