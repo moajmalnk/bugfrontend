@@ -862,11 +862,19 @@ export function UserWorkStats({
                               return (
                               <div key={idx} className="p-3 rounded-lg bg-white/50 dark:bg-gray-800/30 border border-gray-200/50 dark:border-gray-700/30">
                                 <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                                     <span className="font-semibold text-gray-900 dark:text-white">
                                       {format(new Date(submission.date), 'MMM dd, yyyy')}
                                     </span>
+                                    {String(submission.day_status || '') === 'leave' ? (
+                                      <Badge className="bg-teal-100 text-teal-900 border-teal-200 dark:bg-teal-950/50 dark:text-teal-200 dark:border-teal-800 text-[10px]">
+                                        On leave
+                                        {submission.leave_type_name
+                                          ? ` · ${submission.leave_type_name}`
+                                          : ''}
+                                      </Badge>
+                                    ) : null}
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-1">

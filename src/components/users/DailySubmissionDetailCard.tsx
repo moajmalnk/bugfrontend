@@ -23,6 +23,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatWorkSubmissionSubmittedAt, normalizeYmdDateString } from "@/lib/dateUtils";
 import { lookupProjectName, parsePlannedProjectIds, resolveSubmissionProjectNames } from "@/lib/periodDetailsFilters";
 import { formatProjectUpdatesForText, parseProjectUpdatesFromRow } from "@/lib/projectWorkUpdates";
@@ -368,6 +375,23 @@ export function DailySubmissionDetailCard({
         </div>
       </div>
 
+      {String(submission.day_status || '') === 'leave' ? (
+        <div className="rounded-xl border border-teal-200/70 dark:border-teal-800/50 bg-teal-50/70 dark:bg-teal-950/30 px-3 py-2.5 text-xs space-y-1">
+          <div className="font-semibold text-teal-800 dark:text-teal-200">
+            Leave day
+            {submission.leave_type_name ? ` · ${submission.leave_type_name}` : ''}
+          </div>
+          <p className="text-teal-700/90 dark:text-teal-300/90">
+            {String(submission.leave_type_code || '').toLowerCase() === 'paid'
+              ? 'Paid leave credited as 8 work hours for this day.'
+              : 'Attendance is blocked for this approved leave day.'}
+            {submission.leave_request_id
+              ? ` · Request #${submission.leave_request_id}`
+              : ''}
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-2">
           <span className="text-muted-foreground">Completed</span>
@@ -571,18 +595,24 @@ export function DailySubmissionDetailCard({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor={`ot-status-${submissionId}`}>OT status</Label>
-              <select
-                id={`ot-status-${submissionId}`}
-                className={`flex h-10 w-full px-3 py-2 text-sm ${fieldClass}`}
-                value={form.extra_hours_approval_status}
-                onChange={(e) => setField("extra_hours_approval_status", e.target.value)}
+              <Select
+                value={form.extra_hours_approval_status || "none"}
+                onValueChange={(v) => setField("extra_hours_approval_status", v)}
               >
-                <option value="none">None</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="changed">Changed</option>
-              </select>
+                <SelectTrigger
+                  id={`ot-status-${submissionId}`}
+                  className={`h-10 ${fieldClass}`}
+                >
+                  <SelectValue placeholder="Select OT status" />
+                </SelectTrigger>
+                <SelectContent className="z-[200]">
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="changed">Changed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor={`checkin-${submissionId}`}>Check-in time</Label>
@@ -617,19 +647,27 @@ export function DailySubmissionDetailCard({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor={`plan-status-${submissionId}`}>Planned work status</Label>
-              <select
-                id={`plan-status-${submissionId}`}
-                className={`flex h-10 w-full px-3 py-2 text-sm ${fieldClass}`}
-                value={form.planned_work_status}
-                onChange={(e) => setField("planned_work_status", e.target.value)}
+              <Select
+                value={form.planned_work_status || "__none__"}
+                onValueChange={(v) =>
+                  setField("planned_work_status", v === "__none__" ? "" : v)
+                }
               >
-                <option value="">—</option>
-                <option value="not_started">Not started</option>
-                <option value="in_progress">In progress</option>
-                <option value="completed">Completed</option>
-                <option value="blocked">Blocked</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+                <SelectTrigger
+                  id={`plan-status-${submissionId}`}
+                  className={`h-10 ${fieldClass}`}
+                >
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent className="z-[200]">
+                  <SelectItem value="__none__">—</SelectItem>
+                  <SelectItem value="not_started">Not started</SelectItem>
+                  <SelectItem value="in_progress">In progress</SelectItem>
+                  <SelectItem value="completed">✓ Completed</SelectItem>
+                  <SelectItem value="blocked">Blocked</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

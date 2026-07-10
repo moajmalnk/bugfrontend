@@ -1157,6 +1157,22 @@ export default function UserWorkStatsPeriod() {
                                     </div>
                                   </CardContent>
                                 </Card>
+                                {typeof periodDetails?.summary?.leave_days === 'number' &&
+                                periodDetails.summary.leave_days > 0 ? (
+                                  <Card className="col-span-12 sm:col-span-6 lg:col-span-3 border-teal-200/50 dark:border-teal-800/40 bg-teal-50/40 dark:bg-teal-950/20">
+                                    <CardContent className="p-4 flex items-center justify-between gap-3">
+                                      <div>
+                                        <div className="text-[11px] text-muted-foreground">Leave days</div>
+                                        <div className="text-xl font-bold tabular-nums text-teal-700 dark:text-teal-300">
+                                          {periodDetails.summary.leave_days}
+                                        </div>
+                                      </div>
+                                      <div className="p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                                        <CalendarDays className="h-5 w-5" />
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ) : null}
                               </div>
                             )}
 

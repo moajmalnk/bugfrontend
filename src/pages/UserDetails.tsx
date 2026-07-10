@@ -4,6 +4,7 @@ import { ChangePasswordDialog } from "@/components/users/ChangePasswordDialog";
 import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
+import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -706,6 +707,14 @@ export default function UserDetails() {
 
             {/* Stats */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
+                <CardContent className="p-5 sm:p-6 space-y-6">
+                  <UserLeaveDetails
+                    userId={user.id}
+                    username={user.username || undefined}
+                  />
+                </CardContent>
+              </Card>
               <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
                 <CardContent className="p-5 sm:p-6 space-y-6">
                   <h3 className="text-lg font-semibold">Work Statistics</h3>
