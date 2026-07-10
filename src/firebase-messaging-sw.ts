@@ -19,6 +19,7 @@ export type NotificationPermissionResult =
   | "skipped";
 
 const FCM_SYNC_IN_FLIGHT_KEY = "__bugricer_fcm_sync_in_flight__";
+const FCM_SYNC_PROMISE_KEY = "__bugricer_fcm_sync_promise__";
 
 function isMessagingAllowedDomain() {
   if (typeof window === "undefined") {
@@ -158,6 +159,51 @@ export function setupFcmPwaAutoSync(): () => void {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isFcmStorageError(error: unknown): boolean {
+  const text = String(error instanceof Error ? error.message : error).toLowerCase();
+  return text.includes("storage error") || text.includes("aborterror");
+}
+
+/** Clear broken service worker / cache state that causes Chrome push storage errors. */
+export async function resetPushBrowserState(): Promise<void> {
+  clearFcmRegistrationCache();
+
+  if (navigator?.serviceWorker?.getRegistrations) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  }
+
+  if ("caches" in window) {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map((name) => caches.delete(name)));
+  }
+}
+
+async function acquireFcmToken(vapidKey: string, allowRecovery: boolean): Promise<string | null> {
+  const attempt = async () => {
+    const registration = await getFirebaseServiceWorkerRegistration();
+    if (!registration) {
+      return null;
+    }
+    const messaging = getMessaging(app);
+    return getToken(messaging, {
+      vapidKey,
+      serviceWorkerRegistration: registration,
+    });
+  };
+
+  try {
+    return await attempt();
+  } catch (error) {
+    if (!allowRecovery || !isFcmStorageError(error)) {
+      throw error;
+    }
+    console.warn("[FCM] Storage error detected — resetting browser push state and retrying once");
+    await resetPushBrowserState();
+    return attempt();
+  }
 }
 
 function getRegistrationSignature(userToken: string, fcmToken: string, deviceType: string) {
@@ -337,21 +383,23 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
       });
 
       if (response.ok) {
-        let savedToTable = true;
+        let accepted = true;
         try {
           const body = await response.json();
           if (body?.success === false) {
-            savedToTable = false;
+            accepted = false;
             lastError = body?.error || body?.message || `API rejected token from ${base}`;
           } else if (body?.saved_to_table === false) {
-            savedToTable = false;
-            lastError = `Token not saved to user_fcm_tokens from ${base}`;
+            // Legacy users.fcm_token path still counts as registered for this device.
+            console.warn(
+              `[FCM] Token saved to users.fcm_token but not user_fcm_tokens from ${base}`
+            );
           }
         } catch {
           // Non-JSON success — still treat as saved
         }
 
-        if (savedToTable) {
+        if (accepted) {
           localStorage.setItem(TOKEN_CACHE_KEY, currentSignature);
           localStorage.setItem(TOKEN_PWA_STATE_KEY, String(pwaInstalled));
           return true;
@@ -372,46 +420,56 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
 /**
  * Sync FCM for the active logged-in session.
  * Call on login and when permission is already granted.
+ *
+ * force: re-POST token to backend even if local signature matches.
+ * Does NOT clear local cache first (that was wiping registration on every login
+ * and falsely showing "Finish setup on this device").
  */
 export async function syncFcmTokenForSession(options?: {
   force?: boolean;
   interactive?: boolean;
   retries?: number;
 }): Promise<NotificationPermissionResult> {
-  if ((window as any)[FCM_SYNC_IN_FLIGHT_KEY]) {
-    return "skipped";
+  const existing = (window as any)[FCM_SYNC_PROMISE_KEY] as
+    | Promise<NotificationPermissionResult>
+    | undefined;
+  if (existing) {
+    return existing;
   }
-  (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = true;
 
-  const retries = Math.max(0, options?.retries ?? 3);
-  if (options?.force) {
-    clearFcmRegistrationCache();
-  }
-  try {
-    const interactive = options?.interactive ?? false;
-    const forceSave = options?.force ?? false;
+  const run = (async (): Promise<NotificationPermissionResult> => {
+    (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = true;
+    const retries = Math.max(0, options?.retries ?? 3);
+    try {
+      const interactive = options?.interactive ?? false;
+      const forceSave = options?.force ?? false;
 
-    let result = await requestNotificationPermission({
-      interactive,
-      forceSave,
-    });
-
-    // Reliability path: on some devices/browsers, SW/token setup lags behind login.
-    // Retry a few times when permission is granted but token save was skipped.
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      if (result !== "skipped") break;
-      if (getNotificationPermissionState() !== "granted") break;
-      await sleep(attempt * 1200);
-      result = await requestNotificationPermission({
-        interactive: false,
-        forceSave: true,
+      let result = await requestNotificationPermission({
+        interactive,
+        forceSave,
       });
-    }
 
-    return result;
-  } finally {
-    (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = false;
-  }
+      // Reliability path: on some devices/browsers, SW/token setup lags behind login.
+      // Retry a few times when permission is granted but token save was skipped.
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        if (result !== "skipped") break;
+        if (getNotificationPermissionState() !== "granted") break;
+        await sleep(attempt * 1200);
+        result = await requestNotificationPermission({
+          interactive: false,
+          forceSave: true,
+        });
+      }
+
+      return result;
+    } finally {
+      (window as any)[FCM_SYNC_IN_FLIGHT_KEY] = false;
+      (window as any)[FCM_SYNC_PROMISE_KEY] = undefined;
+    }
+  })();
+
+  (window as any)[FCM_SYNC_PROMISE_KEY] = run;
+  return run;
 }
 
 /** Re-register push token on this browser/device (call after user enables notifications). */
@@ -470,15 +528,7 @@ export async function requestNotificationPermission(options?: {
   }
 
   try {
-    const registration = await getFirebaseServiceWorkerRegistration();
-    if (!registration) {
-      return "skipped";
-    }
-    const messaging = getMessaging(app);
-    const token = await getToken(messaging, {
-      vapidKey,
-      serviceWorkerRegistration: registration,
-    });
+    const token = await acquireFcmToken(vapidKey, true);
 
     if (!token) {
       return "skipped";
@@ -491,7 +541,15 @@ export async function requestNotificationPermission(options?: {
 
     return "granted";
   } catch (error) {
-    console.warn("[FCM] Token registration failed:", error);
+    if (isFcmStorageError(error)) {
+      console.warn(
+        "[FCM] Token registration failed after recovery:",
+        error,
+        "— clear site data in Chrome (Application → Clear site data) or test on https://bugs.bugricer.com"
+      );
+    } else {
+      console.warn("[FCM] Token registration failed:", error);
+    }
     return "skipped";
   }
 }

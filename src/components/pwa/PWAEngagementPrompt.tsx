@@ -193,7 +193,7 @@ export function PWAEngagementPrompt() {
       });
   }, [setInstalled]);
 
-  // Decide when to show the modal
+  // Decide when to show the modal — wait for silent FCM sync when permission is already granted
   useEffect(() => {
     if (!currentUser) {
       setOpen(false);
@@ -201,15 +201,34 @@ export function PWAEngagementPrompt() {
     }
 
     clearLegacyDismiss();
+    let cancelled = false;
 
-    const timer = window.setTimeout(() => {
+    const decide = async () => {
       const standalone = isStandaloneDisplay();
       if (standalone || hasInstalledFlag()) {
         setInstalled();
       }
 
       const installed = standalone || hasInstalledFlag();
-      const permission = refreshPermission();
+      let permission = refreshPermission();
+
+      // Permission already granted: collect/refresh token silently on login before prompting.
+      if (permission === "granted") {
+        const result = await syncFcmTokenForSession({
+          force: true,
+          interactive: false,
+          retries: 5,
+        });
+        if (cancelled) return;
+        permission = refreshPermission();
+        if (result === "granted" || hasFcmTokenOnThisDevice()) {
+          setOpen(false);
+          setForceNotifPrompt(false);
+          return;
+        }
+      }
+
+      if (cancelled) return;
 
       // Fully set up — never show install/notification modal
       if (installed && permission === "granted" && !needsPushRegistrationOnThisDevice()) {
@@ -240,9 +259,16 @@ export function PWAEngagementPrompt() {
       } else {
         setOpen(false);
       }
-    }, 1200);
+    };
 
-    return () => window.clearTimeout(timer);
+    const timer = window.setTimeout(() => {
+      void decide();
+    }, 800);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [currentUser, deferredPrompt, forceNotifPrompt, ios, refreshPermission, setInstalled]);
 
   // Re-check permission when user returns from browser site settings
@@ -292,11 +318,16 @@ export function PWAEngagementPrompt() {
     };
   }, [currentUser, notificationState, refreshPermission]);
 
-  // Quietly refresh FCM token when already granted
+  // Quietly refresh FCM token when already granted (shared with AuthContext via in-flight promise)
   useEffect(() => {
     if (!currentUser) return;
     if (getNotificationPermissionState() !== "granted") return;
-    void syncFcmTokenForSession({ force: true, retries: 5 });
+    void syncFcmTokenForSession({ force: true, retries: 5 }).then((result) => {
+      if (result === "granted" || hasFcmTokenOnThisDevice()) {
+        setOpen(false);
+        setForceNotifPrompt(false);
+      }
+    });
   }, [currentUser]);
 
   const closePrompt = useCallback(
@@ -379,7 +410,7 @@ export function PWAEngagementPrompt() {
         );
       } else if (alreadyGranted || getNotificationPermissionState() === "granted") {
         setStatusMessage(
-          "Browser allows notifications, but this device could not finish setup. Refresh the page, then tap the button again."
+          "Browser allows notifications, but this device could not finish setup. In Chrome: DevTools → Application → Clear site data, then refresh. For best results test on https://bugs.bugricer.com (HTTPS), not localhost."
         );
       } else {
         setStatusMessage("Could not enable notifications on this device.");

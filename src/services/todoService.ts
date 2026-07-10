@@ -364,6 +364,38 @@ export async function adminUpsertWorkSubmission(body: {
   return data as { success?: boolean; message?: string; data?: Record<string, unknown> };
 }
 
+export async function adminUpdateWorkSubmission(body: {
+  id: number;
+  hours_today?: number;
+  overtime_hours?: number;
+  requested_extra_hours?: number;
+  approval_reason?: string | null;
+  extra_hours_approval_status?: string;
+  extra_hours_approved_amount?: number | null;
+  start_time?: string | null;
+  check_in_time?: string | null;
+  completed_tasks?: string;
+  pending_tasks?: string;
+  ongoing_tasks?: string;
+  notes?: string;
+  planned_work?: string | null;
+  planned_work_status?: string | null;
+  planned_work_notes?: string | null;
+  planned_projects?: string[];
+  break_entries?: string[];
+  total_break_minutes?: number;
+  admin_note?: string;
+}) {
+  const res = await fetch(`${API}/tasks/admin_update_work_submission.php`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { message?: string }).message || 'Failed to update submission');
+  return data as { success?: boolean; message?: string; data?: Record<string, unknown> };
+}
+
 export async function checkIn(
   submissionDate?: string,
   plannedProjects?: string[],

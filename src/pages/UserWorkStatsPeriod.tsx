@@ -39,7 +39,7 @@ import {
   PlusCircle,
   TrendingUp,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { buildAdminAddHoursPath } from "@/pages/adminOvertimeShared";
 import { Button } from "@/components/ui/button";
@@ -218,6 +218,9 @@ export default function UserWorkStatsPeriod() {
     effectiveRole === "admin" ||
     effectiveRole === "super_admin" ||
     currentUser?.role === "admin";
+  const canAdminEdit =
+    (currentUser?.role || "").toLowerCase() === "admin" ||
+    effectiveRole === "admin";
   const end = useMemo(
     () => (periodStart ? computePeriodEnd(periodStart) : ""),
     [periodStart]
@@ -259,14 +262,19 @@ export default function UserWorkStatsPeriod() {
     [periodDetails?.project_name_map, catalogProjects]
   );
 
-  useEffect(() => {
-    const run = async () => {
+  const loadPeriodData = useCallback(
+    async (opts?: { soft?: boolean }) => {
       if (!periodStart) return;
+      const soft = Boolean(opts?.soft);
       setError(null);
-      setIsLoadingStats(true);
-      setIsLoadingDetails(true);
-      setSelectedPeriod(null);
-      setPeriodDetails(null);
+      if (!soft) {
+        setIsLoadingStats(true);
+        setIsLoadingDetails(true);
+        setSelectedPeriod(null);
+        setPeriodDetails(null);
+      } else {
+        setIsLoadingDetails(true);
+      }
 
       const teamMode = viewScope === "team" && canViewTeam;
 
@@ -299,9 +307,13 @@ export default function UserWorkStatsPeriod() {
       } finally {
         setIsLoadingDetails(false);
       }
-    };
-    void run();
-  }, [userId, periodStart, end, viewScope, canViewTeam]);
+    },
+    [userId, periodStart, end, viewScope, canViewTeam]
+  );
+
+  useEffect(() => {
+    void loadPeriodData();
+  }, [loadPeriodData]);
 
   const headerTitle = useMemo(() => {
     if (label.trim()) return label.trim();
@@ -1163,9 +1175,14 @@ export default function UserWorkStatsPeriod() {
                                   <div className="space-y-3">
                                     {daySubmissions.map((submission: any, idx: number) => (
                                       <DailySubmissionDetailCard
-                                        key={`${day}-${submission.user_id ?? "u"}-${idx}`}
+                                        key={`${day}-${submission.id ?? submission.user_id ?? "u"}-${idx}`}
                                         submission={submission}
                                         showUser={viewScope === "team"}
+                                        projectNameById={projectNameById}
+                                        canAdminEdit={canAdminEdit}
+                                        onChanged={async () => {
+                                          await loadPeriodData({ soft: true });
+                                        }}
                                         monthToDate={
                                           viewScope === "user"
                                             ? (() => {
