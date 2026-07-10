@@ -13,6 +13,7 @@ import { toast } from '@/components/ui/use-toast';
 import { ENV } from '@/lib/env';
 import { adminUpsertWorkSubmission } from '@/services/todoService';
 import { userService } from '@/services/userService';
+import { getAttendanceStatus, type AttendanceStatus } from '@/services/leaveService';
 import { buildAdminAddHoursPath, resolveAdminAddHoursReturn } from '@/pages/adminOvertimeShared';
 import { format, parseISO } from 'date-fns';
 import { AlertCircle } from 'lucide-react';
@@ -48,6 +49,7 @@ export default function AdminAddWorkHours() {
   const [dateBlocked, setDateBlocked] = useState(false);
   const [dateBlockedHours, setDateBlockedHours] = useState<number | null>(null);
   const [checkingDate, setCheckingDate] = useState(false);
+  const [attendanceBlock, setAttendanceBlock] = useState<AttendanceStatus | null>(null);
 
   useEffect(() => {
     setSubmissionDate(defaultDate || new Date().toISOString().slice(0, 10));
@@ -92,27 +94,34 @@ export default function AdminAddWorkHours() {
     if (!isAdmin || !userId || !submissionDate) {
       setDateBlocked(false);
       setDateBlockedHours(null);
+      setAttendanceBlock(null);
       return;
     }
     let cancelled = false;
     (async () => {
       setCheckingDate(true);
       try {
-        const details = await userService.getPeriodDetails(userId, submissionDate, submissionDate);
+        const [details, status] = await Promise.all([
+          userService.getPeriodDetails(userId, submissionDate, submissionDate),
+          getAttendanceStatus(userId, submissionDate),
+        ]);
         const submissions = Array.isArray(details?.submissions) ? details.submissions : [];
         const match = submissions.find(
-          (s: { date?: string; submission_date?: string; hours_today?: number }) =>
-            String(s.date ?? s.submission_date ?? '') === submissionDate
+          (s: { date?: string; submission_date?: string; hours_today?: number; day_status?: string }) =>
+            String(s.date ?? s.submission_date ?? '') === submissionDate &&
+            String(s.day_status || '') !== 'leave'
         );
         const hours = Number(match?.hours_today ?? 0);
         if (!cancelled) {
           setDateBlocked(hours >= 1);
           setDateBlockedHours(hours >= 1 ? hours : null);
+          setAttendanceBlock(status?.allowed === false ? status : null);
         }
       } catch {
         if (!cancelled) {
           setDateBlocked(false);
           setDateBlockedHours(null);
+          setAttendanceBlock(null);
         }
       } finally {
         if (!cancelled) setCheckingDate(false);
@@ -148,6 +157,14 @@ export default function AdminAddWorkHours() {
       toast({
         title: 'Date already has hours',
         description: 'Only one work-hours entry is allowed per day. Pick a different date.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (attendanceBlock) {
+      toast({
+        title: 'Date not available',
+        description: attendanceBlock.message || 'Cannot record hours for this date.',
         variant: 'destructive',
       });
       return;
@@ -262,6 +279,11 @@ export default function AdminAddWorkHours() {
               />
               {checkingDate ? (
                 <p className="text-xs text-muted-foreground">Checking date…</p>
+              ) : attendanceBlock ? (
+                <div className="flex items-start gap-2 rounded-xl border border-rose-200/80 dark:border-rose-800/60 bg-rose-50/80 dark:bg-rose-950/30 px-3 py-2.5 text-sm text-rose-900 dark:text-rose-200">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{attendanceBlock.message}</span>
+                </div>
               ) : dateBlocked ? (
                 <div className="flex items-start gap-2 rounded-xl border border-amber-200/80 dark:border-amber-800/60 bg-amber-50/80 dark:bg-amber-950/30 px-3 py-2.5 text-sm text-amber-900 dark:text-amber-200">
                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -339,7 +361,7 @@ export default function AdminAddWorkHours() {
                 type="button"
                 className="h-11 rounded-xl w-full sm:w-auto bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold shadow-lg disabled:opacity-50"
                 onClick={handleSave}
-                disabled={saving || dateBlocked || checkingDate}
+                disabled={saving || dateBlocked || !!attendanceBlock || checkingDate}
               >
                 {saving ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

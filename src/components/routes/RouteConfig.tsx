@@ -178,6 +178,9 @@ const AdminOvertimeRequests = lazy(() => import("@/pages/AdminOvertimeRequests")
 const AdminOvertimeUserDetail = lazy(() => import("@/pages/AdminOvertimeUserDetail"));
 const AdminAddWorkHours = lazy(() => import("@/pages/AdminAddWorkHours"));
 const DailyWorkUpdate = lazy(() => import("@/pages/DailyWorkUpdate"));
+const LeaveRequests = lazy(() => import("@/pages/LeaveRequests"));
+const AdminLeaveRequests = lazy(() => import("@/pages/AdminLeaveRequests"));
+const AdminLeaveUserDetail = lazy(() => import("@/pages/AdminLeaveUserDetail"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const CommonBugs = lazy(() => import("@/pages/CommonBugs"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
@@ -311,6 +314,8 @@ const RouteConfig = () => {
       <Route path="/notifications" element={<RolePathRedirect suffix="notifications" />} />
       <Route path="/daily-work-update" element={<RolePathRedirect suffix="daily-work-update" />} />
       <Route path="/overtime-requests" element={<RolePathRedirect suffix="overtime-requests" />} />
+      <Route path="/leave" element={<RolePathRedirect suffix="leave" />} />
+      <Route path="/leave-requests" element={<RolePathRedirect suffix="leave-requests" />} />
       <Route path="/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
       <Route path="/common-bugs" element={<RolePathRedirect suffix="common-bugs" />} />
       <Route path="/users/:userId" element={<RolePathRedirect suffix="users/:userId" />} />
@@ -359,9 +364,12 @@ const RouteConfig = () => {
           <Route path="my-tasks" element={<MyTasks />} />
           <Route path="daily-update" element={<DailyUpdate />} />
           <Route path="daily-work-update" element={<DailyWorkUpdate />} />
+          <Route path="leave" element={<LeaveRequests />} />
           <Route path="overtime-requests/:userId/add-hours" element={<AdminAddWorkHours />} />
           <Route path="overtime-requests/:userId" element={<AdminOvertimeUserDetail />} />
           <Route path="overtime-requests" element={<AdminOvertimeRequests />} />
+          <Route path="leave-requests/:userId" element={<AdminLeaveUserDetail />} />
+          <Route path="leave-requests" element={<AdminLeaveRequests />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
           <Route path="common-bugs" element={<CommonBugs />} />
           <Route path="bugdocs" element={<BugDocsPage />} />

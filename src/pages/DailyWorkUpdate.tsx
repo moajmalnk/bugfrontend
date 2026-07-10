@@ -27,6 +27,10 @@ import { extractApiErrorMessage } from '@/lib/apiError';
 import { assertDeviceClockMatchesServer } from '@/lib/deviceClock';
 import { ENV } from '@/lib/env';
 import {
+  getAttendanceStatus,
+  type AttendanceStatus,
+} from '@/services/leaveService';
+import {
   calendarMonthKey,
   computeMonthTotalsToDate,
   getCalendarMonthPeriod,
@@ -248,6 +252,7 @@ export function DailyWorkFlowPanel({
   const [checkoutWizardStep, setCheckoutWizardStep] = useState<'form' | 'preview'>('form');
   const [todaySubmissionComplete, setTodaySubmissionComplete] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState<Record<string, ProjectWorkUpdate>>({});
+  const [attendanceGate, setAttendanceGate] = useState<AttendanceStatus | null>(null);
   const didAutoOpenEditRef = useRef(false);
   const didAutoOpenFlowRef = useRef<string | null>(null);
 
@@ -265,6 +270,27 @@ export function DailyWorkFlowPanel({
 
   const hasCheckedIn = !!form.check_in_time;
   const hasActiveWorkSession = hasCheckedIn && !todaySubmissionComplete && !isEditing;
+  const attendanceBlocked = attendanceGate != null && attendanceGate.allowed === false;
+
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setAttendanceGate(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const date = serverToday || todayYMD();
+        const status = await getAttendanceStatus(String(currentUser.id), date);
+        if (!cancelled) setAttendanceGate(status);
+      } catch {
+        if (!cancelled) setAttendanceGate(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, serverToday]);
 
   useEffect(() => {
     if (todaySubmissionComplete && !isEditing) {
@@ -635,6 +661,14 @@ export function DailyWorkFlowPanel({
   }
 
   function openCheckInDialog() {
+    if (attendanceBlocked) {
+      toast({
+        title: 'Check-in unavailable',
+        description: attendanceGate?.message || 'You cannot check in today.',
+        variant: 'destructive',
+      });
+      return;
+    }
     syncFlowAction('checkin');
     setIsCheckInDialogOpen(true);
   }
@@ -1503,6 +1537,36 @@ export function DailyWorkFlowPanel({
 
   return (
     <>
+      {attendanceBlocked && !hasCheckedIn ? (
+        <div className="w-full rounded-xl border border-rose-200/80 dark:border-rose-800/60 bg-rose-50/90 dark:bg-rose-950/40 px-4 py-3 text-sm text-rose-900 dark:text-rose-100 flex items-start gap-2 mb-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">
+              {attendanceGate?.reason === 'on_leave'
+                ? 'You are on approved leave today'
+                : attendanceGate?.reason === 'before_joining'
+                  ? 'Before joining date'
+                  : 'Check-in unavailable'}
+            </p>
+            <p className="text-xs mt-0.5 opacity-90">
+              {attendanceGate?.message}
+              {attendanceGate?.reason === 'on_leave' ? (
+                <>
+                  {' '}
+                  Manage leave from{' '}
+                  <a
+                    href={`/${currentUser?.role}/leave`}
+                    className="underline font-medium"
+                  >
+                    My Leave
+                  </a>
+                  .
+                </>
+              ) : null}
+            </p>
+          </div>
+        </div>
+      ) : null}
       <div
         className={
           isHeaderLayout
@@ -1545,7 +1609,7 @@ export function DailyWorkFlowPanel({
         {!isEditing && !hasCheckedIn && !todaySubmissionComplete ? (
           <Button
             onClick={openCheckInDialog}
-            disabled={isCheckingIn}
+            disabled={isCheckingIn || attendanceBlocked}
             className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-blue-600 to-emerald-700 text-white hover:from-blue-700 hover:to-emerald-800`}
           >
             {isCheckingIn ? (

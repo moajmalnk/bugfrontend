@@ -310,11 +310,17 @@ export default function Notifications() {
     // Navigate based on entity type
     if (notification.entity_type && notification.entity_id && role) {
       let path = '';
-      const workActivityTypes = ['work_check_in', 'work_break', 'work_update', 'overtime'];
+      const workActivityTypes = ['work_check_in', 'work_break', 'work_update', 'overtime', 'leave'];
       if (workActivityTypes.includes(notification.entity_type)) {
         const userId = String(notification.entity_id).split(':')[0];
         if (userId) {
-          path = `/${role}/users/${userId}`;
+          if (notification.entity_type === 'leave') {
+            path = role === 'admin'
+              ? `/${role}/leave-requests/${userId}`
+              : `/${role}/leave`;
+          } else {
+            path = `/${role}/users/${userId}`;
+          }
         }
       } else if (notification.entity_type === 'bug') {
         path = `/${role}/bugs/${notification.entity_id}`;

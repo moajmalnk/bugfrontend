@@ -96,6 +96,8 @@ export interface User {
   role_id?: number | null;
   /** 1 = active, 0 = deactivated by admin (when column exists) */
   account_active?: number;
+  /** Employment start date (YYYY-MM-DD); attendance blocked before this day */
+  joining_date?: string | null;
   avatar?: string;
   created_at?: string;
   admin_id?: string; // For impersonation tracking

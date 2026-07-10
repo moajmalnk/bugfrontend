@@ -29,6 +29,7 @@ import {
   Search,
   LifeBuoy,
   Signal,
+  PlaneTakeoff,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -226,6 +227,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
+            {role !== 'tester' && (
+              <NavLink
+                to="/leave"
+                icon={<PlaneTakeoff className="h-5 w-5" />}
+                label="My Leave"
+              />
+            )}
+
             {showBugMessageInMainNav(role) && (
               <NavLink
                 to="/messages"
@@ -293,6 +302,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/overtime-requests"
                       icon={<Timer className="h-5 w-5" />}
                       label="OT requests"
+                    />
+                  )}
+
+                  {hasUsersPermission && (
+                    <NavLink
+                      to="/leave-requests"
+                      icon={<PlaneTakeoff className="h-5 w-5" />}
+                      label="Leave requests"
                     />
                   )}
 

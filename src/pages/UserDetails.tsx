@@ -408,12 +408,14 @@ export default function UserDetails() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-xs text-muted-foreground">
-                            Joined
+                            Joining date
                           </div>
                           <div className="font-semibold truncate">
-                            {user.created_at
-                              ? new Date(user.created_at).toLocaleDateString()
-                              : "—"}
+                            {user.joining_date
+                              ? new Date(user.joining_date).toLocaleDateString()
+                              : user.created_at
+                                ? new Date(user.created_at).toLocaleDateString()
+                                : "—"}
                           </div>
                         </div>
                       </div>

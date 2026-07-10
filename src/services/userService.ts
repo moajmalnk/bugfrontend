@@ -8,6 +8,7 @@ interface NewUserData {
   phone?: string;
   password: string;
   role: UserRole;
+  joining_date?: string | null;
 }
 
 interface UpdateUserData {
@@ -17,6 +18,7 @@ interface UpdateUserData {
   role?: UserRole;
   role_id?: number;
   account_active?: boolean | number;
+  joining_date?: string | null;
 }
 
 // Define the structure for user statistics
@@ -74,6 +76,7 @@ class UserService {
         user.account_active !== undefined && user.account_active !== null
           ? Number(user.account_active)
           : undefined,
+      joining_date: user.joining_date ?? null,
     }));
   }
 
@@ -139,6 +142,7 @@ class UserService {
           updatedUser.account_active !== undefined && updatedUser.account_active !== null
             ? Number(updatedUser.account_active)
             : undefined,
+        joining_date: updatedUser.joining_date ?? null,
       };
     }
     

@@ -45,6 +45,12 @@ const userFormSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
   role: z.string().min(1, { message: "Please select a role" }),
   phone: z.string().optional(),
+  joining_date: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), {
+      message: "Joining date must be YYYY-MM-DD",
+    }),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -137,6 +143,7 @@ export function EditUserDialog({
       email: user.email,
       role: user.role || "tester",
       phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
+      joining_date: user.joining_date || "",
     },
   });
 
@@ -146,6 +153,7 @@ export function EditUserDialog({
       email: user.email,
       role: user.role || "tester",
       phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
+      joining_date: user.joining_date || "",
     });
   }, [user, form]);
 
@@ -162,6 +170,7 @@ export function EditUserDialog({
         role: data.role as UserRole,
         role_id: selectedRole?.id,
         phone: data.phone ? "+91" + data.phone : "",
+        joining_date: data.joining_date?.trim() || null,
       });
 
       const updatedRole = (updatedUser.role || data.role) as UserRole;
@@ -315,6 +324,25 @@ export function EditUserDialog({
                     <FormLabelDot color="bg-orange-500">Phone</FormLabelDot>
                     <FormControl>
                       <PhoneInput value={field.value} onChange={field.onChange} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="joining_date"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabelDot color="bg-teal-500">Joining date</FormLabelDot>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value || ""}
+                        className={fieldInputClass}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

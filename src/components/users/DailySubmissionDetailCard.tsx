@@ -301,6 +301,12 @@ export function DailySubmissionDetailCard({
             <span className="font-semibold text-gray-900 dark:text-white">
               {formatDayLabel(dayKey)}
             </span>
+            {String(submission.day_status || '') === 'leave' ? (
+              <Badge className="bg-teal-100 text-teal-900 border-teal-200 dark:bg-teal-950/50 dark:text-teal-200 dark:border-teal-800">
+                On leave
+                {submission.leave_type_name ? ` (${submission.leave_type_name})` : ''}
+              </Badge>
+            ) : null}
             {showUser && submission.username ? (
               <Badge variant="outline" className="gap-1 text-xs">
                 <UserRound className="h-3 w-3" />

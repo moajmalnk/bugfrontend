@@ -433,7 +433,7 @@ export function UserDetailDialog({
                         <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
-                        <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Joined</p>
+                        <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Account created</p>
                         <p className="text-[10px] sm:text-sm font-medium text-foreground truncate">{format(new Date(user.created_at), "PPP")}</p>
                       </div>
                     </div>
@@ -441,6 +441,26 @@ export function UserDetailDialog({
                     <div></div>
                   )}
                 </div>
+
+                {(user.joining_date || user.created_at) && (
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/40 rounded-lg border border-border/30 hover:bg-muted/60 transition-colors min-w-0">
+                      <div className="p-1 sm:p-1.5 bg-primary/10 rounded-md flex-shrink-0">
+                        <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Joining date</p>
+                        <p className="text-[10px] sm:text-sm font-medium text-foreground truncate">
+                          {format(
+                            new Date(user.joining_date || String(user.created_at).slice(0, 10)),
+                            "PPP"
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div></div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

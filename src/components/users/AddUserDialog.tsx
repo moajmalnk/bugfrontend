@@ -50,6 +50,12 @@ const userFormSchema = z.object({
     message: "Please select a role",
   }),
   phone: z.string().optional(),
+  joining_date: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), {
+      message: "Joining date must be YYYY-MM-DD",
+    }),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -119,6 +125,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
       password: "",
       role: "",
       phone: "",
+      joining_date: "",
     },
   });
 
@@ -160,6 +167,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
         role: userData.role,
         role_id: selectedRole?.id,
         phone: userData.phone && userData.phone.trim() ? "+91" + userData.phone.trim() : undefined,
+        joining_date: userData.joining_date?.trim() || undefined,
       };
       return await onUserAdd(payload as UserFormValues);
     } catch {
@@ -326,6 +334,28 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                     <FormControl>
                       <PhoneInput value={field.value} onChange={field.onChange} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="joining_date"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabelDot color="bg-teal-500">Joining date</FormLabelDot>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value || ""}
+                        className={fieldInputClass}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Attendance is blocked before this date
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

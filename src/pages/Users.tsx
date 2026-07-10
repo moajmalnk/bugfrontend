@@ -157,6 +157,7 @@ interface NewUser {
   password: string;
   role: UserRole;
   phone?: string;
+  joining_date?: string;
 }
 
 const Users = () => {
@@ -366,6 +367,7 @@ const Users = () => {
         password: userData.password,
         role: userData.role,
         phone: userData.phone,
+        joining_date: userData.joining_date || undefined,
       };
       const result = await userService.addUser(payload);
       toast({
