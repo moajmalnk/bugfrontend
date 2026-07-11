@@ -126,8 +126,6 @@ const Updates = () => {
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const setCreatedByFilter = (value: string) => setFilter("createdByFilter", value);
-  const [projectOpen, setProjectOpen] = useState(false);
-  const [creatorOpen, setCreatorOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Local state for search input (avoids fighting persisted filter on each keystroke)
@@ -409,102 +407,98 @@ const Updates = () => {
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none"></div>
           <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-                      <div className="p-1.5 bg-green-500 rounded-lg">
-                        <Search className="h-4 w-4 text-white" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 bg-green-500 rounded-lg">
+                  <Search className="h-4 w-4 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Search Bar */}
+                <div className="flex-1 relative group">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search updates, projects, or creators..."
+                    value={localSearchTerm}
+                    onChange={handleSearchChange}
+                    className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                    autoComplete="off"
+                  />
+                </div>
+
+                {/* Filter Controls */}
+                <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
+                  {/* Project Filter */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                      <FolderOpen className="h-4 w-4 text-white" />
                     </div>
-          <div className="flex flex-col xl:flex-row gap-4">
-            {/* Search Bar */}
-            <div className="flex-1 min-w-0 relative group">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search updates, projects, or creators..."
-                value={localSearchTerm}
-                onChange={handleSearchChange}
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                autoComplete="off"
-              />
-            </div>
+                    <Select value={projectFilter} onValueChange={setProjectFilter}>
+                      <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectValue placeholder="Project" />
+                      </SelectTrigger>
+                      <SelectContent
+                        position="popper"
+                        sideOffset={4}
+                        collisionPadding={16}
+                        className="z-[100] max-h-[min(20rem,var(--radix-select-content-available-height))]"
+                      >
+                        <SelectItem value="all">All Projects</SelectItem>
+                        {uniqueProjects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            {/* Filter Controls */}
-            <div className="flex flex-wrap gap-3 w-full xl:w-auto xl:shrink-0">
-              {/* Project Filter */}
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
-                  <FolderOpen className="h-4 w-4 text-white" />
+                  {/* Created By Filter */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                      <User className="h-4 w-4 text-white" />
+                    </div>
+                    <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+                      <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectValue placeholder="Created By" />
+                      </SelectTrigger>
+                      <SelectContent
+                        position="popper"
+                        sideOffset={4}
+                        collisionPadding={16}
+                        className="z-[100] max-h-[min(20rem,var(--radix-select-content-available-height))]"
+                      >
+                        <SelectItem value="all">All Creators</SelectItem>
+                        {uniqueCreators.map((creator) => (
+                          <SelectItem key={creator} value={creator}>
+                            {creator}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Clear Filters Button */}
+                  {(localSearchTerm || projectFilter !== "all" || createdByFilter !== "all") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setLocalSearchTerm("");
+                        clearFilters();
+                      }}
+                      className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                    >
+                      Clear
+                    </Button>
+                  )}
                 </div>
-                <Select
-                  open={projectOpen}
-                  onOpenChange={setProjectOpen}
-                  value={projectFilter}
-                  onValueChange={(v) => {
-                    setProjectFilter(v);
-                    setProjectOpen(false);
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                    <SelectValue placeholder="Project" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[60]">
-                    <SelectItem value="all">All Projects</SelectItem>
-                    {uniqueProjects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
-
-              {/* Created By Filter */}
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                  <User className="h-4 w-4 text-white" />
-                </div>
-                <Select
-                  open={creatorOpen}
-                  onOpenChange={setCreatorOpen}
-                  value={createdByFilter}
-                  onValueChange={(v) => {
-                    setCreatedByFilter(v);
-                    setCreatorOpen(false);
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                    <SelectValue placeholder="Created By" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[60]">
-                    <SelectItem value="all">All Creators</SelectItem>
-                    {uniqueCreators.map((creator) => (
-                      <SelectItem key={creator} value={creator}>
-                        {creator}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Clear Filters Button */}
-              {(localSearchTerm || projectFilter !== "all" || createdByFilter !== "all") && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setLocalSearchTerm("");
-                    clearFilters();
-                  }}
-                  className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                >
-                  Clear
-                </Button>
-              )}
             </div>
-          </div>
-
           </div>
         </div>
 

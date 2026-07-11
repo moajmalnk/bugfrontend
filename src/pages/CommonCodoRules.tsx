@@ -405,18 +405,18 @@ export default function CommonCodoRules() {
 
   if (!canAccess) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-7xl mx-auto">
-          <div className="relative overflow-hidden">
+      <main className="min-h-[calc(100vh-4rem)] min-w-0 w-full overflow-x-hidden bg-background py-2 sm:py-4">
+        <section className="w-full min-w-0 max-w-7xl mx-auto">
+          <div className="relative overflow-hidden rounded-2xl">
             <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/50 via-blue-50/30 to-indigo-50/50 dark:from-cyan-950/20 dark:via-blue-950/10 dark:to-indigo-950/20 rounded-2xl" />
-            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center">
-              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
-                <Lock className="h-10 w-10 text-white" />
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-12 text-center">
+              <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                <Lock className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">
                 Access Denied
               </h3>
-              <p className="text-lg text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+              <p className="text-sm sm:text-lg text-gray-600 dark:text-gray-400 max-w-md mx-auto">
                 Common CODO is available to administrators, developers, and testers.
               </p>
             </div>
@@ -498,20 +498,20 @@ export default function CommonCodoRules() {
     return (
       <div
         key={rule.id}
-        className="group relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 hover:shadow-md hover:border-cyan-300/40 dark:hover:border-cyan-700/40 transition-all duration-300"
+        className="group relative w-full min-w-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3.5 sm:p-5 hover:shadow-md hover:border-cyan-300/40 dark:hover:border-cyan-700/40 transition-all duration-300 overflow-hidden"
       >
-        <div className="flex gap-3 sm:gap-4">
+        <div className="flex gap-2.5 sm:gap-4 min-w-0">
           <div
-            className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${meta.accent} text-white shadow-sm`}
+            className={`mt-0.5 flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${meta.accent} text-white shadow-sm`}
           >
-            <Icon className="h-5 w-5" />
+            <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 space-y-1.5">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <div className="flex items-start justify-between gap-2 min-w-0">
+              <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-snug">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-snug break-words">
                     {rule.title}
                   </h3>
                   <span
@@ -520,12 +520,12 @@ export default function CommonCodoRules() {
                     {meta.label}
                   </span>
                   {rule.subtitle ? (
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 break-words">
                       {rule.subtitle}
                     </span>
                   ) : null}
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed break-words">
                   {rule.description}
                 </p>
                 {rule.phase === 'project' && (rule.projects?.length || 0) > 0 ? (
@@ -533,20 +533,20 @@ export default function CommonCodoRules() {
                     {rule.projects!.map((p) => (
                       <span
                         key={p.id}
-                        className="inline-flex items-center gap-1 rounded-md border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:text-violet-200"
+                        className="inline-flex items-center gap-1 rounded-md border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 px-2 py-0.5 text-[11px] font-medium text-violet-800 dark:text-violet-200 max-w-full"
                       >
-                        <FolderKanban className="h-3 w-3" />
-                        {p.name}
+                        <FolderKanban className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{p.name}</span>
                       </span>
                     ))}
                   </div>
                 ) : null}
-                <p className="text-[11px] font-mono text-gray-400 dark:text-gray-500">
+                <p className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate">
                   {rule.rule_key}
                 </p>
               </div>
 
-              <div className="flex items-center gap-1 shrink-0 -mt-0.5">
+              <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 -mt-0.5">
                 <Button
                   type="button"
                   variant="ghost"
@@ -581,10 +581,10 @@ export default function CommonCodoRules() {
                   if (!canViewAckDetails) return;
                   setExpandedAck((prev) => ({ ...prev, [rule.id]: open }));
                 }}
-                className="mt-3"
+                className="mt-3 min-w-0"
               >
-                <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-gray-50/70 dark:bg-gray-800/40 p-3 sm:p-3.5 space-y-3">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-gray-50/70 dark:bg-gray-800/40 p-2.5 sm:p-3.5 space-y-3 min-w-0 overflow-hidden">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between min-w-0">
                     {canViewAckDetails ? (
                       <div className="min-w-0 flex-1 space-y-2">
                         <span
@@ -652,7 +652,7 @@ export default function CommonCodoRules() {
                       </div>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto min-w-0">
                       {canRespond
                         ? (
                             ['acknowledged', 'doubt', 'not_required'] as CodoAckStatus[]
@@ -667,7 +667,8 @@ export default function CommonCodoRules() {
                                 size="sm"
                                 variant={active ? 'default' : 'outline'}
                                 className={cn(
-                                  'rounded-lg h-8 px-2.5 sm:px-3 text-xs font-semibold',
+                                  'rounded-lg h-8 px-2 sm:px-3 text-xs font-semibold min-w-0',
+                                  status === 'not_required' && 'col-span-2 sm:col-span-1',
                                   active
                                     ? sMeta.activeClass
                                     : 'bg-white/70 dark:bg-gray-900/60 text-gray-800 dark:text-gray-100 border-gray-200 dark:border-gray-700'
@@ -680,7 +681,7 @@ export default function CommonCodoRules() {
                                 ) : (
                                   <SIcon className="mr-1.5 h-3.5 w-3.5" />
                                 )}
-                                {sMeta.label}
+                                <span className="truncate">{sMeta.label}</span>
                               </Button>
                             );
                           })
@@ -692,7 +693,7 @@ export default function CommonCodoRules() {
                             variant="ghost"
                             size="sm"
                             className={cn(
-                              'rounded-lg h-8 px-2.5 text-xs font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white',
+                              'rounded-lg h-8 px-2.5 text-xs font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white col-span-2 sm:col-span-1',
                               ackOpen &&
                                 'bg-white/80 dark:bg-gray-800 text-gray-900 dark:text-white'
                             )}
@@ -799,36 +800,36 @@ export default function CommonCodoRules() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-        <div className="relative overflow-hidden">
+    <main className="min-h-[calc(100vh-4rem)] min-w-0 w-full overflow-x-hidden bg-background py-2 sm:py-4">
+      <section className="w-full min-w-0 max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
+        <div className="relative min-w-0 overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-50/50 via-transparent to-blue-50/50 dark:from-cyan-950/20 dark:via-transparent dark:to-blue-950/20" />
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-lg">
-                    <ClipboardCheck className="h-6 w-6 text-white" />
+          <div className="relative min-w-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-6 min-w-0">
+              <div className="space-y-2 sm:space-y-3 min-w-0 flex-1">
+                <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0">
+                  <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-lg shrink-0">
+                    <ClipboardCheck className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
                       Common CODO
                     </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full mt-2" />
+                    <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full mt-2" />
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl break-words">
                   Shared production standards for developers, QA, and projects.
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto min-w-0">
                 <Button
                   variant="outline"
                   size="lg"
                   onClick={handleDownloadPdf}
                   disabled={isDownloadingReport || pdfRules.length === 0}
-                  className="h-12 px-6 border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 font-semibold"
+                  className="h-11 sm:h-12 w-full sm:w-auto px-4 sm:px-6 border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 font-semibold"
                 >
                   {isDownloadingReport ? (
                     <>
@@ -842,11 +843,11 @@ export default function CommonCodoRules() {
                     </>
                   )}
                 </Button>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 border border-cyan-200 dark:border-cyan-800 rounded-xl shadow-sm">
-                  <div className="p-1.5 bg-cyan-500 rounded-lg">
+                <div className="flex items-center justify-center gap-3 px-4 py-2.5 sm:py-3 bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 border border-cyan-200 dark:border-cyan-800 rounded-xl shadow-sm w-full sm:w-auto">
+                  <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
                     <ClipboardCheck className="h-5 w-5 text-white" />
                   </div>
-                  <div className="text-2xl font-bold text-cyan-700 dark:text-cyan-300">
+                  <div className="text-2xl font-bold text-cyan-700 dark:text-cyan-300 tabular-nums">
                     {counts.all}
                   </div>
                 </div>
@@ -854,7 +855,7 @@ export default function CommonCodoRules() {
                   type="button"
                   size="lg"
                   onClick={openCreate}
-                  className="h-12 px-6 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg"
+                  className="h-11 sm:h-12 w-full sm:w-auto px-4 sm:px-6 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold shadow-lg"
                 >
                   <Plus className="mr-2 h-5 w-5" />
                   Add rule
@@ -867,34 +868,34 @@ export default function CommonCodoRules() {
         <Tabs
           value={activeTab}
           onValueChange={(val) => setTab(val as TabKey)}
-          className="w-full"
+          className="w-full min-w-0"
         >
-          <div className="relative">
+          <div className="relative min-w-0">
             <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-cyan-50/50 dark:from-gray-800/50 dark:to-cyan-900/50 rounded-2xl" />
-            <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <div className="lg:hidden p-1">
+            <div className="relative min-w-0 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
+              <div className="lg:hidden p-1 min-w-0">
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-12 rounded-2xl justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
+                  className="w-full h-12 rounded-2xl justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70 min-w-0"
                   onClick={() => setIsMobileTabSelectorOpen(true)}
                 >
-                  <span className="flex items-center gap-2 text-sm font-semibold">
+                  <span className="flex items-center gap-2 text-sm font-semibold min-w-0 truncate">
                     {activeCodoTab?.icon && (
-                      <activeCodoTab.icon className="h-4 w-4" />
+                      <activeCodoTab.icon className="h-4 w-4 shrink-0" />
                     )}
-                    {activeCodoTab?.label}
+                    <span className="truncate">{activeCodoTab?.label}</span>
                   </span>
-                  <ChevronDown className="h-4 w-4 opacity-70" />
+                  <ChevronDown className="h-4 w-4 opacity-70 shrink-0" />
                 </Button>
               </div>
 
-              <TabsList className="hidden lg:grid w-full grid-cols-5 h-14 bg-transparent p-1 gap-1">
+              <TabsList className="hidden lg:grid w-full grid-cols-5 h-14 bg-transparent p-1 gap-1 min-w-0">
                 {codoTabs.map((tab) => (
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="min-w-0 px-1.5 sm:px-2 text-xs sm:text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 flex items-center justify-center gap-1"
+                    className="min-w-0 px-1.5 sm:px-2 text-xs sm:text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 flex items-center justify-center gap-1 overflow-hidden"
                   >
                     <tab.icon className="h-4 w-4 shrink-0" />
                     <span className="hidden xl:inline truncate">{tab.label}</span>
@@ -973,23 +974,23 @@ export default function CommonCodoRules() {
             </DrawerContent>
           </Drawer>
 
-          <TabsContent value={activeTab} className="space-y-6 sm:space-y-8 mt-6">
+          <TabsContent value={activeTab} className="space-y-4 sm:space-y-6 md:space-y-8 mt-4 sm:mt-6 min-w-0 w-full overflow-x-hidden">
             {!loading && (
-              <div className="relative">
+              <div className="relative min-w-0">
                 <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-cyan-50/30 dark:from-gray-800/30 dark:to-cyan-900/30 rounded-2xl" />
-                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="p-1.5 bg-cyan-500 rounded-lg">
+                <div className="relative min-w-0 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6">
+                  <div className="space-y-4 min-w-0">
+                    <div className="flex items-center gap-2 mb-2 min-w-0">
+                      <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
                         <Search className="h-4 w-4 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
                         Search & Filter
                       </h3>
                     </div>
-                    <div className="flex flex-col md:flex-row gap-4">
-                      <div className="flex-1 relative group">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-cyan-500 transition-colors" />
+                    <div className="flex flex-col md:flex-row gap-3 sm:gap-4 min-w-0">
+                      <div className="flex-1 relative group min-w-0">
+                        <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-cyan-500 transition-colors pointer-events-none" />
                         <input
                           type="text"
                           placeholder={
@@ -999,7 +1000,7 @@ export default function CommonCodoRules() {
                           }
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                          className="w-full min-w-0 max-w-full pl-10 sm:pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                         />
                       </div>
                       {search ? (
@@ -1007,7 +1008,7 @@ export default function CommonCodoRules() {
                           variant="outline"
                           size="sm"
                           onClick={() => setSearch('')}
-                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                          className="h-11 px-4 w-full md:w-auto bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                         >
                           Clear
                         </Button>
@@ -1031,9 +1032,9 @@ export default function CommonCodoRules() {
                 search={search}
               />
             ) : listFiltered.length === 0 ? (
-              <div className="relative overflow-hidden">
+              <div className="relative overflow-hidden min-w-0 rounded-2xl">
                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/50 via-blue-50/30 to-indigo-50/50 dark:from-cyan-950/20 dark:via-blue-950/10 dark:to-indigo-950/20 rounded-2xl" />
-                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-10 sm:p-12 text-center">
+                <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-10 md:p-12 text-center">
                   <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
                     <ClipboardCheck className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
                   </div>
@@ -1056,7 +1057,7 @@ export default function CommonCodoRules() {
                 </div>
               </div>
             ) : (
-              <div className="grid gap-4 grid-cols-1" aria-label="CODO rules list">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 min-w-0" aria-label="CODO rules list">
                 {listFiltered.map((rule) => renderRuleCard(rule))}
               </div>
             )}
@@ -1074,7 +1075,7 @@ export default function CommonCodoRules() {
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <AlertDialogContent className="rounded-2xl">
+        <AlertDialogContent className="rounded-2xl w-[calc(100%-1.5rem)] max-w-lg mx-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete CODO rule?</AlertDialogTitle>
             <AlertDialogDescription>

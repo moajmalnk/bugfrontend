@@ -171,21 +171,21 @@ export function CodoAnalyticsPanel({ rules, canViewDetails, search = '' }: Props
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-5 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg">
+    <div className="space-y-4 sm:space-y-6 min-w-0 w-full overflow-x-hidden">
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-4 sm:p-6 min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shrink-0">
               <BarChart3 className="h-5 w-5" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">CODO Analytics</h2>
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">CODO Analytics</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Response overview across all rules
               </p>
             </div>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50/80 dark:bg-cyan-950/30 px-4 py-2">
+          <div className="inline-flex items-center gap-2 rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50/80 dark:bg-cyan-950/30 px-4 py-2 w-full sm:w-auto justify-between sm:justify-center">
             <span className="text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300">
               Completion
             </span>
@@ -202,21 +202,21 @@ export function CodoAnalyticsPanel({ rules, canViewDetails, search = '' }: Props
           />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3 min-w-0">
           {summaryCards.map((card) => (
             <div
               key={card.label}
-              className="rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-gray-50/60 dark:bg-gray-800/40 p-3.5"
+              className="rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-gray-50/60 dark:bg-gray-800/40 p-3 sm:p-3.5 min-w-0"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <div className={cn('p-1.5 rounded-lg bg-gradient-to-br text-white', card.className)}>
+              <div className="flex items-center gap-2 mb-2 min-w-0">
+                <div className={cn('p-1.5 rounded-lg bg-gradient-to-br text-white shrink-0', card.className)}>
                   <card.icon className="h-3.5 w-3.5" />
                 </div>
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 truncate">
                   {card.label}
                 </span>
               </div>
-              <p className={cn('text-xl font-bold tabular-nums', card.chip.split(' ').slice(-2).join(' '))}>
+              <p className={cn('text-lg sm:text-xl font-bold tabular-nums', card.chip.split(' ').slice(-2).join(' '))}>
                 {card.value}
               </p>
             </div>

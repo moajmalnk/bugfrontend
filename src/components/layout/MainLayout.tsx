@@ -184,7 +184,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               className={cn(
                 isMessagesPage
                   ? "flex-1 flex flex-col min-h-0 p-0 overflow-hidden"
-                  : "h-full p-4 md:p-6 lg:p-8"
+                  : "h-full min-w-0 w-full p-4 md:p-6 lg:p-8 overflow-x-hidden"
               )}
             >
               {isMessagesPage ? (
@@ -193,8 +193,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 </div>
               ) : (
                 <>
-                  <div className="max-w-7xl mx-auto">{children}</div>
-                  <footer className="max-w-7xl mx-auto mt-8 mb-8 border-t pt-4 pb-3">
+                  <div className="max-w-7xl mx-auto w-full min-w-0">{children}</div>
+                  <footer className="max-w-7xl mx-auto w-full min-w-0 mt-8 mb-8 border-t pt-4 pb-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3 text-xs text-muted-foreground">
                       <p className="order-2 sm:order-none justify-self-center sm:justify-self-start text-center sm:text-left">© {new Date().getFullYear()} BugRicer. All rights reserved.</p>
                       <div className="order-3 sm:order-none justify-self-center flex items-center gap-3 flex-wrap justify-center">

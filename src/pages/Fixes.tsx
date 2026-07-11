@@ -413,7 +413,7 @@ const Fixes = () => {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
                 </div>
                 
-                <div className="flex flex-col xl:flex-row gap-4">
+                <div className="flex flex-col md:flex-row gap-4">
                   {/* Search Bar */}
                   <div className="flex-1 relative group">
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -427,14 +427,14 @@ const Fixes = () => {
                   </div>
 
                   {/* Filter Controls */}
-                  <div className="flex flex-wrap gap-3 w-full xl:w-auto xl:shrink-0">
+                  <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
                     {/* Priority Filter */}
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
                         <Filter className="h-4 w-4 text-white" />
                       </div>
                       <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                           <SelectValue placeholder="Priority" />
                         </SelectTrigger>
                         <SelectContent position="popper" className="z-[60]">
@@ -452,7 +452,7 @@ const Fixes = () => {
                         <FolderOpen className="h-4 w-4 text-white" />
                       </div>
                       <Select value={projectFilter} onValueChange={setProjectFilter}>
-                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                           <SelectValue placeholder="Project" />
                         </SelectTrigger>
                         <SelectContent position="popper" className="z-[60]">
@@ -527,7 +527,7 @@ const Fixes = () => {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
                 </div>
                 
-                <div className="flex flex-col xl:flex-row gap-4">
+                <div className="flex flex-col md:flex-row gap-4">
                   {/* Search Bar */}
                   <div className="flex-1 relative group">
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -541,14 +541,14 @@ const Fixes = () => {
                   </div>
 
                   {/* Filter Controls */}
-                  <div className="flex flex-wrap gap-3 w-full xl:w-auto xl:shrink-0">
+                  <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
                     {/* Priority Filter */}
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
                         <Filter className="h-4 w-4 text-white" />
                       </div>
                       <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                           <SelectValue placeholder="Priority" />
                         </SelectTrigger>
                         <SelectContent position="popper" className="z-[60]">
@@ -566,7 +566,7 @@ const Fixes = () => {
                         <FolderOpen className="h-4 w-4 text-white" />
                       </div>
                       <Select value={projectFilter} onValueChange={setProjectFilter}>
-                        <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                           <SelectValue placeholder="Project" />
                         </SelectTrigger>
                         <SelectContent position="popper" className="z-[60]">
@@ -650,7 +650,7 @@ const Fixes = () => {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
               </div>
               
-              <div className="flex flex-col xl:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
                 {/* Search Bar */}
                 <div className="flex-1 min-w-0 relative group">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -664,14 +664,14 @@ const Fixes = () => {
                 </div>
 
                 {/* Filter Controls */}
-                <div className="flex flex-wrap gap-3 w-full xl:w-auto xl:shrink-0">
+                <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
                   {/* Priority Filter */}
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
                       <Filter className="h-4 w-4 text-white" />
                     </div>
                     <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                      <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                      <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                         <SelectValue placeholder="Priority" />
                       </SelectTrigger>
                       <SelectContent position="popper" className="z-[60]">
@@ -689,7 +689,7 @@ const Fixes = () => {
                       <FolderOpen className="h-4 w-4 text-white" />
                     </div>
                     <Select value={projectFilter} onValueChange={setProjectFilter}>
-                      <SelectTrigger className="w-full sm:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                      <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                         <SelectValue placeholder="Project" />
                       </SelectTrigger>
                       <SelectContent position="popper" className="z-[60]">
