@@ -32,6 +32,8 @@ import {
   Signal,
   PlaneTakeoff,
   ClipboardCheck,
+  LayoutDashboard,
+  Clapperboard,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -167,6 +169,13 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
         <div className="space-y-6">
           {/* Main Navigation */}
           <div className="space-y-1">
+            {role === "admin" && (
+              <NavLink
+                to="/dashboard"
+                icon={<LayoutDashboard className="h-5 w-5" />}
+                label="Dashboard"
+              />
+            )}
             <NavLink
               to="/projects"
               icon={<FolderKanban className="h-5 w-5" />}
@@ -362,6 +371,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/push-coverage"
                       icon={<Signal className="h-5 w-5" />}
                       label="Push Coverage"
+                    />
+                  )}
+
+                  {role === "admin" && (
+                    <NavLink
+                      to="/shorts"
+                      icon={<Clapperboard className="h-5 w-5" />}
+                      label="Shorts"
                     />
                   )}
 

@@ -78,6 +78,13 @@ export interface UserActivitySnapshotWork {
 export interface UserActivitySnapshot {
   user: User;
   work: UserActivitySnapshotWork | null;
+  assigned_projects?: Array<{
+    id: string;
+    name: string;
+    member_role?: string | null;
+    is_active?: number | boolean | null;
+    status?: string | null;
+  }>;
   bugs: UserActivitySnapshotItem[];
   fixes: UserActivitySnapshotItem[];
   updates: UserActivitySnapshotItem[];
@@ -85,6 +92,7 @@ export interface UserActivitySnapshot {
     bugs: number;
     fixes: number;
     updates: number;
+    projects?: number;
   };
 }
 

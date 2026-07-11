@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CodoAnalyticsPanel, computeAnalyticsCompletion } from '@/components/codo/CodoAnalyticsPanel';
+import { CodoExportPanel } from '@/components/codo/CodoExportPanel';
 import { CodoRuleDialog } from '@/components/codo/CodoRuleDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -67,9 +68,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, parseISO, isValid } from 'date-fns';
 
-type TabKey = 'all' | CodoRulePhase | 'analytics';
+type TabKey = 'all' | CodoRulePhase | 'analytics' | 'export';
 
-const VALID_TABS: TabKey[] = ['all', 'developer', 'tester', 'project', 'analytics'];
+const VALID_TABS: TabKey[] = ['all', 'developer', 'tester', 'project', 'analytics', 'export'];
 
 const PHASE_META: Record<
   CodoRulePhase,
@@ -279,7 +280,7 @@ export default function CommonCodoRules() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rules.filter((r) => {
-      if (activeTab === 'analytics') return true;
+      if (activeTab === 'analytics' || activeTab === 'export') return true;
       if (activeTab !== 'all' && r.phase !== activeTab) return false;
       if (!q) return true;
       return (
@@ -292,14 +293,14 @@ export default function CommonCodoRules() {
   }, [rules, activeTab, search]);
 
   const listFiltered = useMemo(() => {
-    if (activeTab === 'analytics') return [];
+    if (activeTab === 'analytics' || activeTab === 'export') return [];
     return filtered;
   }, [filtered, activeTab]);
 
   const analyticsCompletion = useMemo(() => computeAnalyticsCompletion(rules), [rules]);
 
   const pdfRules = useMemo(() => {
-    if (activeTab === 'analytics') return rules;
+    if (activeTab === 'analytics' || activeTab === 'export') return rules;
     return filtered;
   }, [activeTab, rules, filtered]);
 
@@ -472,12 +473,22 @@ export default function CommonCodoRules() {
       countClass:
         'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
     },
+    {
+      value: 'export' as TabKey,
+      label: 'Export',
+      shortLabel: 'Export',
+      icon: Download,
+      count: String(counts.all),
+      countClass:
+        'bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-300',
+    },
   ];
   const activeCodoTab = codoTabs.find((t) => t.value === activeTab) ?? codoTabs[0];
 
   const defaultPhase: CodoRulePhase =
     activeTab === 'tester' || activeTab === 'project' ? activeTab : 'developer';
   const isAnalytics = activeTab === 'analytics';
+  const isExport = activeTab === 'export';
 
   const renderRuleCard = (rule: CodoCommonRule) => {
     const meta = PHASE_META[rule.phase];
@@ -890,12 +901,12 @@ export default function CommonCodoRules() {
                 </Button>
               </div>
 
-              <TabsList className="hidden lg:grid w-full grid-cols-5 h-14 bg-transparent p-1 gap-1 min-w-0">
+              <TabsList className="hidden lg:grid w-full grid-cols-12 h-14 bg-transparent p-1 gap-1 min-w-0">
                 {codoTabs.map((tab) => (
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="min-w-0 px-1.5 sm:px-2 text-xs sm:text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 flex items-center justify-center gap-1 overflow-hidden"
+                    className="col-span-2 min-w-0 px-1.5 sm:px-2 text-xs sm:text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 flex items-center justify-center gap-1 overflow-hidden"
                   >
                     <tab.icon className="h-4 w-4 shrink-0" />
                     <span className="hidden xl:inline truncate">{tab.label}</span>
@@ -921,7 +932,11 @@ export default function CommonCodoRules() {
                   Select Section
                 </DrawerTitle>
                 <DrawerDescription>
-                  {isAnalytics ? 'Open analytics or filter by phase' : 'Filter CODO rules by phase'}
+                  {isAnalytics
+                    ? 'Open analytics or filter by phase'
+                    : isExport
+                      ? 'Export rules for Cursor, Antigravity, Android Studio, and other agents'
+                      : 'Filter CODO rules by phase'}
                 </DrawerDescription>
               </DrawerHeader>
               <div className="px-4 pb-6 space-y-3 max-h-[65vh] overflow-y-auto">
@@ -996,7 +1011,9 @@ export default function CommonCodoRules() {
                           placeholder={
                             isAnalytics
                               ? 'Search analytics by rule title or key…'
-                              : 'Search rules by title, description, or key…'
+                              : isExport
+                                ? 'Search rules to include in export…'
+                                : 'Search rules by title, description, or key…'
                           }
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
@@ -1031,6 +1048,8 @@ export default function CommonCodoRules() {
                 canViewDetails={canViewAckDetails}
                 search={search}
               />
+            ) : isExport ? (
+              <CodoExportPanel rules={rules} search={search} />
             ) : listFiltered.length === 0 ? (
               <div className="relative overflow-hidden min-w-0 rounded-2xl">
                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/50 via-blue-50/30 to-indigo-50/50 dark:from-cyan-950/20 dark:via-blue-950/10 dark:to-indigo-950/20 rounded-2xl" />

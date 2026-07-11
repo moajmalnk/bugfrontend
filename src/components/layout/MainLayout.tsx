@@ -17,6 +17,7 @@ import { NotificationPopover } from "@/components/notifications/NotificationPopo
 import { GlobalSearchProvider, useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
 import { AdminActiveUsersStrip } from "@/components/users/AdminActiveUsersStrip";
+import { AdminShortsStrip } from "@/components/shorts/AdminShortsStrip";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -89,6 +90,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const { pathname } = useLocation();
   /** BugMessage: fill viewport; scroll only inside chat panes (not the app shell). */
   const isMessagesPage = /\/messages\/?$/.test(pathname);
+  const isUsersListPage = /\/users\/?$/.test(pathname);
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(
@@ -172,7 +174,12 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           {/* Top bar with menu button on mobile/tablet */}
           <MobileTopBar onOpenSidebar={() => setSidebarOpen(true)} />
 
-          {getEffectiveRole(currentUser) === "admin" ? <AdminActiveUsersStrip /> : null}
+          {getEffectiveRole(currentUser) === "admin" && !isUsersListPage ? (
+            <AdminShortsStrip />
+          ) : null}
+          {getEffectiveRole(currentUser) === "admin" && isUsersListPage ? (
+            <AdminActiveUsersStrip />
+          ) : null}
           
           {/* Main content area */}
           <main

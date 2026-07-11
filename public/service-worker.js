@@ -151,7 +151,7 @@ self.addEventListener('notificationclick', function (event) {
 
 // Stable per deploy — must NOT use new Date() here (causes endless SW updates + page reload loops).
 // Keep in sync with public/version.json when you bump releases.
-const APP_CACHE_VERSION = '1.0.13';
+const APP_CACHE_VERSION = '1.0.16';
 const CACHE_SUFFIX = APP_CACHE_VERSION.replace(/[^a-zA-Z0-9._-]/g, '-');
 const CACHE_NAME = `bugricer-v${CACHE_SUFFIX}`;
 const STATIC_CACHE = `bugricer-static-v${CACHE_SUFFIX}`;
@@ -200,13 +200,40 @@ const EXCLUDE_FROM_CACHE = [
   '.hot-update.',
   '/assets/',
   'accounts.google.com', // Never cache Google OAuth requests
+  // Third-party players / CDNs — SW must not re-fetch these (CORS / status 0)
+  'youtube.com',
+  'youtube-nocookie.com',
+  'youtu.be',
+  'ytimg.com',
+  'googlevideo.com',
+  'ggpht.com',
+  'instagram.com',
+  'cdninstagram.com',
+  'facebook.com',
+  'fbcdn.net',
 ];
+
+/**
+ * Only same-origin app traffic should be handled by this SW.
+ * Cross-origin scripts (YouTube iframe_api, widgetapi, etc.) must bypass entirely.
+ */
+function isSameOriginRequest(request) {
+  try {
+    return new URL(request.url).origin === self.location.origin;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Check if URL should be cached
  * Professional filtering to prevent caching issues
  */
 function shouldCache(request) {
+  if (!isSameOriginRequest(request)) {
+    return false;
+  }
+
   const urlString = request.url;
   const url = new URL(urlString);
 
@@ -320,6 +347,11 @@ self.addEventListener('activate', event => {
 
 // Fetch event - Professional caching strategies
 self.addEventListener('fetch', event => {
+  // Never intercept cross-origin traffic (YouTube, social embeds, CDNs, etc.)
+  if (!isSameOriginRequest(event.request)) {
+    return;
+  }
+
   // Skip non-cacheable requests early
   if (!shouldCache(event.request)) {
     // Let the request pass through without SW interference

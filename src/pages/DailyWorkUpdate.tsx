@@ -588,8 +588,23 @@ export function DailyWorkFlowPanel({
       }
 
       const cleanedNotes = parseBreakLinesFromNotes(form.notes || '').cleanNotes;
+      // Always send check-in explicitly so WhatsApp/email can show it even if DB value is missing.
+      let checkInForPayload: string | undefined = form.check_in_time || undefined;
+      let startTimeForPayload: string | undefined = form.start_time || undefined;
+      if (checkInForPayload && !startTimeForPayload) {
+        try {
+          const d = new Date(checkInForPayload);
+          if (!Number.isNaN(d.getTime())) {
+            startTimeForPayload = d.toTimeString().slice(0, 8);
+          }
+        } catch {
+          /* keep undefined */
+        }
+      }
       const payload: any = {
         ...form,
+        check_in_time: checkInForPayload,
+        start_time: startTimeForPayload,
         notes: `${cleanedNotes}${noteParts.join('\n')}`.trim(),
         requested_extra_hours: requestAdminApproval ? requestedExtraHours : 0,
         approval_reason: requestAdminApproval ? approvalReason.trim() : '',

@@ -207,6 +207,22 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
 
   // —— Administration (admin role) ——
   {
+    id: "page-admin-dashboard",
+    label: "Ops Dashboard",
+    path: "/dashboard",
+    keywords: [
+      "dashboard",
+      "ops",
+      "deadlines",
+      "tracking",
+      "overview",
+      "project health",
+      "admin home",
+    ],
+    adminOnly: true,
+    subtitle: "Administration",
+  },
+  {
     id: "page-users",
     label: "Users",
     path: "/users",

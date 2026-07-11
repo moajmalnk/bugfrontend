@@ -1,6 +1,8 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -24,10 +26,12 @@ import {
   CheckCircle2,
   ClipboardList,
   ExternalLink,
+  FolderKanban,
   Loader2,
+  X,
   Wrench,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 interface ActiveUserActivityDialogProps {
   user: User | null;
@@ -45,7 +49,7 @@ function PresenceBadge({ status }: { status?: User["status"] }) {
         : "bg-muted-foreground/50";
 
   return (
-    <Badge variant="secondary" className="gap-1.5 font-normal">
+    <Badge variant="secondary" className="gap-1.5 rounded-full px-2.5 font-normal">
       <span className={cn("h-1.5 w-1.5 rounded-full", color, status === "active" && "animate-pulse")} />
       {label}
     </Badge>
@@ -54,7 +58,7 @@ function PresenceBadge({ status }: { status?: User["status"] }) {
 
 function RoleBadge({ role }: { role?: string }) {
   return (
-    <Badge variant="outline" className="capitalize font-normal">
+    <Badge variant="outline" className="rounded-full capitalize font-normal">
       {role || "user"}
     </Badge>
   );
@@ -62,9 +66,9 @@ function RoleBadge({ role }: { role?: string }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
-      <ClipboardList className="mb-2 h-8 w-8 opacity-40" />
-      <p className="text-sm">{message}</p>
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/10 py-12 text-center text-muted-foreground">
+      <ClipboardList className="mb-3 h-8 w-8 opacity-35" />
+      <p className="max-w-xs text-sm leading-relaxed">{message}</p>
     </div>
   );
 }
@@ -72,13 +76,15 @@ function EmptyState({ message }: { message: string }) {
 function TaskSection({ title, items }: { title: string; items: string[] }) {
   if (!items.length) return null;
   return (
-    <div className="space-y-2">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h4>
-      <ul className="space-y-1.5">
+    <div className="space-y-2.5">
+      <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        {title}
+      </h4>
+      <ul className="space-y-2">
         {items.map((item, idx) => (
           <li
             key={`${title}-${idx}`}
-            className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-foreground"
+            className="rounded-xl border border-border/50 bg-muted/20 px-3.5 py-2.5 text-sm leading-relaxed text-foreground"
           >
             {item}
           </li>
@@ -92,29 +98,32 @@ function ActivityListItem({
   item,
   href,
   meta,
+  onNavigate,
 }: {
   item: UserActivitySnapshotItem;
   href: string;
   meta?: string;
+  onNavigate: (href: string) => void;
 }) {
   return (
-    <Link
-      to={href}
-      className="group flex items-start gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent/40"
+    <button
+      type="button"
+      onClick={() => onNavigate(href)}
+      className="group flex w-full items-start gap-3 rounded-xl border border-border/50 bg-card/60 px-3.5 py-3 text-left transition-colors hover:border-border hover:bg-accent/30"
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
           {item.title}
         </p>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {item.project_name ? <span className="truncate">{item.project_name}</span> : null}
           {item.status ? (
-            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] capitalize">
+            <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px] capitalize">
               {item.status.replace(/_/g, " ")}
             </Badge>
           ) : null}
           {item.priority ? (
-            <Badge variant="outline" className="h-5 px-1.5 text-[10px] capitalize">
+            <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] capitalize">
               {item.priority}
             </Badge>
           ) : null}
@@ -122,7 +131,7 @@ function ActivityListItem({
         </div>
       </div>
       <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-    </Link>
+    </button>
   );
 }
 
@@ -139,6 +148,7 @@ export function ActiveUserActivityDialog({
   onOpenChange,
 }: ActiveUserActivityDialogProps) {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const rolePath = getEffectiveRole(currentUser || { role: "admin" });
 
   const { data, isLoading, error } = useQuery<UserActivitySnapshot>({
@@ -157,30 +167,66 @@ export function ActiveUserActivityDialog({
 
   const work = data?.work;
   const counts = data?.counts;
+  const assignedProjects = data?.assigned_projects || [];
+  const todayProjectNames = work?.project_names || [];
+
+  const navigateAndClose = (href: string) => {
+    onOpenChange(false);
+    navigate(href);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0 space-y-3 border-b px-6 pb-4 pt-6 text-left">
-          <div className="flex items-start gap-3">
-            <img
-              src={avatar}
-              alt={snapshotUser?.username || "User"}
-              className="h-12 w-12 rounded-full border object-cover"
-            />
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[88vh] max-w-2xl flex-col gap-0 overflow-hidden border-border/60 bg-background p-0 shadow-2xl sm:max-w-2xl sm:rounded-2xl"
+      >
+        <DialogHeader className="relative shrink-0 space-y-4 border-b border-border/50 bg-gradient-to-b from-muted/30 to-transparent px-5 pb-4 pt-5 text-left sm:px-6 sm:pt-6">
+          <div className="flex items-start gap-3.5 pr-12">
+            <div className="relative shrink-0">
+              <img
+                src={avatar}
+                alt={snapshotUser?.username || "User"}
+                className="h-14 w-14 rounded-full border border-border/60 object-cover shadow-sm"
+              />
+              <span
+                className={cn(
+                  "absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-background",
+                  snapshotUser?.status === "active"
+                    ? "bg-emerald-500"
+                    : snapshotUser?.status === "idle"
+                      ? "bg-amber-500"
+                      : "bg-muted-foreground/60"
+                )}
+                aria-hidden
+              />
+            </div>
+
             <div className="min-w-0 flex-1">
-              <DialogTitle className="truncate text-lg">
+              <DialogTitle className="truncate text-xl font-semibold tracking-tight">
                 {snapshotUser?.username || snapshotUser?.name || "User"}
               </DialogTitle>
-              <DialogDescription className="mt-1 truncate">
+              <DialogDescription className="mt-1 truncate text-sm">
                 {snapshotUser?.email || "Team member activity for today"}
               </DialogDescription>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 <RoleBadge role={snapshotUser?.role} />
                 <PresenceBadge status={snapshotUser?.status || user?.status} />
               </div>
             </div>
           </div>
+
+          <DialogClose asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-3 top-3 h-9 w-9 rounded-full border border-border/60 bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-accent hover:text-foreground sm:right-4 sm:top-4"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogClose>
 
           <ActiveTodayWorkSummary
             checkInTime={work?.check_in_time ?? user?.check_in_time}
@@ -190,81 +236,119 @@ export function ActiveUserActivityDialog({
           />
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
           {isLoading ? (
-            <div className="space-y-3 py-2">
+            <div className="space-y-3 py-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading activity…
               </div>
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-11 w-full rounded-xl" />
+              <Skeleton className="h-28 w-full rounded-xl" />
+              <Skeleton className="h-20 w-full rounded-xl" />
             </div>
           ) : error ? (
             <EmptyState message={error instanceof Error ? error.message : "Failed to load activity"} />
           ) : (
             <Tabs defaultValue="work" className="w-full">
-              <TabsList className="mb-4 grid h-auto w-full grid-cols-4">
-                <TabsTrigger value="work" className="gap-1 text-xs sm:text-sm">
+              <TabsList className="mb-5 grid h-11 w-full grid-cols-4 rounded-xl bg-muted/50 p-1">
+                <TabsTrigger value="work" className="rounded-lg text-xs sm:text-sm">
                   Work
                 </TabsTrigger>
-                <TabsTrigger value="bugs" className="gap-1 text-xs sm:text-sm">
+                <TabsTrigger value="bugs" className="gap-1.5 rounded-lg text-xs sm:text-sm">
                   <Bug className="hidden h-3.5 w-3.5 sm:inline" />
                   Bugs
                   {typeof counts?.bugs === "number" ? (
-                    <span className="text-muted-foreground">({counts.bugs})</span>
+                    <span className="tabular-nums text-muted-foreground">{counts.bugs}</span>
                   ) : null}
                 </TabsTrigger>
-                <TabsTrigger value="fixes" className="gap-1 text-xs sm:text-sm">
+                <TabsTrigger value="fixes" className="gap-1.5 rounded-lg text-xs sm:text-sm">
                   <Wrench className="hidden h-3.5 w-3.5 sm:inline" />
                   Fixes
                   {typeof counts?.fixes === "number" ? (
-                    <span className="text-muted-foreground">({counts.fixes})</span>
+                    <span className="tabular-nums text-muted-foreground">{counts.fixes}</span>
                   ) : null}
                 </TabsTrigger>
-                <TabsTrigger value="updates" className="gap-1 text-xs sm:text-sm">
+                <TabsTrigger value="updates" className="gap-1.5 rounded-lg text-xs sm:text-sm">
                   <CheckCircle2 className="hidden h-3.5 w-3.5 sm:inline" />
                   Updates
                   {typeof counts?.updates === "number" ? (
-                    <span className="text-muted-foreground">({counts.updates})</span>
+                    <span className="tabular-nums text-muted-foreground">{counts.updates}</span>
                   ) : null}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="work" className="mt-0 space-y-4">
+                {assignedProjects.length > 0 ? (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                      <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                        Assigned projects
+                      </h4>
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                        ({assignedProjects.length})
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {assignedProjects.map((project) => (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => navigateAndClose(`/${rolePath}/projects/${project.id}`)}
+                          className="inline-flex"
+                        >
+                          <Badge
+                            variant="outline"
+                            className="rounded-full border-border/70 px-2.5 py-1 font-normal transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
+                          >
+                            {project.name}
+                          </Badge>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 {!work ? (
                   <EmptyState message="No work submission for today yet." />
                 ) : (
                   <>
                     {work.planned_work ? (
-                      <div className="space-y-1.5 rounded-lg border bg-muted/20 p-3">
+                      <div className="space-y-2.5 rounded-2xl border border-border/50 bg-gradient-to-br from-muted/40 to-muted/10 p-4">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                             Planned work
                           </h4>
                           {work.planned_work_status ? (
-                            <Badge variant="secondary" className="h-5 capitalize">
+                            <Badge variant="secondary" className="h-5 rounded-full capitalize">
                               {work.planned_work_status.replace(/_/g, " ")}
                             </Badge>
                           ) : null}
                         </div>
-                        <p className="whitespace-pre-wrap text-sm">{work.planned_work}</p>
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                          {work.planned_work}
+                        </p>
                         {work.planned_work_notes ? (
-                          <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                          <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
                             {work.planned_work_notes}
                           </p>
                         ) : null}
                       </div>
                     ) : null}
 
-                    {work.project_names && work.project_names.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {work.project_names.map((name) => (
-                          <Badge key={name} variant="outline">
-                            {name}
-                          </Badge>
-                        ))}
+                    {todayProjectNames.length > 0 ? (
+                      <div className="space-y-2.5">
+                        <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                          Today&apos;s planned projects
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {todayProjectNames.map((name) => (
+                            <Badge key={name} variant="secondary" className="rounded-full font-normal">
+                              {name}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     ) : null}
 
@@ -274,18 +358,21 @@ export function ActiveUserActivityDialog({
                     <TaskSection title="Notes / upcoming" items={work.tasks?.upcoming || []} />
 
                     {work.project_updates && work.project_updates.length > 0 ? (
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <div className="space-y-2.5">
+                        <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                           Project updates
                         </h4>
                         {work.project_updates.map((pu, idx) => (
-                          <div key={idx} className="rounded-md border px-3 py-2 text-sm">
+                          <div
+                            key={idx}
+                            className="rounded-xl border border-border/50 bg-muted/15 px-3.5 py-3 text-sm"
+                          >
                             {pu.project_name ? (
-                              <p className="mb-1 text-xs font-medium text-muted-foreground">
+                              <p className="mb-1.5 text-xs font-medium text-muted-foreground">
                                 {pu.project_name}
                               </p>
                             ) : null}
-                            <p className="whitespace-pre-wrap">{pu.update || "—"}</p>
+                            <p className="whitespace-pre-wrap leading-relaxed">{pu.update || "—"}</p>
                           </div>
                         ))}
                       </div>
@@ -303,7 +390,7 @@ export function ActiveUserActivityDialog({
                 )}
               </TabsContent>
 
-              <TabsContent value="bugs" className="mt-0 space-y-2">
+              <TabsContent value="bugs" className="mt-0 space-y-2.5">
                 {(data?.bugs || []).length === 0 ? (
                   <EmptyState message="No bugs raised by this user." />
                 ) : (
@@ -313,12 +400,13 @@ export function ActiveUserActivityDialog({
                       item={bug}
                       href={`/${rolePath}/bugs/${bug.id}`}
                       meta={formatRelative(bug.created_at)}
+                      onNavigate={navigateAndClose}
                     />
                   ))
                 )}
               </TabsContent>
 
-              <TabsContent value="fixes" className="mt-0 space-y-2">
+              <TabsContent value="fixes" className="mt-0 space-y-2.5">
                 {(data?.fixes || []).length === 0 ? (
                   <EmptyState message="No fixes recorded for this user." />
                 ) : (
@@ -328,12 +416,13 @@ export function ActiveUserActivityDialog({
                       item={fix}
                       href={`/${rolePath}/bugs/${fix.id}`}
                       meta={formatRelative(fix.updated_at || fix.created_at)}
+                      onNavigate={navigateAndClose}
                     />
                   ))
                 )}
               </TabsContent>
 
-              <TabsContent value="updates" className="mt-0 space-y-2">
+              <TabsContent value="updates" className="mt-0 space-y-2.5">
                 {(data?.updates || []).length === 0 ? (
                   <EmptyState message="No project updates authored by this user." />
                 ) : (
@@ -343,6 +432,7 @@ export function ActiveUserActivityDialog({
                       item={update}
                       href={`/${rolePath}/updates/${update.id}`}
                       meta={formatRelative(update.created_at)}
+                      onNavigate={navigateAndClose}
                     />
                   ))
                 )}

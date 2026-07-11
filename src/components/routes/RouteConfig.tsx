@@ -14,6 +14,7 @@ import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 import MeetLobby from "@/pages/MeetLobby";
 import MeetRoom from "@/pages/MeetRoom";
 import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
+import { getEffectiveRole } from "@/lib/utils";
 
 // Professional Skeleton Loading Component
 const SkeletonFallback = () => (
@@ -194,6 +195,18 @@ const Notifications = lazy(() => import("@/pages/Notifications"));
 const UserDetails = lazy(() => import("@/pages/UserDetails"));
 const UserWorkStatsPeriod = lazy(() => import("@/pages/UserWorkStatsPeriod"));
 const AdminPushCoverage = lazy(() => import("@/pages/AdminPushCoverage"));
+const Shorts = lazy(() => import("@/pages/Shorts"));
+const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
+
+/** Admin lands on ops dashboard; other roles keep projects as home. */
+const RoleHomeRedirect = () => {
+  const { currentUser } = useAuth();
+  const role = getEffectiveRole(currentUser || {});
+  if (role === "admin") {
+    return <Navigate to="dashboard" replace />;
+  }
+  return <Navigate to="projects" replace />;
+};
 
 // Component to handle role-neutral bug redirects
 const BugRedirect = () => {
@@ -318,6 +331,9 @@ const RouteConfig = () => {
       <Route path="/leave" element={<RolePathRedirect suffix="leave" />} />
       <Route path="/leave-requests" element={<RolePathRedirect suffix="leave-requests" />} />
       <Route path="/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
+      <Route path="/push-coverage" element={<RolePathRedirect suffix="push-coverage" />} />
+      <Route path="/shorts/:shortId" element={<RolePathRedirect suffix="shorts/:shortId" />} />
+      <Route path="/shorts" element={<RolePathRedirect suffix="shorts" />} />
       <Route path="/common-bugs" element={<RolePathRedirect suffix="common-bugs" />} />
       <Route path="/common-codo" element={<RolePathRedirect suffix="common-codo" />} />
       <Route path="/users/:userId" element={<RolePathRedirect suffix="users/:userId" />} />
@@ -331,6 +347,7 @@ const RouteConfig = () => {
       {/* Protected Routes with role prefix */}
       {isAuthenticated && role && (
         <Route path={`/${role}`} element={<ProtectedRoleLayout />}>
+          <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/new" element={<NewProject />} />
           <Route path="projects/:projectId/compliance" element={<ProjectCompliance />} />
@@ -381,10 +398,12 @@ const RouteConfig = () => {
           <Route path="bugsheets/project/:projectId" element={<ProjectDocumentsPage />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="push-coverage" element={<AdminPushCoverage />} />
+          <Route path="shorts/:shortId" element={<Shorts />} />
+          <Route path="shorts" element={<Shorts />} />
           <Route path="help" element={<HelpSupportRoute />} />
           <Route path="help/:articleId" element={<HelpArticleRoute />} />
-          {/* Redirect from /:role to /:role/projects */}
-          <Route index element={<Navigate to="projects" replace />} />
+          {/* Admin → ops dashboard; others → projects */}
+          <Route index element={<RoleHomeRedirect />} />
         </Route>
       )}
 

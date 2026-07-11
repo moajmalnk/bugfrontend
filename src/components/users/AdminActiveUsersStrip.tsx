@@ -37,37 +37,80 @@ function presenceSortRank(status?: User["status"]) {
   return 2;
 }
 
-function StatusCard({ user, onClick }: { user: User; onClick: () => void }) {
+function getUserDisplay(user: User) {
   const name = user.username || user.name || "User";
   const avatar =
     user.avatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff`;
-  const checkInLabel = formatCheckInTime(user.check_in_time);
+  return { name, avatar, checkInLabel: formatCheckInTime(user.check_in_time) };
+}
+
+/** Instagram-style circular story avatar — mobile only */
+function InstagramStoryAvatar({ user, onClick }: { user: User; onClick: () => void }) {
+  const { name, avatar, checkInLabel } = getUserDisplay(user);
+  const isLive = user.status === "active" || user.status === "idle";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-[4.5rem] shrink-0 flex-col items-center gap-1.5 outline-none"
+      aria-label={`View activity for ${name}`}
+    >
+      <div
+        className={cn(
+          "rounded-full p-[2.5px] transition-opacity group-hover:opacity-90",
+          isLive
+            ? "bg-gradient-to-tr from-amber-400 via-rose-500 to-violet-600"
+            : "bg-muted-foreground/35"
+        )}
+      >
+        <div className="rounded-full bg-background p-[2px]">
+          <img
+            src={avatar}
+            alt=""
+            className="h-[3.65rem] w-[3.65rem] rounded-full object-cover"
+          />
+        </div>
+      </div>
+      <div className="w-full min-w-0 text-center">
+        <p className="truncate text-[11px] font-medium leading-tight text-foreground">{name}</p>
+        {checkInLabel ? (
+          <p className="truncate text-[10px] leading-tight text-muted-foreground">{checkInLabel}</p>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
+/** WhatsApp-style tall status card — tablet & desktop */
+function WhatsAppStatusCard({ user, onClick }: { user: User; onClick: () => void }) {
+  const { name, avatar, checkInLabel } = getUserDisplay(user);
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "group relative flex h-40 w-[6.5rem] shrink-0 flex-col overflow-hidden rounded-2xl border border-border/60",
-        "bg-gradient-to-b from-primary/25 via-card to-card text-left shadow-sm outline-none",
-        "transition-[border-color,box-shadow,filter] hover:border-border hover:brightness-110",
-        "focus-visible:border-primary/50 focus-visible:ring-0"
+        "group relative flex h-[10.5rem] w-[6.75rem] shrink-0 flex-col overflow-hidden rounded-2xl border border-border/50",
+        "bg-gradient-to-b from-primary/20 via-card to-card text-left shadow-sm outline-none",
+        "transition-[border-color,filter] hover:border-border hover:brightness-[1.06]",
+        "focus-visible:border-primary/40"
       )}
       aria-label={`View activity for ${name}`}
     >
       <div
-        className="absolute inset-0 opacity-40"
+        className="absolute inset-0 opacity-35"
         style={{
           backgroundImage: `url(${avatar})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          filter: "blur(10px) saturate(1.1)",
-          transform: "scale(1.2)",
+          filter: "blur(12px) saturate(1.15)",
+          transform: "scale(1.25)",
         }}
         aria-hidden
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/40 to-background/90" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/45 to-background/95" />
 
       <div className="relative z-10 flex h-full flex-col p-2.5">
         <div
@@ -79,7 +122,7 @@ function StatusCard({ user, onClick }: { user: User; onClick: () => void }) {
           <img src={avatar} alt="" className="h-full w-full object-cover" />
         </div>
 
-        <div className="mt-auto min-w-0">
+        <div className="mt-auto min-w-0 space-y-0.5">
           <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-foreground">
             {name}
           </p>
@@ -146,9 +189,14 @@ export function AdminActiveUsersStrip() {
     return null;
   }
 
+  const openUser = (user: User) => {
+    setSelectedUser(user);
+    setDialogOpen(true);
+  };
+
   return (
     <>
-      <div className="shrink-0 border-b bg-background/95 px-3 py-2.5 backdrop-blur-sm md:px-4">
+      <div className="shrink-0 border-b border-border/50 bg-background/95 px-3 py-2.5 backdrop-blur-sm md:px-4 md:py-3">
 
         <Carousel
           setApi={setCarouselApi}
@@ -159,24 +207,26 @@ export function AdminActiveUsersStrip() {
           }}
           className="w-full"
         >
-          <CarouselContent className="-ml-2">
+          <CarouselContent className="-ml-2.5 md:-ml-3">
             {checkedInUsers.map((user) => (
-              <CarouselItem key={user.id} className="basis-auto pl-2">
-                <StatusCard
-                  user={user}
-                  onClick={() => {
-                    setSelectedUser(user);
-                    setDialogOpen(true);
-                  }}
-                />
+              <CarouselItem key={user.id} className="basis-auto pl-2.5 md:pl-3">
+                {/* Mobile: Instagram stories */}
+                <div className="md:hidden">
+                  <InstagramStoryAvatar user={user} onClick={() => openUser(user)} />
+                </div>
+                {/* Tablet & desktop: WhatsApp status cards */}
+                <div className="hidden md:block">
+                  <WhatsAppStatusCard user={user} onClick={() => openUser(user)} />
+                </div>
               </CarouselItem>
             ))}
           </CarouselContent>
+
           {canScrollPrev ? (
-            <CarouselPrevious className="left-0 hidden h-7 w-7 border bg-background/90 sm:flex" />
+            <CarouselPrevious className="left-0 hidden h-8 w-8 border bg-background/95 shadow-sm md:flex" />
           ) : null}
           {canScrollNext ? (
-            <CarouselNext className="right-0 hidden h-7 w-7 border bg-background/90 sm:flex" />
+            <CarouselNext className="right-0 hidden h-8 w-8 border bg-background/95 shadow-sm md:flex" />
           ) : null}
         </Carousel>
       </div>
