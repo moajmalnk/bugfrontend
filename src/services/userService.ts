@@ -33,6 +33,61 @@ interface UserStats {
   }>;
 }
 
+export interface UserActivitySnapshotItem {
+  id: string;
+  title: string;
+  status?: string;
+  priority?: string;
+  type?: string;
+  created_at?: string;
+  updated_at?: string;
+  project_id?: string;
+  project_name?: string | null;
+}
+
+export interface UserActivitySnapshotWork {
+  id?: number | null;
+  submission_date?: string | null;
+  check_in_time?: string | null;
+  checkout_time?: string | null;
+  hours_today?: number;
+  break_minutes?: number;
+  start_time?: string | null;
+  planned_work?: string | null;
+  planned_work_status?: string | null;
+  planned_work_notes?: string | null;
+  planned_projects?: string[];
+  project_names?: string[];
+  project_updates?: Array<{
+    project_id?: string;
+    project_name?: string | null;
+    update?: string;
+  }>;
+  completed_tasks?: string;
+  pending_tasks?: string;
+  ongoing_tasks?: string;
+  notes?: string;
+  tasks?: {
+    completed?: string[];
+    pending?: string[];
+    ongoing?: string[];
+    upcoming?: string[];
+  };
+}
+
+export interface UserActivitySnapshot {
+  user: User;
+  work: UserActivitySnapshotWork | null;
+  bugs: UserActivitySnapshotItem[];
+  fixes: UserActivitySnapshotItem[];
+  updates: UserActivitySnapshotItem[];
+  counts: {
+    bugs: number;
+    fixes: number;
+    updates: number;
+  };
+}
+
 class UserService {
   private baseUrl = `${ENV.API_URL}/users`;
 
@@ -196,6 +251,16 @@ class UserService {
       throw new Error(response.message || 'Failed to fetch active hours');
     }
     return response.data;
+  }
+
+  async getActivitySnapshot(userId: string): Promise<UserActivitySnapshot> {
+    const response = await this.fetchWithAuth(
+      `${this.baseUrl}/activity_snapshot.php?id=${encodeURIComponent(userId)}`
+    );
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch activity snapshot');
+    }
+    return response.data as UserActivitySnapshot;
   }
 
   async deleteUser(userId: string, force = false): Promise<boolean> {

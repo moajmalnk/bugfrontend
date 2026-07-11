@@ -6,7 +6,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Menu, Bug, Search, RefreshCw } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { cn, getEffectiveRole } from "@/lib/utils";
 import FirebaseListener from "../messaging/FirebaseListener";
 import AnnouncementPopup from "../ui/AnnouncementPopup";
 import { ImpersonateBanner } from "../ui/ImpersonateBanner";
@@ -16,6 +16,7 @@ import { BugBotFab } from "@/components/bugbot/BugBotFab";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
 import { GlobalSearchProvider, useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { GlobalSearchDialog } from "@/components/search/GlobalSearchDialog";
+import { AdminActiveUsersStrip } from "@/components/users/AdminActiveUsersStrip";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -170,6 +171,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         <div className={`flex-1 flex flex-col min-w-0 ${isImpersonating ? 'pt-16' : ''}`}>
           {/* Top bar with menu button on mobile/tablet */}
           <MobileTopBar onOpenSidebar={() => setSidebarOpen(true)} />
+
+          {getEffectiveRole(currentUser) === "admin" ? <AdminActiveUsersStrip /> : null}
           
           {/* Main content area */}
           <main
