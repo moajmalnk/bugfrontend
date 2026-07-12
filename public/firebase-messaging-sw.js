@@ -33,7 +33,7 @@ function resolveNotificationPayload(payload) {
     url: toAbsoluteUrl(data.click_action || data.url || '/notifications'),
     image: data.image || notification.image || '',
     icon: data.icon || toAbsoluteUrl('/notification-icon.png'),
-    badge: data.badge || toAbsoluteUrl('/notification-badge.png'),
+    badge: data.badge || toAbsoluteUrl('/notification-badge-96.png'),
     tag: data.tag || ('bugricer-' + (data.bug_id || data.notification_id || Date.now())),
     unreadCount: Number(data.unread_count || 0),
     bugId: data.bug_id || '',

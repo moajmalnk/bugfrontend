@@ -34,7 +34,7 @@ function fcmResolveNotificationPayload(payload) {
     url: fcmToAbsoluteUrl(data.click_action || data.url || '/notifications'),
     image: data.image || notification.image || '',
     icon: data.icon || fcmToAbsoluteUrl('/notification-icon.png'),
-    badge: data.badge || fcmToAbsoluteUrl('/notification-badge.png'),
+    badge: data.badge || fcmToAbsoluteUrl('/notification-badge-96.png'),
     tag: data.tag || ('bugricer-' + (data.bug_id || data.notification_id || Date.now())),
     unreadCount: Number(data.unread_count || 0),
     bugId: data.bug_id || '',
@@ -151,7 +151,7 @@ self.addEventListener('notificationclick', function (event) {
 
 // Stable per deploy — must NOT use new Date() here (causes endless SW updates + page reload loops).
 // Keep in sync with public/version.json when you bump releases.
-const APP_CACHE_VERSION = '1.0.16';
+const APP_CACHE_VERSION = '1.0.17';
 const CACHE_SUFFIX = APP_CACHE_VERSION.replace(/[^a-zA-Z0-9._-]/g, '-');
 const CACHE_NAME = `bugricer-v${CACHE_SUFFIX}`;
 const STATIC_CACHE = `bugricer-static-v${CACHE_SUFFIX}`;

@@ -111,7 +111,8 @@ class NotificationService {
 
     new Notification('BugRicer Notification Test', {
       body: 'This is a test notification from BugRicer',
-      icon: '/favicon.ico'
+      icon: '/notification-icon.png',
+      badge: '/notification-badge-96.png',
     });
 
     return true;
@@ -154,7 +155,8 @@ class NotificationService {
 
     new Notification(title, {
       body,
-      icon: '/favicon.ico',
+      icon: '/notification-icon.png',
+      badge: '/notification-badge-96.png',
       tag: `bug-${type}-${Date.now()}` // Prevents duplicate notifications
     });
 
