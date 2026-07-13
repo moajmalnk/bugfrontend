@@ -33,6 +33,12 @@ try {
   const buildCommand = PRODUCTION_BUILD ? 'npx vite build' : 'npx vite build --mode development';
   execSync(buildCommand, { stdio: 'inherit', cwd: path.join(__dirname, '..') });
   console.log('✅ Vite build completed\n');
+  try {
+    execSync('node scripts/patch-pwa-manifest.mjs', { stdio: 'inherit', cwd: path.join(__dirname, '..') });
+    console.log('✅ PWA manifest patched with absolute URLs\n');
+  } catch (error) {
+    console.warn('⚠️ PWA manifest patch failed:', error.message);
+  }
 } catch (error) {
   console.error('❌ Build failed:', error.message);
   process.exit(1);

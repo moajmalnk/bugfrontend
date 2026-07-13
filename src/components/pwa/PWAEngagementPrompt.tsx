@@ -599,11 +599,17 @@ export function PWAEngagementPrompt() {
                     </div>
                   )}
                   {isAndroidDevice() && (
-                    <p className="mt-3 text-xs text-slate-500 leading-relaxed">
-                      After installing on Android, share screenshots from WhatsApp, Gallery, or
-                      other apps directly to BugRicer — it will appear in your share menu and open
-                      Report Bug with attachments filled in.
-                    </p>
+                    <div className="mt-3 space-y-2 text-xs text-slate-500 leading-relaxed">
+                      <p>
+                        <strong className="text-slate-300">Share to BugRicer:</strong> install from{" "}
+                        <strong className="text-slate-300">Google Chrome</strong> (Menu → Install
+                        app). Samsung Internet / Firefox installs do not register in the share menu.
+                      </p>
+                      <p>
+                        After installing, share photos from WhatsApp or Gallery → BugRicer appears
+                        under Apps in the share sheet → Report Bug opens with attachments attached.
+                      </p>
+                    </div>
                   )}
                 </div>
               )}

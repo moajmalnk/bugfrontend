@@ -1,8 +1,22 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import fs from "fs";
 
 // https://vitejs.dev/config/
+function patchPwaManifestFile(manifestPath: string, origin: string) {
+  if (!fs.existsSync(manifestPath)) return;
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const base = `${origin}/`;
+  manifest.id = base;
+  manifest.start_url = base;
+  manifest.scope = base;
+  if (manifest.share_target) {
+    manifest.share_target.action = `${origin}/share-target`;
+  }
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiProxyTarget =
@@ -46,6 +60,14 @@ export default defineConfig(({ mode }) => {
       // Enable SWC optimizations
       plugins: [],
     }),
+    {
+      name: "patch-pwa-manifest",
+      closeBundle() {
+        const origin =
+          env.VITE_PWA_ORIGIN?.replace(/\/$/, "") || "https://bugs.bugricer.com";
+        patchPwaManifestFile(path.resolve(__dirname, "dist/manifest.json"), origin);
+      },
+    },
   ],
   resolve: {
     alias: {
