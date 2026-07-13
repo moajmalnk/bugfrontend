@@ -121,6 +121,7 @@ const NewBug = () => {
   const preSelectedProjectId = searchParams.get("projectId");
   const isSharedImport = searchParams.get("shared") === "1";
   const shareSessionId = searchParams.get("sid");
+  const shareErr = searchParams.get("shareErr");
   const { currentUser } = useAuth();
   const { addBug } = useBugs();
 
@@ -533,6 +534,17 @@ const NewBug = () => {
       cancelled = true;
     };
   }, [shareSessionId, isSharedImport]);
+
+  useEffect(() => {
+    if (shareErr !== "large") return;
+    toast({
+      title: "PDF too large for quick share",
+      description:
+        "Open BugRicer from your home screen first, then use Attach Files on Report Bug. Large PDFs work when the app is already installed and open.",
+      variant: "destructive",
+      duration: 8000,
+    });
+  }, [shareErr]);
 
   screenshotsRef.current = screenshots;
   filesRef.current = files;

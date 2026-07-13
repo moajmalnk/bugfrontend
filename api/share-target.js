@@ -9,7 +9,8 @@ export const config = {
   runtime: "edge",
 };
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB — Vercel edge/serverless body limit
+const SERVERLESS_SAFE_BYTES = 2 * 1024 * 1024;
 const DB_NAME = "bugricer-share-target";
 const DB_STORE = "pending";
 const DB_KEY = "current";
@@ -185,6 +186,11 @@ export default async function handler(request) {
 
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > SERVERLESS_SAFE_BYTES) {
+    return Response.redirect(`${origin}/bugs/new?shareErr=large`, 303);
   }
 
   try {
