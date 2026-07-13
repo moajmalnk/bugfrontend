@@ -151,7 +151,7 @@ self.addEventListener('notificationclick', function (event) {
 
 // Stable per deploy — must NOT use new Date() here (causes endless SW updates + page reload loops).
 // Keep in sync with public/version.json when you bump releases.
-const APP_CACHE_VERSION = '1.0.21';
+const APP_CACHE_VERSION = '1.0.22';
 const CACHE_SUFFIX = APP_CACHE_VERSION.replace(/[^a-zA-Z0-9._-]/g, '-');
 const CACHE_NAME = `bugricer-v${CACHE_SUFFIX}`;
 const STATIC_CACHE = `bugricer-static-v${CACHE_SUFFIX}`;
@@ -386,6 +386,33 @@ function shareTargetIdbPut(db, key, value) {
   });
 }
 
+function shareTargetIdbGet(db, key) {
+  return new Promise(function (resolve, reject) {
+    const tx = db.transaction(SHARE_TARGET_STORE, 'readonly');
+    const store = tx.objectStore(SHARE_TARGET_STORE);
+    const request = store.get(key);
+    request.onerror = function () {
+      reject(request.error || new Error('share IDB get failed'));
+    };
+    request.onsuccess = function () {
+      resolve(request.result);
+    };
+  });
+}
+
+function dedupeShareFiles(files) {
+  const seen = new Set();
+  const result = [];
+  for (let i = 0; i < files.length; i += 1) {
+    const file = files[i];
+    const key = file.name + ':' + file.lastModified + ':' + file.buffer.byteLength;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(file);
+  }
+  return result;
+}
+
 async function persistShareTargetPayload(formData) {
   const title = String(formData.get('title') || '');
   const text = String(formData.get('text') || '');
@@ -410,32 +437,41 @@ async function persistShareTargetPayload(formData) {
     });
   }
 
-  const payload = {
-    id: String(Date.now()) + '-' + Math.random().toString(36).slice(2),
-    title: title,
-    text: text,
-    url: url,
-    files: files,
-    createdAt: Date.now(),
-  };
-
   const db = await openShareTargetDb();
   try {
+    const existing = await shareTargetIdbGet(db, SHARE_TARGET_KEY);
+    const mergedFiles = dedupeShareFiles([].concat(existing && existing.files ? existing.files : [], files));
+    const textParts = [];
+    if (existing && existing.text) textParts.push(String(existing.text).trim());
+    if (text) textParts.push(text.trim());
+
+    const payload = {
+      id: String(Date.now()) + '-' + Math.random().toString(36).slice(2),
+      title: (title || (existing && existing.title) || '').trim(),
+      text: textParts.filter(Boolean).join('\n\n'),
+      url: (url || (existing && existing.url) || '').trim(),
+      files: mergedFiles,
+      createdAt: Date.now(),
+    };
+
     await shareTargetIdbPut(db, SHARE_TARGET_KEY, payload);
+    return payload.id;
   } finally {
     db.close();
   }
 }
 
 async function handleShareTarget(request) {
+  let shareId = '';
   try {
     const formData = await request.formData();
-    await persistShareTargetPayload(formData);
+    shareId = await persistShareTargetPayload(formData);
   } catch (err) {
     // Still redirect so the user lands on the bug form even if storage fails
   }
 
-  const redirectUrl = self.location.origin + '/bugs/new?shared=1';
+  const sid = shareId ? ('&sid=' + encodeURIComponent(shareId)) : '';
+  const redirectUrl = self.location.origin + '/bugs/new?shared=1' + sid;
   return Response.redirect(redirectUrl, 303);
 }
 

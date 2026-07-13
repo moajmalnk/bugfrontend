@@ -32,9 +32,10 @@ import { useBugs } from "@/context/BugContext";
 import { ENV } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import {
-  clearPendingSharePayload,
+  finalizeShareTargetSession,
   getPendingSharePayload,
-  routeSharedContent,
+  getUnimportedShareContent,
+  markFilesImported,
 } from "@/lib/shareTargetStorage";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { sendNewBugNotification } from "@/services/emailService";
@@ -119,6 +120,7 @@ const NewBug = () => {
   const [searchParams] = useSearchParams();
   const preSelectedProjectId = searchParams.get("projectId");
   const isSharedImport = searchParams.get("shared") === "1";
+  const shareSessionId = searchParams.get("sid");
   const { currentUser } = useAuth();
   const { addBug } = useBugs();
 
@@ -146,7 +148,8 @@ const NewBug = () => {
   // Refs for file inputs
   const screenshotInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const shareImportHandledRef = useRef(false);
+  const screenshotsRef = useRef<FileWithPreview[]>([]);
+  const filesRef = useRef<FileWithPreview[]>([]);
 
   const {
     data: projects = [],
@@ -310,6 +313,8 @@ const NewBug = () => {
           description: "Bug submitted. Email and WhatsApp sharing is processing in background.",
         });
 
+        void finalizeShareTargetSession();
+
         // Navigate immediately after successful submission.
         if (preSelectedProjectId) {
           navigate(
@@ -463,9 +468,9 @@ const NewBug = () => {
     if (files.length > 0) addScreenshotFiles(files);
   };
 
-  // Consume Web Share Target payload (Android installed PWA)
+  // Consume Web Share Target payload — append only new files, never replace existing attachments
   useEffect(() => {
-    if (shareImportHandledRef.current) return;
+    if (searchParams.get("shared") !== "1") return;
 
     let cancelled = false;
 
@@ -473,19 +478,25 @@ const NewBug = () => {
       const payload = await getPendingSharePayload();
       if (!payload || cancelled) return;
 
-      shareImportHandledRef.current = true;
-      const routed = routeSharedContent(payload);
+      const routed = getUnimportedShareContent(payload);
+      if (routed.importedKeys.length === 0) return;
 
       if (routed.screenshots.length > 0) {
-        addScreenshotFiles(routed.screenshots);
+        const newScreenshots = routed.screenshots.map((file) => {
+          const withPreview = file as FileWithPreview;
+          withPreview.preview = URL.createObjectURL(withPreview);
+          return withPreview;
+        });
+        setScreenshots((prev) => [...prev, ...newScreenshots]);
       }
 
       if (routed.attachments.length > 0) {
-        const newFiles = routed.attachments as FileWithPreview[];
-        newFiles.forEach((file) => {
-          if (file.type.startsWith("image/")) {
-            file.preview = URL.createObjectURL(file);
+        const newFiles = routed.attachments.map((file) => {
+          const withPreview = file as FileWithPreview;
+          if (withPreview.type.startsWith("image/")) {
+            withPreview.preview = URL.createObjectURL(withPreview);
           }
+          return withPreview;
         });
         setFiles((prev) => [...prev, ...newFiles]);
       }
@@ -502,7 +513,7 @@ const NewBug = () => {
         });
       }
 
-      await clearPendingSharePayload();
+      markFilesImported(routed.importedKeys);
 
       const fileCount = routed.screenshots.length + routed.attachments.length;
       if (fileCount > 0 || routed.description) {
@@ -521,21 +532,23 @@ const NewBug = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [shareSessionId, isSharedImport]);
 
-  // Clean up object URLs when component unmounts
+  screenshotsRef.current = screenshots;
+  filesRef.current = files;
+
+  // Revoke preview URLs only when leaving the page
   useEffect(() => {
     return () => {
-      screenshots.forEach((file) => {
+      screenshotsRef.current.forEach((file) => {
         if (file.preview) URL.revokeObjectURL(file.preview);
       });
 
-      files.forEach((file) => {
+      filesRef.current.forEach((file) => {
         if (file.preview) URL.revokeObjectURL(file.preview);
       });
-
     };
-  }, [screenshots, files, voiceNotes]);
+  }, []);
 
   // Debug voice notes duration
   useEffect(() => {

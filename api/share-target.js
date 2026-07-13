@@ -2,7 +2,7 @@
  * Server-side Web Share Target handler (Vercel Edge).
  * Android share launches POST /share-target before the service worker can intercept,
  * so static hosting returns HTTP 405. This endpoint parses the share payload and
- * returns a bridge HTML page that writes to IndexedDB then opens Report Bug.
+ * returns a bridge HTML page that merges into IndexedDB then opens Report Bug.
  */
 
 export const config = {
@@ -21,6 +21,18 @@ function uint8ToBase64(bytes) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
   return btoa(binary);
+}
+
+function dedupeFiles(files) {
+  const seen = new Set();
+  const result = [];
+  for (const file of files) {
+    const key = `${file.name}:${file.lastModified}:${file.base64.length}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(file);
+  }
+  return result;
 }
 
 async function extractPayload(formData) {
@@ -48,18 +60,11 @@ async function extractPayload(formData) {
     });
   }
 
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    title,
-    text,
-    url,
-    files,
-    createdAt: Date.now(),
-  };
+  return { title, text, url, files };
 }
 
-function buildBridgeHtml(payload, origin) {
-  const safeJson = JSON.stringify(payload)
+function buildBridgeHtml(incoming, origin) {
+  const safeJson = JSON.stringify(incoming)
     .replace(/</g, "\\u003c")
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
@@ -79,8 +84,22 @@ function buildBridgeHtml(payload, origin) {
   <p>Importing shared content…</p>
   <script>
     (async function () {
-      const raw = ${safeJson};
-      const files = (raw.files || []).map(function (f) {
+      const incoming = ${safeJson};
+
+      function dedupeStored(files) {
+        const seen = new Set();
+        const out = [];
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i];
+          const key = f.name + ':' + f.lastModified + ':' + (f.buffer ? f.buffer.byteLength : 0);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push(f);
+        }
+        return out;
+      }
+
+      const incomingFiles = (incoming.files || []).map(function (f) {
         const binary = atob(f.base64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -91,13 +110,42 @@ function buildBridgeHtml(payload, origin) {
           buffer: bytes.buffer,
         };
       });
+
+      const existing = await new Promise(function (resolve) {
+        const req = indexedDB.open("${DB_NAME}", 1);
+        req.onupgradeneeded = function () {
+          const db = req.result;
+          if (!db.objectStoreNames.contains("${DB_STORE}")) {
+            db.createObjectStore("${DB_STORE}");
+          }
+        };
+        req.onsuccess = function () {
+          const db = req.result;
+          const tx = db.transaction("${DB_STORE}", "readonly");
+          const getReq = tx.objectStore("${DB_STORE}").get("${DB_KEY}");
+          getReq.onsuccess = function () {
+            db.close();
+            resolve(getReq.result || null);
+          };
+          getReq.onerror = function () {
+            db.close();
+            resolve(null);
+          };
+        };
+        req.onerror = function () { resolve(null); };
+      });
+
+      const textParts = [];
+      if (existing && existing.text) textParts.push(String(existing.text).trim());
+      if (incoming.text) textParts.push(String(incoming.text).trim());
+
       const payload = {
-        id: raw.id,
-        title: raw.title || "",
-        text: raw.text || "",
-        url: raw.url || "",
-        files: files,
-        createdAt: raw.createdAt || Date.now(),
+        id: String(Date.now()) + '-' + Math.random().toString(36).slice(2),
+        title: (incoming.title || (existing && existing.title) || '').trim(),
+        text: textParts.filter(Boolean).join('\\n\\n'),
+        url: (incoming.url || (existing && existing.url) || '').trim(),
+        files: dedupeStored([].concat(existing && existing.files ? existing.files : [], incomingFiles)),
+        createdAt: Date.now(),
       };
 
       await new Promise(function (resolve, reject) {
@@ -118,7 +166,7 @@ function buildBridgeHtml(payload, origin) {
         req.onerror = function () { reject(req.error); };
       });
 
-      location.replace("${origin}/bugs/new?shared=1");
+      location.replace("${origin}/bugs/new?shared=1&sid=" + encodeURIComponent(payload.id));
     })().catch(function () {
       location.replace("${origin}/bugs/new?shared=1");
     });
@@ -141,8 +189,8 @@ export default async function handler(request) {
 
   try {
     const formData = await request.formData();
-    const payload = await extractPayload(formData);
-    const html = buildBridgeHtml(payload, origin);
+    const incoming = await extractPayload(formData);
+    const html = buildBridgeHtml(incoming, origin);
     return new Response(html, {
       status: 200,
       headers: {

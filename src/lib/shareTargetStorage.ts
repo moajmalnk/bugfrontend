@@ -5,6 +5,7 @@ export const SHARE_TARGET_DB_VERSION = 1;
 export const SHARE_TARGET_STORE = "pending";
 export const SHARE_TARGET_KEY = "current";
 export const MAX_SHARE_FILE_BYTES = 25 * 1024 * 1024;
+export const SHARE_IMPORTED_FILES_KEY = "bugricer_share_imported_file_keys";
 
 export interface StoredShareFile {
   name: string;
@@ -53,6 +54,16 @@ function idbGet<T>(db: IDBDatabase, key: string): Promise<T | undefined> {
   });
 }
 
+function idbPut(db: IDBDatabase, key: string, value: unknown): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SHARE_TARGET_STORE, "readwrite");
+    const store = tx.objectStore(SHARE_TARGET_STORE);
+    const request = store.put(value, key);
+    request.onerror = () => reject(request.error ?? new Error("IDB put failed"));
+    request.onsuccess = () => resolve();
+  });
+}
+
 function idbDelete(db: IDBDatabase, key: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(SHARE_TARGET_STORE, "readwrite");
@@ -61,6 +72,56 @@ function idbDelete(db: IDBDatabase, key: string): Promise<void> {
     request.onerror = () => reject(request.error ?? new Error("IDB delete failed"));
     request.onsuccess = () => resolve();
   });
+}
+
+export function storedFileKey(file: Pick<StoredShareFile, "name" | "lastModified" | "buffer">): string {
+  return `${file.name}:${file.lastModified}:${file.buffer.byteLength}`;
+}
+
+export function fileImportKey(file: Pick<File, "name" | "lastModified" | "size">): string {
+  return `${file.name}:${file.lastModified}:${file.size}`;
+}
+
+function getImportedFileKeys(): Set<string> {
+  try {
+    const raw = sessionStorage.getItem(SHARE_IMPORTED_FILES_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as string[];
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function markFilesImported(keys: string[]): void {
+  if (keys.length === 0) return;
+  const merged = getImportedFileKeys();
+  keys.forEach((key) => merged.add(key));
+  try {
+    sessionStorage.setItem(SHARE_IMPORTED_FILES_KEY, JSON.stringify([...merged]));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+export function clearShareImportSession(): void {
+  try {
+    sessionStorage.removeItem(SHARE_IMPORTED_FILES_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function dedupeStoredFiles(files: StoredShareFile[]): StoredShareFile[] {
+  const seen = new Set<string>();
+  const result: StoredShareFile[] = [];
+  for (const file of files) {
+    const key = storedFileKey(file);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(file);
+  }
+  return result;
 }
 
 function storedFileToFile(stored: StoredShareFile): File {
@@ -109,6 +170,25 @@ export function routeSharedContent(payload: SharePayload): RoutedShareContent {
   };
 }
 
+/** Return only share files that have not yet been imported into the form. */
+export function getUnimportedShareContent(payload: SharePayload): RoutedShareContent & {
+  importedKeys: string[];
+} {
+  const imported = getImportedFileKeys();
+  const newStored: StoredShareFile[] = [];
+  const importedKeys: string[] = [];
+
+  for (const stored of payload.files) {
+    const key = storedFileKey(stored);
+    if (imported.has(key)) continue;
+    newStored.push(stored);
+    importedKeys.push(key);
+  }
+
+  const routed = routeSharedContent({ ...payload, files: newStored });
+  return { ...routed, importedKeys };
+}
+
 export async function getPendingSharePayload(): Promise<SharePayload | null> {
   if (typeof indexedDB === "undefined") {
     return null;
@@ -129,6 +209,37 @@ export async function getPendingSharePayload(): Promise<SharePayload | null> {
   }
 }
 
+/** Merge incoming share files into the pending queue instead of replacing. */
+export async function mergePendingSharePayload(
+  incoming: Pick<SharePayload, "title" | "text" | "url" | "files">
+): Promise<string> {
+  if (typeof indexedDB === "undefined") {
+    return "";
+  }
+
+  let db: IDBDatabase | null = null;
+  try {
+    db = await openShareDb();
+    const existing = await idbGet<SharePayload>(db, SHARE_TARGET_KEY);
+    const mergedFiles = dedupeStoredFiles([...(existing?.files ?? []), ...incoming.files]);
+    const textParts = [existing?.text, incoming.text].map((v) => (v || "").trim()).filter(Boolean);
+
+    const payload: SharePayload = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      title: (incoming.title || existing?.title || "").trim(),
+      text: textParts.join("\n\n"),
+      url: (incoming.url || existing?.url || "").trim(),
+      files: mergedFiles,
+      createdAt: Date.now(),
+    };
+
+    await idbPut(db, SHARE_TARGET_KEY, payload);
+    return payload.id;
+  } finally {
+    db?.close();
+  }
+}
+
 export async function clearPendingSharePayload(): Promise<void> {
   if (typeof indexedDB === "undefined") {
     return;
@@ -143,4 +254,9 @@ export async function clearPendingSharePayload(): Promise<void> {
   } finally {
     db?.close();
   }
+}
+
+export async function finalizeShareTargetSession(): Promise<void> {
+  await clearPendingSharePayload();
+  clearShareImportSession();
 }
