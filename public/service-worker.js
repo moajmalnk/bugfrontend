@@ -151,7 +151,7 @@ self.addEventListener('notificationclick', function (event) {
 
 // Stable per deploy — must NOT use new Date() here (causes endless SW updates + page reload loops).
 // Keep in sync with public/version.json when you bump releases.
-const APP_CACHE_VERSION = '1.0.19';
+const APP_CACHE_VERSION = '1.0.21';
 const CACHE_SUFFIX = APP_CACHE_VERSION.replace(/[^a-zA-Z0-9._-]/g, '-');
 const CACHE_NAME = `bugricer-v${CACHE_SUFFIX}`;
 const STATIC_CACHE = `bugricer-static-v${CACHE_SUFFIX}`;
@@ -165,6 +165,8 @@ const CRITICAL_RESOURCES = [
   '/favicon.ico',
   '/icon-192.png',
   '/icon-512.png',
+  '/icon-maskable-192.png',
+  '/icon-maskable-512.png',
   '/notification-icon.png',
   '/notification-badge.png',
   '/notification-icon-96.png',
@@ -444,7 +446,7 @@ self.addEventListener('fetch', event => {
   if (
     event.request.method === 'POST' &&
     requestUrl.origin === self.location.origin &&
-    requestUrl.pathname === '/share-target'
+    requestUrl.pathname.replace(/\/$/, '') === '/share-target'
   ) {
     event.respondWith(handleShareTarget(event.request));
     return;
@@ -453,7 +455,7 @@ self.addEventListener('fetch', event => {
   if (
     event.request.method === 'GET' &&
     requestUrl.origin === self.location.origin &&
-    requestUrl.pathname === '/share-target'
+    requestUrl.pathname.replace(/\/$/, '') === '/share-target'
   ) {
     event.respondWith(Response.redirect(self.location.origin + '/bugs/new?shared=1', 302));
     return;

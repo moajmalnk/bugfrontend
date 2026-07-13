@@ -1,7 +1,11 @@
 {
   "rewrites": [
     {
-      "source": "/((?!assets/|service-worker\\.js|firebase-messaging-sw\\.js|manifest\\.json|version\\.json|robots\\.txt|favicon\\.ico).*)",
+      "source": "/share-target",
+      "destination": "/api/share-target"
+    },
+    {
+      "source": "/((?!assets/|service-worker\\.js|firebase-messaging-sw\\.js|manifest\\.json|version\\.json|robots\\.txt|favicon\\.ico|share-target|api/).*)",
       "destination": "/index.html"
     }
   ],
