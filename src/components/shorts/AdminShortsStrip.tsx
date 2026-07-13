@@ -8,12 +8,15 @@ import {
 } from "@/components/ui/carousel";
 import { shortsService, resolveShortMediaUrl, type ShortItem } from "@/services/shortsService";
 import { prefetchYouTubeApi } from "@/components/shorts/CustomShortPlayer";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Clapperboard, Play } from "lucide-react";
+import { Clapperboard, Eye, EyeOff, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { cn, getEffectiveRole } from "@/lib/utils";
+
+const SHORTS_STRIP_HIDDEN_KEY = "bugricer_admin_shorts_strip_hidden";
 
 /** Compact stripe card — same footprint as active-users WhatsApp cards */
 function ShortStripeCard({ short, onClick }: { short: ShortItem; onClick: () => void }) {
@@ -69,6 +72,9 @@ export function AdminShortsStrip() {
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
+  const [hidden, setHidden] = useState(
+    () => localStorage.getItem(SHORTS_STRIP_HIDDEN_KEY) === "true"
+  );
 
   // Hide on Shorts management page and Users (users page shows active-users strip instead)
   const onShortsPage = /\/shorts(\/|$)/.test(pathname);
@@ -85,6 +91,24 @@ export function AdminShortsStrip() {
   useEffect(() => {
     prefetchYouTubeApi();
   }, []);
+
+  useEffect(() => {
+    const syncHidden = () => {
+      setHidden(localStorage.getItem(SHORTS_STRIP_HIDDEN_KEY) === "true");
+    };
+    window.addEventListener("storage", syncHidden);
+    return () => window.removeEventListener("storage", syncHidden);
+  }, []);
+
+  const hideStrip = () => {
+    localStorage.setItem(SHORTS_STRIP_HIDDEN_KEY, "true");
+    setHidden(true);
+  };
+
+  const showStrip = () => {
+    localStorage.removeItem(SHORTS_STRIP_HIDDEN_KEY);
+    setHidden(false);
+  };
 
   useEffect(() => {
     shorts.forEach((s) => {
@@ -127,6 +151,31 @@ export function AdminShortsStrip() {
     return null;
   }
 
+  if (hidden) {
+    return (
+      <div className="shrink-0 border-b border-border/50 bg-background/95 px-3 py-1.5 backdrop-blur-sm md:px-4">
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={showStrip}
+            className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Show Shorts · {shorts.length}
+          </Button>
+          <Link
+            to={`/${rolePath}/shorts`}
+            className="text-[11px] font-medium text-primary hover:underline"
+          >
+            Open page
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="shrink-0 border-b border-border/50 bg-background/95 px-3 py-2.5 backdrop-blur-sm md:px-4 md:py-3">
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -136,12 +185,26 @@ export function AdminShortsStrip() {
             Shorts · {shorts.length}
           </p>
         </div>
-        <Link
-          to={`/${rolePath}/shorts`}
-          className="text-[11px] font-medium text-primary hover:underline"
-        >
-          Open page
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/${rolePath}/shorts`}
+            className="text-[11px] font-medium text-primary hover:underline"
+          >
+            Open page
+          </Link>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={hideStrip}
+            className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+            aria-label="Hide Shorts strip"
+            title="Hide Shorts strip"
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+            Hide
+          </Button>
+        </div>
       </div>
 
       <Carousel

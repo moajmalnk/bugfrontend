@@ -31,6 +31,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useBugs } from "@/context/BugContext";
 import { ENV } from "@/lib/env";
 import { cn } from "@/lib/utils";
+import {
+  clearPendingSharePayload,
+  getPendingSharePayload,
+  routeSharedContent,
+} from "@/lib/shareTargetStorage";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { sendNewBugNotification } from "@/services/emailService";
 import { BugLevel, BugPriority, Project } from "@/types";
@@ -113,6 +118,7 @@ const NewBug = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const preSelectedProjectId = searchParams.get("projectId");
+  const isSharedImport = searchParams.get("shared") === "1";
   const { currentUser } = useAuth();
   const { addBug } = useBugs();
 
@@ -140,6 +146,7 @@ const NewBug = () => {
   // Refs for file inputs
   const screenshotInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const shareImportHandledRef = useRef(false);
 
   const {
     data: projects = [],
@@ -456,6 +463,66 @@ const NewBug = () => {
     if (files.length > 0) addScreenshotFiles(files);
   };
 
+  // Consume Web Share Target payload (Android installed PWA)
+  useEffect(() => {
+    if (shareImportHandledRef.current) return;
+
+    let cancelled = false;
+
+    const consumeSharedContent = async () => {
+      const payload = await getPendingSharePayload();
+      if (!payload || cancelled) return;
+
+      shareImportHandledRef.current = true;
+      const routed = routeSharedContent(payload);
+
+      if (routed.screenshots.length > 0) {
+        addScreenshotFiles(routed.screenshots);
+      }
+
+      if (routed.attachments.length > 0) {
+        const newFiles = routed.attachments as FileWithPreview[];
+        newFiles.forEach((file) => {
+          if (file.type.startsWith("image/")) {
+            file.preview = URL.createObjectURL(file);
+          }
+        });
+        setFiles((prev) => [...prev, ...newFiles]);
+      }
+
+      if (routed.title) {
+        setName((prev) => prev || routed.title!.slice(0, TITLE_MAX));
+      }
+
+      if (routed.description) {
+        setDescription((prev) => {
+          if (!prev.trim()) return routed.description!;
+          if (prev.includes(routed.description!)) return prev;
+          return `${prev}\n\n${routed.description}`;
+        });
+      }
+
+      await clearPendingSharePayload();
+
+      const fileCount = routed.screenshots.length + routed.attachments.length;
+      if (fileCount > 0 || routed.description) {
+        toast({
+          title: "Shared content added",
+          description:
+            fileCount > 0
+              ? `${fileCount} file${fileCount === 1 ? "" : "s"} added to your bug report.`
+              : "Shared text was added to the description.",
+        });
+      }
+    };
+
+    void consumeSharedContent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Clean up object URLs when component unmounts
   useEffect(() => {
     return () => {
@@ -483,6 +550,11 @@ const NewBug = () => {
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w mx-auto space-y-6 sm:space-y-8">
+        {isSharedImport && (
+          <div className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
+            Attachments imported from share. Review them below before submitting.
+          </div>
+        )}
         {/* Professional Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>

@@ -151,7 +151,7 @@ self.addEventListener('notificationclick', function (event) {
 
 // Stable per deploy — must NOT use new Date() here (causes endless SW updates + page reload loops).
 // Keep in sync with public/version.json when you bump releases.
-const APP_CACHE_VERSION = '1.0.17';
+const APP_CACHE_VERSION = '1.0.18';
 const CACHE_SUFFIX = APP_CACHE_VERSION.replace(/[^a-zA-Z0-9._-]/g, '-');
 const CACHE_NAME = `bugricer-v${CACHE_SUFFIX}`;
 const STATIC_CACHE = `bugricer-static-v${CACHE_SUFFIX}`;
@@ -345,8 +345,120 @@ self.addEventListener('activate', event => {
   );
 });
 
+// Web Share Target — keep in sync with src/lib/shareTargetStorage.ts
+const SHARE_TARGET_DB_NAME = 'bugricer-share-target';
+const SHARE_TARGET_DB_VERSION = 1;
+const SHARE_TARGET_STORE = 'pending';
+const SHARE_TARGET_KEY = 'current';
+const MAX_SHARE_FILE_BYTES = 25 * 1024 * 1024;
+
+function openShareTargetDb() {
+  return new Promise(function (resolve, reject) {
+    const request = indexedDB.open(SHARE_TARGET_DB_NAME, SHARE_TARGET_DB_VERSION);
+    request.onerror = function () {
+      reject(request.error || new Error('share DB open failed'));
+    };
+    request.onupgradeneeded = function () {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(SHARE_TARGET_STORE)) {
+        db.createObjectStore(SHARE_TARGET_STORE);
+      }
+    };
+    request.onsuccess = function () {
+      resolve(request.result);
+    };
+  });
+}
+
+function shareTargetIdbPut(db, key, value) {
+  return new Promise(function (resolve, reject) {
+    const tx = db.transaction(SHARE_TARGET_STORE, 'readwrite');
+    const store = tx.objectStore(SHARE_TARGET_STORE);
+    const request = store.put(value, key);
+    request.onerror = function () {
+      reject(request.error || new Error('share IDB put failed'));
+    };
+    request.onsuccess = function () {
+      resolve();
+    };
+  });
+}
+
+async function persistShareTargetPayload(formData) {
+  const title = String(formData.get('title') || '');
+  const text = String(formData.get('text') || '');
+  const url = String(formData.get('url') || '');
+  const files = [];
+  const mediaEntries = formData.getAll('media');
+
+  for (let i = 0; i < mediaEntries.length; i += 1) {
+    const entry = mediaEntries[i];
+    if (!entry || typeof entry.arrayBuffer !== 'function') {
+      continue;
+    }
+    const buffer = await entry.arrayBuffer();
+    if (buffer.byteLength > MAX_SHARE_FILE_BYTES) {
+      continue;
+    }
+    files.push({
+      name: entry.name || ('shared-' + (i + 1)),
+      type: entry.type || 'application/octet-stream',
+      lastModified: entry.lastModified || Date.now(),
+      buffer: buffer,
+    });
+  }
+
+  const payload = {
+    id: String(Date.now()) + '-' + Math.random().toString(36).slice(2),
+    title: title,
+    text: text,
+    url: url,
+    files: files,
+    createdAt: Date.now(),
+  };
+
+  const db = await openShareTargetDb();
+  try {
+    await shareTargetIdbPut(db, SHARE_TARGET_KEY, payload);
+  } finally {
+    db.close();
+  }
+}
+
+async function handleShareTarget(request) {
+  try {
+    const formData = await request.formData();
+    await persistShareTargetPayload(formData);
+  } catch (err) {
+    // Still redirect so the user lands on the bug form even if storage fails
+  }
+
+  const redirectUrl = self.location.origin + '/bugs/new?shared=1';
+  return Response.redirect(redirectUrl, 303);
+}
+
 // Fetch event - Professional caching strategies
 self.addEventListener('fetch', event => {
+  const requestUrl = new URL(event.request.url);
+
+  if (
+    event.request.method === 'POST' &&
+    requestUrl.origin === self.location.origin &&
+    requestUrl.pathname === '/share-target'
+  ) {
+    event.respondWith(handleShareTarget(event.request));
+    return;
+  }
+
+  if (
+    event.request.method === 'GET' &&
+    requestUrl.origin === self.location.origin &&
+    requestUrl.pathname === '/share-target'
+  ) {
+    event.respondWith(Response.redirect(self.location.origin + '/bugs/new?shared=1', 302));
+    return;
+  }
+
   // Never intercept cross-origin traffic (YouTube, social embeds, CDNs, etc.)
   if (!isSameOriginRequest(event.request)) {
     return;

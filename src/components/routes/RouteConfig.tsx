@@ -10,7 +10,7 @@ import NotFound from "@/pages/NotFound";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfUse from "@/pages/TermsOfUse";
 import { lazy, Suspense } from "react";
-import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useParams, useLocation } from "react-router-dom";
 import MeetLobby from "@/pages/MeetLobby";
 import MeetRoom from "@/pages/MeetRoom";
 import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
@@ -250,12 +250,9 @@ const ProjectRedirect = () => {
 /** Redirect push/deep links like /messages → /{role}/messages */
 const RolePathRedirect = ({ suffix }: { suffix: string }) => {
   const params = useParams();
-  const { isAuthenticated, currentUser } = useAuth();
+  const location = useLocation();
+  const { isAuthenticated, currentUser, storeIntendedDestination } = useAuth();
   const role = currentUser?.role;
-
-  if (!isAuthenticated || !role) {
-    return <Navigate to="/login" replace />;
-  }
 
   let path = suffix;
   Object.entries(params).forEach(([key, value]) => {
@@ -264,7 +261,16 @@ const RolePathRedirect = ({ suffix }: { suffix: string }) => {
     }
   });
 
-  return <Navigate to={`/${role}/${path.replace(/^\//, "")}`} replace />;
+  const normalizedPath = `/${path.replace(/^\//, "")}`;
+  const search = location.search || "";
+  const roleNeutralPath = `${normalizedPath}${search}`;
+
+  if (!isAuthenticated || !role) {
+    storeIntendedDestination(roleNeutralPath);
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={`/${role}/${path.replace(/^\//, "")}${search}`} replace />;
 };
 
 const RouteConfig = () => {
@@ -313,6 +319,7 @@ const RouteConfig = () => {
       />
 
       {/* Role-neutral deep links for push notifications */}
+      <Route path="/bugs/new" element={<RolePathRedirect suffix="bugs/new" />} />
       <Route path="/bugs/:bugId" element={<BugRedirect />} />
       <Route path="/updates/:updateId" element={<UpdateRedirect />} />
       <Route path="/projects/:projectId" element={<ProjectRedirect />} />

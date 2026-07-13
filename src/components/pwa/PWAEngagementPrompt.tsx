@@ -61,6 +61,11 @@ function isIosDevice(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
+function isAndroidDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /android/i.test(navigator.userAgent);
+}
+
 function wasDismissed(key: string, maxMs: number): boolean {
   const raw = localStorage.getItem(key);
   if (!raw) return false;
@@ -592,6 +597,13 @@ export function PWAEngagementPrompt() {
                         </span>
                       </p>
                     </div>
+                  )}
+                  {isAndroidDevice() && (
+                    <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+                      After installing on Android, share screenshots from WhatsApp, Gallery, or
+                      other apps directly to BugRicer — it will appear in your share menu and open
+                      Report Bug with attachments filled in.
+                    </p>
                   )}
                 </div>
               )}
