@@ -1,5 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -7,15 +12,18 @@ import {
   buildCodoAgentExportContent,
   copyTextToClipboard,
   downloadTextFile,
+  formatExportFileSize,
   type CodoAgentExportId,
 } from '@/lib/utils/codoRulesAgentExport';
 import type { CodoCommonRule, CodoRulePhase } from '@/services/codoRulesService';
 import {
   Check,
+  ChevronDown,
   ClipboardCopy,
   Code2,
   Download,
   FileDown,
+  FileText,
   FolderKanban,
   ShieldCheck,
   Sparkles,
@@ -36,10 +44,24 @@ type CodoExportPanelProps = {
   search?: string;
 };
 
+function renderUsageStep(step: string) {
+  const parts = step.split(/\*\*(.*?)\*\*/g);
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <strong key={i} className="font-semibold text-foreground">
+        {part}
+      </strong>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
 export function CodoExportPanel({ rules, search = '' }: CodoExportPanelProps) {
   const [scope, setScope] = useState<ScopeKey>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<CodoAgentExportId | null>(null);
+  const [openGuideId, setOpenGuideId] = useState<CodoAgentExportId | null>('cursor');
 
   const exportRules = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -74,7 +96,7 @@ export function CodoExportPanel({ rules, search = '' }: CodoExportPanelProps) {
       window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 2000);
       toast({
         title: 'Copied to clipboard',
-        description: `${exportRules.length} rule${exportRules.length === 1 ? '' : 's'} ready to paste.`,
+        description: `${exportRules.length} rule${exportRules.length === 1 ? '' : 's'} ready to paste into a text file.`,
       });
     } catch (e) {
       toast({
@@ -104,8 +126,8 @@ export function CodoExportPanel({ rules, search = '' }: CodoExportPanelProps) {
       const content = buildCodoAgentExportContent(id, exportRules);
       downloadTextFile(format.filename, content, format.mimeType);
       toast({
-        title: 'Download started',
-        description: format.filename,
+        title: 'Text file saved',
+        description: `${format.filename} (${formatExportFileSize(content)})`,
       });
     } catch (e) {
       toast({
@@ -120,67 +142,16 @@ export function CodoExportPanel({ rules, search = '' }: CodoExportPanelProps) {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-lg">
-        <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/40 via-transparent to-violet-50/30 dark:from-cyan-950/15 dark:via-transparent dark:to-violet-950/10 pointer-events-none" />
-        <div className="relative p-5 sm:p-6 space-y-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shrink-0">
-                <FileDown className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-tight">
-                  Copy & download for AI agents
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                  Export Common CODO as Cursor, Antigravity, Android Studio, or generic agent rules —
-                  for developers and admins.
-                </p>
-              </div>
-            </div>
-            <Badge
-              variant="outline"
-              className="shrink-0 self-start font-bold tabular-nums px-2.5 py-1 border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300"
-            >
-              {exportRules.length} rule{exportRules.length === 1 ? '' : 's'}
-            </Badge>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Scope
-            </p>
-            <div className="grid grid-cols-12 gap-2">
-              {SCOPE_OPTIONS.map((opt) => {
-                const Icon = opt.icon;
-                const active = scope === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setScope(opt.value)}
-                    className={cn(
-                      'col-span-6 sm:col-span-3 flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-sm font-semibold transition-all',
-                      active
-                        ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-md border border-gray-200 dark:border-gray-700'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-white/70 dark:hover:bg-gray-800/60 border border-transparent'
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0 opacity-80" />
-                    <span className="truncate">{opt.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="grid grid-cols-12 gap-4 sm:gap-5">
         {CODO_AGENT_EXPORT_FORMATS.map((format) => {
           const copying = busyId === `copy-${format.id}`;
           const downloading = busyId === `dl-${format.id}`;
           const justCopied = copiedId === format.id;
+          const previewContent = buildCodoAgentExportContent(format.id, exportRules);
+          const fileSize = formatExportFileSize(previewContent);
+          const guideOpen = openGuideId === format.id;
+
           return (
             <div
               key={format.id}
@@ -195,19 +166,38 @@ export function CodoExportPanel({ rules, search = '' }: CodoExportPanelProps) {
                       format.accent
                     )}
                   >
-                    <Download className="h-4 w-4" />
+                    <FileText className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
-                      {format.name}
-                    </h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                        {format.name}
+                      </h3>
+                      <Badge
+                        variant="secondary"
+                        className="font-mono text-[10px] uppercase tracking-wide px-2 py-0"
+                      >
+                        Text {format.fileExtension}
+                      </Badge>
+                    </div>
                     <p className="text-sm text-muted-foreground mt-0.5">{format.description}</p>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/40 px-3.5 py-3 space-y-1">
-                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 font-mono truncate">
-                    {format.filename}
+                <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/40 px-3.5 py-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 font-mono truncate">
+                      {format.filename}
+                    </p>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground tabular-nums">
+                      {exportRules.length > 0 ? fileSize : '—'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Save to:{' '}
+                    <code className="text-[11px] font-mono text-foreground/80 bg-background/60 px-1.5 py-0.5 rounded">
+                      {format.targetPath}
+                    </code>
                   </p>
                   <p className="text-xs text-muted-foreground leading-relaxed">{format.installHint}</p>
                 </div>
@@ -225,7 +215,7 @@ export function CodoExportPanel({ rules, search = '' }: CodoExportPanelProps) {
                     ) : (
                       <ClipboardCopy className="h-4 w-4 mr-2" />
                     )}
-                    {justCopied ? 'Copied' : copying ? 'Copying…' : 'Copy'}
+                    {justCopied ? 'Copied' : copying ? 'Copying…' : 'Copy text'}
                   </Button>
                   <Button
                     type="button"
@@ -237,9 +227,51 @@ export function CodoExportPanel({ rules, search = '' }: CodoExportPanelProps) {
                     onClick={() => runDownload(format.id)}
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    {downloading ? 'Saving…' : 'Download'}
+                    {downloading
+                      ? 'Saving…'
+                      : `Download ${format.fileExtension}`}
                   </Button>
                 </div>
+
+                <Collapsible
+                  open={guideOpen}
+                  onOpenChange={(open) => setOpenGuideId(open ? format.id : null)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200/80 dark:border-gray-700/80 bg-gray-50/50 dark:bg-gray-800/30 px-3.5 py-2.5 text-left text-sm font-semibold text-gray-800 dark:text-gray-100 hover:bg-gray-100/80 dark:hover:bg-gray-800/60 transition-colors"
+                    >
+                      <span>How to use — step by step</span>
+                      <ChevronDown
+                        className={cn(
+                          'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                          guideOpen && 'rotate-180'
+                        )}
+                      />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-none">
+                    <ol className="mt-3 space-y-2.5 rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-900/40 px-3.5 py-3.5">
+                      {format.usageSteps.map((step, index) => (
+                        <li
+                          key={index}
+                          className="flex gap-3 text-xs sm:text-sm text-muted-foreground leading-relaxed"
+                        >
+                          <span
+                            className={cn(
+                              'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white bg-gradient-to-br',
+                              format.accent
+                            )}
+                          >
+                            {index + 1}
+                          </span>
+                          <span className="pt-0.5">{renderUsageStep(step)}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             </div>
           );
@@ -250,7 +282,12 @@ export function CodoExportPanel({ rules, search = '' }: CodoExportPanelProps) {
         <p className="text-sm text-center text-muted-foreground py-4">
           No active rules match this scope{search.trim() ? ' and search' : ''}.
         </p>
-      ) : null}
+      ) : (
+        <p className="text-xs text-center text-muted-foreground">
+          Downloads are UTF-8 text files. Open them in any editor (Cursor, VS Code, Android Studio) —
+          they are not images or PDFs.
+        </p>
+      )}
     </div>
   );
 }
