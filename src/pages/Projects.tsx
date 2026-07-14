@@ -207,7 +207,8 @@ const Projects = () => {
     const byId = new Map<string, string>();
     projects.forEach((project) => {
       (project.members_detail || []).forEach((member) => {
-        if (member.role === "developer" && member.user_id) {
+        const role = String(member.role || "").toLowerCase();
+        if (role === "developer" && member.user_id) {
           byId.set(String(member.user_id), member.username || member.email || "Developer");
         }
       });
@@ -221,7 +222,8 @@ const Projects = () => {
     const byId = new Map<string, string>();
     projects.forEach((project) => {
       (project.members_detail || []).forEach((member) => {
-        if (member.role === "tester" && member.user_id) {
+        const role = String(member.role || "").toLowerCase();
+        if (role === "tester" && member.user_id) {
           byId.set(String(member.user_id), member.username || member.email || "Tester");
         }
       });
@@ -362,7 +364,7 @@ const Projects = () => {
       filtered = filtered.filter((project) =>
         (project.members_detail || []).some(
           (member) =>
-            member.role === "developer" &&
+            String(member.role || "").toLowerCase() === "developer" &&
             String(member.user_id) === String(developerFilter)
         )
       );
@@ -372,7 +374,7 @@ const Projects = () => {
       filtered = filtered.filter((project) =>
         (project.members_detail || []).some(
           (member) =>
-            member.role === "tester" &&
+            String(member.role || "").toLowerCase() === "tester" &&
             String(member.user_id) === String(testerFilter)
         )
       );
