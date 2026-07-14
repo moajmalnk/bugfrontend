@@ -330,6 +330,9 @@ export default function Notifications() {
         path = `/${role}/my-tasks`;
       } else if (notification.entity_type === 'project') {
         path = `/${role}/projects/${notification.entity_id}`;
+      } else if (notification.entity_type === 'compliance') {
+        const projectId = notification.project_id || notification.entity_id;
+        path = `/${role}/projects/${projectId}/compliance`;
       }
       
       if (path) {
