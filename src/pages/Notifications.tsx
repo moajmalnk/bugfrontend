@@ -262,7 +262,7 @@ export default function Notifications() {
         return '📋';
       case 'meet_created':
       case 'meeting_reminder':
-        return '📹';
+        return '📅';
       case 'doc_created':
         return '📄';
       case 'project_created':
