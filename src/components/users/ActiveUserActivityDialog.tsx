@@ -17,10 +17,11 @@ import {
   userService,
   type UserActivitySnapshot,
   type UserActivitySnapshotItem,
+  type UserActivityWorkHistoryDay,
 } from "@/services/userService";
 import { User } from "@/types";
 import { useQuery } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, isValid, parseISO } from "date-fns";
 import {
   Bug,
   CheckCircle2,
@@ -28,6 +29,7 @@ import {
   ExternalLink,
   FolderKanban,
   Loader2,
+  StickyNote,
   X,
   Wrench,
 } from "lucide-react";
@@ -142,6 +144,118 @@ function formatRelative(value?: string | null) {
   return formatDistanceToNow(date, { addSuffix: true });
 }
 
+function formatDayLabel(dateStr?: string | null, isToday?: boolean) {
+  if (!dateStr) return isToday ? "Today" : "Unknown day";
+  const parsed = parseISO(dateStr.length > 10 ? dateStr : `${dateStr}T00:00:00`);
+  if (!isValid(parsed)) return dateStr;
+  if (isToday) return `Today · ${format(parsed, "EEE, d MMM yyyy")}`;
+  return format(parsed, "EEE, d MMM yyyy");
+}
+
+function PlannedDayCard({ day }: { day: UserActivityWorkHistoryDay }) {
+  const projectNames = day.project_names || [];
+  const notesLines = day.tasks?.upcoming || [];
+  const plannedWork = (day.planned_work || "").trim();
+  const plannedNotes = (day.planned_work_notes || "").trim();
+  const rawNotes = (day.notes || "").trim();
+  const hasNotes = notesLines.length > 0 || !!plannedNotes || (!!rawNotes && notesLines.length === 0);
+
+  return (
+    <div
+      className={cn(
+        "space-y-3 rounded-2xl border px-4 py-3.5",
+        day.is_today
+          ? "border-primary/30 bg-gradient-to-br from-primary/10 via-muted/20 to-muted/5"
+          : "border-border/50 bg-muted/10"
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-medium text-foreground">
+            {formatDayLabel(day.submission_date, day.is_today)}
+          </h4>
+          {day.is_today ? (
+            <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px]">
+              Today
+            </Badge>
+          ) : null}
+        </div>
+        {typeof day.hours_today === "number" && day.hours_today > 0 ? (
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {Number.isInteger(day.hours_today) ? `${day.hours_today}h` : `${day.hours_today.toFixed(1)}h`} worked
+          </span>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <FolderKanban className="h-3.5 w-3.5" />
+          Planned projects
+        </div>
+        {projectNames.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {projectNames.map((name) => (
+              <Badge key={name} variant="secondary" className="rounded-full font-normal">
+                {name}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No planned projects</p>
+        )}
+      </div>
+
+      {plannedWork ? (
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Planned work
+            </span>
+            {day.planned_work_status ? (
+              <Badge variant="outline" className="h-5 rounded-full capitalize text-[10px]">
+                {day.planned_work_status.replace(/_/g, " ")}
+              </Badge>
+            ) : null}
+          </div>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{plannedWork}</p>
+        </div>
+      ) : null}
+
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <StickyNote className="h-3.5 w-3.5" />
+          Notes
+        </div>
+        {hasNotes ? (
+          <div className="space-y-2">
+            {plannedNotes ? (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                {plannedNotes}
+              </p>
+            ) : null}
+            {notesLines.length > 0 ? (
+              <ul className="space-y-1.5">
+                {notesLines.map((line, idx) => (
+                  <li
+                    key={`${day.submission_date}-note-${idx}`}
+                    className="rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-sm leading-relaxed"
+                  >
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            ) : rawNotes && !plannedNotes ? (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{rawNotes}</p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No notes</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ActiveUserActivityDialog({
   user,
   open,
@@ -166,9 +280,9 @@ export function ActiveUserActivityDialog({
     )}&background=3b82f6&color=fff`;
 
   const work = data?.work;
+  const workHistory = data?.work_history || [];
   const counts = data?.counts;
   const assignedProjects = data?.assigned_projects || [];
-  const todayProjectNames = work?.project_names || [];
 
   const navigateAndClose = (href: string) => {
     onOpenChange(false);
@@ -310,52 +424,46 @@ export function ActiveUserActivityDialog({
                   </div>
                 ) : null}
 
-                {!work ? (
-                  <EmptyState message="No work submission for today yet." />
-                ) : (
-                  <>
-                    {work.planned_work ? (
-                      <div className="space-y-2.5 rounded-2xl border border-border/50 bg-gradient-to-br from-muted/40 to-muted/10 p-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                            Planned work
-                          </h4>
-                          {work.planned_work_status ? (
-                            <Badge variant="secondary" className="h-5 rounded-full capitalize">
-                              {work.planned_work_status.replace(/_/g, " ")}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                          {work.planned_work}
-                        </p>
-                        {work.planned_work_notes ? (
-                          <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-                            {work.planned_work_notes}
-                          </p>
-                        ) : null}
-                      </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Planned projects &amp; notes
+                    </h4>
+                    {workHistory.length > 0 ? (
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                        {workHistory.length} day{workHistory.length === 1 ? "" : "s"}
+                      </span>
                     ) : null}
+                  </div>
 
-                    {todayProjectNames.length > 0 ? (
-                      <div className="space-y-2.5">
-                        <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                          Today&apos;s planned projects
-                        </h4>
-                        <div className="flex flex-wrap gap-1.5">
-                          {todayProjectNames.map((name) => (
-                            <Badge key={name} variant="secondary" className="rounded-full font-normal">
-                              {name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
+                  {workHistory.length > 0 ? (
+                    <div className="space-y-3">
+                      {workHistory.map((day) => (
+                        <PlannedDayCard
+                          key={`${day.submission_date}-${day.id ?? "row"}`}
+                          day={day}
+                        />
+                      ))}
+                    </div>
+                  ) : !work ? (
+                    <EmptyState message="No planned projects or notes for today or previous days." />
+                  ) : (
+                    <EmptyState message="Checked in, but no planned projects or notes yet." />
+                  )}
+                </div>
 
+                {work &&
+                ((work.tasks?.completed?.length || 0) > 0 ||
+                  (work.tasks?.ongoing?.length || 0) > 0 ||
+                  (work.tasks?.pending?.length || 0) > 0 ||
+                  (work.project_updates?.length || 0) > 0) ? (
+                  <div className="space-y-4 border-t border-border/40 pt-4">
+                    <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Today&apos;s task update
+                    </h4>
                     <TaskSection title="Completed" items={work.tasks?.completed || []} />
                     <TaskSection title="Ongoing" items={work.tasks?.ongoing || []} />
                     <TaskSection title="Pending" items={work.tasks?.pending || []} />
-                    <TaskSection title="Notes / upcoming" items={work.tasks?.upcoming || []} />
 
                     {work.project_updates && work.project_updates.length > 0 ? (
                       <div className="space-y-2.5">
@@ -377,17 +485,8 @@ export function ActiveUserActivityDialog({
                         ))}
                       </div>
                     ) : null}
-
-                    {!work.planned_work &&
-                    !(work.tasks?.completed?.length ||
-                      work.tasks?.ongoing?.length ||
-                      work.tasks?.pending?.length ||
-                      work.tasks?.upcoming?.length) &&
-                    !(work.project_updates?.length) ? (
-                      <EmptyState message="Checked in, but no work details submitted yet." />
-                    ) : null}
-                  </>
-                )}
+                  </div>
+                ) : null}
               </TabsContent>
 
               <TabsContent value="bugs" className="mt-0 space-y-2.5">

@@ -48,6 +48,7 @@ export interface UserActivitySnapshotItem {
 export interface UserActivitySnapshotWork {
   id?: number | null;
   submission_date?: string | null;
+  is_today?: boolean;
   check_in_time?: string | null;
   checkout_time?: string | null;
   hours_today?: number;
@@ -75,9 +76,27 @@ export interface UserActivitySnapshotWork {
   };
 }
 
+export interface UserActivityWorkHistoryDay {
+  id?: number | null;
+  submission_date: string;
+  is_today?: boolean;
+  check_in_time?: string | null;
+  hours_today?: number;
+  planned_work?: string | null;
+  planned_work_status?: string | null;
+  planned_work_notes?: string | null;
+  planned_projects?: string[];
+  project_names?: string[];
+  notes?: string;
+  tasks?: {
+    upcoming?: string[];
+  };
+}
+
 export interface UserActivitySnapshot {
   user: User;
   work: UserActivitySnapshotWork | null;
+  work_history?: UserActivityWorkHistoryDay[];
   assigned_projects?: Array<{
     id: string;
     name: string;
