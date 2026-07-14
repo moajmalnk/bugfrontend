@@ -22,6 +22,8 @@ import {
   formatBugLevelLabel,
 } from "@/lib/bugMetaUtils";
 import { Badge } from "@/components/ui/badge";
+import { formatRetestSummary } from "@/components/bugs/details/TesterVerificationPanel";
+import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { GoogleDocsButton } from "./GoogleDocsButton";
@@ -267,6 +269,50 @@ export const BugDetailsCard = ({
                     </span>
                   </div>
                 )}
+              {bugState.status === "fixed" && (
+                <>
+                  <div className="flex justify-between items-center text-sm gap-2">
+                    <span className="text-muted-foreground shrink-0">Retested:</span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "rounded-full text-xs",
+                        formatRetestSummary(bugState).className
+                      )}
+                    >
+                      {formatRetestSummary(bugState).label}
+                    </Badge>
+                  </div>
+                  {(bugState.tester_retested === true ||
+                    bugState.tester_retested === 1 ||
+                    String(bugState.tester_retested) === "1") && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Issue Fixed:</span>
+                      <span className="font-medium">
+                        {bugState.tester_issue_fixed === true ||
+                        bugState.tester_issue_fixed === 1 ||
+                        String(bugState.tester_issue_fixed) === "1"
+                          ? "Yes"
+                          : bugState.tester_issue_fixed === false ||
+                              bugState.tester_issue_fixed === 0 ||
+                              String(bugState.tester_issue_fixed) === "0"
+                            ? "No"
+                            : "—"}
+                      </span>
+                    </div>
+                  )}
+                  {(bugState.tester_verified_by_name ||
+                    bug.tester_verified_by_name) && (
+                    <div className="flex justify-between items-center text-sm gap-2">
+                      <span className="text-muted-foreground shrink-0">Verified By:</span>
+                      <span className="font-medium text-right truncate">
+                        {bugState.tester_verified_by_name ||
+                          bug.tester_verified_by_name}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
 

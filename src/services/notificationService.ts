@@ -185,12 +185,22 @@ class NotificationService {
     return this.sendBugNotification('New Bug Reported', body, 'new');
   }
 
-  async sendBugStatusNotification(bugTitle: string, status: string): Promise<boolean> {
-    return this.sendBugNotification(
-      'Bug Status Updated',
-      `${bugTitle} has been marked as ${status}`,
-      'status_change'
-    );
+  async sendBugStatusNotification(
+    bugTitle: string,
+    status: string,
+    extras?: { bugLevel?: string; alreadyRaised?: boolean | number | string | null }
+  ): Promise<boolean> {
+    const metaLine = extras
+      ? bugMetaTextLines({
+          bug_level: extras.bugLevel,
+          already_raised: extras.alreadyRaised,
+        })
+      : "";
+    const body = metaLine
+      ? `${bugTitle} has been marked as ${status}\n${metaLine}`
+      : `${bugTitle} has been marked as ${status}`;
+
+    return this.sendBugNotification('Bug Status Updated', body, 'status_change');
   }
 
   async sendBugFixedNotification(bug: {

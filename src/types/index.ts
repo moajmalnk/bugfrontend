@@ -24,6 +24,13 @@ export type Bug = {
   fix_description?: string | null;
   already_raised?: boolean;
   bug_level?: BugLevel;
+  /** NULL pending, 0 no, 1 yes — tester retested after fix */
+  tester_retested?: boolean | number | null;
+  /** NULL N/A, 0 still broken, 1 confirmed fixed — only when retested=yes */
+  tester_issue_fixed?: boolean | number | null;
+  tester_verified_by?: string | null;
+  tester_verified_by_name?: string | null;
+  tester_verified_at?: string | null;
   screenshots?: Array<{
     id: string;
     name: string;

@@ -463,7 +463,10 @@ export const sendBugNotification = async (bug: any, subject: string, statusChang
     // Send browser notification if enabled
     if (settings.browserNotifications && settings.statusChangeNotifications) {
       const statusText = statusChange ? statusChange.to : bug.status;
-      browserResult = await notificationService.sendBugStatusNotification(bug.title, statusText);
+      browserResult = await notificationService.sendBugStatusNotification(bug.title, statusText, {
+        bugLevel: bug.bug_level,
+        alreadyRaised: bug.already_raised,
+      });
     }
 
     return {

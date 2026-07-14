@@ -8,6 +8,10 @@ import {
 } from "@/components/ui/dialog";
 import { DocumentPreviewBody } from "@/components/attachments/DocumentPreviewBody";
 import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
+import {
+  formatRetestSummary,
+  TesterVerificationPanel,
+} from "@/components/bugs/details/TesterVerificationPanel";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import {
   alreadyRaisedBadgeClass,
@@ -22,9 +26,11 @@ import { useMalayalamToggle } from "@/hooks/useMalayalamToggle";
 import { Bug } from "@/types";
 import { ENV } from "@/lib/env";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
+import { cn } from "@/lib/utils";
 import {
   Briefcase,
   Calendar,
+  ClipboardCheck,
   Clock,
   Download,
   Eye,
@@ -39,9 +45,10 @@ import { useEffect, useState } from "react";
 
 interface BugContentCardsProps {
   bug: Bug;
+  onBugUpdated?: (bug: Bug) => void;
 }
 
-export function BugContentCards({ bug }: BugContentCardsProps) {
+export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
   const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
   const [voiceNoteDurations, setVoiceNoteDurations] = useState<{
     [key: string]: number;
@@ -329,8 +336,8 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
         </Card>
       )}
 
-      {/* Fix Description Card - Only show if status is fixed and fix_description exists */}
-      {bug.status === 'fixed' && bug.fix_description && (
+      {/* Fix Description Card - show for fixed bugs so tester verification is always available */}
+      {bug.status === 'fixed' && (
         <Card className="relative overflow-hidden rounded-2xl border border-green-200/60 dark:border-green-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-green-50/30 via-transparent to-emerald-50/30 dark:from-green-950/10 dark:via-transparent dark:to-emerald-950/10" />
           <CardHeader className="relative">
@@ -342,9 +349,13 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="relative">
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <p className="whitespace-pre-wrap break-words text-green-800 dark:text-green-200">{bug.fix_description}</p>
-            </div>
+            {bug.fix_description ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <p className="whitespace-pre-wrap break-words text-green-800 dark:text-green-200">{bug.fix_description}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No fix notes were provided.</p>
+            )}
             {/* Fix Information */}
             <div className="mt-4 pt-4 border-t border-green-200/30 dark:border-green-800/30">
               <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
@@ -364,6 +375,8 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
                 </div>
               )}
             </div>
+
+            <TesterVerificationPanel bug={bug} onUpdated={onBugUpdated} />
           </CardContent>
         </Card>
       )}
@@ -704,6 +717,100 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
               )}
             </div>
           </div>
+
+          {bug.status === "fixed" && (
+            <div className="mt-5 rounded-xl border border-sky-200/60 dark:border-sky-800/40 bg-sky-50/40 dark:bg-sky-950/20 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ClipboardCheck className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                  <span className="text-sm font-semibold text-foreground">
+                    Tester verification
+                  </span>
+                </div>
+                {(() => {
+                  const summary = formatRetestSummary(bug);
+                  return (
+                    <Badge
+                      variant="outline"
+                      className={cn("rounded-full font-medium", summary.className)}
+                    >
+                      {summary.label}
+                    </Badge>
+                  );
+                })()}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium">Tester tested again:</span>
+                  <Badge variant="outline" className="rounded-full">
+                    {bug.tester_retested === true ||
+                    bug.tester_retested === 1 ||
+                    bug.tester_retested === "1"
+                      ? "Yes"
+                      : bug.tester_retested === false ||
+                          bug.tester_retested === 0 ||
+                          bug.tester_retested === "0"
+                        ? "No"
+                        : "Not recorded"}
+                  </Badge>
+                </div>
+
+                {(bug.tester_retested === true ||
+                  bug.tester_retested === 1 ||
+                  bug.tester_retested === "1") && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium">Issue fixed:</span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "rounded-full",
+                        bug.tester_issue_fixed === true ||
+                          bug.tester_issue_fixed === 1 ||
+                          bug.tester_issue_fixed === "1"
+                          ? "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"
+                          : bug.tester_issue_fixed === false ||
+                              bug.tester_issue_fixed === 0 ||
+                              bug.tester_issue_fixed === "0"
+                            ? "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800"
+                            : ""
+                      )}
+                    >
+                      {bug.tester_issue_fixed === true ||
+                      bug.tester_issue_fixed === 1 ||
+                      bug.tester_issue_fixed === "1"
+                        ? "Yes"
+                        : bug.tester_issue_fixed === false ||
+                            bug.tester_issue_fixed === 0 ||
+                            bug.tester_issue_fixed === "0"
+                          ? "No"
+                          : "Not recorded"}
+                    </Badge>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium">Bug Level:</span>
+                  <Badge variant="outline" className={bugLevelBadgeClass(bug.bug_level)}>
+                    {formatBugLevelLabel(bug.bug_level)}
+                  </Badge>
+                </div>
+
+                {(bug.tester_verified_by_name || bug.tester_verified_at) && (
+                  <div className="flex items-center gap-2 flex-wrap sm:col-span-2">
+                    <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-medium">Verified by:</span>
+                    <span className="text-sm text-muted-foreground">
+                      {bug.tester_verified_by_name || "Unknown"}
+                      {bug.tester_verified_at
+                        ? ` · ${formatDetailedDate(bug.tester_verified_at)}`
+                        : ""}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -39,6 +39,8 @@ import {
 import React, { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import { formatRetestSummary } from "@/components/bugs/details/TesterVerificationPanel";
+import { cn } from "@/lib/utils";
 
 // Enhanced table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -59,6 +61,9 @@ const TableRowSkeleton = () => (
       <Skeleton className="h-5 w-28 lg:w-32" />
     </TableCell>
     <TableCell className="hidden 2xl:table-cell">
+      <Skeleton className="h-5 w-28 lg:w-32" />
+    </TableCell>
+    <TableCell className="hidden xl:table-cell">
       <Skeleton className="h-5 w-28 lg:w-32" />
     </TableCell>
     <TableCell className="text-right">
@@ -211,6 +216,24 @@ const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
               </div>
             </div>
           </div>
+
+          {(() => {
+            const retest = formatRetestSummary(bug);
+            return (
+              <div className="flex items-center gap-3 p-3 bg-sky-50/50 dark:bg-sky-900/20 rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                    Tester verification
+                  </span>
+                  <div className="mt-1.5">
+                    <Badge variant="outline" className={cn("rounded-full font-medium", retest.className)}>
+                      {retest.label}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Action Button */}
@@ -359,6 +382,9 @@ const Fixes = () => {
                   </TableHead>
                   <TableHead className="hidden xl:table-cell">
                     Fixed By
+                  </TableHead>
+                  <TableHead className="hidden xl:table-cell">
+                    Verification
                   </TableHead>
                   <TableHead className="hidden 2xl:table-cell">
                     Fixed Date
@@ -978,6 +1004,9 @@ const Fixes = () => {
                   <TableHead className="hidden xl:table-cell font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                     Fixed By
                   </TableHead>
+                  <TableHead className="hidden xl:table-cell font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                    Verification
+                  </TableHead>
                   <TableHead className="hidden 2xl:table-cell font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                     Fixed Date
                   </TableHead>
@@ -1024,6 +1053,19 @@ const Fixes = () => {
                     </TableCell>
                     <TableCell className="hidden xl:table-cell text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
                       {bug.updated_by_name || "BugRicer"}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell py-4">
+                      {(() => {
+                        const retest = formatRetestSummary(bug);
+                        return (
+                          <Badge
+                            variant="outline"
+                            className={cn("rounded-full text-xs font-medium whitespace-nowrap", retest.className)}
+                          >
+                            {retest.label}
+                          </Badge>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="hidden 2xl:table-cell text-sm sm:text-base text-gray-600 dark:text-gray-400 py-4 font-medium">
                       {formatDate(bug.updated_at)}

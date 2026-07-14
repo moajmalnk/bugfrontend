@@ -931,7 +931,16 @@ const BugDetails = () => {
         <div className="grid grid-cols-1 gap-8">
           {/* Main Content - Description, Screenshots, Voice Notes, Attachments, Bug Information */}
           <section className="space-y-8">
-            <BugContentCards bug={bug} />
+            <BugContentCards
+              bug={bug}
+              onBugUpdated={(updated) => {
+                queryClient.setQueryData(["bug", bug.id], updated);
+                queryClient.invalidateQueries({ queryKey: ["bugs"] });
+                setBugList((prevList) =>
+                  prevList.map((b) => (b.id === updated.id ? { ...b, ...updated } : b))
+                );
+              }}
+            />
           </section>
           {/* Move Bug Details below Bug Information as requested */}
           <section className="space-y-8">

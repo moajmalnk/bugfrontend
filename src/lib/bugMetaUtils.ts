@@ -62,12 +62,10 @@ export function bugMetaTextLines(bug: {
   bug_level?: BugLevel | string | null;
   already_raised?: boolean | number | string | null;
 }): string {
-  const lines: string[] = [];
-  lines.push(`📊 *Bug Level:* ${formatBugLevelLabel(bug.bug_level)}`);
-  if (isAlreadyRaised(bug.already_raised)) {
-    lines.push(`🔁 *Already Raised:* Yes`);
-  }
-  return lines.join("\n");
+  return [
+    `📊 Bug Level: ${formatBugLevelLabel(bug.bug_level)}`,
+    `🔁 Already Raised: ${formatAlreadyRaisedLabel(bug.already_raised)}`,
+  ].join("\n");
 }
 
 export const BUG_LEVEL_FORM_OPTIONS: {
