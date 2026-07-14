@@ -36,6 +36,7 @@ import {
   ProjectFormValues,
 } from '@/lib/utils/projectUtils';
 import { User } from '@/types';
+import type { Client } from '@/types';
 import {
   ArrowLeft,
   Building2,
@@ -69,6 +70,7 @@ interface ProjectFormProps {
   onCancel: () => void;
   isSubmitting: boolean;
   users: User[];
+  clients?: Client[];
   existingAttachments?: ProjectAttachment[];
   projectMeta?: Pick<Project, 'created_at' | 'created_by' | 'status' | 'start_date' | 'deadline_date'>;
   createdByName?: string;
@@ -355,6 +357,7 @@ export function ProjectForm({
   onCancel,
   isSubmitting,
   users,
+  clients = [],
   existingAttachments = [],
   projectMeta,
   createdByName,
@@ -662,90 +665,49 @@ export function ProjectForm({
 
               <SectionBlock
                 title="Client Details"
-                description="Client contact and account information"
+                description="Link this project to a client profile"
                 icon={Building2}
                 iconClass="bg-gradient-to-br from-amber-500 to-orange-600"
               >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-3 sm:col-span-2">
-                    <FieldLabel htmlFor="client_name" dotClass="from-amber-500 to-orange-600">
-                      Client Name
-                    </FieldLabel>
-                    <Input
-                      id="client_name"
-                      placeholder="e.g. CODO AI Innovations"
-                      value={values.client_name}
-                      onChange={(e) => setField('client_name', e.target.value)}
-                      className={cn(inputClass, 'focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500')}
-                    />
-                  </div>
-                  <div className="space-y-3 sm:col-span-2">
-                    <FieldLabel htmlFor="client_location" dotClass="from-yellow-500 to-amber-600">
-                      Location
-                    </FieldLabel>
-                    <Input
-                      id="client_location"
-                      placeholder="City, Country"
-                      value={values.client_location}
-                      onChange={(e) => setField('client_location', e.target.value)}
-                      className={cn(inputClass, 'focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500')}
-                    />
-                  </div>
+                <div className="space-y-4">
                   <div className="space-y-3">
-                    <FieldLabel htmlFor="client_contact_name" dotClass="from-orange-500 to-red-600">
-                      Primary Contact
-                    </FieldLabel>
-                    <Input
-                      id="client_contact_name"
-                      placeholder="Contact name"
-                      value={values.client_contact_name}
-                      onChange={(e) => setField('client_contact_name', e.target.value)}
-                      className={cn(inputClass, 'focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500')}
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <FieldLabel htmlFor="client_account_status" dotClass="from-green-500 to-emerald-600">
-                      Account Status
+                    <FieldLabel htmlFor="client_id" dotClass="from-amber-500 to-orange-600">
+                      Client
                     </FieldLabel>
                     <SearchableSelect
-                      value={values.client_account_status}
-                      onValueChange={(v) =>
-                        setField('client_account_status', v as ProjectFormValues['client_account_status'])
-                      }
-                      placeholder="Select account status"
-                      searchPlaceholder="Search status..."
-                      options={[
-                        { value: 'active', label: 'Active' },
-                        { value: 'inactive', label: 'Inactive' },
-                      ]}
-                      triggerClassName="focus:ring-2 focus:ring-green-500/50"
+                      id="client_id"
+                      value={values.client_id}
+                      onValueChange={(v) => {
+                        const selected = clients.find((c) => c.id === v);
+                        onChange({
+                          ...values,
+                          client_id: v,
+                          client_name: selected?.corporate_name || '',
+                        });
+                      }}
+                      placeholder="Select a client..."
+                      searchPlaceholder="Search clients..."
+                      emptyMessage="No clients found."
+                      options={clients.map((client) => ({
+                        value: client.id,
+                        label: client.corporate_name,
+                        searchValue: `${client.corporate_name} ${client.primary_contact_name || ''} ${client.direct_email || ''}`,
+                      }))}
+                      triggerClassName="focus:ring-2 focus:ring-amber-500/50"
                     />
+                    <Link
+                      to={`/${effectiveRole}/clients/new`}
+                      className="text-sm text-blue-600 hover:underline inline-flex items-center gap-1"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Create new client
+                    </Link>
                   </div>
-                  <div className="space-y-3">
-                    <FieldLabel htmlFor="client_email" dotClass="from-blue-500 to-cyan-600">
-                      Email
-                    </FieldLabel>
-                    <Input
-                      id="client_email"
-                      type="email"
-                      placeholder="client@example.com"
-                      value={values.client_email}
-                      onChange={(e) => setField('client_email', e.target.value)}
-                      className={cn(inputClass, 'focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500')}
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <FieldLabel htmlFor="client_phone" dotClass="from-indigo-500 to-purple-600">
-                      Phone
-                    </FieldLabel>
-                    <Input
-                      id="client_phone"
-                      placeholder="+91 ..."
-                      value={values.client_phone}
-                      onChange={(e) => setField('client_phone', e.target.value)}
-                      className={cn(inputClass, 'focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500')}
-                    />
-                  </div>
+                  {values.client_id && !clients.some((c) => c.id === values.client_id) && values.client_name && (
+                    <p className="text-sm text-muted-foreground">
+                      Linked client: {values.client_name}
+                    </p>
+                  )}
                 </div>
               </SectionBlock>
 

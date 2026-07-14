@@ -116,9 +116,7 @@ const Bugs = () => {
       const data = await bugService.getBugs({
         page: 1,
         limit: 1000,
-        status: "pending",
-        userId: currentUser?.id,
-      }); // or a higher limit if needed
+      });
       setBugs(data.bugs);
       setCurrentPage(data.pagination.currentPage);
       setTotalBugs(data.pagination.totalBugs);

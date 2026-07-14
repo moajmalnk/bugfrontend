@@ -36,8 +36,9 @@ import { CompliancePipelineStage, getPipelineStageLabel } from "@/lib/codo/compl
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { canReportBug } from "@/lib/utils";
 import { getProjectStatusLabel } from "@/lib/utils/projectUtils";
-import { bugService } from "@/services/bugService";
 import { Project, projectService } from "@/services/projectService";
+import { clientService } from "@/services/clientService";
+import { Client } from "@/types";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -54,7 +55,7 @@ import {
   Users,
   Plus,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
@@ -140,30 +141,29 @@ interface ProjectMemberCounts {
   testers: number;
 }
 
-interface ProjectMember {
-  id: string | number;
-  role?: string;
-}
-
 const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [skeletonLoading, setSkeletonLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
   
   // Use persisted filters hook
   const [filters, setFilter, clearFilters] = usePersistedFilters("projects", {
     searchQuery: "",
     statusFilter: "all",
     dateFilter: "all",
+    clientFilter: "all",
   });
   const searchQuery = filters.searchQuery || "";
   const statusFilter = filters.statusFilter || "all";
   const dateFilter = filters.dateFilter || "all";
+  const clientFilter = filters.clientFilter || "all";
   
   const setSearchQuery = (value: string) => setFilter("searchQuery", value);
   const setStatusFilter = (value: string) => setFilter("statusFilter", value);
   const setDateFilter = (value: string) => setFilter("dateFilter", value);
+  const setClientFilter = (value: string) => setFilter("clientFilter", value);
+  const [clientsList, setClientsList] = useState<Client[]>([]);
   const { currentUser } = useAuth();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -180,9 +180,6 @@ const Projects = () => {
   const [projectMemberCounts, setProjectMemberCounts] = useState<
     Record<string, ProjectMemberCounts>
   >({});
-  const [userProjectMemberships, setUserProjectMemberships] = useState<
-    Record<string, boolean>
-  >({});
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -191,183 +188,110 @@ const Projects = () => {
   const [itemsPerPage, setItemsPerPage] = useState(12);
   const [projectToUndo, setProjectToUndo] = useState<Project | null>(null);
 
+  const userProjectMemberships = useMemo(() => {
+    if (!currentUser || projects.length === 0) {
+      return {};
+    }
+    const memberships: Record<string, boolean> = {};
+    projects.forEach((project) => {
+      memberships[project.id] =
+        currentUser.role === "admin" ||
+        (project.members || []).some((memberId) => String(memberId) === String(currentUser.id));
+    });
+    return memberships;
+  }, [projects, currentUser]);
+
   useEffect(() => {
     // Fetch projects when component mounts
     fetchProjects();
+    if (currentUser?.role === "admin" || currentUser?.role === "developer") {
+      clientService.getClients().then(setClientsList).catch(() => {});
+    }
   }, []);
+
+  useEffect(() => {
+    const clientIdFromUrl = searchParams.get("client_id");
+    if (clientIdFromUrl && clientIdFromUrl !== clientFilter) {
+      setClientFilter(clientIdFromUrl);
+    }
+  }, [searchParams]);
+
+  const applyStatsBundle = useCallback(
+    (stats: {
+      bugs: Record<string, number>;
+      open: Record<string, number>;
+      fixed: Record<string, number>;
+      members: Record<string, ProjectMemberCounts>;
+    }) => {
+      setProjectBugsCount(stats.bugs);
+      setProjectOpenBugsCount(stats.open);
+      setProjectFixedBugsCount(stats.fixed);
+      setProjectMemberCounts(stats.members);
+    },
+    []
+  );
 
   const fetchProjects = async () => {
     try {
       setIsLoading(true);
-      setSkeletonLoading(true);
-
-      // Show skeleton immediately for better UX
+      setStatsLoading(true);
       const data = await projectService.getProjects();
       setProjects(data);
       setFilteredProjects(data);
 
-      // For better UX, if there are no projects, show empty state immediately
-      if (data.length === 0) {
-        setSkeletonLoading(false);
-      }
+      const stats = await projectService.resolveProjectStats(data);
+      const totalCounts: Record<string, number> = {};
+      const openCounts: Record<string, number> = {};
+      const fixedCounts: Record<string, number> = {};
+      const memberCounts: Record<string, ProjectMemberCounts> = {};
+
+      Object.entries(stats.bugs || {}).forEach(([projectId, bugStats]) => {
+        totalCounts[projectId] = bugStats.total;
+        openCounts[projectId] = bugStats.open;
+        fixedCounts[projectId] = bugStats.fixed;
+      });
+
+      Object.entries(stats.members || {}).forEach(([projectId, memberStats]) => {
+        memberCounts[projectId] = {
+          total: memberStats.total,
+          developers: memberStats.developers,
+          testers: memberStats.testers,
+        };
+      });
+
+      applyStatsBundle({
+        bugs: totalCounts,
+        open: openCounts,
+        fixed: fixedCounts,
+        members: memberCounts,
+      });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to load projects. Please try again.",
         variant: "destructive",
       });
-      setSkeletonLoading(false);
     } finally {
       setIsLoading(false);
+      setStatsLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (projects.length > 0) {
-      // Fetch project membership/member counts first (batched), then bug counts.
-      const minLoadingTime = 800; // 800ms minimum for better UX
-      const startTime = Date.now();
-      
-      fetchProjectMembershipAndCounts().then(() => {
-        // After membership is determined, fetch bugs
-        fetchAndCountBugs();
-        
-        const elapsedTime = Date.now() - startTime;
-        const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
-        
-        // If loading was too fast, add a small delay for better UX
-        setTimeout(() => {
-          setSkeletonLoading(false);
-        }, remainingTime);
-      }).catch(() => {
-        // Even on error, ensure skeleton is turned off
-        setSkeletonLoading(false);
-      });
-    }
-  }, [projects]);
-
   // Apply filtering whenever search query, memberships, tab, or filters change
   useEffect(() => {
-    if (projects.length > 0 && Object.keys(userProjectMemberships).length > 0) {
+    if (projects.length > 0) {
       applyFilters();
     }
-  }, [searchQuery, userProjectMemberships, projects, tabFromUrl, statusFilter, dateFilter]);
+  }, [searchQuery, userProjectMemberships, projects, tabFromUrl, statusFilter, dateFilter, clientFilter]);
 
   // Reset current page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, userProjectMemberships, projects.length, statusFilter, dateFilter]);
-
-  const mapWithConcurrency = async <T, R>(
-    items: T[],
-    concurrency: number,
-    mapper: (item: T) => Promise<R>
-  ): Promise<R[]> => {
-    const results: R[] = new Array(items.length);
-    let currentIndex = 0;
-
-    const workers = new Array(Math.min(concurrency, items.length))
-      .fill(null)
-      .map(async () => {
-        while (currentIndex < items.length) {
-          const index = currentIndex++;
-          results[index] = await mapper(items[index]);
-        }
-      });
-
-    await Promise.all(workers);
-    return results;
-  };
-
-  const fetchProjectMembershipAndCounts = async () => {
-    if (!currentUser) {
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        return;
-      }
-
-      const memberships: Record<string, boolean> = {};
-      const memberCounts: Record<string, ProjectMemberCounts> = {};
-
-      // Admins have access to all projects
-      if (currentUser.role === "admin") {
-        projects.forEach((project) => {
-          memberships[project.id] = true;
-        });
-      }
-
-      // Batched requests to avoid overwhelming API and causing 500 bursts.
-      const results = await mapWithConcurrency(projects, 5, async (project) => {
-        try {
-          const response = await fetch(
-            `${ENV.API_URL}/projects/get_members.php?project_id=${project.id}`,
-            {
-              headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-              const members: ProjectMember[] = data.data?.members || [];
-              const isMember = members.some(
-                (member) => String(member.id) === String(currentUser.id)
-              );
-              const developers = members.filter((m) => m.role === "developer").length;
-              const testers = members.filter((m) => m.role === "tester").length;
-              return {
-                projectId: project.id,
-                isMember,
-                counts: {
-                  total: members.length,
-                  developers,
-                  testers,
-                },
-              };
-            }
-          }
-          return {
-            projectId: project.id,
-            isMember: false,
-            counts: { total: 0, developers: 0, testers: 0 },
-          };
-        } catch (error) {
-          return {
-            projectId: project.id,
-            isMember: false,
-            counts: { total: 0, developers: 0, testers: 0 },
-          };
-        }
-      });
-
-      results.forEach(({ projectId, isMember, counts }) => {
-        if (currentUser.role !== "admin") {
-          memberships[projectId] = isMember;
-        }
-        memberCounts[projectId] = counts;
-      });
-
-      setUserProjectMemberships(memberships);
-      setProjectMemberCounts(memberCounts);
-    } catch (error) {
-      console.error("Error fetching memberships/member counts:", error);
-    }
-  };
+  }, [searchQuery, userProjectMemberships, projects.length, statusFilter, dateFilter, clientFilter]);
 
   // Apply all filters (search, membership, status, and custom filters)
   const applyFilters = () => {
-    if (
-      projects.length === 0 ||
-      Object.keys(userProjectMemberships).length === 0
-    ) {
+    if (projects.length === 0) {
       setFilteredProjects([]);
       return;
     }
@@ -376,10 +300,13 @@ const Projects = () => {
 
     // Filter by search query
     if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (project) =>
-          project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          project.description.toLowerCase().includes(searchQuery.toLowerCase())
+          project.name.toLowerCase().includes(q) ||
+          project.description.toLowerCase().includes(q) ||
+          project.client?.corporate_name?.toLowerCase().includes(q) ||
+          project.client_name?.toLowerCase().includes(q)
       );
     }
 
@@ -395,6 +322,10 @@ const Projects = () => {
     // Apply custom status filter
     if (statusFilter !== "all") {
       filtered = filtered.filter(project => project.status === statusFilter);
+    }
+
+    if (clientFilter !== "all") {
+      filtered = filtered.filter((project) => project.client_id === clientFilter);
     }
 
     // Apply date filter
@@ -441,70 +372,11 @@ const Projects = () => {
     setFilteredProjects(filtered);
   };
 
-  const fetchAndCountBugs = async () => {
-    try {
-      const totalCounts: Record<string, number> = {};
-      const openCounts: Record<string, number> = {};
-      const fixedCounts: Record<string, number> = {};
-
-      // Wait for membership data to be available
-      if (Object.keys(userProjectMemberships).length === 0) {
-        return;
-      }
-
-      // Only fetch bugs for projects where user is a member
-      const accessibleProjects = projects.filter(project => 
-        userProjectMemberships[project.id] || currentUser?.role === "admin"
-      );
-
-      if (accessibleProjects.length === 0) {
-        return;
-      }
-
-      // Batched requests to reduce backend pressure and avoid 500 spikes.
-      const bugResults = await mapWithConcurrency(accessibleProjects, 4, async (project) => {
-        try {
-          const { bugs } = await bugService.getBugs({
-            projectId: project.id,
-            page: 1,
-            limit: 1000,
-            status: "pending",
-            userId: currentUser?.id,
-          });
-
-          const openBugs = bugs.filter(
-            (bug) => bug.status === "pending" || bug.status === "in_progress"
-          );
-          const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
-
-          return {
-            projectId: project.id,
-            total: bugs.length,
-            open: openBugs.length,
-            fixed: fixedBugs.length,
-          };
-        } catch (error) {
-          return {
-            projectId: project.id,
-            total: 0,
-            open: 0,
-            fixed: 0,
-          };
-        }
-      });
-
-      bugResults.forEach(({ projectId, total, open, fixed }) => {
-        totalCounts[projectId] = total;
-        openCounts[projectId] = open;
-        fixedCounts[projectId] = fixed;
-      });
-
-      setProjectBugsCount(totalCounts);
-      setProjectOpenBugsCount(openCounts);
-      setProjectFixedBugsCount(fixedCounts);
-    } catch (error) {
-      console.error("Error fetching bug counts:", error);
+  const renderStatCount = (value: number | undefined) => {
+    if (statsLoading) {
+      return <Skeleton className="h-6 w-8" />;
     }
+    return value ?? 0;
   };
 
   // Undo delete functionality
@@ -721,14 +593,10 @@ const Projects = () => {
 
   // clearFilters is now provided by usePersistedFilters hook
 
-  const hasActiveFilters = searchQuery || statusFilter !== "all" || dateFilter !== "all";
+  const hasActiveFilters = searchQuery || statusFilter !== "all" || dateFilter !== "all" || clientFilter !== "all";
 
-  // Fetch bugs after membership is determined
-  useEffect(() => {
-    if (projects.length > 0 && Object.keys(userProjectMemberships).length > 0) {
-      fetchAndCountBugs();
-    }
-  }, [projects, userProjectMemberships]);
+  const getProjectClientLabel = (project: Project) =>
+    project.client?.corporate_name || project.client_name || null;
 
   const totalFiltered = filteredProjects.length;
   // Sort projects by highest count of open bugs before pagination
@@ -770,7 +638,7 @@ const Projects = () => {
                 {hasActiveFilters && (
                   <div className="ml-auto flex items-center gap-2">
                     <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
-                      {[searchQuery && "Search", statusFilter !== "all" && "Status", dateFilter !== "all" && "Date"].filter(Boolean).length} filter{([searchQuery && "Search", statusFilter !== "all" && "Status", dateFilter !== "all" && "Date"].filter(Boolean).length) !== 1 ? "s" : ""} active
+                      {[searchQuery && "Search", statusFilter !== "all" && "Status", dateFilter !== "all" && "Date", clientFilter !== "all" && "Client"].filter(Boolean).length} filter{([searchQuery && "Search", statusFilter !== "all" && "Status", dateFilter !== "all" && "Date", clientFilter !== "all" && "Client"].filter(Boolean).length) !== 1 ? "s" : ""} active
                     </div>
                   </div>
                 )}
@@ -809,6 +677,29 @@ const Projects = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {(currentUser?.role === "admin" || currentUser?.role === "developer") &&
+                    tabFromUrl === "all-projects" &&
+                    clientsList.length > 0 && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1.5 bg-amber-500 rounded-lg shrink-0">
+                      <Users className="h-4 w-4 text-white" />
+                    </div>
+                    <Select value={clientFilter} onValueChange={setClientFilter}>
+                      <SelectTrigger className="w-full sm:w-[160px] md:w-[180px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectValue placeholder="Client" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[60]">
+                        <SelectItem value="all">All Clients</SelectItem>
+                        {clientsList.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.corporate_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  )}
 
                   {/* Date Filter */}
                   <div className="flex items-center gap-2 min-w-0">
@@ -850,7 +741,7 @@ const Projects = () => {
         )}
 
         {/* Professional Responsive Pagination Controls - Show when there are multiple pages */}
-        {!skeletonLoading &&
+        {!isLoading &&
           !isLoading &&
           totalFiltered > 0 &&
           totalPages > 1 && (
@@ -1063,7 +954,7 @@ const Projects = () => {
         )}
 
         {/* Simple results info when no pagination needed - show when there are projects */}
-        {!skeletonLoading &&
+        {!isLoading &&
           !isLoading &&
           totalFiltered > 0 &&
           totalPages <= 1 && (
@@ -1093,11 +984,7 @@ const Projects = () => {
         )}
 
         {/* Projects Grid with Enhanced Professional Skeletons */}
-        {skeletonLoading ||
-        isLoading ||
-        (totalFiltered === 0 &&
-          projects.length > 0 &&
-          Object.keys(userProjectMemberships).length === 0) ? (
+        {isLoading ? (
         <div
           className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3"
           aria-busy="true"
@@ -1179,6 +1066,14 @@ const Projects = () => {
                     >
                       {getProjectStatusLabel(project.status)}
                     </Badge>
+                    {getProjectClientLabel(project) && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] sm:text-xs px-2 py-0.5 mb-2 rounded-full border-amber-500/40 text-amber-700 dark:text-amber-300"
+                      >
+                        {getProjectClientLabel(project)}
+                      </Badge>
+                    )}
                     {project.compliance && showProjectActions && (
                       <Badge
                         variant="outline"
@@ -1220,7 +1115,7 @@ const Projects = () => {
                           Total
                         </span>
                         <span className="font-semibold text-lg sm:text-xl">
-                          {projectBugsCount[project.id] ?? 0}
+                          {renderStatCount(projectBugsCount[project.id])}
                         </span>
                         <span className="text-[10px] sm:text-xs text-muted-foreground">
                           Bugs
@@ -1231,7 +1126,7 @@ const Projects = () => {
                           Open
                         </span>
                         <span className="font-semibold text-lg sm:text-xl text-yellow-600 dark:text-yellow-400">
-                          {projectOpenBugsCount[project.id] ?? 0}
+                          {renderStatCount(projectOpenBugsCount[project.id])}
                         </span>
                         <span className="text-[10px] sm:text-xs text-muted-foreground">
                           Bugs
@@ -1242,7 +1137,7 @@ const Projects = () => {
                           Fixed
                         </span>
                         <span className="font-semibold text-lg sm:text-xl text-green-600 dark:text-green-400">
-                          {projectFixedBugsCount[project.id] ?? 0}
+                          {renderStatCount(projectFixedBugsCount[project.id])}
                         </span>
                         <span className="text-[10px] sm:text-xs text-muted-foreground">
                           Bugs
@@ -1265,7 +1160,7 @@ const Projects = () => {
                         >
                           <Code className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
                           <span className="text-xs sm:text-sm">
-                            {projectMemberCounts[project.id]?.developers ?? 0}
+                            {renderStatCount(projectMemberCounts[project.id]?.developers)}
                           </span>
                         </div>
                         <div
@@ -1274,7 +1169,7 @@ const Projects = () => {
                         >
                           <TestTube className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-600" />
                           <span className="text-xs sm:text-sm">
-                            {projectMemberCounts[project.id]?.testers ?? 0}
+                            {renderStatCount(projectMemberCounts[project.id]?.testers)}
                           </span>
                         </div>
                         <div className="flex items-center gap-1" title="Admins">
@@ -1431,7 +1326,7 @@ const Projects = () => {
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                        {skeletonLoading ? (
+                        {isLoading ? (
                           <div className="flex items-center gap-2">
                             <Skeleton className="h-6 w-8" />
                             <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>

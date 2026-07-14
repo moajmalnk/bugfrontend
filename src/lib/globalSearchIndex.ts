@@ -231,6 +231,14 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     subtitle: "Administration",
   },
   {
+    id: "page-clients",
+    label: "Clients",
+    path: "/clients",
+    keywords: ["clients", "client", "corporate", "customer", "companies"],
+    adminOnly: true,
+    subtitle: "Administration",
+  },
+  {
     id: "page-ot",
     label: "OT Requests",
     path: "/overtime-requests",

@@ -265,7 +265,6 @@ const Fixes = () => {
         page: 1,
         limit: 1000,
         status: "fixed",
-        userId: currentUser?.id,
       }),
   });
 

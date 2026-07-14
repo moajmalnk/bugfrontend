@@ -2,6 +2,8 @@ export type ProjectStatus = 'active' | 'completed' | 'archived' | 'release_ready
 export type ClientAccountStatus = 'active' | 'inactive';
 export type ProjectMemberRole = 'manager' | 'developer' | 'tester';
 
+import type { ClientSummary } from '@/types';
+
 export interface ProjectComplianceSummaryLite {
   pipeline_stage: string;
   developer_verified: number;
@@ -30,6 +32,18 @@ export interface ProjectAttachment {
   created_at?: string;
 }
 
+export interface ProjectBugStatsLite {
+  total: number;
+  open: number;
+  fixed: number;
+}
+
+export interface ProjectMemberStatsLite {
+  total: number;
+  developers: number;
+  testers: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -38,6 +52,8 @@ export interface Project {
   created_by: string;
   created_at: string;
   updated_at: string;
+  client_id?: string | null;
+  client?: ClientSummary | null;
   client_name?: string | null;
   client_location?: string | null;
   client_contact_name?: string | null;
@@ -55,8 +71,45 @@ export interface Project {
   backend_finish_date?: string | null;
   members?: string[];
   members_detail?: ProjectMemberDetail[];
+  bug_stats?: ProjectBugStatsLite;
+  member_stats?: ProjectMemberStatsLite;
   attachments?: ProjectAttachment[];
   compliance?: ProjectComplianceSummaryLite;
+}
+
+export type ExtractedProjectStats = {
+  bugs: Record<string, number>;
+  open: Record<string, number>;
+  fixed: Record<string, number>;
+  members: Record<string, ProjectMemberStatsLite>;
+  hasEmbeddedStats: boolean;
+};
+
+export function extractStatsFromProjects(projects: Project[]): ExtractedProjectStats {
+  const bugs: Record<string, number> = {};
+  const open: Record<string, number> = {};
+  const fixed: Record<string, number> = {};
+  const members: Record<string, ProjectMemberStatsLite> = {};
+  let hasEmbeddedStats = false;
+
+  projects.forEach((project) => {
+    if (project.bug_stats) {
+      hasEmbeddedStats = true;
+      bugs[project.id] = project.bug_stats.total;
+      open[project.id] = project.bug_stats.open;
+      fixed[project.id] = project.bug_stats.fixed;
+    }
+    if (project.member_stats) {
+      hasEmbeddedStats = true;
+      members[project.id] = {
+        total: project.member_stats.total,
+        developers: project.member_stats.developers,
+        testers: project.member_stats.testers,
+      };
+    }
+  });
+
+  return { bugs, open, fixed, members, hasEmbeddedStats };
 }
 
 export interface ProjectMemberInput {
@@ -68,6 +121,7 @@ export interface CreateProjectData {
   name: string;
   description: string;
   status?: ProjectStatus;
+  client_id?: string | null;
   client_name?: string;
   client_location?: string;
   client_contact_name?: string;
@@ -92,6 +146,7 @@ export interface ProjectFormValues {
   name: string;
   description: string;
   status: ProjectStatus;
+  client_id: string;
   client_name: string;
   client_location: string;
   client_contact_name: string;
@@ -116,6 +171,7 @@ export const emptyProjectFormValues = (): ProjectFormValues => ({
   name: '',
   description: '',
   status: 'active',
+  client_id: '',
   client_name: '',
   client_location: '',
   client_contact_name: '',
@@ -142,7 +198,8 @@ export function projectToFormValues(project: Project): ProjectFormValues {
     name: project.name || '',
     description: project.description || '',
     status: project.status || 'active',
-    client_name: project.client_name || '',
+    client_id: project.client_id || project.client?.id || '',
+    client_name: project.client?.corporate_name || project.client_name || '',
     client_location: project.client_location || '',
     client_contact_name: project.client_contact_name || '',
     client_email: project.client_email || '',
@@ -179,6 +236,7 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
     name: values.name.trim(),
     description: values.description.trim(),
     status: values.status,
+    client_id: values.client_id.trim() || null,
     client_name: values.client_name.trim() || undefined,
     client_location: values.client_location.trim() || undefined,
     client_contact_name: values.client_contact_name.trim() || undefined,

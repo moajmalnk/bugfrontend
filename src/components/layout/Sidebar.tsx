@@ -8,6 +8,7 @@ import { PermissionGuard } from "@/components/PermissionGuard";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   Bell,
+  Building2,
   Bug,
   CheckCircle,
   FolderKanban,
@@ -313,6 +314,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/users"
                       icon={<Users className="h-5 w-5" />}
                       label="Users"
+                    />
+                  )}
+
+                  {hasUsersPermission && (
+                    <NavLink
+                      to="/clients"
+                      icon={<Building2 className="h-5 w-5" />}
+                      label="Clients"
                     />
                   )}
 

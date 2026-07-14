@@ -704,8 +704,6 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
         projectId: projectId,
         page: 1,
         limit: 1000,
-        status: "pending",
-        userId: currentUser?.id,
       });
       setBugs(data.bugs);
       setCurrentPage(data.pagination.currentPage);
@@ -786,7 +784,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
       case "my-bugs":
         return bugs.filter(
           (bug) =>
-            bug.reported_by === currentUser?.id &&
+            String(bug.reported_by) === String(currentUser?.id) &&
             validStatuses.includes(bug.status)
         ).length;
       default:
@@ -1805,7 +1803,6 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
         page: 1,
         limit: 1000,
         status: "fixed",
-        userId: currentUser?.id,
       });
       setBugs(data.bugs);
       setCurrentPage(data.pagination.currentPage);
@@ -1838,7 +1835,8 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
           break;
         case "my-fixes":
           filteredByTab = bugs.filter((bug) => {
-            return String(bug.reported_by) === String(currentUser.id);
+            const fixerId = bug.fixed_by || bug.updated_by;
+            return String(fixerId) === String(currentUser.id);
           });
           break;
         default:
@@ -1886,7 +1884,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
       case "my-fixes":
         return bugs.filter(
           (bug) =>
-            bug.reported_by === currentUser?.id &&
+            String(bug.fixed_by || bug.updated_by) === String(currentUser?.id) &&
             validStatuses.includes(bug.status)
         ).length;
       default:
@@ -4533,15 +4531,15 @@ const ProjectDetails = () => {
         .filter(() => roleFilter === "all" || roleFilter === "admin")
     : [];
 
-  const projectTabCounts = useMemo(
-    () => ({
-      bugs: bugs.length,
+  const projectTabCounts = useMemo(() => {
+    const openBugStatuses = ["pending", "in_progress", "declined", "rejected"];
+    return {
+      bugs: bugs.filter((bug) => openBugStatuses.includes(bug.status)).length,
       fixes: bugs.filter((bug) => bug.status === "fixed").length,
       updates: updates.length,
       tasks: sharedTasks.length,
-    }),
-    [bugs, updates, sharedTasks]
-  );
+    };
+  }, [bugs, updates, sharedTasks]);
 
   const memberStats = useMemo(() => {
     const stats: Record<string, { bugs: number; fixes: number }> = {};

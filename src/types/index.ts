@@ -112,6 +112,72 @@ export interface User {
   permissions?: string[]; // Effective permissions for the user
 }
 
+export type CommercialStatus = 'lead' | 'active' | 'inactive' | 'ended';
+export type MarketIndustry =
+  | 'fintech'
+  | 'healthcare'
+  | 'ecommerce'
+  | 'education'
+  | 'saas'
+  | 'manufacturing'
+  | 'real_estate'
+  | 'other';
+export type ReferralSource =
+  | 'direct'
+  | 'referral'
+  | 'website'
+  | 'social_media'
+  | 'event'
+  | 'partner'
+  | 'other';
+
+export interface ClientSummary {
+  id: string;
+  corporate_name: string;
+  website?: string | null;
+  market_industry?: MarketIndustry | null;
+  commercial_status?: CommercialStatus;
+  primary_contact_name?: string | null;
+  direct_email?: string | null;
+  direct_phone?: string | null;
+  hq_location?: string | null;
+}
+
+export interface ClientAttachment {
+  id: string;
+  client_id: string;
+  file_name: string;
+  file_path: string;
+  file_type?: string | null;
+  uploaded_by?: string | null;
+  created_at?: string;
+}
+
+export interface ClientLinkedProject {
+  id: string;
+  name: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Client extends ClientSummary {
+  gst_tax_id?: string | null;
+  position?: string | null;
+  birthday?: string | null;
+  date_of_joining?: string | null;
+  date_of_ending?: string | null;
+  referral_source?: ReferralSource | null;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  project_count?: number;
+  active_project_count?: number;
+  attachments?: ClientAttachment[];
+  projects?: ClientLinkedProject[];
+}
+
 // Messaging System Types
 export type MessageType = 'text' | 'voice' | 'reply' | 'image' | 'video' | 'document' | 'audio' | 'location' | 'contact';
 export type MediaType = 'image' | 'video' | 'document' | 'audio';

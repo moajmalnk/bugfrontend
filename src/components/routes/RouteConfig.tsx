@@ -111,6 +111,9 @@ const BugDetailsDiagnostic = lazy(() =>
 const NewBug = lazy(() => import("@/pages/NewBug"));
 const Activity = lazy(() => import("@/pages/Activity"));
 const Users = lazy(() => import("@/pages/Users"));
+const Clients = lazy(() => import("@/pages/Clients"));
+const ClientDetails = lazy(() => import("@/pages/ClientDetails"));
+const ClientFormPage = lazy(() => import("@/pages/ClientFormPage"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const BugBackup = lazy(() => import("@/pages/BugBackup"));
 const Profile = lazy(() => import("@/pages/Profile"));
@@ -345,6 +348,10 @@ const RouteConfig = () => {
       <Route path="/common-codo" element={<RolePathRedirect suffix="common-codo" />} />
       <Route path="/users/:userId" element={<RolePathRedirect suffix="users/:userId" />} />
       <Route path="/users" element={<RolePathRedirect suffix="users" />} />
+      <Route path="/clients/:clientId/edit" element={<RolePathRedirect suffix="clients/:clientId/edit" />} />
+      <Route path="/clients/new" element={<RolePathRedirect suffix="clients/new" />} />
+      <Route path="/clients/:clientId" element={<RolePathRedirect suffix="clients/:clientId" />} />
+      <Route path="/clients" element={<RolePathRedirect suffix="clients" />} />
       <Route path="/updates" element={<RolePathRedirect suffix="updates" />} />
       <Route path="/projects" element={<RolePathRedirect suffix="projects" />} />
       <Route path="/document" element={<RolePathRedirect suffix="document" />} />
@@ -371,6 +378,10 @@ const RouteConfig = () => {
           <Route path="activity" element={<Activity />} />
           <Route path="users" element={<Users />} />
           <Route path="users/:userId" element={<UserDetails />} />
+          <Route path="clients" element={<Clients />} />
+          <Route path="clients/new" element={<ClientFormPage />} />
+          <Route path="clients/:clientId/edit" element={<ClientFormPage />} />
+          <Route path="clients/:clientId" element={<ClientDetails />} />
           <Route path="users/:userId/add-hours" element={<AdminAddWorkHours />} />
           <Route path="users/:userId/work-stats/:periodStart" element={<UserWorkStatsPeriod />} />
           <Route path="users/:userId/permissions" element={<UserPermissions />} />

@@ -13,6 +13,7 @@ import {
   projectToFormValues,
 } from '@/services/projectService';
 import { userService } from '@/services/userService';
+import { clientService } from '@/services/clientService';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, FolderKanban, Pencil } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
@@ -71,6 +72,12 @@ const EditProject = () => {
   const { data: users = [] } = useQuery({
     queryKey: ['users', 'project-form'],
     queryFn: () => userService.getUsers(),
+    enabled: currentUser?.role === 'admin',
+  });
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients', 'project-form'],
+    queryFn: () => clientService.getClients(),
     enabled: currentUser?.role === 'admin',
   });
 
@@ -319,6 +326,7 @@ const EditProject = () => {
           onCancel={() => navigate(`/${currentUser.role}/projects/${projectId}`)}
           isSubmitting={isSubmitting}
           users={users}
+          clients={clients}
           existingAttachments={allAttachments}
           projectMeta={project}
           createdByName={createdByName}
