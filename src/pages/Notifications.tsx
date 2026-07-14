@@ -333,6 +333,8 @@ export default function Notifications() {
       } else if (notification.entity_type === 'compliance') {
         const projectId = notification.project_id || notification.entity_id;
         path = `/${role}/projects/${projectId}/compliance`;
+      } else if (notification.entity_type === 'codo' || notification.entity_type === 'codo_rule') {
+        path = `/${role}/common-codo`;
       }
       
       if (path) {

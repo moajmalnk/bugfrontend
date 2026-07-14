@@ -43,7 +43,6 @@ import { motion } from "framer-motion";
 import {
   AlertCircle,
   Bug,
-  Calendar,
   Clock,
   Code,
   FolderKanban,
@@ -151,17 +150,20 @@ const Projects = () => {
   const [filters, setFilter, clearFilters] = usePersistedFilters("projects", {
     searchQuery: "",
     statusFilter: "all",
-    dateFilter: "all",
+    developerFilter: "all",
+    testerFilter: "all",
     clientFilter: "all",
   });
   const searchQuery = filters.searchQuery || "";
   const statusFilter = filters.statusFilter || "all";
-  const dateFilter = filters.dateFilter || "all";
+  const developerFilter = filters.developerFilter || "all";
+  const testerFilter = filters.testerFilter || "all";
   const clientFilter = filters.clientFilter || "all";
   
   const setSearchQuery = (value: string) => setFilter("searchQuery", value);
   const setStatusFilter = (value: string) => setFilter("statusFilter", value);
-  const setDateFilter = (value: string) => setFilter("dateFilter", value);
+  const setDeveloperFilter = (value: string) => setFilter("developerFilter", value);
+  const setTesterFilter = (value: string) => setFilter("testerFilter", value);
   const setClientFilter = (value: string) => setFilter("clientFilter", value);
   const [clientsList, setClientsList] = useState<Client[]>([]);
   const { currentUser } = useAuth();
@@ -200,6 +202,34 @@ const Projects = () => {
     });
     return memberships;
   }, [projects, currentUser]);
+
+  const developerOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    projects.forEach((project) => {
+      (project.members_detail || []).forEach((member) => {
+        if (member.role === "developer" && member.user_id) {
+          byId.set(String(member.user_id), member.username || member.email || "Developer");
+        }
+      });
+    });
+    return Array.from(byId.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects]);
+
+  const testerOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    projects.forEach((project) => {
+      (project.members_detail || []).forEach((member) => {
+        if (member.role === "tester" && member.user_id) {
+          byId.set(String(member.user_id), member.username || member.email || "Tester");
+        }
+      });
+    });
+    return Array.from(byId.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects]);
 
   useEffect(() => {
     // Fetch projects when component mounts
@@ -282,12 +312,12 @@ const Projects = () => {
     if (projects.length > 0) {
       applyFilters();
     }
-  }, [searchQuery, userProjectMemberships, projects, tabFromUrl, statusFilter, dateFilter, clientFilter]);
+  }, [searchQuery, userProjectMemberships, projects, tabFromUrl, statusFilter, developerFilter, testerFilter, clientFilter]);
 
   // Reset current page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, userProjectMemberships, projects.length, statusFilter, dateFilter, clientFilter]);
+  }, [searchQuery, userProjectMemberships, projects.length, statusFilter, developerFilter, testerFilter, clientFilter]);
 
   // Apply all filters (search, membership, status, and custom filters)
   const applyFilters = () => {
@@ -328,38 +358,24 @@ const Projects = () => {
       filtered = filtered.filter((project) => project.client_id === clientFilter);
     }
 
-    // Apply date filter
-    if (dateFilter !== "all") {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
-      filtered = filtered.filter(project => {
-        const projectDate = new Date(project.created_at);
-        const projectDateOnly = new Date(projectDate.getFullYear(), projectDate.getMonth(), projectDate.getDate());
-        
-        switch (dateFilter) {
-          case "today":
-            return projectDateOnly.getTime() === today.getTime();
-          case "yesterday":
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            return projectDateOnly.getTime() === yesterday.getTime();
-          case "this_week":
-            const weekStart = new Date(today);
-            weekStart.setDate(today.getDate() - today.getDay());
-            return projectDateOnly >= weekStart;
-          case "this_month":
-            return projectDate.getMonth() === now.getMonth() && projectDate.getFullYear() === now.getFullYear();
-          case "last_month":
-            const lastMonth = new Date(now);
-            lastMonth.setMonth(lastMonth.getMonth() - 1);
-            return projectDate.getMonth() === lastMonth.getMonth() && projectDate.getFullYear() === lastMonth.getFullYear();
-          case "this_year":
-            return projectDate.getFullYear() === now.getFullYear();
-          default:
-            return true;
-        }
-      });
+    if (developerFilter !== "all") {
+      filtered = filtered.filter((project) =>
+        (project.members_detail || []).some(
+          (member) =>
+            member.role === "developer" &&
+            String(member.user_id) === String(developerFilter)
+        )
+      );
+    }
+
+    if (testerFilter !== "all") {
+      filtered = filtered.filter((project) =>
+        (project.members_detail || []).some(
+          (member) =>
+            member.role === "tester" &&
+            String(member.user_id) === String(testerFilter)
+        )
+      );
     }
 
     // For non-admin, non-developer users, only show assigned projects
@@ -593,7 +609,7 @@ const Projects = () => {
 
   // clearFilters is now provided by usePersistedFilters hook
 
-  const hasActiveFilters = searchQuery || statusFilter !== "all" || dateFilter !== "all" || clientFilter !== "all";
+  const hasActiveFilters = searchQuery || statusFilter !== "all" || developerFilter !== "all" || testerFilter !== "all" || clientFilter !== "all";
 
   const getProjectClientLabel = (project: Project) =>
     project.client?.corporate_name || project.client_name || null;
@@ -638,7 +654,7 @@ const Projects = () => {
                 {hasActiveFilters && (
                   <div className="ml-auto flex items-center gap-2">
                     <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
-                      {[searchQuery && "Search", statusFilter !== "all" && "Status", dateFilter !== "all" && "Date", clientFilter !== "all" && "Client"].filter(Boolean).length} filter{([searchQuery && "Search", statusFilter !== "all" && "Status", dateFilter !== "all" && "Date", clientFilter !== "all" && "Client"].filter(Boolean).length) !== 1 ? "s" : ""} active
+                      {[searchQuery && "Search", statusFilter !== "all" && "Status", developerFilter !== "all" && "Developer", testerFilter !== "all" && "Tester", clientFilter !== "all" && "Client"].filter(Boolean).length} filter{([searchQuery && "Search", statusFilter !== "all" && "Status", developerFilter !== "all" && "Developer", testerFilter !== "all" && "Tester", clientFilter !== "all" && "Client"].filter(Boolean).length) !== 1 ? "s" : ""} active
                     </div>
                   </div>
                 )}
@@ -701,23 +717,42 @@ const Projects = () => {
                   </div>
                   )}
 
-                  {/* Date Filter */}
+                  {/* Developer Filter */}
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                      <Calendar className="h-4 w-4 text-white" />
+                    <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0">
+                      <Code className="h-4 w-4 text-white" />
                     </div>
-                    <Select value={dateFilter} onValueChange={setDateFilter}>
-                      <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                        <SelectValue placeholder="Date" />
+                    <Select value={developerFilter} onValueChange={setDeveloperFilter}>
+                      <SelectTrigger className="w-full sm:w-[150px] md:w-[170px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectValue placeholder="Developer" />
                       </SelectTrigger>
                       <SelectContent position="popper" className="z-[60]">
-                        <SelectItem value="all">All Time</SelectItem>
-                        <SelectItem value="today">Today</SelectItem>
-                        <SelectItem value="yesterday">Yesterday</SelectItem>
-                        <SelectItem value="this_week">This Week</SelectItem>
-                        <SelectItem value="this_month">This Month</SelectItem>
-                        <SelectItem value="last_month">Last Month</SelectItem>
-                        <SelectItem value="this_year">This Year</SelectItem>
+                        <SelectItem value="all">All Developers</SelectItem>
+                        {developerOptions.map((developer) => (
+                          <SelectItem key={developer.id} value={developer.id}>
+                            {developer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Tester Filter */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                      <TestTube className="h-4 w-4 text-white" />
+                    </div>
+                    <Select value={testerFilter} onValueChange={setTesterFilter}>
+                      <SelectTrigger className="w-full sm:w-[150px] md:w-[170px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                        <SelectValue placeholder="Tester" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[60]">
+                        <SelectItem value="all">All Testers</SelectItem>
+                        {testerOptions.map((tester) => (
+                          <SelectItem key={tester.id} value={tester.id}>
+                            {tester.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
