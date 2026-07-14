@@ -808,6 +808,15 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                     </span>
                   </div>
                 )}
+
+                {bug.tester_verification_notes?.trim() ? (
+                  <div className="sm:col-span-2 space-y-1">
+                    <span className="text-sm font-medium">Verification notes:</span>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap rounded-lg border border-border/60 bg-background/50 px-3 py-2">
+                      {bug.tester_verification_notes}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
           )}

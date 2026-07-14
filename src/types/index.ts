@@ -31,6 +31,8 @@ export type Bug = {
   tester_verified_by?: string | null;
   tester_verified_by_name?: string | null;
   tester_verified_at?: string | null;
+  /** Notes from admin/tester during post-fix verification */
+  tester_verification_notes?: string | null;
   screenshots?: Array<{
     id: string;
     name: string;
@@ -50,6 +52,8 @@ export type Bug = {
     file_type: string;
     uploaded_by?: string;
     created_at?: string;
+    /** report | verification */
+    upload_context?: string | null;
   }>;
   fixed_by?: string | null;
   fixed_by_name?: string | null;
