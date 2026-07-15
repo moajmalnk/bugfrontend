@@ -1,5 +1,5 @@
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageSkeleton } from "@/components/layout/MainLayoutSkeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
@@ -16,42 +16,8 @@ import MeetRoom from "@/pages/MeetRoom";
 import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
 import { getEffectiveRole } from "@/lib/utils";
 
-// Professional Skeleton Loading Component
-const SkeletonFallback = () => (
-  <div className="container mx-auto px-4 py-8 animate-in fade-in duration-300 max-w-7xl">
-    {/* Header Skeleton */}
-    <div className="mb-8">
-      <Skeleton className="h-8 w-64 mb-2" />
-      <Skeleton className="h-4 w-32" />
-    </div>
-
-    {/* Content Skeleton - Adaptive Layout */}
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {/* Card Skeletons */}
-      {[1, 2, 3, 4, 5, 6].map((i) => (
-        <div key={i} className="border rounded-lg p-4 space-y-3">
-          <Skeleton className="h-5 w-3/4" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
-          <div className="flex items-center justify-between pt-2">
-            <Skeleton className="h-4 w-20 rounded-full" />
-            <Skeleton className="h-8 w-24" />
-          </div>
-        </div>
-      ))}
-    </div>
-
-    {/* Navigation Skeleton */}
-    <div className="mt-8 flex justify-between items-center">
-      <Skeleton className="h-10 w-32" />
-      <div className="flex gap-2">
-        <Skeleton className="h-10 w-10 rounded-full" />
-        <Skeleton className="h-10 w-10 rounded-full" />
-        <Skeleton className="h-10 w-10 rounded-full" />
-      </div>
-    </div>
-  </div>
-);
+// Shared page skeleton (mirrors real page geometry — header, toolbar, stats, cards)
+const SkeletonFallback = () => <PageSkeleton />;
 
 // New layout for role-based routes
 const ProtectedRoleLayout = () => (

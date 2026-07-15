@@ -12,7 +12,6 @@ import {
   Bug,
   CheckCircle,
   FolderKanban,
-  Menu,
   MessageCircle,
   MessageSquare,
   Video,
@@ -36,7 +35,6 @@ import {
   LayoutDashboard,
   Clapperboard,
 } from "lucide-react";
-import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
 import { useGlobalSearchModal } from "@/context/GlobalSearchContext";
@@ -469,89 +467,3 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   );
 };
 
-export default function MainLayout({ children }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  return (
-    <div className="flex h-screen min-w-0 bg-background">
-      {/* Sidebar for desktop */}
-      <div className="hidden lg:block w-72 min-w-0">
-        <Sidebar />
-      </div>
-
-      {/* Sidebar drawer for mobile/tablet */}
-      <div
-        className={`fixed inset-0 z-50 transition-all duration-300 ease-in-out lg:hidden ${
-          sidebarOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
-        }`}
-        onClick={() => setSidebarOpen(false)}
-        aria-label="Sidebar overlay"
-      >
-        {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-        
-        {/* Sidebar */}
-        <div
-          className={`absolute left-0 top-0 h-full w-80 max-w-[85vw] bg-card shadow-2xl transition-transform duration-300 ease-in-out ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Sidebar closeSidebar={() => setSidebarOpen(false)} />
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar with menu button on mobile/tablet */}
-        <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm sticky top-0 z-40">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open sidebar"
-              className="h-9 w-9 hover:bg-accent/80"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Bug className="h-5 w-5 text-primary" />
-              </div>
-              <span className="font-bold text-lg text-foreground">BugRicer</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Main content area */}
-        <main className="flex-1 overflow-y-auto min-w-0 bg-background">
-          <div className="h-full">
-            {children}
-          </div>
-          <div className="px-4 md:px-6 lg:px-8">
-            <footer className="max-w-7xl mx-auto mt-4 mb-6 border-t pt-4 pb-3">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-                <p className="order-2 sm:order-1">© {new Date().getFullYear()} BugRicer. All rights reserved.</p>
-                <div className="order-3 sm:order-2 flex items-center gap-3">
-                  <a href="mailto:support@bugricer.com" className="hover:text-foreground transition-colors" aria-label="Contact support">
-                    support@bugricer.com
-                  </a>
-                  <span className="hidden sm:inline text-border">|</span>
-                  <a href="https://bugricer.com" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors" aria-label="Visit website">
-                    bugricer.com
-                  </a>
-                </div>
-                <p className="order-1 sm:order-3 text-[11px] text-muted-foreground/80">
-                  Built with care for testers & developers
-                </p>
-              </div>
-            </footer>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}

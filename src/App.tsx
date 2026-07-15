@@ -12,8 +12,6 @@ import { BrowserRouter as Router } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { PWAEngagementPrompt } from "@/components/pwa/PWAEngagementPrompt";
 import ContextMenu from "./components/ContextMenu";
-import { MainLayout } from "@/components/layout/MainLayout";
-import Fixes from "@/pages/Fixes";
 import { ErrorBoundaryProvider } from "@/components/ErrorBoundaryManager";
 import { useApiErrorHandler } from "@/hooks/useApiErrorHandler";
 import { DebugInfo } from "@/components/DebugInfo";
@@ -375,8 +373,8 @@ function AppContent() {
         <PWAEngagementPrompt />
         <TimezoneDebug />
         {networkError && <NetworkError />}
-        <PerformanceMonitor enabled={process.env.NODE_ENV === 'development'} />
-        <BundleAnalyzer enabled={process.env.NODE_ENV === 'development'} />
+        <PerformanceMonitor enabled={import.meta.env.DEV} />
+        <BundleAnalyzer enabled={import.meta.env.DEV} />
         
         {/* Loading Error Modal */}
         <LoadingErrorModal
