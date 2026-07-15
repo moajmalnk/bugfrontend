@@ -110,14 +110,14 @@ export async function requestLeave(body: {
   start_date: string;
   end_date: string;
   reason?: string;
-}): Promise<LeaveRequest> {
+}): Promise<{ request: LeaveRequest; message: string }> {
   const res = await fetch(`${API}/request.php`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(body),
   });
   const data = await parseJson(res);
-  return data.data;
+  return { request: data.data, message: data?.message || 'Leave request submitted' };
 }
 
 export async function cancelLeaveRequest(id: number): Promise<LeaveRequest> {

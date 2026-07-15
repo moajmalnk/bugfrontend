@@ -192,13 +192,17 @@ export default function LeaveRequests() {
     }
     setSubmitting(true);
     try {
-      await requestLeave({
+      const { message } = await requestLeave({
         leave_type_id: Number(leaveTypeId),
         start_date: startDate,
         end_date: endDate || startDate,
         reason: reason.trim() || undefined,
       });
-      toast({ title: 'Leave requested', description: 'Waiting for admin approval.' });
+      const wasSplit = /split/i.test(message);
+      toast({
+        title: 'Leave requested',
+        description: wasSplit ? message : 'Waiting for admin approval.',
+      });
       setReason('');
       setStartDate('');
       setEndDate('');
