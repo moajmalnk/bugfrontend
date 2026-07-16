@@ -643,135 +643,134 @@ const Projects = () => {
       <>
         {/* Professional Search and Filter Controls - show when there are projects OR when there are active filters */}
         {(projects.length > 0 || hasActiveFilters) && (
-        <div className="relative">
+        <div className="relative min-w-0">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl"></div>
-          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 bg-blue-500 rounded-lg">
-                  <FolderKanban className="h-4 w-4 text-white" />
+          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 min-w-0 overflow-hidden">
+            <div className="space-y-4 min-w-0">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                    <FolderKanban className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+                    Search & Filter
+                  </h3>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-                {/* Show active filters indicator */}
                 {hasActiveFilters && (
-                  <div className="ml-auto flex items-center gap-2">
-                    <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium whitespace-nowrap">
                       {[searchQuery && "Search", statusFilter !== "all" && "Status", developerFilter !== "all" && "Developer", testerFilter !== "all" && "Tester", clientFilter !== "all" && "Client"].filter(Boolean).length} filter{([searchQuery && "Search", statusFilter !== "all" && "Status", developerFilter !== "all" && "Developer", testerFilter !== "all" && "Tester", clientFilter !== "all" && "Client"].filter(Boolean).length) !== 1 ? "s" : ""} active
                     </div>
                   </div>
                 )}
               </div>
-              
-              <div className="flex flex-col md:flex-row gap-4">
-                {/* Search Bar */}
-                <div className="flex-1 relative group">
-                  <FolderKanban className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                  <input
-                    type="text"
-                    placeholder="Search projects by name or description..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                  />
+
+              {/* Search — always full width */}
+              <div className="w-full min-w-0 relative group">
+                <FolderKanban className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Search projects by name or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full min-w-0 pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                />
+              </div>
+
+              {/* Filters — wrap into a responsive grid instead of one overflowing row */}
+              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-green-500 rounded-lg shrink-0">
+                    <Clock className="h-4 w-4 text-white" />
+                  </div>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[60]">
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="release_ready">Release Ready</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                {/* Filter Controls */}
-                <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                  {/* Status Filter */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-green-500 rounded-lg shrink-0">
-                      <Clock className="h-4 w-4 text-white" />
-                    </div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-[60]">
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="release_ready">Release Ready</SelectItem>
-                        <SelectItem value="archived">Archived</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {(currentUser?.role === "admin" || currentUser?.role === "developer") &&
+                  tabFromUrl === "all-projects" &&
+                  clientsList.length > 0 && (
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-amber-500 rounded-lg shrink-0">
+                    <Users className="h-4 w-4 text-white" />
                   </div>
+                  <Select value={clientFilter} onValueChange={setClientFilter}>
+                    <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                      <SelectValue placeholder="Client" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[60]">
+                      <SelectItem value="all">All Clients</SelectItem>
+                      {clientsList.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.corporate_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                )}
 
-                  {(currentUser?.role === "admin" || currentUser?.role === "developer") &&
-                    tabFromUrl === "all-projects" &&
-                    clientsList.length > 0 && (
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-amber-500 rounded-lg shrink-0">
-                      <Users className="h-4 w-4 text-white" />
-                    </div>
-                    <Select value={clientFilter} onValueChange={setClientFilter}>
-                      <SelectTrigger className="w-full sm:w-[160px] md:w-[180px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                        <SelectValue placeholder="Client" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-[60]">
-                        <SelectItem value="all">All Clients</SelectItem>
-                        {clientsList.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.corporate_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0">
+                    <Code className="h-4 w-4 text-white" />
                   </div>
-                  )}
+                  <Select value={developerFilter} onValueChange={setDeveloperFilter}>
+                    <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                      <SelectValue placeholder="Developer" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[60]">
+                      <SelectItem value="all">All Developers</SelectItem>
+                      {developerOptions.map((developer) => (
+                        <SelectItem key={developer.id} value={developer.id}>
+                          {developer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {/* Developer Filter */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0">
-                      <Code className="h-4 w-4 text-white" />
-                    </div>
-                    <Select value={developerFilter} onValueChange={setDeveloperFilter}>
-                      <SelectTrigger className="w-full sm:w-[150px] md:w-[170px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                        <SelectValue placeholder="Developer" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-[60]">
-                        <SelectItem value="all">All Developers</SelectItem>
-                        {developerOptions.map((developer) => (
-                          <SelectItem key={developer.id} value={developer.id}>
-                            {developer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                    <TestTube className="h-4 w-4 text-white" />
                   </div>
-
-                  {/* Tester Filter */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                      <TestTube className="h-4 w-4 text-white" />
-                    </div>
-                    <Select value={testerFilter} onValueChange={setTesterFilter}>
-                      <SelectTrigger className="w-full sm:w-[150px] md:w-[170px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                        <SelectValue placeholder="Tester" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-[60]">
-                        <SelectItem value="all">All Testers</SelectItem>
-                        {testerOptions.map((tester) => (
-                          <SelectItem key={tester.id} value={tester.id}>
-                            {tester.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Clear Filters Button */}
-                  {hasActiveFilters && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearFilters}
-                      className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                    >
-                      Clear
-                    </Button>
-                  )}
+                  <Select value={testerFilter} onValueChange={setTesterFilter}>
+                    <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                      <SelectValue placeholder="Tester" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[60]">
+                      <SelectItem value="all">All Testers</SelectItem>
+                      {testerOptions.map((tester) => (
+                        <SelectItem key={tester.id} value={tester.id}>
+                          {tester.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+
+              {hasActiveFilters && (
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1319,35 +1318,34 @@ const Projects = () => {
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <div className="min-w-0 w-full space-y-6 sm:space-y-8">
         {/* Professional Header */}
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden min-w-0">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-green-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg">
-                    <FolderKanban className="h-6 w-6 text-white" />
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8 min-w-0">
+            <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:justify-between lg:items-center">
+              <div className="space-y-2 sm:space-y-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
+                    <FolderKanban className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
                       Projects
                     </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
+                    <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl">
                   Manage your projects and track bugs
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex flex-col xs:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full lg:w-auto shrink-0">
                 {currentUser?.role === "admin" && (
                   <Button
                     asChild
-                    className="h-11 sm:h-12 text-sm sm:text-base shrink-0"
+                    className="h-11 sm:h-12 text-sm sm:text-base w-full sm:w-auto"
                     aria-label="Create a new project"
                   >
                     <Link to={`/${currentUser.role}/projects/new`}>
@@ -1356,9 +1354,9 @@ const Projects = () => {
                   </Button>
                 )}
 
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-emerald-50 dark:from-blue-950/30 dark:to-emerald-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
-                    <div className="p-1.5 bg-blue-600 rounded-lg">
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-emerald-50 dark:from-blue-950/30 dark:to-emerald-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm w-full sm:w-auto justify-center sm:justify-start">
+                    <div className="p-1.5 bg-blue-600 rounded-lg shrink-0">
                       <FolderKanban className="h-5 w-5 text-white" />
                     </div>
                     <div>
@@ -1387,35 +1385,35 @@ const Projects = () => {
             onValueChange={handleTabChange}
             className="w-full"
           >
-            <div className="relative">
+            <div className="relative min-w-0">
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
-              <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-                <TabsList className="grid w-full grid-cols-2 h-14 bg-transparent p-1">
+              <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-1.5 sm:p-2 min-w-0 overflow-hidden">
+                <TabsList className="grid w-full grid-cols-2 h-auto min-h-12 sm:h-14 bg-transparent p-1 gap-1">
                   <TabsTrigger
                     value="all-projects"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                    className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 py-2.5 sm:px-3"
                   >
-                    <FolderKanban className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">
+                    <FolderKanban className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
+                    <span className="hidden sm:inline truncate">
                       {currentUser?.role === "admin" ? "All Projects" : "All Projects"}
                     </span>
-                    <span className="sm:hidden">All</span>
-                    <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
+                    <span className="sm:hidden truncate">All</span>
+                    <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
                       {projects.length}
                     </span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="my-projects"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
+                    className="text-xs sm:text-sm md:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 px-2 py-2.5 sm:px-3"
                   >
-                    <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
+                    <span className="hidden sm:inline truncate">
                       {currentUser?.role === "admin" ? "My Projects" : "Assigned Projects"}
                     </span>
-                    <span className="sm:hidden">
+                    <span className="sm:hidden truncate">
                       {currentUser?.role === "admin" ? "My" : "Assigned"}
                     </span>
-                    <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
+                    <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
                       {projects.filter(p => userProjectMemberships[p.id]).length}
                     </span>
                   </TabsTrigger>
@@ -1435,7 +1433,6 @@ const Projects = () => {
             {renderProjectsContent()}
           </div>
         )}
-      </section>
 
       {/* Delete Dialog */}
       {isDeleteDialogOpen && (
@@ -1614,7 +1611,7 @@ const Projects = () => {
         onUndo={handleUndoClick}
         onConfirmNow={confirmDelete}
       />
-    </main>
+    </div>
   );
 };
 
