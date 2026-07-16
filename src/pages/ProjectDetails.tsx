@@ -104,6 +104,7 @@ import {
   Search,
   Share2,
   Shield,
+  ShieldCheck,
   TestTube,
   User,
   Users,
@@ -4864,13 +4865,31 @@ const ProjectDetails = () => {
               </div>
               <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full"></div>
             </div>
-            {currentUser?.role === "admin" && (
-              <Button asChild className="w-full xl:w-auto mt-0 flex-shrink-0" size="sm">
-                <Link to={`/${currentUser.role}/projects/${projectId}/edit`}>
-                  <Pencil className="mr-2 h-4 w-4" /> Edit Project
-                </Link>
-              </Button>
-            )}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full xl:w-auto flex-shrink-0">
+              {(currentUser?.role === "admin" ||
+                currentUser?.role === "developer" ||
+                currentUser?.role === "tester") && (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/40"
+                >
+                  <Link
+                    to={`/${currentUser.role}/projects/${projectId}/compliance`}
+                  >
+                    <ShieldCheck className="mr-2 h-4 w-4" /> Compliance
+                  </Link>
+                </Button>
+              )}
+              {currentUser?.role === "admin" && (
+                <Button asChild className="w-full sm:w-auto" size="sm">
+                  <Link to={`/${currentUser.role}/projects/${projectId}/edit`}>
+                    <Pencil className="mr-2 h-4 w-4" /> Edit Project
+                  </Link>
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>

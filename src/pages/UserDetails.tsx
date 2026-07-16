@@ -3,6 +3,7 @@ import { ActiveHours } from "@/components/users/ActiveHours";
 import { ChangePasswordDialog } from "@/components/users/ChangePasswordDialog";
 import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
+import { UserProjectsDialog } from "@/components/users/UserProjectsDialog";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ import {
   Phone,
   Shield,
   Trash2,
+  UserPlus,
   UserRound,
   UserCheck,
   UserX,
@@ -156,6 +158,10 @@ export default function UserDetails() {
 
   const canAdminManageAccount =
     effectiveRole === "admin" && currentUser?.id && user?.id && currentUser.id !== user.id;
+  const canManageUserProjects =
+    effectiveRole === "admin" &&
+    Boolean(user?.id) &&
+    (user?.role === "developer" || user?.role === "tester");
   const isAccountDeactivated = user?.account_active === 0;
 
   const handleUserUpdate = (updated: User) => {
@@ -246,14 +252,40 @@ export default function UserDetails() {
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <Button
-                  variant="outline"
-                  className="h-11 rounded-xl border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-900/40 backdrop-blur hover:bg-white/80 dark:hover:bg-gray-900/60"
-                  onClick={() => navigate(`/${effectiveRole}/users`)}
-                >
-                  Back to Users
-                </Button>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {canManageUserProjects && user ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-11 w-11 rounded-xl shrink-0 border border-gray-200/60 dark:border-gray-700/60"
+                      onClick={() => navigate(`/${effectiveRole}/users`)}
+                      aria-label="Back to Users"
+                      title="Back to Users"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <UserProjectsDialog
+                      user={user}
+                      onChanged={() => void refetch()}
+                      trigger={
+                        <Button className="h-11 rounded-xl inline-flex items-center justify-center gap-2 w-full sm:w-auto">
+                          <UserPlus className="h-4 w-4 shrink-0" />
+                          Assign Projects
+                        </Button>
+                      }
+                    />
+                  </>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="h-11 rounded-xl border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-900/40 backdrop-blur hover:bg-white/80 dark:hover:bg-gray-900/60"
+                    onClick={() => navigate(`/${effectiveRole}/users`)}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Users
+                  </Button>
+                )}
               </div>
             </div>
           </div>

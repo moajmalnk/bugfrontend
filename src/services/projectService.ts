@@ -273,6 +273,52 @@ class ProjectService {
       return empty;
     }
   }
+
+  async getUserAssignedProjects(userId: string): Promise<UserAssignedProject[]> {
+    const response = await apiClient.get<{
+      success: boolean;
+      data?: { projects?: UserAssignedProject[] };
+      message?: string;
+    }>(`/projects/get_user_projects.php?user_id=${encodeURIComponent(userId)}`);
+
+    if (response.data.success) {
+      return response.data.data?.projects || [];
+    }
+    throw new Error(response.data.message || 'Failed to load user projects');
+  }
+
+  async addProjectMember(
+    projectId: string,
+    userId: string,
+    role: string
+  ): Promise<void> {
+    const response = await apiClient.post<{ success: boolean; message?: string }>(
+      '/projects/add_member.php',
+      { project_id: projectId, user_id: userId, role }
+    );
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Failed to assign project');
+    }
+  }
+
+  async removeProjectMember(projectId: string, userId: string): Promise<void> {
+    const response = await apiClient.post<{ success: boolean; message?: string }>(
+      '/projects/remove_member.php',
+      { project_id: projectId, user_id: userId }
+    );
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Failed to remove from project');
+    }
+  }
 }
+
+export type UserAssignedProject = {
+  id: string;
+  name: string;
+  status?: string;
+  description?: string | null;
+  member_role?: string;
+  joined_at?: string;
+};
 
 export const projectService = new ProjectService();
