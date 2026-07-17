@@ -4,7 +4,9 @@ import {
   computeProjectDurationDays,
   formatProjectDate,
   getProjectStatusLabel,
+  parseProjectPlatforms,
   Project,
+  PROJECT_PLATFORM_OPTIONS,
 } from '@/lib/utils/projectUtils';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -12,11 +14,14 @@ import {
   Calendar,
   ExternalLink,
   FileText,
+  Github,
+  Globe,
   Layers,
   Mail,
   MapPin,
   Paperclip,
   Phone,
+  Smartphone,
   UserCircle,
   Users,
 } from 'lucide-react';
@@ -225,6 +230,32 @@ function renderDescription(text?: string) {
   );
 }
 
+function LinkOrText({ label, value }: { label: string; value?: string | null }) {
+  const content = value?.trim();
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1.5">{label}</p>
+      {content ? (
+        /^https?:\/\//i.test(content) ? (
+          <a
+            href={content}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-start gap-1.5 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400 break-all"
+          >
+            <ExternalLink className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            {content}
+          </a>
+        ) : (
+          <p className="text-sm font-medium text-gray-900 dark:text-white break-all">{content}</p>
+        )
+      ) : (
+        <p className="text-sm text-muted-foreground italic">Not set</p>
+      )}
+    </div>
+  );
+}
+
 export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverviewProps) {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -235,6 +266,23 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
   const techStack = project.technology_stack
     ? project.technology_stack.split(',').map((s) => s.trim()).filter(Boolean)
     : [];
+  const platforms = parseProjectPlatforms(project.platforms);
+  const platformLabels = platforms.map(
+    (p) => PROJECT_PLATFORM_OPTIONS.find((o) => o.value === p)?.label || p
+  );
+  const hasDomains =
+    Boolean(project.frontend_domain?.trim()) ||
+    Boolean(project.backend_domain?.trim()) ||
+    Boolean(project.vercel_domain?.trim());
+  const hasAppUrls =
+    Boolean(project.app_url_ios?.trim()) ||
+    Boolean(project.app_url_android?.trim()) ||
+    Boolean(project.testflight_url?.trim());
+  const hasGithub =
+    Boolean(project.github_frontend?.trim()) ||
+    Boolean(project.github_backend?.trim()) ||
+    Boolean(project.github_app?.trim());
+  const hasPlatformsSection = platforms.length > 0 || hasAppUrls;
 
   const leads = members.filter((m) => m.role === 'manager').map((m) => m.username || 'Unknown');
   const developers = members.filter((m) => m.role === 'developer').map((m) => m.username || 'Unknown');
@@ -363,6 +411,49 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
       <SectionShell title="Reference Sites / Themes" icon={ExternalLink} accent="slate">
         {renderDescription(project.reference_sites_or_themes)}
       </SectionShell>
+
+      {(hasDomains || hasPlatformsSection || hasGithub) && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+          {hasDomains && (
+            <SectionShell title="Domains & Deployment" icon={Globe} accent="blue">
+              <div className="space-y-4">
+                <LinkOrText label="Frontend Domain" value={project.frontend_domain} />
+                <LinkOrText label="Backend Domain" value={project.backend_domain} />
+                <LinkOrText label="Vercel Domain" value={project.vercel_domain} />
+              </div>
+            </SectionShell>
+          )}
+
+          {hasPlatformsSection && (
+            <SectionShell title="Platforms & App URLs" icon={Smartphone} accent="violet">
+              <div className="space-y-4">
+                {platformLabels.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {platformLabels.map((label) => (
+                      <Badge key={label} variant="secondary" className="rounded-lg">
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+                <LinkOrText label="iOS App URL" value={project.app_url_ios} />
+                <LinkOrText label="Android App URL" value={project.app_url_android} />
+                <LinkOrText label="TestFlight URL" value={project.testflight_url} />
+              </div>
+            </SectionShell>
+          )}
+
+          {hasGithub && (
+            <SectionShell title="GitHub Repositories" icon={Github} accent="slate">
+              <div className="space-y-4">
+                <LinkOrText label="Web Frontend" value={project.github_frontend} />
+                <LinkOrText label="Backend" value={project.github_backend} />
+                <LinkOrText label="App" value={project.github_app} />
+              </div>
+            </SectionShell>
+          )}
+        </div>
+      )}
 
       <SectionShell title="Attachments" icon={Paperclip} accent="slate">
         {attachments.length > 0 ? (

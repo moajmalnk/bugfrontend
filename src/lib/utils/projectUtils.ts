@@ -1,8 +1,29 @@
 export type ProjectStatus = 'active' | 'completed' | 'archived' | 'release_ready';
 export type ClientAccountStatus = 'active' | 'inactive';
 export type ProjectMemberRole = 'manager' | 'developer' | 'tester';
+/** Comma-separated in DB; use helpers below. */
+export type ProjectPlatform = 'web' | 'ios' | 'android';
 
 import type { ClientSummary } from '@/types';
+
+export const PROJECT_PLATFORM_OPTIONS: { value: ProjectPlatform; label: string }[] = [
+  { value: 'web', label: 'Web' },
+  { value: 'ios', label: 'iOS App' },
+  { value: 'android', label: 'Android App' },
+];
+
+export function parseProjectPlatforms(value?: string | null): ProjectPlatform[] {
+  if (!value?.trim()) return [];
+  const allowed = new Set<ProjectPlatform>(['web', 'ios', 'android']);
+  return value
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s): s is ProjectPlatform => allowed.has(s as ProjectPlatform));
+}
+
+export function serializeProjectPlatforms(platforms: ProjectPlatform[]): string {
+  return platforms.join(',');
+}
 
 export interface ProjectComplianceSummaryLite {
   pipeline_stage: string;
@@ -62,6 +83,17 @@ export interface Project {
   client_account_status?: ClientAccountStatus;
   technology_stack?: string | null;
   reference_sites_or_themes?: string | null;
+  frontend_domain?: string | null;
+  backend_domain?: string | null;
+  vercel_domain?: string | null;
+  /** Comma-separated: web,ios,android */
+  platforms?: string | null;
+  app_url_ios?: string | null;
+  app_url_android?: string | null;
+  testflight_url?: string | null;
+  github_frontend?: string | null;
+  github_backend?: string | null;
+  github_app?: string | null;
   start_date?: string | null;
   deadline_date?: string | null;
   expected_publish_date?: string | null;
@@ -130,6 +162,16 @@ export interface CreateProjectData {
   client_account_status?: ClientAccountStatus;
   technology_stack?: string;
   reference_sites_or_themes?: string;
+  frontend_domain?: string;
+  backend_domain?: string;
+  vercel_domain?: string;
+  platforms?: string;
+  app_url_ios?: string;
+  app_url_android?: string;
+  testflight_url?: string;
+  github_frontend?: string;
+  github_backend?: string;
+  github_app?: string;
   start_date?: string;
   deadline_date?: string;
   expected_publish_date?: string;
@@ -155,6 +197,16 @@ export interface ProjectFormValues {
   client_account_status: ClientAccountStatus;
   technology_stack: string;
   reference_sites_or_themes: string;
+  frontend_domain: string;
+  backend_domain: string;
+  vercel_domain: string;
+  platforms: ProjectPlatform[];
+  app_url_ios: string;
+  app_url_android: string;
+  testflight_url: string;
+  github_frontend: string;
+  github_backend: string;
+  github_app: string;
   start_date: string;
   deadline_date: string;
   expected_publish_date: string;
@@ -180,6 +232,16 @@ export const emptyProjectFormValues = (): ProjectFormValues => ({
   client_account_status: 'active',
   technology_stack: '',
   reference_sites_or_themes: '',
+  frontend_domain: '',
+  backend_domain: '',
+  vercel_domain: '',
+  platforms: [],
+  app_url_ios: '',
+  app_url_android: '',
+  testflight_url: '',
+  github_frontend: '',
+  github_backend: '',
+  github_app: '',
   start_date: '',
   deadline_date: '',
   expected_publish_date: '',
@@ -207,6 +269,16 @@ export function projectToFormValues(project: Project): ProjectFormValues {
     client_account_status: project.client_account_status || 'active',
     technology_stack: project.technology_stack || '',
     reference_sites_or_themes: project.reference_sites_or_themes || '',
+    frontend_domain: project.frontend_domain || '',
+    backend_domain: project.backend_domain || '',
+    vercel_domain: project.vercel_domain || '',
+    platforms: parseProjectPlatforms(project.platforms),
+    app_url_ios: project.app_url_ios || '',
+    app_url_android: project.app_url_android || '',
+    testflight_url: project.testflight_url || '',
+    github_frontend: project.github_frontend || '',
+    github_backend: project.github_backend || '',
+    github_app: project.github_app || '',
     start_date: project.start_date || '',
     deadline_date: project.deadline_date || '',
     expected_publish_date: project.expected_publish_date || '',
@@ -245,6 +317,16 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
     client_account_status: values.client_account_status,
     technology_stack: values.technology_stack.trim() || undefined,
     reference_sites_or_themes: values.reference_sites_or_themes.trim() || undefined,
+    frontend_domain: values.frontend_domain.trim() || undefined,
+    backend_domain: values.backend_domain.trim() || undefined,
+    vercel_domain: values.vercel_domain.trim() || undefined,
+    platforms: serializeProjectPlatforms(values.platforms) || undefined,
+    app_url_ios: values.app_url_ios.trim() || undefined,
+    app_url_android: values.app_url_android.trim() || undefined,
+    testflight_url: values.testflight_url.trim() || undefined,
+    github_frontend: values.github_frontend.trim() || undefined,
+    github_backend: values.github_backend.trim() || undefined,
+    github_app: values.github_app.trim() || undefined,
     start_date: values.start_date || undefined,
     deadline_date: values.deadline_date || undefined,
     expected_publish_date: values.expected_publish_date || undefined,

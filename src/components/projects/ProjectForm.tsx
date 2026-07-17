@@ -30,10 +30,12 @@ import {
   computeProjectDurationDays,
   formatProjectDate,
   getProjectStatusLabel,
+  PROJECT_PLATFORM_OPTIONS,
   Project,
   ProjectAttachment,
   ProjectComplianceSummaryLite,
   ProjectFormValues,
+  type ProjectPlatform,
 } from '@/lib/utils/projectUtils';
 import { User } from '@/types';
 import type { Client } from '@/types';
@@ -47,10 +49,13 @@ import {
   File,
   FileText,
   FolderKanban,
+  Github,
+  Globe,
   Layers,
   Paperclip,
   Plus,
   ShieldCheck,
+  Smartphone,
   UserCircle,
   Users,
   X,
@@ -819,6 +824,200 @@ export function ProjectForm({
               </SectionBlock>
 
               <SectionBlock
+                title="Domains & Deployment"
+                description="Frontend, backend, and hosting domains"
+                icon={Globe}
+                iconClass="bg-gradient-to-br from-sky-500 to-blue-600"
+              >
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-3 sm:col-span-2 lg:col-span-1">
+                    <FieldLabel
+                      htmlFor="frontend_domain"
+                      dotClass="from-sky-500 to-blue-600"
+                      hint="Public web / SPA domain"
+                    >
+                      Frontend Domain
+                    </FieldLabel>
+                    <Input
+                      id="frontend_domain"
+                      placeholder="e.g. https://app.example.com"
+                      value={values.frontend_domain}
+                      onChange={(e) => setField('frontend_domain', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500')}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel
+                      htmlFor="backend_domain"
+                      dotClass="from-indigo-500 to-violet-600"
+                      hint="API / server domain"
+                    >
+                      Backend Domain
+                    </FieldLabel>
+                    <Input
+                      id="backend_domain"
+                      placeholder="e.g. https://api.example.com"
+                      value={values.backend_domain}
+                      onChange={(e) => setField('backend_domain', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500')}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel
+                      htmlFor="vercel_domain"
+                      dotClass="from-zinc-500 to-slate-700"
+                      hint="Vercel preview or production URL"
+                    >
+                      Vercel Domain
+                    </FieldLabel>
+                    <Input
+                      id="vercel_domain"
+                      placeholder="e.g. https://project.vercel.app"
+                      value={values.vercel_domain}
+                      onChange={(e) => setField('vercel_domain', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500')}
+                    />
+                  </div>
+                </div>
+              </SectionBlock>
+
+              <SectionBlock
+                title="Platforms & App URLs"
+                description="Planning Web, iOS, Android — or both"
+                icon={Smartphone}
+                iconClass="bg-gradient-to-br from-violet-500 to-fuchsia-600"
+              >
+                <div className="space-y-3">
+                  <FieldLabel
+                    dotClass="from-violet-500 to-fuchsia-600"
+                    hint="Select everything this project will ship"
+                  >
+                    Target Platforms
+                  </FieldLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {PROJECT_PLATFORM_OPTIONS.map((opt) => {
+                      const selected = values.platforms.includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            const next: ProjectPlatform[] = selected
+                              ? values.platforms.filter((p) => p !== opt.value)
+                              : [...values.platforms, opt.value];
+                            setField('platforms', next);
+                          }}
+                          className={cn(
+                            'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all',
+                            selected
+                              ? 'border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-300 shadow-sm'
+                              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-muted-foreground hover:border-violet-300'
+                          )}
+                        >
+                          {selected ? <Check className="h-4 w-4" /> : null}
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {(values.platforms.includes('ios') ||
+                  values.platforms.includes('android')) && (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pt-2">
+                    {values.platforms.includes('ios') && (
+                      <>
+                        <div className="space-y-3">
+                          <FieldLabel htmlFor="app_url_ios" dotClass="from-blue-500 to-cyan-600">
+                            iOS App URL
+                          </FieldLabel>
+                          <Input
+                            id="app_url_ios"
+                            placeholder="App Store / deep link URL"
+                            value={values.app_url_ios}
+                            onChange={(e) => setField('app_url_ios', e.target.value)}
+                            className={cn(inputClass, 'focus:ring-2 focus:ring-blue-500/50')}
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          <FieldLabel htmlFor="testflight_url" dotClass="from-sky-500 to-blue-600">
+                            TestFlight URL
+                          </FieldLabel>
+                          <Input
+                            id="testflight_url"
+                            placeholder="https://testflight.apple.com/join/..."
+                            value={values.testflight_url}
+                            onChange={(e) => setField('testflight_url', e.target.value)}
+                            className={cn(inputClass, 'focus:ring-2 focus:ring-sky-500/50')}
+                          />
+                        </div>
+                      </>
+                    )}
+                    {values.platforms.includes('android') && (
+                      <div className="space-y-3">
+                        <FieldLabel htmlFor="app_url_android" dotClass="from-emerald-500 to-green-600">
+                          Android App URL
+                        </FieldLabel>
+                        <Input
+                          id="app_url_android"
+                          placeholder="Play Store / APK / deep link URL"
+                          value={values.app_url_android}
+                          onChange={(e) => setField('app_url_android', e.target.value)}
+                          className={cn(inputClass, 'focus:ring-2 focus:ring-emerald-500/50')}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </SectionBlock>
+
+              <SectionBlock
+                title="GitHub Repositories"
+                description="Separate repos for web frontend, backend, and app"
+                icon={Github}
+                iconClass="bg-gradient-to-br from-zinc-700 to-zinc-900"
+              >
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-3">
+                    <FieldLabel htmlFor="github_frontend" dotClass="from-sky-500 to-blue-600">
+                      Web Frontend GitHub
+                    </FieldLabel>
+                    <Input
+                      id="github_frontend"
+                      placeholder="https://github.com/org/frontend"
+                      value={values.github_frontend}
+                      onChange={(e) => setField('github_frontend', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-sky-500/50')}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel htmlFor="github_backend" dotClass="from-indigo-500 to-violet-600">
+                      Backend GitHub
+                    </FieldLabel>
+                    <Input
+                      id="github_backend"
+                      placeholder="https://github.com/org/backend"
+                      value={values.github_backend}
+                      onChange={(e) => setField('github_backend', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-indigo-500/50')}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <FieldLabel htmlFor="github_app" dotClass="from-violet-500 to-fuchsia-600">
+                      App GitHub
+                    </FieldLabel>
+                    <Input
+                      id="github_app"
+                      placeholder="https://github.com/org/mobile-app"
+                      value={values.github_app}
+                      onChange={(e) => setField('github_app', e.target.value)}
+                      className={cn(inputClass, 'focus:ring-2 focus:ring-violet-500/50')}
+                    />
+                  </div>
+                </div>
+              </SectionBlock>
+
+              <SectionBlock
                 title="Project Timeline"
                 description={`Duration: ${durationDays} days (from start date)`}
                 icon={Calendar}
@@ -953,8 +1152,20 @@ export function ProjectForm({
               )}
 
               <div className="space-y-4">
-                <FieldLabel dotClass="from-indigo-500 to-purple-600">Attachment Docs</FieldLabel>
+                <FieldLabel
+                  dotClass="from-indigo-500 to-purple-600"
+                  hint="Docs, screenshots, .env / config files, and other project assets"
+                >
+                  Attachments (.env & docs)
+                </FieldLabel>
                 <div className="rounded-xl border border-indigo-200/60 dark:border-indigo-800/50 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/15 dark:to-purple-950/10 p-4 sm:p-5 space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    Upload documentation, design files, and environment files such as{' '}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env</code>,{' '}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env.example</code>, or
+                    other config exports. Treat secrets carefully — prefer sanitized examples when
+                    possible.
+                  </p>
                   {existingAttachments.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Existing attachments</p>
@@ -982,14 +1193,21 @@ export function ProjectForm({
                     </div>
                   )}
 
-                  <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".env,.env.*,.txt,.json,.yml,.yaml,.md,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.zip,*"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
                     className="h-12 w-full sm:w-auto rounded-xl border-dashed border-2 hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20"
                   >
-                    <Paperclip className="mr-2 h-4 w-4" /> Choose documentation files
+                    <Paperclip className="mr-2 h-4 w-4" /> Choose .env, docs & files
                   </Button>
 
                   {attachmentFiles.length > 0 && (
