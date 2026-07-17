@@ -78,6 +78,7 @@ import { bugService, Bug as BugType } from "@/services/bugService";
 import {
   Project,
   projectService,
+  parseProjectPlatforms,
 } from "@/services/projectService";
 import { updateService } from "@/services/updateService";
 import { motion } from "framer-motion";
@@ -94,6 +95,7 @@ import {
   Clock,
   Code,
   Copy,
+  ExternalLink,
   FileText,
   Filter,
   ListChecks,
@@ -4863,6 +4865,49 @@ const ProjectDetails = () => {
                 <span>Created: <span className="text-foreground">{new Date(project.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></span>
                 <span>Status: <span className="capitalize inline-flex items-center px-1.5 py-0.5 rounded-full border bg-muted/40">{project.status}</span></span>
               </div>
+              {(project.frontend_domain ||
+                project.backend_domain ||
+                project.vercel_domain ||
+                project.platforms ||
+                project.github_frontend ||
+                project.github_backend ||
+                project.github_app) && (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {parseProjectPlatforms(project.platforms).map((p) => (
+                    <span
+                      key={p}
+                      className="inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300 capitalize"
+                    >
+                      {p === "ios" ? "iOS" : p === "android" ? "Android" : "Web"}
+                    </span>
+                  ))}
+                  {[
+                    { label: "Frontend", href: project.frontend_domain },
+                    { label: "Backend", href: project.backend_domain },
+                    { label: "Vercel", href: project.vercel_domain },
+                    { label: "GitHub FE", href: project.github_frontend },
+                    { label: "GitHub BE", href: project.github_backend },
+                    { label: "GitHub App", href: project.github_app },
+                  ]
+                    .filter((item) => item.href?.trim())
+                    .map((item) => (
+                      <a
+                        key={item.label}
+                        href={
+                          /^https?:\/\//i.test(item.href!.trim())
+                            ? item.href!.trim()
+                            : `https://${item.href!.trim()}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                      >
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                        {item.label}
+                      </a>
+                    ))}
+                </div>
+              )}
               <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full"></div>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full xl:w-auto flex-shrink-0">

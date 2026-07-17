@@ -270,19 +270,6 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
   const platformLabels = platforms.map(
     (p) => PROJECT_PLATFORM_OPTIONS.find((o) => o.value === p)?.label || p
   );
-  const hasDomains =
-    Boolean(project.frontend_domain?.trim()) ||
-    Boolean(project.backend_domain?.trim()) ||
-    Boolean(project.vercel_domain?.trim());
-  const hasAppUrls =
-    Boolean(project.app_url_ios?.trim()) ||
-    Boolean(project.app_url_android?.trim()) ||
-    Boolean(project.testflight_url?.trim());
-  const hasGithub =
-    Boolean(project.github_frontend?.trim()) ||
-    Boolean(project.github_backend?.trim()) ||
-    Boolean(project.github_app?.trim());
-  const hasPlatformsSection = platforms.length > 0 || hasAppUrls;
 
   const leads = members.filter((m) => m.role === 'manager').map((m) => m.username || 'Unknown');
   const developers = members.filter((m) => m.role === 'developer').map((m) => m.username || 'Unknown');
@@ -412,48 +399,47 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
         {renderDescription(project.reference_sites_or_themes)}
       </SectionShell>
 
-      {(hasDomains || hasPlatformsSection || hasGithub) && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-          {hasDomains && (
-            <SectionShell title="Domains & Deployment" icon={Globe} accent="blue">
-              <div className="space-y-4">
-                <LinkOrText label="Frontend Domain" value={project.frontend_domain} />
-                <LinkOrText label="Backend Domain" value={project.backend_domain} />
-                <LinkOrText label="Vercel Domain" value={project.vercel_domain} />
-              </div>
-            </SectionShell>
-          )}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+        <SectionShell title="Domains & Deployment" icon={Globe} accent="blue">
+          <div className="space-y-4">
+            <LinkOrText label="Frontend Domain" value={project.frontend_domain} />
+            <LinkOrText label="Backend Domain" value={project.backend_domain} />
+            <LinkOrText label="Vercel Domain" value={project.vercel_domain} />
+          </div>
+        </SectionShell>
 
-          {hasPlatformsSection && (
-            <SectionShell title="Platforms & App URLs" icon={Smartphone} accent="violet">
-              <div className="space-y-4">
-                {platformLabels.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {platformLabels.map((label) => (
-                      <Badge key={label} variant="secondary" className="rounded-lg">
-                        {label}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
-                <LinkOrText label="iOS App URL" value={project.app_url_ios} />
-                <LinkOrText label="Android App URL" value={project.app_url_android} />
-                <LinkOrText label="TestFlight URL" value={project.testflight_url} />
-              </div>
-            </SectionShell>
-          )}
+        <SectionShell title="Platforms & App URLs" icon={Smartphone} accent="violet">
+          <div className="space-y-4">
+            <div>
+              <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">
+                Target Platforms
+              </p>
+              {platformLabels.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {platformLabels.map((label) => (
+                    <Badge key={label} variant="secondary" className="rounded-lg">
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">Not set</p>
+              )}
+            </div>
+            <LinkOrText label="iOS App URL" value={project.app_url_ios} />
+            <LinkOrText label="Android App URL" value={project.app_url_android} />
+            <LinkOrText label="TestFlight URL" value={project.testflight_url} />
+          </div>
+        </SectionShell>
 
-          {hasGithub && (
-            <SectionShell title="GitHub Repositories" icon={Github} accent="slate">
-              <div className="space-y-4">
-                <LinkOrText label="Web Frontend" value={project.github_frontend} />
-                <LinkOrText label="Backend" value={project.github_backend} />
-                <LinkOrText label="App" value={project.github_app} />
-              </div>
-            </SectionShell>
-          )}
-        </div>
-      )}
+        <SectionShell title="GitHub Repositories" icon={Github} accent="slate">
+          <div className="space-y-4">
+            <LinkOrText label="Web Frontend" value={project.github_frontend} />
+            <LinkOrText label="Backend" value={project.github_backend} />
+            <LinkOrText label="App" value={project.github_app} />
+          </div>
+        </SectionShell>
+      </div>
 
       <SectionShell title="Attachments" icon={Paperclip} accent="slate">
         {attachments.length > 0 ? (

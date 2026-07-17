@@ -25,6 +25,8 @@ export {
   getProjectStatusLabel,
   computeProjectDurationDays,
   formatProjectDate,
+  parseProjectPlatforms,
+  PROJECT_PLATFORM_OPTIONS,
 } from '@/lib/utils/projectUtils';
 
 export type ProjectBugStats = {
