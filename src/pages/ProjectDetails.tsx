@@ -113,7 +113,8 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { getReturnPathFromState } from "@/hooks/useUrlPagination";
 
 // Skeleton components for loading state
 const ProjectHeaderSkeleton = () => (
@@ -4020,6 +4021,7 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
 const ProjectDetails = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [project, setProject] = useState<Project | null>(null);
   const [projectOwner, setProjectOwner] = useState<ProjectUser | null>(null);
   const [bugs, setBugs] = useState<BugType[]>([]);
@@ -4818,7 +4820,10 @@ const ProjectDetails = () => {
   return (
     <div className="space-y-6 p-3 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
       <Link
-        to={`/${currentUser?.role || "tester"}/projects`}
+        to={getReturnPathFromState(
+          location.state,
+          `/${currentUser?.role || "tester"}/projects`
+        )}
         className="inline-flex items-center text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ChevronLeft className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -4922,6 +4927,12 @@ const ProjectDetails = () => {
                 >
                   <Link
                     to={`/${currentUser.role}/projects/${projectId}/compliance`}
+                    state={{
+                      from: getReturnPathFromState(
+                        location.state,
+                        `/${currentUser.role}/projects`
+                      ),
+                    }}
                   >
                     <ShieldCheck className="mr-2 h-4 w-4" /> Compliance
                   </Link>
@@ -5008,7 +5019,7 @@ const ProjectDetails = () => {
                             }}
                             className={`w-full h-auto min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between ${
                               isActive
-                                ? "bg-lime-400 text-gray-950 hover:bg-lime-400"
+                                ? "bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-500 hover:to-red-600"
                                 : "bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:bg-gray-200/80 dark:hover:bg-gray-700/80"
                             }`}
                           >
@@ -5016,7 +5027,7 @@ const ProjectDetails = () => {
                               <span
                                 className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
                                   isActive
-                                    ? "bg-lime-500/80 text-gray-950"
+                                    ? "bg-white/20 text-white"
                                     : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
                                 }`}
                               >

@@ -6,12 +6,16 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { Button } from "@/components/ui/button";
 import { ActiveUserActivityDialog } from "@/components/users/ActiveUserActivityDialog";
 import { cn } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { User } from "@/types";
 import { useQuery } from "@tanstack/react-query";
+import { Eye, EyeOff, UserCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+
+const ACTIVE_USERS_STRIP_HIDDEN_KEY = "bugricer_admin_active_users_strip_hidden";
 
 function formatCheckInTime(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -141,6 +145,9 @@ export function AdminActiveUsersStrip() {
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
+  const [hidden, setHidden] = useState(
+    () => localStorage.getItem(ACTIVE_USERS_STRIP_HIDDEN_KEY) === "true"
+  );
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["admin-active-users-strip"],
@@ -160,6 +167,24 @@ export function AdminActiveUsersStrip() {
         return aTime - bTime;
       });
   }, [users]);
+
+  useEffect(() => {
+    const syncHidden = () => {
+      setHidden(localStorage.getItem(ACTIVE_USERS_STRIP_HIDDEN_KEY) === "true");
+    };
+    window.addEventListener("storage", syncHidden);
+    return () => window.removeEventListener("storage", syncHidden);
+  }, []);
+
+  const hideStrip = () => {
+    localStorage.setItem(ACTIVE_USERS_STRIP_HIDDEN_KEY, "true");
+    setHidden(true);
+  };
+
+  const showStrip = () => {
+    localStorage.removeItem(ACTIVE_USERS_STRIP_HIDDEN_KEY);
+    setHidden(false);
+  };
 
   useEffect(() => {
     if (!carouselApi) return;
@@ -194,9 +219,48 @@ export function AdminActiveUsersStrip() {
     setDialogOpen(true);
   };
 
+  if (hidden) {
+    return (
+      <div className="shrink-0 border-b border-border/50 bg-background/95 px-3 py-1.5 backdrop-blur-sm md:px-4">
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={showStrip}
+            className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Show Active · {checkedInUsers.length}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="shrink-0 border-b border-border/50 bg-background/95 px-3 py-2.5 backdrop-blur-sm md:px-4 md:py-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <UserCheck className="h-3.5 w-3.5 text-primary" />
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">
+              Active today · {checkedInUsers.length}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={hideStrip}
+            className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+            aria-label="Hide active users strip"
+            title="Hide active users strip"
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+            Hide
+          </Button>
+        </div>
 
         <Carousel
           setApi={setCarouselApi}

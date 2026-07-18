@@ -56,8 +56,14 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import {
+  useUrlPagination,
+  useClampUrlPage,
+  useResetUrlPageOnChange,
+  listReturnState,
+} from "@/hooks/useUrlPagination";
 
 // Enhanced Professional Project Card Skeleton with animations
 const ProjectCardSkeleton = ({ index = 0 }: { index?: number }) => (
@@ -185,9 +191,16 @@ const Projects = () => {
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const tabFromUrl = searchParams.get("tab") || (currentUser?.role === "admin" ? "all-projects" : currentUser?.role === "developer" ? "my-projects" : "overview");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(12);
+  const {
+    page: currentPage,
+    pageSize: itemsPerPage,
+    setPage: setCurrentPage,
+    setPageSize: setItemsPerPage,
+    clampToTotalPages,
+  } = useUrlPagination({ defaultPageSize: 12 });
+  const listFromState = listReturnState(location.pathname, location.search);
   const [projectToUndo, setProjectToUndo] = useState<Project | null>(null);
 
   const userProjectMemberships = useMemo(() => {
@@ -316,10 +329,14 @@ const Projects = () => {
     }
   }, [searchQuery, userProjectMemberships, projects, tabFromUrl, statusFilter, developerFilter, testerFilter, clientFilter]);
 
-  // Reset current page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, userProjectMemberships, projects.length, statusFilter, developerFilter, testerFilter, clientFilter]);
+  // Reset page when filters change (not on initial mount — preserves ?page=N)
+  useResetUrlPageOnChange(setCurrentPage, [
+    searchQuery,
+    statusFilter,
+    developerFilter,
+    testerFilter,
+    clientFilter,
+  ]);
 
   // Apply all filters (search, membership, status, and custom filters)
   const applyFilters = () => {
@@ -605,8 +622,16 @@ const Projects = () => {
     cancelCountdown();
   };
 
-  const handleTabChange = (tab) => {
-    setSearchParams({ tab });
+  const handleTabChange = (tab: string) => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set("tab", tab);
+        params.delete("page");
+        return params;
+      },
+      { replace: true }
+    );
   };
 
   // clearFilters is now provided by usePersistedFilters hook
@@ -627,7 +652,8 @@ const Projects = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
+  useClampUrlPage(clampToTotalPages, totalPages);
   const userProjectsCount = (currentUser?.role === "admin") ? projects.length : projects.filter((p) => userProjectMemberships[p.id]).length;
 
   // NOTE: The component's actual return is defined after helper functions below.
@@ -781,12 +807,12 @@ const Projects = () => {
           !isLoading &&
           totalFiltered > 0 &&
           totalPages > 1 && (
-          <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+          <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             {/* Top Row - Results Info and Items Per Page */}
-            <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
-                <span className="text-sm sm:text-base text-foreground font-semibold">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-5 min-w-0">
+              <div className="flex items-start sm:items-center gap-2 min-w-0">
+                <div className="w-2 h-2 mt-1.5 sm:mt-0 shrink-0 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+                <span className="text-sm sm:text-base text-foreground font-semibold break-words">
                   Showing{" "}
                   <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                     {(currentPage - 1) * itemsPerPage + 1}
@@ -802,8 +828,8 @@ const Projects = () => {
                   projects
                 </span>
               </div>
-              <div className="flex items-center justify-center sm:justify-end gap-3">
-                <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
+              <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
+                <span className="text-sm text-muted-foreground font-medium">
                   Items per page:
                 </span>
                 <ItemsPerPageSelect
@@ -816,7 +842,7 @@ const Projects = () => {
             </div>
 
             {/* Bottom Row - Pagination Navigation */}
-            <div className="flex flex-col sm:flex-row md:flex-row items-center justify-between gap-4 p-4 sm:p-5 pt-0 sm:pt-0 md:pt-0 border-t border-border/30">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-5 pt-0 border-t border-border/30 min-w-0">
               {/* Page Info for Mobile */}
               <div className="sm:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
                 <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
@@ -831,14 +857,14 @@ const Projects = () => {
               </div>
 
               {/* Enhanced Pagination Controls */}
-              <div className="flex items-center justify-center gap-2 w-full sm:w-auto md:w-auto">
+              <div className="flex items-center justify-center gap-2 w-full sm:w-auto min-w-0">
                 {/* Previous Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                  className="h-10 min-h-10 px-3 sm:px-4 min-w-10 sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                 >
                   <svg
                     className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
@@ -953,7 +979,7 @@ const Projects = () => {
                     setCurrentPage((p) => Math.min(totalPages, p + 1))
                   }
                   disabled={currentPage === totalPages}
-                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                  className="h-10 min-h-10 px-3 sm:px-4 min-w-10 sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                 >
                   <span className="hidden sm:inline">Next</span>
                   <span className="sm:hidden text-lg">›</span>
@@ -994,10 +1020,10 @@ const Projects = () => {
           !isLoading &&
           totalFiltered > 0 &&
           totalPages <= 1 && (
-          <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
-              <span className="text-sm sm:text-base text-foreground font-semibold">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6 p-4 sm:p-5 min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+            <div className="flex items-start sm:items-center gap-2 min-w-0">
+              <div className="w-2 h-2 mt-1.5 sm:mt-0 shrink-0 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
+              <span className="text-sm sm:text-base text-foreground font-semibold break-words">
                 Showing{" "}
                 <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                   {totalFiltered}
@@ -1005,8 +1031,8 @@ const Projects = () => {
                 projects
               </span>
             </div>
-            <div className="flex items-center justify-center sm:justify-end gap-3">
-              <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
+            <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
+              <span className="text-sm text-muted-foreground font-medium">
                 Items per page:
               </span>
               <ItemsPerPageSelect
@@ -1133,6 +1159,7 @@ const Projects = () => {
                           ? `/${currentUser.role}/projects/${project.id}`
                           : `/projects/${project.id}`
                       }
+                      state={listFromState}
                       className="break-words text-base sm:text-lg lg:text-xl font-semibold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent hover:opacity-90 transition-opacity"
                     >
                       {project.name}
@@ -1236,6 +1263,7 @@ const Projects = () => {
                               ? `/${currentUser.role}/projects/${project.id}`
                               : `/projects/${project.id}`
                           }
+                          state={listFromState}
                           className="inline-flex w-full items-center justify-center"
                         >
                           View

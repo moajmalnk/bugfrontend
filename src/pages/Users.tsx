@@ -26,7 +26,13 @@ import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
 import { Bug, Check, ChevronDown, Code2, Shield, UserCheck, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  useUrlPagination,
+  useClampUrlPage,
+  useResetUrlPageOnChange,
+  listReturnState,
+} from "@/hooks/useUrlPagination";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 
@@ -165,13 +171,20 @@ const Users = () => {
   const { hasPermission, isLoading: isLoadingPermissions } = usePermissions(null);
   const effectiveRole = getEffectiveRole(currentUser || {});
   const navigate = useNavigate();
+  const location = useLocation();
+  const listFromState = listReturnState(location.pathname, location.search);
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   // User detail is now a dedicated page route; no modal state here.
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(12);
+  const {
+    page: currentPage,
+    pageSize: itemsPerPage,
+    setPage: setCurrentPage,
+    setPageSize: setItemsPerPage,
+    clampToTotalPages,
+  } = useUrlPagination({ defaultPageSize: 10 });
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "active";
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -284,21 +297,11 @@ const Users = () => {
   }, [searchTerm, users, tabFromUrl]);
 
   // Reset current page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, tabFromUrl]);
+  useResetUrlPageOnChange(setCurrentPage, [searchTerm, tabFromUrl]);
 
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value);
-    setCurrentPage(1);
   };
-
-  // Keep page in range when result count or page size changes
-  useEffect(() => {
-    if (filteredUsers.length === 0) return;
-    const maxPage = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
-    setCurrentPage((page) => Math.min(page, maxPage));
-  }, [filteredUsers.length, itemsPerPage]);
 
   // Apply all filters (search and role)
   const applyFilters = () => {
@@ -343,7 +346,13 @@ const Users = () => {
   };
 
   const handleTabChange = (tab: string) => {
-    setSearchParams({ tab });
+    const params = new URLSearchParams(searchParams);
+    if (params.get("tab") === tab && !params.has("page")) {
+      return;
+    }
+    params.set("tab", tab);
+    params.delete("page");
+    setSearchParams(params, { replace: true });
   };
 
   const getRoleIcon = (role: string) => {
@@ -472,17 +481,19 @@ const Users = () => {
   const othersCount = users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length;
   const activeTodayCount = users.filter((u) => u.checked_in_today).length;
 
-  // Determine which tabs to show
-  const visibleTabs = [{ value: "active", count: activeTodayCount }];
-  if (adminCount > 0) visibleTabs.push({ value: "admins", count: adminCount });
-  if (developerCount > 0) visibleTabs.push({ value: "developers", count: developerCount });
-  if (testerCount > 0) visibleTabs.push({ value: "testers", count: testerCount });
-  if (othersCount > 0) visibleTabs.push({ value: "others", count: othersCount });
-
-  // Get the first visible tab if current tab has no users
-  const isValidTab = visibleTabs.some(tab => tab.value === tabFromUrl);
-  const defaultTab = visibleTabs.length > 0 ? visibleTabs[0].value : "active";
+  // Always keep role tabs mounted (even at 0) so URL tab + Radix Tabs don't
+  // snap back to "active" while users are still loading after Back.
+  const knownTabs = ["active", "admins", "developers", "testers", "others"] as const;
+  const isKnownTab = (knownTabs as readonly string[]).includes(tabFromUrl);
+  const isValidTab =
+    tabFromUrl === "active" ||
+    tabFromUrl === "admins" ||
+    tabFromUrl === "developers" ||
+    tabFromUrl === "testers" ||
+    (tabFromUrl === "others" && (isLoading || othersCount > 0));
+  const defaultTab = "active";
   const activeTab = isValidTab ? tabFromUrl : defaultTab;
+
   const roleTabs = [
     {
       value: "active",
@@ -492,17 +503,39 @@ const Users = () => {
       count: activeTodayCount,
       countClass: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300",
     },
-    ...(adminCount > 0
-      ? [{ value: "admins", label: "Admins", shortLabel: "Admins", icon: Shield, count: adminCount, countClass: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" }]
-      : []),
-    ...(developerCount > 0
-      ? [{ value: "developers", label: "Developers", shortLabel: "Devs", icon: Code2, count: developerCount, countClass: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" }]
-      : []),
-    ...(testerCount > 0
-      ? [{ value: "testers", label: "Testers", shortLabel: "Testers", icon: Bug, count: testerCount, countClass: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300" }]
-      : []),
-    ...(othersCount > 0
-      ? [{ value: "others", label: "Others", shortLabel: "Others", icon: UserRound, count: othersCount, countClass: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300" }]
+    {
+      value: "admins",
+      label: "Admins",
+      shortLabel: "Admins",
+      icon: Shield,
+      count: adminCount,
+      countClass: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
+    },
+    {
+      value: "developers",
+      label: "Developers",
+      shortLabel: "Devs",
+      icon: Code2,
+      count: developerCount,
+      countClass: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
+    },
+    {
+      value: "testers",
+      label: "Testers",
+      shortLabel: "Testers",
+      icon: Bug,
+      count: testerCount,
+      countClass: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
+    },
+    ...(othersCount > 0 || tabFromUrl === "others"
+      ? [{
+          value: "others",
+          label: "Others",
+          shortLabel: "Others",
+          icon: UserRound,
+          count: othersCount,
+          countClass: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
+        }]
       : []),
   ];
   const activeRoleTab = roleTabs.find((tab) => tab.value === activeTab) ?? roleTabs[0];
@@ -541,17 +574,32 @@ const Users = () => {
     </TabsList>
   );
 
-  // Redirect to valid tab if current tab has no users
+  // Only rewrite an unknown tab after data is ready — never wipe developers/page on load
   useEffect(() => {
-    if (!isValidTab && visibleTabs.length > 0 && tabFromUrl !== defaultTab) {
-      setSearchParams({ tab: defaultTab }, { replace: true });
+    if (isLoading) return;
+    if (!isValidTab && !isKnownTab && tabFromUrl !== defaultTab) {
+      const params = new URLSearchParams(searchParams);
+      params.set("tab", defaultTab);
+      params.delete("page");
+      if (params.toString() === searchParams.toString()) return;
+      setSearchParams(params, { replace: true });
     }
-  }, [isValidTab, visibleTabs.length, defaultTab, tabFromUrl, setSearchParams]);
+  }, [
+    isLoading,
+    isValidTab,
+    isKnownTab,
+    defaultTab,
+    tabFromUrl,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const totalFiltered = filteredUsers.length;
-  const totalPages = totalFiltered > 0 ? Math.ceil(totalFiltered / itemsPerPage) : 0;
+  const totalPages =
+    totalFiltered > 0 ? Math.max(1, Math.ceil(totalFiltered / itemsPerPage)) : 1;
+  useClampUrlPage(clampToTotalPages, totalPages);
   const activePage =
-    totalPages > 0 ? Math.min(Math.max(1, currentPage), totalPages) : 1;
+    totalFiltered > 0 ? Math.min(Math.max(1, currentPage), totalPages) : 1;
   const paginatedUsers = filteredUsers.slice(
     (activePage - 1) * itemsPerPage,
     activePage * itemsPerPage
@@ -593,6 +641,7 @@ const Users = () => {
   }
 
   return (
+    <TooltipProvider>
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
       {/* Professional Header (matches Bugs/Fixes style) */}
@@ -695,12 +744,12 @@ const Users = () => {
                         }}
                         className={`w-full min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between transition-colors ${
                           isActive
-                            ? "bg-lime-400 text-gray-950"
+                            ? "bg-gradient-to-r from-orange-500 to-red-600 text-white"
                             : "bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100"
                         }`}
                       >
                         <span className="flex items-center gap-3">
-                          <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${isActive ? "bg-lime-500/80" : "bg-gray-200 dark:bg-gray-700"}`}>
+                          <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${isActive ? "bg-white/20 text-white" : "bg-gray-200 dark:bg-gray-700"}`}>
                             <tab.icon className="h-5 w-5" />
                           </span>
                           <span className="text-lg font-semibold">{tab.label}</span>
@@ -716,26 +765,20 @@ const Users = () => {
             </Drawer>
           )}
 
-        {/* Only show TabsContent for tabs that have users */}
+        {/* Keep all tab panels mounted so Back to ?tab=developers does not reset */}
         <TabsContent value="active" className="space-y-6 sm:space-y-8">
           {renderUsersContent()}
         </TabsContent>
-        {developerCount > 0 && (
-          <TabsContent value="developers" className="space-y-6 sm:space-y-8">
-            {renderUsersContent()}
-          </TabsContent>
-        )}
-        {testerCount > 0 && (
-          <TabsContent value="testers" className="space-y-6 sm:space-y-8">
-            {renderUsersContent()}
-          </TabsContent>
-        )}
-        {adminCount > 0 && (
-          <TabsContent value="admins" className="space-y-6 sm:space-y-8">
-            {renderUsersContent()}
-          </TabsContent>
-        )}
-        {othersCount > 0 && (
+        <TabsContent value="developers" className="space-y-6 sm:space-y-8">
+          {renderUsersContent()}
+        </TabsContent>
+        <TabsContent value="testers" className="space-y-6 sm:space-y-8">
+          {renderUsersContent()}
+        </TabsContent>
+        <TabsContent value="admins" className="space-y-6 sm:space-y-8">
+          {renderUsersContent()}
+        </TabsContent>
+        {(othersCount > 0 || tabFromUrl === "others") && (
           <TabsContent value="others" className="space-y-6 sm:space-y-8">
             {renderUsersContent()}
           </TabsContent>
@@ -743,6 +786,16 @@ const Users = () => {
       </Tabs>
     </section>
   </main>
+      <UndoDeleteNotificationPortal
+        open={undoDelete.isCountingDown && !!userToDelete}
+        title="User Deleted"
+        itemName={userToDelete?.username ?? ""}
+        timeLeft={undoDelete.timeLeft}
+        duration={10}
+        onUndo={undoDelete.cancelCountdown}
+        onConfirmNow={undoDelete.confirmDelete}
+      />
+    </TooltipProvider>
   );
 
   function renderUserWorkSection(user: User) {
@@ -796,7 +849,7 @@ const Users = () => {
 
         {/* Professional Responsive Pagination Controls - Only show if there are multiple pages */}
         {!isLoading && totalFiltered > 0 && totalPages > 1 && (
-        <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+        <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
           {/* Top Row - Results Info and Items Per Page */}
           <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
             <div className="flex items-center gap-2">
@@ -1145,7 +1198,7 @@ const Users = () => {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 className="h-9 px-4 py-2 rounded-lg text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-                                onClick={() => navigate(`/${effectiveRole}/users/${user.id}`)}
+                                onClick={() => navigate(`/${effectiveRole}/users/${user.id}`, { state: listFromState })}
                               >
                                 View
                               </button>
@@ -1211,7 +1264,7 @@ const Users = () => {
                     {/* Action Button */}
                     <button
                       className="w-full h-10 px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200"
-                      onClick={() => navigate(`/${effectiveRole}/users/${user.id}`)}
+                      onClick={() => navigate(`/${effectiveRole}/users/${user.id}`, { state: listFromState })}
                     >
                       View
                     </button>
@@ -1226,162 +1279,6 @@ const Users = () => {
       </>
     );
   }
-
-  return (
-    <TooltipProvider>
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-          {/* Professional Header */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3 min-w-0">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg">
-                    <UserRound className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
-                      Users
-                    </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
-                  </div>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                  Manage team members and their roles
-                </p>
-              </div>
-    
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <div className="shrink-0 group">
-                  <AddUserDialog onUserAdd={handleAddUser} />
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-emerald-50 dark:from-blue-950/30 dark:to-emerald-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
-                    <div className="p-1.5 bg-blue-600 rounded-lg">
-                      <UserRound className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                        {filteredUsers.length}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Professional Tabs */}
-        <Tabs
-          value={activeTab}
-          onValueChange={handleTabChange}
-          className="w-full"
-        >
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
-            <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-              <TabsList 
-                className="grid w-full h-14 bg-transparent p-1"
-                style={{ gridTemplateColumns: `repeat(${visibleTabs.length || 1}, minmax(0, 1fr))` }}
-              >
-                {/* Conditionally render tabs only if they have users */}
-                {developerCount > 0 && (
-                  <TabsTrigger
-                    value="developers"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <Code2 className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">Developers</span>
-                    <span className="sm:hidden">Devs</span>
-                    <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold">
-                      {developerCount}
-                    </span>
-                  </TabsTrigger>
-                )}
-                {testerCount > 0 && (
-                  <TabsTrigger
-                    value="testers"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <Bug className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">Testers</span>
-                    <span className="sm:hidden">Testers</span>
-                    <span className="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-bold">
-                      {testerCount}
-                    </span>
-                  </TabsTrigger>
-                )}
-                {adminCount > 0 && (
-                  <TabsTrigger
-                    value="admins"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <Shield className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">Admins</span>
-                    <span className="sm:hidden">Admins</span>
-                    <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold">
-                      {adminCount}
-                    </span>
-                  </TabsTrigger>
-                )}
-                {othersCount > 0 && (
-                  <TabsTrigger
-                    value="others"
-                    className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-                  >
-                    <UserRound className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="hidden sm:inline">Others</span>
-                    <span className="sm:hidden">Others</span>
-                    <span className="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold">
-                      {othersCount}
-                    </span>
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            </div>
-          </div>
-
-          {/* Only show TabsContent for tabs that have users */}
-          {developerCount > 0 && (
-            <TabsContent value="developers" className="space-y-6 sm:space-y-8">
-              {renderUsersContent()}
-            </TabsContent>
-          )}
-          {testerCount > 0 && (
-            <TabsContent value="testers" className="space-y-6 sm:space-y-8">
-              {renderUsersContent()}
-            </TabsContent>
-          )}
-          {adminCount > 0 && (
-            <TabsContent value="admins" className="space-y-6 sm:space-y-8">
-              {renderUsersContent()}
-            </TabsContent>
-          )}
-          {othersCount > 0 && (
-            <TabsContent value="others" className="space-y-6 sm:space-y-8">
-              {renderUsersContent()}
-            </TabsContent>
-          )}
-        </Tabs>
-      </section>
-
-      {/* User details now use route: /:role/users/:userId */}
-      </main>
-
-      <UndoDeleteNotificationPortal
-        open={undoDelete.isCountingDown && !!userToDelete}
-        title="User Deleted"
-        itemName={userToDelete?.username ?? ""}
-        timeLeft={undoDelete.timeLeft}
-        duration={10}
-        onUndo={undoDelete.cancelCountdown}
-        onConfirmNow={undoDelete.confirmDelete}
-      />
-    </TooltipProvider>
-  );
 };
 
 export default Users;

@@ -180,7 +180,7 @@ export function ComplianceSegmentTabs({
                   className={cn(
                     'w-full h-auto min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between',
                     isActive
-                      ? 'bg-lime-400 text-gray-950 hover:bg-lime-400'
+                      ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-500 hover:to-red-600'
                       : 'bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:bg-gray-200/80 dark:hover:bg-gray-700/80'
                   )}
                 >
@@ -189,7 +189,7 @@ export function ComplianceSegmentTabs({
                       className={cn(
                         'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
                         isActive
-                          ? 'bg-lime-500/80 text-gray-950'
+                          ? 'bg-white/20 text-white'
                           : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
                       )}
                     >
@@ -203,7 +203,7 @@ export function ComplianceSegmentTabs({
                             className={cn(
                               'rounded-full px-2 py-0.5 text-xs font-bold',
                               isActive
-                                ? 'bg-lime-500/60 text-gray-950'
+                                ? 'bg-white/25 text-white'
                                 : tab.id === 'developer'
                                   ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                                   : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'

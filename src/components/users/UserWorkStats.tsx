@@ -4,12 +4,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { userService } from "@/services/userService";
 import { useAuth } from "@/context/AuthContext";
 import { getEffectiveRole } from "@/lib/utils";
-import { Calendar, Clock, TrendingUp, Users, X, CheckCircle2, AlertCircle, PlayCircle, CalendarDays, FileText, Loader2, PlusCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
+import { Calendar, Clock, TrendingUp, Users, X, CheckCircle2, AlertCircle, PlayCircle, CalendarDays, FileText, Loader2, PlusCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
 interface TaskCounts {
@@ -23,6 +24,11 @@ interface WorkStats {
   user_id: string;
   username: string;
   role: string;
+  joining_date?: string | null;
+  trend_scope?: "recent" | "full" | string;
+  trend_months?: number;
+  available_trend_months?: number;
+  has_more_trend?: boolean;
   current_period: {
     period_start: string;
     period_end: string;
@@ -57,6 +63,8 @@ interface UserWorkStatsProps {
   showTrend?: boolean;
   checkInTime?: string | null;
 }
+
+const INITIAL_TREND_MONTHS = 6;
 
 /** e.g. `Mar 28, 2026 - 10:26 PM` (Asia/Kolkata) from save time or check-in. */
 function formatDailySubmittedAt(
@@ -116,6 +124,15 @@ function sumDailyBreakdownTotals(submissions: any[]) {
   );
 }
 
+function formatJoinMonth(joiningDate?: string | null): string | null {
+  if (!joiningDate) return null;
+  try {
+    return format(parseISO(joiningDate.slice(0, 10)), "MMM yyyy");
+  } catch {
+    return joiningDate.slice(0, 7);
+  }
+}
+
 export function UserWorkStats({
   userId,
   compact = false,
@@ -128,6 +145,8 @@ export function UserWorkStats({
   const [stats, setStats] = useState<WorkStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFullTrend, setShowFullTrend] = useState(false);
+  const [loadingFullTrend, setLoadingFullTrend] = useState(false);
   // Kept for backwards compatibility with older UI; period details are now navigated to a page.
   const [selectedPeriod, setSelectedPeriod] = useState<WorkStats['period_trend'][0] | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -140,25 +159,61 @@ export function UserWorkStats({
     return sumDailyBreakdownTotals(subs);
   }, [periodDetails]);
 
+  const fetchStats = useCallback(
+    async (full = false) => {
+      const data = await userService.getUserWorkStats(userId, full ? { full: true } : undefined);
+      setStats(data);
+      return data as WorkStats;
+    },
+    [userId]
+  );
+
   useEffect(() => {
-    const fetchStats = async () => {
+    let cancelled = false;
+    const load = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await userService.getUserWorkStats(userId);
-        setStats(data);
+        setShowFullTrend(false);
+        await fetchStats(false);
       } catch (err: any) {
-        setError(err.message);
-        console.error('Failed to fetch work stats:', err);
+        if (!cancelled) {
+          setError(err.message);
+          console.error('Failed to fetch work stats:', err);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     if (userId) {
-      fetchStats();
+      load();
     }
-  }, [userId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, fetchStats]);
+
+  const handleShowFullHistory = async () => {
+    if (showFullTrend) {
+      setShowFullTrend(false);
+      return;
+    }
+    // Already have full data from a previous expand
+    if (stats?.trend_scope === "full" || (stats?.period_trend?.length || 0) > INITIAL_TREND_MONTHS) {
+      setShowFullTrend(true);
+      return;
+    }
+    setLoadingFullTrend(true);
+    try {
+      await fetchStats(true);
+      setShowFullTrend(true);
+    } catch (err: any) {
+      console.error("Failed to load full work trend:", err);
+    } finally {
+      setLoadingFullTrend(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -199,7 +254,17 @@ export function UserWorkStats({
   });
   const uniquePeriodTrend = Array.from(periodMap.values());
 
-  const workTrendVisible = uniquePeriodTrend.slice(0, 6);
+  const workTrendVisible = showFullTrend
+    ? uniquePeriodTrend
+    : uniquePeriodTrend.slice(0, INITIAL_TREND_MONTHS);
+  const hiddenMonthCount = Math.max(0, uniquePeriodTrend.length - INITIAL_TREND_MONTHS);
+  const canExpand =
+    Boolean(stats.has_more_trend) ||
+    stats.trend_scope === "full" ||
+    uniquePeriodTrend.length > INITIAL_TREND_MONTHS ||
+    (Number(stats.available_trend_months || 0) > INITIAL_TREND_MONTHS);
+  const joinLabel = formatJoinMonth(stats.joining_date);
+
   const workTrendHeaderTotals = workTrendVisible.reduce(
     (acc, p) => {
       acc.hours += Number(p.hours || 0);
@@ -316,9 +381,20 @@ export function UserWorkStats({
         <Card className="border-0 shadow-sm bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <CardContent className="p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Work Trend</h4>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Work Trend</h4>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1 pl-6">
+                  {showFullTrend
+                    ? joinLabel
+                      ? `Full history from ${joinLabel} · ${workTrendVisible.length} months`
+                      : `Full history · ${workTrendVisible.length} months`
+                    : canExpand
+                      ? `Showing last ${Math.min(INITIAL_TREND_MONTHS, uniquePeriodTrend.length)} months`
+                      : `${workTrendVisible.length} month${workTrendVisible.length === 1 ? "" : "s"}`}
+                </p>
               </div>
               <div
                 className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 text-[11px] sm:text-xs"
@@ -354,7 +430,7 @@ export function UserWorkStats({
               </div>
             </div>
             <div className="space-y-3">
-              {uniquePeriodTrend.slice(0, 6).map((period, index) => (
+              {workTrendVisible.map((period) => (
                 <div 
                   key={period.period} 
                   onClick={() => {
@@ -431,6 +507,44 @@ export function UserWorkStats({
                 </div>
               ))}
             </div>
+
+            {canExpand ? (
+              <div className="mt-4 pt-3 border-t border-gray-200/50 dark:border-gray-700/50">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loadingFullTrend}
+                  onClick={handleShowFullHistory}
+                  className="w-full h-11 rounded-xl border-dashed border-orange-300/70 dark:border-orange-700/60 bg-orange-50/40 dark:bg-orange-950/20 hover:bg-orange-100/60 dark:hover:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-semibold"
+                >
+                  {loadingFullTrend ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Loading full history…
+                    </>
+                  ) : showFullTrend ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-2" />
+                      Show less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Show more
+                      <span className="ml-1.5 font-normal text-orange-600/80 dark:text-orange-300/80">
+                        · full history
+                        {joinLabel ? ` from ${joinLabel}` : ""}
+                        {Number(stats.available_trend_months || 0) > INITIAL_TREND_MONTHS
+                          ? ` (${Number(stats.available_trend_months) - INITIAL_TREND_MONTHS}+ months)`
+                          : hiddenMonthCount > 0
+                            ? ` (${hiddenMonthCount} more)`
+                            : ""}
+                      </span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       )}

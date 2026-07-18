@@ -953,7 +953,7 @@ export default function CommonCodoRules() {
                       }}
                       className={`w-full h-auto min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between ${
                         isActive
-                          ? 'bg-lime-400 text-gray-950 hover:bg-lime-400'
+                          ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-500 hover:to-red-600'
                           : 'bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 hover:bg-gray-200/80 dark:hover:bg-gray-700/80'
                       }`}
                     >
@@ -961,7 +961,7 @@ export default function CommonCodoRules() {
                         <span
                           className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
                             isActive
-                              ? 'bg-lime-500/80 text-gray-950'
+                              ? 'bg-white/20 text-white'
                               : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
                           }`}
                         >

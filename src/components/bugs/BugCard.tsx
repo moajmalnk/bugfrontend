@@ -122,7 +122,7 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
             to={`/${currentUser?.role || "tester"}/bugs/${bug.id}${
               isFromProject ? "?from=project" : ""
             }`}
-            state={{ from: isFromProject ? "project" : "bugs" }}
+            state={{ from: `${location.pathname}${location.search}` }}
           >
             View
           </Link>
@@ -139,6 +139,7 @@ interface CommonBugCardProps {
 
 export function CommonBugCard({ bug }: CommonBugCardProps) {
   const { currentUser } = useAuth();
+  const location = useLocation();
   const developerNames =
     bug.project_developers?.map((d) => d.username).join(", ") || "—";
 
@@ -227,7 +228,7 @@ export function CommonBugCard({ bug }: CommonBugCardProps) {
           >
             <Link
               to={`/${currentUser?.role || "admin"}/bugs/${bug.id}`}
-              state={{ from: "common-bugs" }}
+              state={{ from: `${location.pathname}${location.search}` }}
             >
               View
             </Link>

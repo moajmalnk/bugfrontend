@@ -53,26 +53,52 @@ export const BugHeader = ({
 
   const searchParams = new URLSearchParams(location.search);
   const fromParam = searchParams.get("from");
+  const fromState =
+    location.state &&
+    typeof location.state === "object" &&
+    "from" in location.state
+      ? (location.state as { from: unknown }).from
+      : undefined;
+  const pathFromState =
+    typeof fromState === "string" &&
+    fromState.startsWith("/") &&
+    !fromState.startsWith("//")
+      ? fromState
+      : null;
+
   const referrerIsProject =
     typeof document !== "undefined" && document.referrer.includes("/projects/");
   const isFromProject =
-    location.state?.from === "project" ||
+    Boolean(pathFromState?.includes("/projects/")) ||
+    fromState === "project" ||
     fromParam === "project" ||
     referrerIsProject;
-  const isFromFixes = fromParam === "fixes";
+  const isFromFixes =
+    Boolean(pathFromState?.includes("/fixes")) ||
+    fromState === "fixes" ||
+    fromParam === "fixes";
+  const isFromCommonBugs =
+    Boolean(pathFromState?.includes("/common-bugs")) ||
+    fromState === "common-bugs";
 
   const role = getEffectiveRole(authUser || {});
-  const backLink = isFromProject
-    ? `/${role}/projects/${bug.project_id}?tab=bugs`
-    : isFromFixes
-      ? `/${role}/fixes`
-      : `/${role}/bugs`;
+  const backLink =
+    pathFromState ||
+    (isFromProject
+      ? `/${role}/projects/${bug.project_id}?tab=bugs`
+      : isFromFixes
+        ? `/${role}/fixes`
+        : isFromCommonBugs
+          ? `/${role}/common-bugs`
+          : `/${role}/bugs`);
 
   const backText = isFromProject
     ? "Back to Project Bugs"
     : isFromFixes
       ? "Back to Fixes"
-      : "Back to Bugs";
+      : isFromCommonBugs
+        ? "Back to Common Bugs"
+        : "Back to Bugs";
 
   const handleBackNavigation = () => {
     const target = backLink;

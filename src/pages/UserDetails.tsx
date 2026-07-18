@@ -51,7 +51,8 @@ import {
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { getReturnPathFromState } from "@/hooks/useUrlPagination";
 
 type UserStatus = "active" | "idle" | "offline";
 
@@ -133,10 +134,15 @@ async function handlePasswordChange(
 export default function UserDetails() {
   const { userId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { currentUser } = useAuth();
   const effectiveRole = getEffectiveRole(currentUser || {});
   const { hasPermission } = usePermissions(null);
+  const usersBackPath = getReturnPathFromState(
+    location.state,
+    `/${effectiveRole}/users`
+  );
 
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [isAccountToggleLoading, setIsAccountToggleLoading] = useState(false);
@@ -173,7 +179,7 @@ export default function UserDetails() {
   const handleUserDelete = async (id: string, force?: boolean) => {
     await userService.deleteUser(id, Boolean(force));
     toast({ title: "Deleted", description: "User deleted successfully" });
-    navigate(`/${effectiveRole}/users`);
+    navigate(usersBackPath);
   };
 
   const handleGenerateDashboardLink = async () => {
@@ -259,7 +265,7 @@ export default function UserDetails() {
                       variant="ghost"
                       size="icon"
                       className="h-11 w-11 rounded-xl shrink-0 border border-gray-200/60 dark:border-gray-700/60"
-                      onClick={() => navigate(`/${effectiveRole}/users`)}
+                      onClick={() => navigate(usersBackPath)}
                       aria-label="Back to Users"
                       title="Back to Users"
                     >
@@ -280,7 +286,7 @@ export default function UserDetails() {
                   <Button
                     variant="outline"
                     className="h-11 rounded-xl border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-900/40 backdrop-blur hover:bg-white/80 dark:hover:bg-gray-900/60"
-                    onClick={() => navigate(`/${effectiveRole}/users`)}
+                    onClick={() => navigate(usersBackPath)}
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Users
@@ -316,7 +322,7 @@ export default function UserDetails() {
               <p className="text-sm text-muted-foreground">
                 The requested user doesn’t exist or you don’t have access.
               </p>
-              <Button onClick={() => navigate(`/${effectiveRole}/users`)}>
+              <Button onClick={() => navigate(usersBackPath)}>
                 Go back
               </Button>
             </CardContent>

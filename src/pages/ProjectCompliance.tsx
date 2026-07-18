@@ -8,13 +8,19 @@ import { projectService } from '@/services/projectService';
 import { getProjectStatusLabel, type ProjectStatus } from '@/lib/utils/projectUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FolderOpen, ShieldCheck } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { getReturnPathFromState } from '@/hooks/useUrlPagination';
 
 const ProjectCompliance = () => {
   const { projectId } = useParams<{ projectId: string }>();
+  const location = useLocation();
   const { currentUser } = useAuth();
   const role = currentUser?.role || 'admin';
   const queryClient = useQueryClient();
+  const projectsListPath = getReturnPathFromState(
+    location.state,
+    `/${role}/projects`
+  );
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -150,7 +156,7 @@ const ProjectCompliance = () => {
         <CodoCompliancePanel
           projectId={projectId}
           projectStatus={project.status}
-          projectsListPath={`/${role}/projects`}
+          projectsListPath={projectsListPath}
           onStatusFinalized={handleStatusFinalized}
         />
       </section>

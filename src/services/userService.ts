@@ -241,8 +241,11 @@ class UserService {
     return response.data; // Assuming response.data contains the UserStats object
   }
 
-  async getUserWorkStats(userId: string): Promise<any> {
-    const response = await this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?id=${userId}`);
+  async getUserWorkStats(userId: string, opts?: { full?: boolean; months?: number }): Promise<any> {
+    const params = new URLSearchParams({ id: userId });
+    if (opts?.full) params.set('full', '1');
+    if (opts?.months && opts.months > 0) params.set('months', String(opts.months));
+    const response = await this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?${params.toString()}`);
     if (!response.success) {
       throw new Error(response.message || 'Failed to fetch work statistics');
     }

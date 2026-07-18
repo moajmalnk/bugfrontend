@@ -247,65 +247,65 @@ export default function LeaveRequests() {
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
       <section className="max-w-7xl mx-auto min-w-0 space-y-6 sm:space-y-8">
         {/* Hero — Bugs/OT style */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-teal-50/50 via-transparent to-cyan-50/50 dark:from-teal-950/20 dark:via-transparent dark:to-cyan-950/20" />
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-teal-50/50 via-transparent to-cyan-50/50 dark:from-teal-950/20 dark:via-transparent dark:to-cyan-950/20 rounded-2xl pointer-events-none" />
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 sm:gap-6">
               <div className="space-y-3 min-w-0 flex-1">
-                <div className="flex items-center gap-3">
+                <div className="flex items-start sm:items-center gap-3 min-w-0">
                   <div className="p-2 bg-gradient-to-br from-teal-600 to-cyan-600 rounded-xl shadow-lg shrink-0">
-                    <PlaneTakeoff className="h-6 w-6 text-white" />
+                    <PlaneTakeoff className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
-                  <div className="min-w-0">
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <div className="min-w-0 flex-1 overflow-visible">
+                    <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight pb-0.5 pr-1 break-words">
                       My Leave
                     </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-teal-600 to-cyan-600 rounded-full mt-2" />
+                    <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-teal-600 to-cyan-600 rounded-full mt-2" />
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl break-words">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl break-words">
                   Apply for leave and track approvals
                   {currentUser?.username ? ` for ${currentUser.username}` : ''}.
                   Pending requests do not block check-in; approved leave does.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-stretch gap-3 shrink-0">
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 rounded-xl shadow-sm">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full xl:w-auto xl:flex xl:flex-wrap xl:items-stretch xl:shrink-0">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 rounded-xl shadow-sm min-w-0">
                   <div className="p-1.5 bg-amber-500 rounded-lg shrink-0">
-                    <Clock className="h-5 w-5 text-white" />
+                    <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
-                  <div>
-                    <div className="text-xs font-medium text-amber-800/80 dark:text-amber-200/80">
+                  <div className="min-w-0">
+                    <div className="text-[10px] sm:text-xs font-medium text-amber-800/80 dark:text-amber-200/80 truncate">
                       Pending
                     </div>
-                    <div className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums leading-none">
+                    <div className="text-xl sm:text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums leading-none">
                       {pendingCount}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm min-w-0">
                   <div className="p-1.5 bg-emerald-600 rounded-lg shrink-0">
-                    <CheckCircle2 className="h-5 w-5 text-white" />
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
-                  <div>
-                    <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80">
+                  <div className="min-w-0">
+                    <div className="text-[10px] sm:text-xs font-medium text-emerald-800/80 dark:text-emerald-200/80 truncate">
                       Approved
                     </div>
-                    <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums leading-none">
+                    <div className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums leading-none">
                       {approvedCount}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-950/30 dark:to-cyan-950/30 border border-teal-200 dark:border-teal-800 rounded-xl shadow-sm">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-950/30 dark:to-cyan-950/30 border border-teal-200 dark:border-teal-800 rounded-xl shadow-sm min-w-0">
                   <div className="p-1.5 bg-teal-600 rounded-lg shrink-0">
-                    <CalendarDays className="h-5 w-5 text-white" />
+                    <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
-                  <div>
-                    <div className="text-xs font-medium text-teal-800/80 dark:text-teal-200/80">
+                  <div className="min-w-0">
+                    <div className="text-[10px] sm:text-xs font-medium text-teal-800/80 dark:text-teal-200/80 truncate">
                       Remaining
                     </div>
-                    <div className="text-2xl font-bold text-teal-700 dark:text-teal-300 tabular-nums leading-none">
+                    <div className="text-xl sm:text-2xl font-bold text-teal-700 dark:text-teal-300 tabular-nums leading-none">
                       {remainingTotal}
                     </div>
                   </div>
@@ -318,22 +318,22 @@ export default function LeaveRequests() {
         {/* Month balances */}
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-teal-50/30 dark:from-gray-800/30 dark:to-teal-900/30 rounded-2xl pointer-events-none" />
-          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3">
+          <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8 space-y-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3 min-w-0">
                 <div className="p-2 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg shrink-0">
                   <CalendarDays className="h-5 w-5 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                <div className="min-w-0">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
                     Monthly balance
                   </h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 break-words">
                     Quota resets each calendar month · {formatMonthLabel(month)}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <Button
                   type="button"
                   variant="outline"
@@ -365,27 +365,27 @@ export default function LeaveRequests() {
             </div>
 
             {loading ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                 {[1, 2, 3, 4].map((i) => (
                   <Skeleton key={i} className="h-36 rounded-2xl" />
                 ))}
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                 {balances.map((b, idx) => {
                   const accent = BALANCE_ACCENTS[idx % BALANCE_ACCENTS.length];
                   return (
                     <div
                       key={b.id}
-                      className={`group relative overflow-hidden rounded-2xl border ${accent.border} bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-5 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl`}
+                      className={`group relative rounded-2xl border ${accent.border} bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-4 sm:p-5 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl min-w-0`}
                     >
                       <div
-                        className={`absolute inset-0 bg-gradient-to-br ${accent.wash} opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none`}
+                        className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${accent.wash} opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none`}
                       />
-                      <div className="relative space-y-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-base font-bold text-gray-900 dark:text-white">
+                      <div className="relative space-y-3 min-w-0">
+                        <div className="flex items-start justify-between gap-2 min-w-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm sm:text-base font-bold text-gray-900 dark:text-white break-words leading-snug">
                               {b.name}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
@@ -398,12 +398,12 @@ export default function LeaveRequests() {
                             <CalendarDays className="h-4 w-4 text-white" />
                           </div>
                         </div>
-                        <p className={`text-4xl font-bold tabular-nums ${accent.number}`}>
+                        <p className={`text-3xl sm:text-4xl font-bold tabular-nums ${accent.number}`}>
                           {b.remaining}
                         </p>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>remaining</span>
-                          <span className="font-medium text-gray-700 dark:text-gray-300">
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span className="shrink-0">remaining</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300 tabular-nums shrink-0">
                             {b.used} used
                           </span>
                         </div>

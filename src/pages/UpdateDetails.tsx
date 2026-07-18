@@ -24,7 +24,8 @@ import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotifica
 import { updateService } from "@/services/updateService";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Clock, CalendarDays, Play, Timer, Flag, Loader2 } from "lucide-react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { getReturnPathFromState } from "@/hooks/useUrlPagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
@@ -146,6 +147,7 @@ const AccessError = () => (
 
 const UpdateDetails = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { updateId } = useParams<{ updateId: string }>();
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -196,6 +198,11 @@ const UpdateDetails = () => {
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
+
+  const updatesListFallback = `/${currentUser?.role || "admin"}/updates`;
+  const updatesBackPath = fromProject
+    ? `/${currentUser?.role || "admin"}/projects/${update?.project_id}?tab=updates`
+    : getReturnPathFromState(location.state, updatesListFallback);
 
   useEffect(() => {
     // Only refetch if we don't have cached data or if it's stale
@@ -415,17 +422,7 @@ const UpdateDetails = () => {
               <div className="min-w-0">
                 <Button 
                   variant="ghost" 
-                  onClick={() => {
-                    if (fromProject) {
-                      // If coming from project, go back to the project updates tab
-                      const role = currentUser?.role || "admin";
-                      navigate(`/${role}/projects/${update?.project_id}?tab=updates`);
-                    } else {
-                      // Otherwise, go back to the updates page
-                      const role = currentUser?.role || "admin";
-                      navigate(`/${role}/updates`);
-                    }
-                  }} 
+                  onClick={() => navigate(updatesBackPath)} 
                   className="mb-2 -ml-2 sm:-ml-4"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />

@@ -31,8 +31,14 @@ import { updateService } from "@/services/updateService";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Bell, Filter, Lock, Plus, Search, User, X, FolderOpen } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import {
+  useUrlPagination,
+  useClampUrlPage,
+  useResetUrlPageOnChange,
+  listReturnState,
+} from "@/hooks/useUrlPagination";
 import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 
@@ -106,12 +112,19 @@ const API_BASE = import.meta.env.VITE_API_URL + "/updates";
 
 const Updates = () => {
   const { currentUser } = useAuth();
+  const location = useLocation();
+  const listFromState = listReturnState(location.pathname, location.search);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "all-updates";
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const {
+    page: currentPage,
+    pageSize: itemsPerPage,
+    setPage: setCurrentPage,
+    setPageSize: setItemsPerPage,
+    clampToTotalPages,
+  } = useUrlPagination({ defaultPageSize: 10 });
   
   // Use persisted filters hook
   const [filters, setFilter, clearFilters] = usePersistedFilters("updates", {
@@ -156,9 +169,12 @@ const Updates = () => {
   });
 
   // Reset current page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab, updates.length, localSearchTerm, projectFilter, createdByFilter]);
+  useResetUrlPageOnChange(setCurrentPage, [
+    activeTab,
+    localSearchTerm,
+    projectFilter,
+    createdByFilter,
+  ]);
 
   // Fetch projects to determine if user can create new update
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
@@ -227,11 +243,7 @@ const Updates = () => {
   // Pagination calculations
   const totalFiltered = filteredUpdates.length;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
-
-  // Avoid empty page when itemsPerPage increases or filters shrink the list
-  useEffect(() => {
-    setCurrentPage((p) => Math.min(p, totalPages));
-  }, [itemsPerPage, totalPages]);
+  useClampUrlPage(clampToTotalPages, totalPages);
 
   const paginatedUpdates = filteredUpdates.slice(
     (currentPage - 1) * itemsPerPage,
@@ -371,7 +383,8 @@ const Updates = () => {
         setSearchParams((prev) => {
           const p = new URLSearchParams(prev);
           p.set("tab", val);
-          return p as any;
+          p.delete("page");
+          return p;
         });
       }}
       className="w-full"
@@ -504,7 +517,7 @@ const Updates = () => {
 
         {/* Professional Responsive Pagination Controls - Show when there are updates and multiple pages */}
         {filteredUpdates.length > 0 && totalPages > 1 && (
-          <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+          <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             {/* Top Row - Results Info and Items Per Page */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 lg:gap-4 p-4 sm:p-5">
               <div className="flex items-center gap-2">
@@ -892,6 +905,7 @@ const Updates = () => {
                                   ? `/${currentUser.role}/updates/${update.id}`
                                   : `/updates/${update.id}`
                               }
+                              state={listFromState}
                             >
                               View
                             </Link>
@@ -920,6 +934,7 @@ const Updates = () => {
                               ? `/${currentUser.role}/updates/${update.id}`
                               : `/updates/${update.id}`
                           }
+                          state={listFromState}
                           className="hover:underline"
                         >
                           {update.title}
@@ -959,6 +974,7 @@ const Updates = () => {
                               ? `/${currentUser.role}/updates/${update.id}`
                               : `/updates/${update.id}`
                           }
+                          state={listFromState}
                         >
                           View
                         </Link>

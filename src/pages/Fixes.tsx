@@ -37,8 +37,14 @@ import {
   UserCheck,
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import {
+  useUrlPagination,
+  useClampUrlPage,
+  useResetUrlPageOnChange,
+  listReturnState,
+} from "@/hooks/useUrlPagination";
 import { formatRetestSummary } from "@/components/bugs/details/TesterVerificationPanel";
 import { cn } from "@/lib/utils";
 
@@ -126,6 +132,7 @@ const getPriorityBadgeVariant = (
 // Professional bug card component with enhanced design
 const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
   const { currentUser } = useAuth();
+  const location = useLocation();
   const role = currentUser?.role;
   const project = projects.find(p => p.id === bug.project_id);
 
@@ -244,7 +251,10 @@ const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
             asChild
             className="w-full h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
           >
-            <Link to={role ? `/${role}/bugs/${bug.id}?from=fixes` : `/bugs/${bug.id}?from=fixes`}>
+            <Link
+              to={role ? `/${role}/bugs/${bug.id}?from=fixes` : `/bugs/${bug.id}?from=fixes`}
+              state={listReturnState(location.pathname, location.search)}
+            >
               View
             </Link>
           </Button>
@@ -256,6 +266,8 @@ const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
 
 const Fixes = () => {
   const { currentUser } = useAuth();
+  const location = useLocation();
+  const listFromState = listReturnState(location.pathname, location.search);
   
   // Use persisted filters hook
   const [filters, setFilter, clearFilters] = usePersistedFilters("fixes", {
@@ -275,8 +287,13 @@ const Fixes = () => {
   const initialTab = searchParams.get("tab") || "all-fixes";
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const {
+    page: currentPage,
+    pageSize: itemsPerPage,
+    setPage: setCurrentPage,
+    setPageSize: setItemsPerPage,
+    clampToTotalPages,
+  } = useUrlPagination({ defaultPageSize: 10 });
 
   const { data, isLoading, error } = useQuery<{
     bugs: BugType[];
@@ -340,6 +357,19 @@ const Fixes = () => {
         (projectFilter === "all" || bug.project_id === projectFilter)
     );
   }, [bugs, activeTab, currentUser?.id, searchTerm, priorityFilter, projectFilter]);
+
+  useResetUrlPageOnChange(setCurrentPage, [
+    activeTab,
+    searchTerm,
+    priorityFilter,
+    projectFilter,
+  ]);
+
+  const listTotalPages = Math.max(
+    1,
+    Math.ceil(filteredBugs.length / itemsPerPage) || 1
+  );
+  useClampUrlPage(clampToTotalPages, listTotalPages);
 
   const showTabs =
     currentUser?.role === "admin" || currentUser?.role === "developer";
@@ -751,7 +781,7 @@ const Fixes = () => {
 
         {/* Enhanced Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+          <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
             {/* Top Row - Results Info and Items Per Page */}
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 xl:gap-4 p-4 sm:p-5">
               <div className="flex items-center gap-2">
@@ -1083,6 +1113,7 @@ const Fixes = () => {
                               ? `/${currentUser.role}/bugs/${bug.id}?from=fixes`
                               : `/bugs/${bug.id}?from=fixes`
                           }
+                          state={listFromState}
                         >
                           View
                         </Link>
@@ -1184,7 +1215,8 @@ const Fixes = () => {
               setSearchParams((prev) => {
                 const p = new URLSearchParams(prev);
                 p.set("tab", val);
-                return p as any;
+                p.delete("page");
+                return p;
               });
             }}
             className="w-full"

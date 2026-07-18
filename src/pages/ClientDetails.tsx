@@ -41,7 +41,8 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { getReturnPathFromState } from '@/hooks/useUrlPagination';
 
 const statusColors: Record<string, string> = {
   lead: 'bg-amber-500 text-white',
@@ -137,8 +138,13 @@ function InfoChip({
 const ClientDetails = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser } = useAuth();
   const role = getEffectiveRole(currentUser || {});
+  const clientsBackPath = getReturnPathFromState(
+    location.state,
+    `/${role}/clients`
+  );
   const [client, setClient] = useState<Client | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -208,7 +214,7 @@ const ClientDetails = () => {
               <Button
                 variant="outline"
                 className="h-11 rounded-xl border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-900/40 backdrop-blur hover:bg-white/80 dark:hover:bg-gray-900/60"
-                onClick={() => navigate(`/${role}/clients`)}
+                onClick={() => navigate(clientsBackPath)}
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Clients
@@ -242,7 +248,7 @@ const ClientDetails = () => {
               <p className="text-sm text-muted-foreground">
                 The requested client doesn’t exist or you don’t have access.
               </p>
-              <Button onClick={() => navigate(`/${role}/clients`)}>Go back</Button>
+              <Button onClick={() => navigate(clientsBackPath)}>Go back</Button>
             </CardContent>
           </Card>
         ) : (
@@ -616,7 +622,7 @@ const ClientDetails = () => {
               projectCount={client.project_count}
               open={deleteOpen}
               onOpenChange={setDeleteOpen}
-              onDeleted={() => navigate(`/${role}/clients`)}
+              onDeleted={() => navigate(clientsBackPath)}
             />
           </div>
         )}

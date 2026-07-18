@@ -27,12 +27,20 @@ import {
   User,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import {
+  useUrlPagination,
+  useClampUrlPage,
+  useResetUrlPageOnChange,
+  listReturnState,
+} from "@/hooks/useUrlPagination";
 import { canReportBug } from "@/lib/utils";
 
 const Bugs = () => {
   const { currentUser } = useAuth();
+  const location = useLocation();
+  const listFromState = listReturnState(location.pathname, location.search);
   const [bugs, setBugs] = useState<Bug[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,8 +67,13 @@ const Bugs = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "all-bugs";
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const {
+    page: currentPage,
+    pageSize: itemsPerPage,
+    setPage: setCurrentPage,
+    setPageSize: setItemsPerPage,
+    clampToTotalPages,
+  } = useUrlPagination({ defaultPageSize: 10 });
   const [totalBugs, setTotalBugs] = useState(0);
   const [pendingBugsCount, setPendingBugsCount] = useState(0);
 
@@ -95,15 +108,12 @@ const Bugs = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [
+  useResetUrlPageOnChange(setCurrentPage, [
     activeTab,
     searchTerm,
     priorityFilter,
     statusFilter,
     projectFilter,
-    bugs.length,
   ]);
 
   const fetchBugs = async (page = 1, limit = itemsPerPage) => {
@@ -118,7 +128,6 @@ const Bugs = () => {
         limit: 1000,
       });
       setBugs(data.bugs);
-      setCurrentPage(data.pagination.currentPage);
       setTotalBugs(data.pagination.totalBugs);
 
       // Calculate pending bugs from all fetched bugs
@@ -221,7 +230,8 @@ const Bugs = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
+  useClampUrlPage(clampToTotalPages, totalPages);
 
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
@@ -301,11 +311,7 @@ const Bugs = () => {
                         ? `/${currentUser.role}/bugs/new`
                         : "/bugs/new"
                     }
-                    state={{
-                      from: currentUser?.role
-                        ? `/${currentUser.role}/bugs`
-                        : "/bugs",
-                    }}
+                    state={listFromState}
                     className="group"
                   >
                     <Button
@@ -345,7 +351,8 @@ const Bugs = () => {
               setSearchParams((prev) => {
                 const p = new URLSearchParams(prev);
                 p.set("tab", val);
-                return p as any;
+                p.delete("page");
+                return p;
               });
             }}
             className="w-full"
@@ -472,7 +479,7 @@ const Bugs = () => {
 
               {/* Professional Responsive Pagination Controls - Show when there are bugs */}
               {!skeletonLoading && !loading && filteredBugs.length > 0 && totalPages > 1 && (
-                <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   {/* Top Row - Results Info and Items Per Page */}
                   <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
                     <div className="flex items-center gap-2">
@@ -858,7 +865,7 @@ const Bugs = () => {
               !loading &&
               filteredBugs.length > 0 &&
               totalPages > 1 && (
-                <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                   {/* Top Row - Results Info and Items Per Page */}
                   <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
                     <div className="flex items-center gap-2">
