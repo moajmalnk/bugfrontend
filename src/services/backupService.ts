@@ -20,6 +20,7 @@ export type BackupJob = {
   table_count: number | null;
   duration_seconds: number | null;
   error_message: string | null;
+  status_detail?: string | null;
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -40,6 +41,8 @@ export type BackupStats = {
   estimate: {
     total_bytes: number;
     total_label: string;
+    eta_seconds?: number;
+    eta_label?: string;
   };
   jobs: {
     active: number;

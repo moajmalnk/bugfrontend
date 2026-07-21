@@ -73,7 +73,7 @@ function statusBadge(status: BackupJobStatus) {
       className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
     },
     processing: {
-      label: 'Processing',
+      label: 'Preparing',
       className: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
     },
     completed: {
@@ -90,7 +90,18 @@ function statusBadge(status: BackupJobStatus) {
   return <Badge className={cn('font-medium', item.className)}>{item.label}</Badge>;
 }
 
-function mailStatusBadge(status: BackupMailStatus, error?: string | null) {
+function mailStatusBadge(status: BackupMailStatus, error?: string | null, jobStatus?: BackupJobStatus) {
+  if (jobStatus && ['queued', 'processing'].includes(jobStatus) && status === 'pending') {
+    return (
+      <span className="inline-flex items-center gap-1.5" title="Email sends when the archive is ready">
+        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+        <Badge className="font-medium bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+          Preparing email
+        </Badge>
+      </span>
+    );
+  }
+
   const map: Record<BackupMailStatus, { label: string; className: string }> = {
     pending: {
       label: 'Pending',
@@ -151,7 +162,8 @@ const BugBackup = () => {
   const [includeConfig, setIncludeConfig] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
-  const [progressValue, setProgressValue] = useState(12);
+  const [progressValue, setProgressValue] = useState(8);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const canAccess = hasPermission('SETTINGS_EDIT');
   const hasSelection = includeDatabase || includeUploads || includeConfig;
@@ -185,22 +197,62 @@ const BugBackup = () => {
   });
 
   const activeJob = useMemo(
-    () => history.find((job) => job.id === activeJobId) ?? history.find((job) => job.status === 'processing'),
+    () =>
+      history.find((job) => job.id === activeJobId) ??
+      history.find((job) => ['queued', 'processing'].includes(job.status)),
     [history, activeJobId]
   );
 
+  const etaSeconds = stats?.estimate?.eta_seconds ?? 180;
+  const etaLabel = stats?.estimate?.eta_label ?? 'about 3 minutes';
+  const isBackupRunning =
+    isStarting ||
+    activeJob?.status === 'processing' ||
+    activeJob?.status === 'queued' ||
+    (stats?.jobs.active ?? 0) > 0;
+
+  const prepareStage = useMemo(() => {
+    if (progressValue < 25) {
+      return {
+        title: 'Collecting data',
+        detail: 'Exporting database tables and gathering selected files.',
+      };
+    }
+    if (progressValue < 55) {
+      return {
+        title: 'Building archive',
+        detail: 'Compressing your BugRicer snapshot into a secure ZIP.',
+      };
+    }
+    if (progressValue < 80) {
+      return {
+        title: 'Preparing email',
+        detail: `Attaching the archive for delivery to ${activeJob?.email || email || 'your inbox'}.`,
+      };
+    }
+    return {
+      title: 'Sending backup',
+      detail: 'Almost done — the ZIP will arrive in your inbox shortly.',
+    };
+  }, [progressValue, activeJob?.email, email]);
+
   useEffect(() => {
-    if (!activeJob || activeJob.status !== 'processing') {
-      setProgressValue((value) => (value < 12 ? 12 : value));
+    if (!isBackupRunning || activeJob?.status === 'completed' || activeJob?.status === 'failed') {
       return;
     }
 
-    const timer = window.setInterval(() => {
-      setProgressValue((value) => (value >= 92 ? 92 : value + 4));
-    }, 1800);
+    setElapsedSeconds(0);
+    const tick = window.setInterval(() => {
+      setElapsedSeconds((s) => {
+        const next = s + 1;
+        const target = Math.min(90, Math.round((next / Math.max(etaSeconds, 1)) * 85) + 8);
+        setProgressValue((value) => Math.max(value, target));
+        return next;
+      });
+    }, 1000);
 
-    return () => window.clearInterval(timer);
-  }, [activeJob?.id, activeJob?.status]);
+    return () => window.clearInterval(tick);
+  }, [isBackupRunning, activeJob?.id, activeJob?.status, etaSeconds]);
 
   useEffect(() => {
     if (activeJob?.status === 'completed') {
@@ -208,8 +260,8 @@ const BugBackup = () => {
       setIsStarting(false);
       refetchStats();
       toast({
-        title: 'Backup completed',
-        description: `Archive sent to ${activeJob.email}.`,
+        title: 'Backup ready — email sent',
+        description: `Your archive was emailed to ${activeJob.email}. Check inbox and spam/promotions.`,
       });
     }
 
@@ -217,7 +269,7 @@ const BugBackup = () => {
       setIsStarting(false);
       toast({
         title: 'Backup failed',
-        description: activeJob.error_message || 'Check history for details.',
+        description: activeJob.error_message || 'Please try again. If this continues, check SMTP settings.',
         variant: 'destructive',
       });
     }
@@ -243,7 +295,8 @@ const BugBackup = () => {
     }
 
     setIsStarting(true);
-    setProgressValue(12);
+    setProgressValue(8);
+    setElapsedSeconds(0);
 
     try {
       const result = await backupService.createBackup({
@@ -261,8 +314,8 @@ const BugBackup = () => {
       ]);
 
       toast({
-        title: 'Backup started',
-        description: `Preparing archive — watch Backup History below. Email will go to ${email}.`,
+        title: 'We are preparing your backup',
+        description: `Estimated ${etaLabel}. When ready, the ZIP will be emailed to ${email}.`,
       });
     } catch (error: unknown) {
       setIsStarting(false);
@@ -426,32 +479,66 @@ const BugBackup = () => {
           })}
         </div>
 
-        {(isStarting || activeJob?.status === 'processing' || (stats?.jobs.active ?? 0) > 0) && (
-          <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 p-5 dark:border-blue-800/70 dark:from-blue-950/30 dark:to-indigo-950/20">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between min-w-0">
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-blue-600 p-2 text-white">
-                  <Activity className="h-5 w-5 animate-pulse" />
+        {isBackupRunning && (
+          <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-emerald-50/40 p-5 dark:border-blue-800/70 dark:from-blue-950/40 dark:via-indigo-950/25 dark:to-emerald-950/20 sm:p-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between min-w-0">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="rounded-xl bg-gradient-to-br from-blue-600 to-emerald-600 p-2.5 text-white shadow-md shrink-0">
+                  <Loader2 className="h-5 w-5 animate-spin" />
                 </div>
-                <div>
+                <div className="min-w-0 space-y-1">
                   <h2 className="text-lg font-semibold text-blue-950 dark:text-blue-100">
-                    Backup in progress
+                    We are preparing your backup
                   </h2>
-                  <p className="text-sm text-blue-800/80 dark:text-blue-200/80">
-                    Packaging components, compressing archive, and preparing secure email delivery.
+                  <p className="text-sm text-blue-900/80 dark:text-blue-100/80 leading-relaxed">
+                    {prepareStage.detail} When the archive is ready, it will be emailed to{' '}
+                    <span className="font-semibold text-blue-700 dark:text-blue-300">
+                      {activeJob?.email || email || 'your inbox'}
+                    </span>
+                    .
+                  </p>
+                  <p className="text-xs font-medium text-blue-800/70 dark:text-blue-200/70">
+                    Estimated time: {etaLabel}
+                    {elapsedSeconds > 0 ? ` · Elapsed ${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s` : ''}
                   </p>
                 </div>
               </div>
-              <Badge className="self-start bg-blue-600 text-white hover:bg-blue-600">
+              <Badge className="self-start bg-blue-600 text-white hover:bg-blue-600 shrink-0">
                 Job #{activeJob?.id ?? '…'}
               </Badge>
             </div>
+
+            <div className="mt-5 grid gap-2 sm:grid-cols-4">
+              {[
+                { key: 'collect', label: 'Collect', done: progressValue >= 25 },
+                { key: 'archive', label: 'Archive', done: progressValue >= 55 },
+                { key: 'email', label: 'Prepare mail', done: progressValue >= 80 },
+                { key: 'send', label: 'Send', done: progressValue >= 95 },
+              ].map((step) => (
+                <div
+                  key={step.key}
+                  className={cn(
+                    'rounded-xl border px-3 py-2 text-center text-xs font-semibold transition-colors',
+                    step.done
+                      ? 'border-emerald-300/80 bg-emerald-50/80 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'
+                      : 'border-blue-200/60 bg-white/50 text-blue-900/70 dark:border-blue-800/50 dark:bg-blue-950/20 dark:text-blue-200/70'
+                  )}
+                >
+                  {step.done ? '✓ ' : ''}
+                  {step.label}
+                </div>
+              ))}
+            </div>
+
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between text-xs text-blue-900/80 dark:text-blue-100/80">
-                <span>Preparing archive</span>
-                <span>{progressValue}%</span>
+                <span className="font-medium">{prepareStage.title}</span>
+                <span>{Math.min(progressValue, 99)}%</span>
               </div>
-              <Progress value={progressValue} className="h-2" />
+              <Progress value={Math.min(progressValue, 99)} className="h-2.5" />
+              <p className="text-[11px] text-muted-foreground">
+                You can leave this page — delivery continues in the background. Check spam/promotions if the email is delayed.
+              </p>
             </div>
           </div>
         )}
@@ -490,7 +577,8 @@ const BugBackup = () => {
                   className="h-12 border-2 text-base"
                 />
                 <p className="mt-2 text-sm text-muted-foreground">
-                  The encrypted ZIP archive and restoration README will be sent to this inbox — check spam/promotions if it does not arrive within a few minutes.
+                  We prepare the ZIP on the server, then email it to this address. Typical delivery takes{' '}
+                  {etaLabel} depending on archive size — check spam/promotions if it does not arrive.
                 </p>
                 {email && (
                   <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
@@ -560,13 +648,13 @@ const BugBackup = () => {
 
               <Button
                 onClick={handleBackup}
-                disabled={isStarting || !email || !hasSelection}
+                disabled={isBackupRunning || !email || !hasSelection}
                 className="h-12 w-full bg-gradient-to-r from-blue-600 to-emerald-600 text-base font-semibold text-white shadow-lg hover:from-blue-700 hover:to-emerald-700"
               >
-                {isStarting ? (
+                {isBackupRunning ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Starting backup job…
+                    Preparing backup… ({etaLabel})
                   </>
                 ) : (
                   <>
@@ -690,7 +778,11 @@ const BugBackup = () => {
                       </TableCell>
                       <TableCell className="max-w-[180px] truncate">{job.email}</TableCell>
                       <TableCell>
-                        {mailStatusBadge(job.mail_status ?? 'pending', job.mail_error)}
+                        {mailStatusBadge(
+                          job.mail_status ?? 'pending',
+                          job.mail_error,
+                          job.status
+                        )}
                       </TableCell>
                       <TableCell>{job.file_size_label || '—'}</TableCell>
                       <TableCell>
