@@ -39,6 +39,12 @@ export interface UsersAnalyticsPayload {
     range: string;
   };
   lookback_months: number;
+  filters?: {
+    active_only_requested?: boolean;
+    active_only_applied?: boolean;
+    total_users_before_filter?: number;
+    total_users_after_filter?: number;
+  };
   team_summary: {
     user_count: number;
     avg_hours_per_day: number;
@@ -400,10 +406,11 @@ class UserService {
     return response.data;
   }
 
-  async getUsersAnalytics(opts?: { months?: number; limit?: number }): Promise<UsersAnalyticsPayload> {
+  async getUsersAnalytics(opts?: { months?: number; limit?: number; activeOnly?: boolean }): Promise<UsersAnalyticsPayload> {
     const params = new URLSearchParams({ analytics: '1' });
     if (opts?.months && opts.months > 0) params.set('months', String(opts.months));
     if (opts?.limit && opts.limit > 0) params.set('limit', String(opts.limit));
+    if (opts?.activeOnly) params.set('active_only', '1');
     const response = await this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?${params.toString()}`);
     if (!response.success) {
       throw new Error(response.message || 'Failed to fetch user analytics');

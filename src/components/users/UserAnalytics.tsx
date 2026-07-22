@@ -8,7 +8,10 @@ import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
   Bug,
+  ChevronDown,
+  ChevronUp,
   Code2,
+  Filter,
   Loader2,
   Shield,
   TrendingDown,
@@ -53,38 +56,6 @@ const RANKING_LABELS: Record<string, string> = {
   work_days: "Work days",
   overtime_hours: "Overtime hours",
 };
-
-function summarizeUsers(users: UsersAnalyticsPayload["roles"]["admin"]["users"]) {
-  if (!users.length) {
-    return {
-      user_count: 0,
-      avg_hours_per_day: 0,
-      avg_work_days: 0,
-      avg_tasks_completed: 0,
-      avg_overtime_hours: 0,
-      total_hours: 0,
-    };
-  }
-  const totals = users.reduce(
-    (acc, user) => {
-      acc.avgHours += Number(user.current_period.avg_hours_per_day || 0);
-      acc.avgDays += Number(user.current_period.days || 0);
-      acc.avgTasks += Number(user.current_period.tasks_completed || 0);
-      acc.avgOt += Number(user.current_period.overtime_hours || 0);
-      acc.totalHours += Number(user.current_period.hours || 0);
-      return acc;
-    },
-    { avgHours: 0, avgDays: 0, avgTasks: 0, avgOt: 0, totalHours: 0 }
-  );
-  return {
-    user_count: users.length,
-    avg_hours_per_day: Number((totals.avgHours / users.length).toFixed(2)),
-    avg_work_days: Number((totals.avgDays / users.length).toFixed(1)),
-    avg_tasks_completed: Number((totals.avgTasks / users.length).toFixed(1)),
-    avg_overtime_hours: Number((totals.avgOt / users.length).toFixed(2)),
-    total_hours: Number(totals.totalHours.toFixed(2)),
-  };
-}
 
 function MetricTile({
   label,
@@ -241,6 +212,24 @@ function RoleAnalyticsSection({
 }) {
   const meta = ROLE_META[role];
   const Icon = meta.icon;
+  const [showLowActivityRows, setShowLowActivityRows] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const { activeUsers, lowActivityUsers } = useMemo(() => {
+    const highSignal = data.users.filter((user) => {
+      const current = user.current_period;
+      return (
+        Number(current.hours || 0) > 0 ||
+        Number(current.days || 0) > 0 ||
+        Number(current.tasks_completed || 0) > 0 ||
+        Number(current.overtime_hours || 0) > 0 ||
+        Number(current.bugs_reported || 0) > 0 ||
+        Number(current.bugs_fixed || 0) > 0
+      );
+    });
+    const lowSignal = data.users.filter((user) => !highSignal.some((u) => u.user_id === user.user_id));
+    return { activeUsers: highSignal, lowActivityUsers: lowSignal };
+  }, [data.users]);
 
   return (
     <Card className="relative overflow-hidden rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-sm dark:border-gray-800/60 dark:bg-gray-900/80">
@@ -263,12 +252,33 @@ function RoleAnalyticsSection({
               </p>
             </div>
           </div>
-          <Badge variant="outline" className={cn("capitalize", meta.badgeClass)}>
-            {data.summary.user_count} users
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={cn("capitalize", meta.badgeClass)}>
+              {data.summary.user_count} users
+            </Badge>
+            <button
+              type="button"
+              onClick={() => setIsCollapsed((prev) => !prev)}
+              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-background transition-colors"
+              aria-expanded={!isCollapsed}
+              aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${meta.label} section`}
+            >
+              {isCollapsed ? (
+                <>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  Expand
+                </>
+              ) : (
+                <>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  Collapse
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="relative space-y-5">
+      <CardContent className={cn("relative space-y-5", isCollapsed ? "pt-0" : "")}>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <MetricTile
             label="Avg h/day"
@@ -293,6 +303,14 @@ function RoleAnalyticsSection({
           />
         </div>
 
+        {isCollapsed ? (
+          <div className="rounded-lg border border-dashed border-border/60 bg-background/50 px-4 py-3 text-xs text-muted-foreground">
+            Section collapsed. Expand to view rankings and detailed member breakdown.
+          </div>
+        ) : null}
+
+        {!isCollapsed ? (
+          <>
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -326,13 +344,34 @@ function RoleAnalyticsSection({
         </div>
 
         <div className="rounded-xl border border-border/50 bg-muted/10 p-3 sm:p-4">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            All {meta.label.toLowerCase()} — current month
-          </p>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              All {meta.label.toLowerCase()} — current month
+            </p>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">
+                {activeUsers.length} active
+              </Badge>
+              {lowActivityUsers.length > 0 ? (
+                <Badge variant="secondary" className="text-[10px]">
+                  {lowActivityUsers.length} low activity
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+          {activeUsers.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border/60 bg-background/50 px-4 py-6 text-center text-sm text-muted-foreground">
+              No recorded activity for this role in the selected month.
+            </div>
+          ) : null}
           <div className="grid grid-cols-1 gap-3 md:hidden">
-            {data.users.map((user) => (
+            {activeUsers.map((user) => (
               <UserCompactCard key={user.user_id} user={user} rolePath={rolePath} />
             ))}
+            {showLowActivityRows &&
+              lowActivityUsers.map((user) => (
+                <UserCompactCard key={user.user_id} user={user} rolePath={rolePath} />
+              ))}
           </div>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[720px] text-sm">
@@ -349,7 +388,7 @@ function RoleAnalyticsSection({
                 </tr>
               </thead>
               <tbody>
-                {data.users.map((user) => (
+                {activeUsers.map((user) => (
                   <tr key={user.user_id} className="border-b border-border/40 last:border-0">
                     <td className="py-2 pr-3">
                       <Link
@@ -375,10 +414,52 @@ function RoleAnalyticsSection({
                     <td className="py-2 tabular-nums">{user.current_period.bugs_fixed}</td>
                   </tr>
                 ))}
+                {showLowActivityRows &&
+                  lowActivityUsers.map((user) => (
+                    <tr key={user.user_id} className="border-b border-border/30 text-muted-foreground/90 last:border-0">
+                      <td className="py-2 pr-3">
+                        <Link
+                          to={`/${rolePath}/users/${user.user_id}`}
+                          className="font-medium hover:text-primary hover:underline"
+                        >
+                          {user.name || user.username}
+                        </Link>
+                        <div className="text-[11px] text-muted-foreground">@{user.username}</div>
+                      </td>
+                      <td className="py-2 pr-3 tabular-nums">{user.current_period.avg_hours_per_day.toFixed(1)}h</td>
+                      <td className="py-2 pr-3 tabular-nums">{user.current_period.days}</td>
+                      <td className="py-2 pr-3 tabular-nums">{user.current_period.tasks_completed}</td>
+                      <td className="py-2 pr-3 tabular-nums">{user.current_period.overtime_hours.toFixed(1)}h</td>
+                      <td className="py-2 pr-3 tabular-nums">{user.current_period.avg_check_in_label || "—"}</td>
+                      <td className="py-2 pr-3 tabular-nums">{user.current_period.bugs_reported}</td>
+                      <td className="py-2 tabular-nums">{user.current_period.bugs_fixed}</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
+          {lowActivityUsers.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowLowActivityRows((prev) => !prev)}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-background transition-colors"
+            >
+              {showLowActivityRows ? (
+                <>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  Hide low-activity members
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  Show low-activity members ({lowActivityUsers.length})
+                </>
+              )}
+            </button>
+          ) : null}
         </div>
+          </>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -402,57 +483,15 @@ function AnalyticsSkeleton() {
 export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
   const [hideDeactivatedUsers, setHideDeactivatedUsers] = useState(true);
   const { data, isLoading, isError, error, isFetching } = useQuery({
-    queryKey: ["usersAnalytics"],
-    queryFn: () => userService.getUsersAnalytics(),
+    queryKey: ["usersAnalytics", hideDeactivatedUsers],
+    queryFn: () => userService.getUsersAnalytics({ activeOnly: hideDeactivatedUsers }),
   });
-
-  const displayData = useMemo(() => {
-    if (!data || !hideDeactivatedUsers) return data;
-
-    const filterActive = (users: UsersAnalyticsPayload["roles"]["admin"]["users"]) =>
-      users.filter((user) => Number(user.account_active ?? 1) !== 0);
-
-    const roles = (["admin", "developer", "tester"] as RoleKey[]).reduce(
-      (acc, role) => {
-        const roleData = data.roles[role];
-        const filteredUsers = filterActive(roleData.users);
-        const high: Record<string, typeof filteredUsers> = {};
-        const low: Record<string, typeof filteredUsers> = {};
-
-        Object.keys(roleData.rankings.high).forEach((metric) => {
-          high[metric] = filterActive(roleData.rankings.high[metric] || []);
-          low[metric] = filterActive(roleData.rankings.low[metric] || []);
-        });
-
-        acc[role] = {
-          ...roleData,
-          users: filteredUsers,
-          summary: summarizeUsers(filteredUsers),
-          rankings: { high, low },
-        };
-        return acc;
-      },
-      {} as UsersAnalyticsPayload["roles"]
-    );
-
-    const allUsers = [
-      ...roles.admin.users,
-      ...roles.developer.users,
-      ...roles.tester.users,
-    ];
-
-    return {
-      ...data,
-      roles,
-      team_summary: summarizeUsers(allUsers),
-    };
-  }, [data, hideDeactivatedUsers]);
 
   if (isLoading) {
     return <AnalyticsSkeleton />;
   }
 
-  if (isError || !displayData) {
+  if (isError || !data) {
     return (
       <Card className="rounded-2xl border border-rose-500/30 bg-rose-500/5">
         <CardContent className="py-10 text-center text-sm text-rose-700 dark:text-rose-300">
@@ -475,7 +514,7 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
               <div>
                 <CardTitle className="text-lg sm:text-xl">Team analytics</CardTitle>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  {displayData.period.name} ({displayData.period.range}) · {displayData.lookback_months}-month lookback averages
+                  {data.period.name} ({data.period.range}) · {data.lookback_months}-month lookback averages
                 </p>
               </div>
             </div>
@@ -488,6 +527,13 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
                 />
                 <span>Hide deactivated users</span>
               </label>
+              {data.filters?.active_only_applied ? (
+                <Badge variant="outline" className="gap-1 text-[10px]">
+                  <Filter className="h-3 w-3" />
+                  Showing {data.filters.total_users_after_filter ?? data.team_summary.user_count} of{" "}
+                  {data.filters.total_users_before_filter ?? data.team_summary.user_count}
+                </Badge>
+              ) : null}
               {isFetching ? (
                 <Badge variant="outline" className="gap-1">
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -501,28 +547,28 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <MetricTile
               label="Team avg h/day"
-              value={`${displayData.team_summary.avg_hours_per_day.toFixed(1)}h`}
+              value={`${data.team_summary.avg_hours_per_day.toFixed(1)}h`}
               detail="Across admins, devs, testers"
             />
             <MetricTile
               label="Team avg days"
-              value={`${displayData.team_summary.avg_work_days.toFixed(1)}`}
+              value={`${data.team_summary.avg_work_days.toFixed(1)}`}
               detail="Work days this month"
             />
             <MetricTile
               label="Team avg tasks"
-              value={`${displayData.team_summary.avg_tasks_completed.toFixed(1)}`}
+              value={`${data.team_summary.avg_tasks_completed.toFixed(1)}`}
               detail="Completed tasks"
             />
             <MetricTile
               label="Team overtime"
-              value={`${displayData.team_summary.avg_overtime_hours.toFixed(1)}h`}
+              value={`${data.team_summary.avg_overtime_hours.toFixed(1)}h`}
               detail="Per member average"
             />
             <MetricTile
               label="Total hours"
-              value={`${displayData.team_summary.total_hours.toFixed(0)}h`}
-              detail={`${displayData.team_summary.user_count} tracked members`}
+              value={`${data.team_summary.total_hours.toFixed(0)}h`}
+              detail={`${data.team_summary.user_count} tracked members`}
               className="sm:col-span-2 lg:col-span-1"
             />
           </div>
@@ -533,7 +579,7 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
         <RoleAnalyticsSection
           key={role}
           role={role}
-          data={displayData.roles[role]}
+          data={data.roles[role]}
           rolePath={rolePath}
         />
       ))}
