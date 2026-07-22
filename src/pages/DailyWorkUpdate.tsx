@@ -253,6 +253,8 @@ export function DailyWorkFlowPanel({
   const [todaySubmissionComplete, setTodaySubmissionComplete] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState<Record<string, ProjectWorkUpdate>>({});
   const [attendanceGate, setAttendanceGate] = useState<AttendanceStatus | null>(null);
+  const projectsCacheRef = useRef<{ at: number; items: Project[] } | null>(null);
+  const projectStatsCacheRef = useRef<Record<string, { bugs: number; updates: number }>>({});
   const didAutoOpenEditRef = useRef(false);
   const didAutoOpenFlowRef = useRef<string | null>(null);
 
@@ -362,7 +364,20 @@ export function DailyWorkFlowPanel({
     }
     setLoadingProjectStats(true);
     try {
-      const statResults = await mapWithConcurrency(projectList, 4, async (project) => {
+      const selectedSet = new Set(selectedProjects);
+      // UX optimization: compute stats for selected projects and first visible chunk only.
+      const prioritized = projectList.filter((p) => selectedSet.has(p.id));
+      const remainder = projectList.filter((p) => !selectedSet.has(p.id)).slice(0, 8);
+      const targetProjects = [...prioritized, ...remainder];
+
+      const statResults = await mapWithConcurrency(targetProjects, 4, async (project) => {
+        if (projectStatsCacheRef.current[project.id]) {
+          return {
+            projectId: project.id,
+            bugs: projectStatsCacheRef.current[project.id].bugs,
+            updates: projectStatsCacheRef.current[project.id].updates,
+          };
+        }
         try {
           const [bugResponse, updates] = await Promise.all([
             bugService.getBugs({ projectId: project.id, page: 1, limit: 1 }),
@@ -386,11 +401,12 @@ export function DailyWorkFlowPanel({
       statResults.forEach((result) => {
         nextStats[result.projectId] = { bugs: result.bugs, updates: result.updates };
       });
-      setProjectStats(nextStats);
+      projectStatsCacheRef.current = { ...projectStatsCacheRef.current, ...nextStats };
+      setProjectStats((prev) => ({ ...prev, ...nextStats }));
     } finally {
       setLoadingProjectStats(false);
     }
-  }, []);
+  }, [selectedProjects]);
 
   const canSubmit = useMemo(() => {
     const hasDate = !!form.submission_date;
@@ -966,6 +982,19 @@ export function DailyWorkFlowPanel({
     let cancelled = false;
     (async () => {
       try {
+        const now = Date.now();
+        const cached = projectsCacheRef.current;
+        if (cached && now - cached.at < 5 * 60 * 1000) {
+          setProjects(cached.items);
+          if (Object.keys(projectStatsCacheRef.current).length > 0) {
+            setProjectStats(projectStatsCacheRef.current);
+          } else {
+            // Non-blocking stats warmup
+            void fetchProjectStats(cached.items);
+          }
+          return;
+        }
+
         setLoadingProjects(true);
         const projectsData = await projectService.getProjects();
         if (cancelled) return;
@@ -981,7 +1010,9 @@ export function DailyWorkFlowPanel({
 
         if (role === 'admin' || !currentUserId) {
           setProjects(activeProjects);
-          fetchProjectStats(activeProjects);
+          projectsCacheRef.current = { at: Date.now(), items: activeProjects };
+          // Non-blocking stats fetch for better perceived performance.
+          void fetchProjectStats(activeProjects);
           return;
         }
 
@@ -1057,7 +1088,9 @@ export function DailyWorkFlowPanel({
 
         if (cancelled) return;
         setProjects(assignedProjects);
-        fetchProjectStats(assignedProjects);
+        projectsCacheRef.current = { at: Date.now(), items: assignedProjects };
+        // Non-blocking stats fetch for better perceived performance.
+        void fetchProjectStats(assignedProjects);
       } catch (error: any) {
         if (cancelled) return;
         console.error('Failed to load projects:', error);
@@ -1097,6 +1130,12 @@ export function DailyWorkFlowPanel({
       return next;
     });
   }, [isCheckoutWizardOpen, checkoutProjects]);
+
+  useEffect(() => {
+    if ((!isCheckInDialogOpen && !isCheckoutWizardOpen) || projects.length === 0) return;
+    // Refresh focused stats for newly selected projects without blocking dialog open.
+    void fetchProjectStats(projects);
+  }, [selectedProjects, isCheckInDialogOpen, isCheckoutWizardOpen, projects, fetchProjectStats]);
 
   // Load server row + merge local draft so preview survives refresh (non-editing mode)
   useEffect(() => {
