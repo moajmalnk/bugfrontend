@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { userService, type UsersAnalyticsPayload } from "@/services/userService";
 import { useQuery } from "@tanstack/react-query";
@@ -13,6 +14,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 type UserAnalyticsProps = {
@@ -51,6 +53,38 @@ const RANKING_LABELS: Record<string, string> = {
   work_days: "Work days",
   overtime_hours: "Overtime hours",
 };
+
+function summarizeUsers(users: UsersAnalyticsPayload["roles"]["admin"]["users"]) {
+  if (!users.length) {
+    return {
+      user_count: 0,
+      avg_hours_per_day: 0,
+      avg_work_days: 0,
+      avg_tasks_completed: 0,
+      avg_overtime_hours: 0,
+      total_hours: 0,
+    };
+  }
+  const totals = users.reduce(
+    (acc, user) => {
+      acc.avgHours += Number(user.current_period.avg_hours_per_day || 0);
+      acc.avgDays += Number(user.current_period.days || 0);
+      acc.avgTasks += Number(user.current_period.tasks_completed || 0);
+      acc.avgOt += Number(user.current_period.overtime_hours || 0);
+      acc.totalHours += Number(user.current_period.hours || 0);
+      return acc;
+    },
+    { avgHours: 0, avgDays: 0, avgTasks: 0, avgOt: 0, totalHours: 0 }
+  );
+  return {
+    user_count: users.length,
+    avg_hours_per_day: Number((totals.avgHours / users.length).toFixed(2)),
+    avg_work_days: Number((totals.avgDays / users.length).toFixed(1)),
+    avg_tasks_completed: Number((totals.avgTasks / users.length).toFixed(1)),
+    avg_overtime_hours: Number((totals.avgOt / users.length).toFixed(2)),
+    total_hours: Number(totals.totalHours.toFixed(2)),
+  };
+}
 
 function MetricTile({
   label,
@@ -366,16 +400,59 @@ function AnalyticsSkeleton() {
 }
 
 export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
+  const [hideDeactivatedUsers, setHideDeactivatedUsers] = useState(true);
   const { data, isLoading, isError, error, isFetching } = useQuery({
     queryKey: ["usersAnalytics"],
     queryFn: () => userService.getUsersAnalytics(),
   });
 
+  const displayData = useMemo(() => {
+    if (!data || !hideDeactivatedUsers) return data;
+
+    const filterActive = (users: UsersAnalyticsPayload["roles"]["admin"]["users"]) =>
+      users.filter((user) => Number(user.account_active ?? 1) !== 0);
+
+    const roles = (["admin", "developer", "tester"] as RoleKey[]).reduce(
+      (acc, role) => {
+        const roleData = data.roles[role];
+        const filteredUsers = filterActive(roleData.users);
+        const high: Record<string, typeof filteredUsers> = {};
+        const low: Record<string, typeof filteredUsers> = {};
+
+        Object.keys(roleData.rankings.high).forEach((metric) => {
+          high[metric] = filterActive(roleData.rankings.high[metric] || []);
+          low[metric] = filterActive(roleData.rankings.low[metric] || []);
+        });
+
+        acc[role] = {
+          ...roleData,
+          users: filteredUsers,
+          summary: summarizeUsers(filteredUsers),
+          rankings: { high, low },
+        };
+        return acc;
+      },
+      {} as UsersAnalyticsPayload["roles"]
+    );
+
+    const allUsers = [
+      ...roles.admin.users,
+      ...roles.developer.users,
+      ...roles.tester.users,
+    ];
+
+    return {
+      ...data,
+      roles,
+      team_summary: summarizeUsers(allUsers),
+    };
+  }, [data, hideDeactivatedUsers]);
+
   if (isLoading) {
     return <AnalyticsSkeleton />;
   }
 
-  if (isError || !data) {
+  if (isError || !displayData) {
     return (
       <Card className="rounded-2xl border border-rose-500/30 bg-rose-500/5">
         <CardContent className="py-10 text-center text-sm text-rose-700 dark:text-rose-300">
@@ -398,44 +475,54 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
               <div>
                 <CardTitle className="text-lg sm:text-xl">Team analytics</CardTitle>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  {data.period.name} ({data.period.range}) · {data.lookback_months}-month lookback averages
+                  {displayData.period.name} ({displayData.period.range}) · {displayData.lookback_months}-month lookback averages
                 </p>
               </div>
             </div>
-            {isFetching ? (
-              <Badge variant="outline" className="gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Updating
-              </Badge>
-            ) : null}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <label className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/70 px-2.5 py-1.5 text-xs font-medium">
+                <Switch
+                  checked={hideDeactivatedUsers}
+                  onCheckedChange={setHideDeactivatedUsers}
+                  aria-label="Hide deactivated users"
+                />
+                <span>Hide deactivated users</span>
+              </label>
+              {isFetching ? (
+                <Badge variant="outline" className="gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Updating
+                </Badge>
+              ) : null}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="relative">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <MetricTile
               label="Team avg h/day"
-              value={`${data.team_summary.avg_hours_per_day.toFixed(1)}h`}
+              value={`${displayData.team_summary.avg_hours_per_day.toFixed(1)}h`}
               detail="Across admins, devs, testers"
             />
             <MetricTile
               label="Team avg days"
-              value={`${data.team_summary.avg_work_days.toFixed(1)}`}
+              value={`${displayData.team_summary.avg_work_days.toFixed(1)}`}
               detail="Work days this month"
             />
             <MetricTile
               label="Team avg tasks"
-              value={`${data.team_summary.avg_tasks_completed.toFixed(1)}`}
+              value={`${displayData.team_summary.avg_tasks_completed.toFixed(1)}`}
               detail="Completed tasks"
             />
             <MetricTile
               label="Team overtime"
-              value={`${data.team_summary.avg_overtime_hours.toFixed(1)}h`}
+              value={`${displayData.team_summary.avg_overtime_hours.toFixed(1)}h`}
               detail="Per member average"
             />
             <MetricTile
               label="Total hours"
-              value={`${data.team_summary.total_hours.toFixed(0)}h`}
-              detail={`${data.team_summary.user_count} tracked members`}
+              value={`${displayData.team_summary.total_hours.toFixed(0)}h`}
+              detail={`${displayData.team_summary.user_count} tracked members`}
               className="sm:col-span-2 lg:col-span-1"
             />
           </div>
@@ -446,7 +533,7 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
         <RoleAnalyticsSection
           key={role}
           role={role}
-          data={data.roles[role]}
+          data={displayData.roles[role]}
           rolePath={rolePath}
         />
       ))}

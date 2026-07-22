@@ -7,6 +7,7 @@ export interface UserAnalyticsMember {
   username: string;
   name: string;
   role: string;
+  account_active?: number;
   current_period: {
     days: number;
     hours: number;
