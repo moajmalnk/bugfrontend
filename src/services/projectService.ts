@@ -1,5 +1,8 @@
 import { apiClient } from '@/lib/axios';
 import { bugService } from '@/services/bugService';
+import type {
+  UserPortfolioWorkItem,
+} from '@/services/userService';
 import {
   CreateProjectData,
   Project,
@@ -83,6 +86,39 @@ function countBugsFromList(bugs: Array<{ status: string }>) {
     fixed,
   };
 }
+
+export type ProjectAnalyticsSummary = {
+  bugs: number;
+  fixes: number;
+  updates: number;
+  open: number;
+  members?: number;
+  avg_rise_duration_seconds?: number | null;
+  avg_rise_duration_label?: string | null;
+  avg_fix_duration_seconds?: number | null;
+  avg_fix_duration_label?: string | null;
+};
+
+export type ProjectAnalyticsData = {
+  project: {
+    id: string;
+    name: string;
+    status?: string | null;
+    is_active?: number | null;
+    created_at?: string | null;
+    member_count?: number;
+    counts: {
+      bugs: number;
+      fixes: number;
+      updates: number;
+      open: number;
+    };
+  };
+  summary: ProjectAnalyticsSummary;
+  bugs: UserPortfolioWorkItem[];
+  fixes: UserPortfolioWorkItem[];
+  updates: UserPortfolioWorkItem[];
+};
 
 class ProjectService {
   async getProjectStats(): Promise<ProjectStatsBundle> {
@@ -311,6 +347,19 @@ class ProjectService {
     if (!response.data.success) {
       throw new Error(response.data.message || 'Failed to remove from project');
     }
+  }
+
+  async getProjectAnalytics(projectId: string): Promise<ProjectAnalyticsData> {
+    const response = await apiClient.get<{
+      success: boolean;
+      data: ProjectAnalyticsData;
+      message?: string;
+    }>(`/projects/analytics.php?project_id=${encodeURIComponent(projectId)}`);
+
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || 'Failed to load project analytics');
   }
 }
 

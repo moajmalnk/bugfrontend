@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
+import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
 import { useAuth } from "@/context/AuthContext";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { API_BASE_URL } from "@/lib/env";
@@ -848,6 +849,13 @@ export default function Profile() {
               )}
             </CardContent>
           </Card>
+
+          {/* Project portfolio with assignment times and status durations */}
+          {currentUser?.id ? (
+            <div className="md:col-span-3">
+              <UserProjectPortfolio userId={currentUser.id} />
+            </div>
+          ) : null}
 
           {/* Recent Activity Section */}
           <Card className="md:col-span-3 shadow-sm hover:shadow-md transition-all duration-200">

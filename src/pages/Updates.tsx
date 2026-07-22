@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,14 +28,16 @@ import { useAuth } from "@/context/AuthContext";
 import { projectService } from "@/services/projectService";
 import { updateService } from "@/services/updateService";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Bell, Filter, Lock, Plus, Search, User, X, FolderOpen } from "lucide-react";
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { AlertCircle, Bell, Lock, Plus, Search, User, FolderOpen } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
+import { ListPagination } from "@/components/pagination/ListPagination";
 import {
   useUrlPagination,
   useClampUrlPage,
   useResetUrlPageOnChange,
+  useMergeSearchParam,
   listReturnState,
 } from "@/hooks/useUrlPagination";
 import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
@@ -108,14 +109,12 @@ const HeaderSkeleton = () => (
   </div>
 );
 
-const API_BASE = import.meta.env.VITE_API_URL + "/updates";
-
 const Updates = () => {
   const { currentUser } = useAuth();
   const location = useLocation();
   const listFromState = listReturnState(location.pathname, location.search);
-  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const mergeSearchParam = useMergeSearchParam();
   const initialTab = searchParams.get("tab") || "all-updates";
   const [activeTab, setActiveTab] = useState(initialTab);
   const {
@@ -125,8 +124,7 @@ const Updates = () => {
     setPageSize: setItemsPerPage,
     clampToTotalPages,
   } = useUrlPagination({ defaultPageSize: 10 });
-  
-  // Use persisted filters hook
+
   const [filters, setFilter, clearFilters] = usePersistedFilters("updates", {
     searchTerm: "",
     projectFilter: "all",
@@ -135,28 +133,15 @@ const Updates = () => {
   const searchTerm = filters.searchTerm || "";
   const projectFilter = filters.projectFilter || "all";
   const createdByFilter = filters.createdByFilter || "all";
-  
+
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const setCreatedByFilter = (value: string) => setFilter("createdByFilter", value);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  
-  // Local state for search input (avoids fighting persisted filter on each keystroke)
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
 
-  // Debounced persist only — do not sync searchTerm back into the input (that drops extra typed chars)
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setFilter("searchTerm", localSearchTerm);
-    }, 300);
-
-    return () => window.clearTimeout(timer);
-  }, [localSearchTerm, setFilter]);
-  
-  // Memoized onChange handler
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocalSearchTerm(e.target.value);
-  }, []);
+  const hasActiveFilters =
+    Boolean(searchTerm.trim()) ||
+    projectFilter !== "all" ||
+    createdByFilter !== "all";
 
   // Fetch updates from backend
   const {
@@ -168,10 +153,9 @@ const Updates = () => {
     queryFn: () => updateService.getUpdates(),
   });
 
-  // Reset current page when filters change
   useResetUrlPageOnChange(setCurrentPage, [
     activeTab,
-    localSearchTerm,
+    searchTerm,
     projectFilter,
     createdByFilter,
   ]);
@@ -207,25 +191,31 @@ const Updates = () => {
         filtered = updates;
     }
 
-    // Then apply search and other filters (use localSearchTerm so list matches the input immediately)
-    const q = (localSearchTerm || "").toLowerCase();
+    const q = searchTerm.trim().toLowerCase();
     return filtered.filter((update) => {
       const matchesSearch =
         !q ||
         (update.title || "").toLowerCase().includes(q) ||
+        (update.description || "").toLowerCase().includes(q) ||
         (update.project_name || "").toLowerCase().includes(q) ||
-        (update.created_by || "").toLowerCase().includes(q);
+        (update.created_by || "").toLowerCase().includes(q) ||
+        (update.created_by_name || "").toLowerCase().includes(q);
 
-      // Project filter: match by project_id, with fallback to project_name if project_id is missing
       let matchesProject = true;
       if (projectFilter !== "all") {
-        const updateProjectId = update.project_id || 
-          (update.project_name ? projects.find(p => p.name === update.project_name)?.id : null);
-        matchesProject = updateProjectId ? String(updateProjectId) === String(projectFilter) : false;
+        const updateProjectId =
+          update.project_id ||
+          (update.project_name
+            ? projects.find((p) => p.name === update.project_name)?.id
+            : null);
+        matchesProject = updateProjectId
+          ? String(updateProjectId) === String(projectFilter)
+          : false;
       }
-      
+
+      const creatorName = update.created_by || update.created_by_name || "";
       const matchesCreatedBy =
-        createdByFilter === "all" || update.created_by === createdByFilter;
+        createdByFilter === "all" || creatorName === createdByFilter;
 
       return matchesSearch && matchesProject && matchesCreatedBy;
     });
@@ -234,7 +224,7 @@ const Updates = () => {
     activeTab,
     currentUser?.username,
     currentUser?.id,
-    localSearchTerm,
+    searchTerm,
     projectFilter,
     createdByFilter,
     projects,
@@ -268,68 +258,51 @@ const Updates = () => {
     }
   };
 
-  // Get unique creators for filter
   const uniqueCreators = useMemo(() => {
     const creators = updates
-      .map((update) => update.created_by)
+      .map((update) => update.created_by || update.created_by_name)
       .filter(Boolean)
       .filter((creator, index, arr) => arr.indexOf(creator) === index);
     return creators.sort();
   }, [updates]);
 
-  // Get unique projects for filter - role-aware
-  const uniqueProjects = useMemo(() => {
-    // For admins: show all unique projects from updates
-    if (currentUser?.role === "admin") {
-      const projectMap = new Map();
-      updates.forEach((update) => {
-        // Try to get project_id from update, fallback to finding by name
-        const projectId = update.project_id || 
-          (update.project_name ? projects.find(p => p.name === update.project_name)?.id : null);
-        const projectName = update.project_name;
-        
-        if (projectId && projectName) {
-          if (!projectMap.has(projectId)) {
-            projectMap.set(projectId, {
-              id: projectId,
-              name: projectName,
-            });
-          }
-        }
-      });
-      return Array.from(projectMap.values()).sort((a, b) => 
-        a.name.localeCompare(b.name)
-      );
-    }
-    
-    // For non-admins: show only their assigned projects that appear in updates
-    const assignedProjectIds = new Set(
-      projects.map((p) => String(p.id))
-    );
-    
-    const projectMap = new Map();
+  const visibleProjects = useMemo(() => {
+    const projectMap = new Map<string, { id: string; name: string }>();
+
     updates.forEach((update) => {
-      // Try to get project_id from update, fallback to finding by name
-      const projectId = update.project_id || 
-        (update.project_name ? projects.find(p => p.name === update.project_name)?.id : null);
+      const projectId =
+        update.project_id ||
+        (update.project_name
+          ? projects.find((p) => p.name === update.project_name)?.id
+          : null);
       const projectName = update.project_name;
-      
-      if (projectId && projectName) {
-        // Only include if user is assigned to this project
-        if (assignedProjectIds.has(String(projectId))) {
-          if (!projectMap.has(projectId)) {
-            projectMap.set(projectId, {
-              id: projectId,
-              name: projectName,
-            });
-          }
-        }
+
+      if (!projectId || !projectName) return;
+
+      const id = String(projectId);
+      if (currentUser?.role !== "admin") {
+        const assigned = projects.some((p) => String(p.id) === id);
+        if (!assigned) return;
+      }
+
+      if (!projectMap.has(id)) {
+        projectMap.set(id, { id, name: projectName });
       }
     });
-    return Array.from(projectMap.values()).sort((a, b) => 
+
+    return Array.from(projectMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
   }, [updates, projects, currentUser?.role]);
+
+  useEffect(() => {
+    if (
+      projectFilter !== "all" &&
+      !visibleProjects.some((p) => p.id === String(projectFilter))
+    ) {
+      setProjectFilter("all");
+    }
+  }, [visibleProjects, projectFilter, setProjectFilter]);
 
   // Keep tab in sync with URL changes (back/forward navigation)
   useEffect(() => {
@@ -352,6 +325,7 @@ const Updates = () => {
   };
 
   const renderEmptyState = () => {
+    const noMatches = hasActiveFilters && updates.length > 0;
     return (
       <div className="relative overflow-hidden min-h-[300px]">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/20 dark:via-indigo-950/10 dark:to-purple-950/20 rounded-2xl"></div>
@@ -360,19 +334,28 @@ const Updates = () => {
             <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
           </div>
           <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">
-            {activeTab === "my-updates" ? "No updates found" : "No Updates"}
+            {noMatches
+              ? "No matching updates"
+              : activeTab === "my-updates"
+                ? "No updates found"
+                : "No Updates"}
           </h3>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-2 max-w-md mx-auto">
-            {activeTab === "my-updates"
-              ? "You haven't created any updates yet. Click 'New Update' to get started."
-              : "There are no updates to display right now. Check back later or create a new one."}
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+            {noMatches
+              ? "Try adjusting your search or filters to find what you're looking for."
+              : activeTab === "my-updates"
+                ? "You haven't created any updates yet. Click 'New Update' to get started."
+                : "There are no updates to display right now. Check back later or create a new one."}
           </p>
+          {noMatches && (
+            <Button variant="outline" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          )}
         </div>
       </div>
     );
   };
-
-  const hasAnyUpdates = useMemo(() => updates.length > 0, [updates]);
 
   // Updates Tabs Component
   const UpdatesTabs = () => (
@@ -380,12 +363,10 @@ const Updates = () => {
       value={activeTab}
       onValueChange={(val) => {
         setActiveTab(val);
-        setSearchParams((prev) => {
-          const p = new URLSearchParams(prev);
-          p.set("tab", val);
-          p.delete("page");
-          return p;
+        mergeSearchParam("tab", val === "all-updates" ? null : val, {
+          replace: true,
         });
+        setCurrentPage(1);
       }}
       className="w-full"
     >
@@ -421,47 +402,52 @@ const Updates = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none"></div>
           <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 bg-green-500 rounded-lg">
-                  <Search className="h-4 w-4 text-white" />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-green-500 rounded-lg">
+                    <Search className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Search & Filter
+                  </h3>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                {hasActiveFilters && (
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-primary">{totalFiltered}</span>{" "}
+                    matching update{totalFiltered === 1 ? "" : "s"}
+                  </p>
+                )}
               </div>
 
-              <div className="flex flex-col md:flex-row gap-4">
-                {/* Search Bar */}
-                <div className="flex-1 relative group">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
+              <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
+                <div className="flex-1 min-w-0 relative group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
                   <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Search updates, projects, or creators..."
-                    value={localSearchTerm}
-                    onChange={handleSearchChange}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                    type="search"
+                    placeholder="Search by title, description, project, or creator..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-11 pr-4 py-2.5 h-11 border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm font-medium"
                     autoComplete="off"
+                    aria-label="Search updates"
                   />
                 </div>
 
-                {/* Filter Controls */}
-                <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                  {/* Project Filter */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+                  <div className="flex items-center gap-2 min-w-0 sm:min-w-[200px]">
+                    <div className="p-1.5 bg-orange-500 rounded-lg shrink-0" aria-hidden>
                       <FolderOpen className="h-4 w-4 text-white" />
                     </div>
-                    <Select value={projectFilter} onValueChange={setProjectFilter}>
-                      <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                        <SelectValue placeholder="Project" />
+                    <Select
+                      value={projectFilter}
+                      onValueChange={setProjectFilter}
+                    >
+                      <SelectTrigger className="w-full h-11 rounded-xl">
+                        <SelectValue placeholder="All Projects" />
                       </SelectTrigger>
-                      <SelectContent
-                        position="popper"
-                        sideOffset={4}
-                        collisionPadding={16}
-                        className="z-[100] max-h-[min(20rem,var(--radix-select-content-available-height))]"
-                      >
+                      <SelectContent position="popper" className="z-[100]">
                         <SelectItem value="all">All Projects</SelectItem>
-                        {uniqueProjects.map((project) => (
+                        {visibleProjects.map((project) => (
                           <SelectItem key={project.id} value={project.id}>
                             {project.name}
                           </SelectItem>
@@ -470,21 +456,18 @@ const Updates = () => {
                     </Select>
                   </div>
 
-                  {/* Created By Filter */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                  <div className="flex items-center gap-2 min-w-0 sm:min-w-[200px]">
+                    <div className="p-1.5 bg-purple-500 rounded-lg shrink-0" aria-hidden>
                       <User className="h-4 w-4 text-white" />
                     </div>
-                    <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
-                      <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                        <SelectValue placeholder="Created By" />
+                    <Select
+                      value={createdByFilter}
+                      onValueChange={setCreatedByFilter}
+                    >
+                      <SelectTrigger className="w-full h-11 rounded-xl">
+                        <SelectValue placeholder="All Creators" />
                       </SelectTrigger>
-                      <SelectContent
-                        position="popper"
-                        sideOffset={4}
-                        collisionPadding={16}
-                        className="z-[100] max-h-[min(20rem,var(--radix-select-content-available-height))]"
-                      >
+                      <SelectContent position="popper" className="z-[100]">
                         <SelectItem value="all">All Creators</SelectItem>
                         {uniqueCreators.map((creator) => (
                           <SelectItem key={creator} value={creator}>
@@ -495,18 +478,14 @@ const Updates = () => {
                     </Select>
                   </div>
 
-                  {/* Clear Filters Button */}
-                  {(localSearchTerm || projectFilter !== "all" || createdByFilter !== "all") && (
+                  {hasActiveFilters && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        setLocalSearchTerm("");
-                        clearFilters();
-                      }}
-                      className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                      onClick={clearFilters}
+                      className="h-11 px-4 rounded-xl"
                     >
-                      Clear
+                      Clear filters
                     </Button>
                   )}
                 </div>
@@ -515,265 +494,16 @@ const Updates = () => {
           </div>
         </div>
 
-        {/* Professional Responsive Pagination Controls - Show when there are updates and multiple pages */}
-        {filteredUpdates.length > 0 && totalPages > 1 && (
-          <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
-            {/* Top Row - Results Info and Items Per Page */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 lg:gap-4 p-4 sm:p-5">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
-                <span className="text-sm sm:text-base text-foreground font-semibold">
-                  Showing{" "}
-                  <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                    {(currentPage - 1) * itemsPerPage + 1}
-                  </span>
-                  -
-                  <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                    {Math.min(currentPage * itemsPerPage, totalFiltered)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                    {totalFiltered}
-                  </span>{" "}
-                  updates
-                </span>
-              </div>
-              <div className="flex items-center justify-center sm:justify-end gap-3">
-                <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
-                  Items per page:
-                </span>
-                <Select
-                  value={String(itemsPerPage)}
-                  onValueChange={(v) => setItemsPerPage(Number(v))}
-                >
-                  <SelectTrigger
-                    className="h-10 w-[92px] border-border/60 bg-background/80 font-medium"
-                    aria-label="Items per page"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[100]">
-                    {[10, 25, 50].map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Bottom Row - Pagination Navigation */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 pt-0 lg:pt-0 border-t border-border/30">
-              {/* Page Info for Mobile/Tablet */}
-              <div className="lg:hidden flex items-center gap-2 text-sm text-muted-foreground font-medium w-full justify-center">
-                <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
-                Page{" "}
-                <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {currentPage}
-                </span>{" "}
-                of{" "}
-                <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {totalPages}
-                </span>
-              </div>
-
-              {/* Enhanced Pagination Controls */}
-              <div className="flex items-center justify-center gap-2 w-full lg:w-auto">
-                {/* Previous Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                >
-                  <svg
-                    className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                  <span className="hidden sm:inline">Previous</span>
-                  <span className="sm:hidden text-lg">‹</span>
-                </Button>
-
-                {/* Page Numbers - Responsive Display */}
-                <div className="flex items-center gap-1.5">
-                  {/* Always show first page on larger screens */}
-                  <Button
-                    variant={currentPage === 1 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(1)}
-                    className="h-10 w-10 p-0 hidden lg:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                  >
-                    1
-                  </Button>
-
-                  {/* Show ellipsis if needed on larger screens */}
-                  {currentPage > 4 && (
-                    <span className="hidden lg:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
-                      •••
-                    </span>
-                  )}
-
-                  {/* Dynamic page numbers based on current page - show more on larger screens */}
-                  {(() => {
-                    const pages = [];
-                    const start = Math.max(2, currentPage - 1);
-                    const end = Math.min(totalPages - 1, currentPage + 1);
-
-                    for (let i = start; i <= end; i++) {
-                      if (i > 1 && i < totalPages) {
-                        pages.push(i);
-                      }
-                    }
-
-                    return pages.map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(page)}
-                        className="h-10 w-10 p-0 hidden lg:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                      >
-                        {page}
-                      </Button>
-                    ));
-                  })()}
-
-                  {/* Show ellipsis if needed on larger screens */}
-                  {currentPage < totalPages - 3 && (
-                    <span className="hidden lg:inline-flex items-center justify-center h-10 w-10 text-sm text-muted-foreground/60 font-medium">
-                      •••
-                    </span>
-                  )}
-
-                  {/* Always show last page if more than 1 page on larger screens */}
-                  {totalPages > 1 && (
-                    <Button
-                      variant={
-                        currentPage === totalPages ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => setCurrentPage(totalPages)}
-                      className="h-10 w-10 p-0 hidden lg:flex font-medium transition-all duration-200 hover:shadow-md hover:scale-105 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                    >
-                      {totalPages}
-                    </Button>
-                  )}
-
-                  {/* Mobile-friendly page selector */}
-                  <div className="lg:hidden flex items-center gap-3 bg-gradient-to-r from-muted/20 to-muted/30 rounded-lg px-3 py-2 border border-border/30 hover:border-primary/30 transition-all duration-200">
-                    <select
-                      value={currentPage}
-                      onChange={(e) => setCurrentPage(Number(e.target.value))}
-                      className="border-0 bg-transparent text-sm font-semibold text-primary focus:outline-none focus:ring-0 min-w-[50px] cursor-pointer hover:text-primary/80 transition-colors duration-200"
-                      aria-label="Go to page"
-                    >
-                      {Array.from({ length: totalPages }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          {i + 1}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-sm text-muted-foreground font-medium">
-                      {" "}
-                      <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                        {totalPages}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-
-                {/* Next Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="h-10 px-3 sm:px-4 min-w-[80px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
-                >
-                  <span className="hidden sm:inline">Next</span>
-                  <span className="sm:hidden text-lg">›</span>
-                  <svg
-                    className="w-4 h-4 ml-1 sm:ml-2 hidden sm:inline transition-transform duration-200 group-hover:translate-x-0.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </Button>
-              </div>
-
-              {/* Page Info for Desktop */}
-              <div className="hidden lg:flex items-center gap-2 text-sm text-muted-foreground font-medium shrink-0">
-                <div className="w-1.5 h-1.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/60 rounded-full animate-pulse"></div>
-                Page{" "}
-                <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {currentPage}
-                </span>{" "}
-                of{" "}
-                <span className="text-primary font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {totalPages}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Simple results info when no pagination needed - show when there are updates */}
-        {filteredUpdates.length > 0 && totalPages <= 1 && (
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 lg:gap-4 mb-6 p-4 sm:p-5 bg-gradient-to-r from-background via-background to-muted/10 rounded-xl border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse"></div>
-              <span className="text-sm sm:text-base text-foreground font-semibold">
-                Showing{" "}
-                <span className="text-primary font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  {totalFiltered}
-                </span>{" "}
-                updates
-              </span>
-            </div>
-            <div className="flex items-center justify-center sm:justify-end gap-3">
-              <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
-                Items per page:
-              </span>
-              <Select
-                value={String(itemsPerPage)}
-                onValueChange={(v) => setItemsPerPage(Number(v))}
-              >
-                <SelectTrigger
-                  className="h-10 w-[92px] border-border/60 bg-background/80 font-medium"
-                  aria-label="Items per page"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper" className="z-[100]">
-                  {[10, 25, 50].map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        {filteredUpdates.length > 0 && (
+          <ListPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalFiltered}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setItemsPerPage}
+            itemLabel="updates"
+          />
         )}
 
         {/* Content */}
@@ -985,6 +715,19 @@ const Updates = () => {
               ))}
             </div>
           </>
+        )}
+
+        {filteredUpdates.length > 0 && (
+          <ListPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalFiltered}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setItemsPerPage}
+            itemLabel="updates"
+            className="mt-2"
+          />
         )}
       </TabsContent>
     </Tabs>

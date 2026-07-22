@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { ActiveTodayWorkSummary } from "@/components/users/ActiveTodayWorkSummary";
+import { UserAnalytics } from "@/components/users/UserAnalytics";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -24,7 +25,7 @@ import { ENV } from "@/lib/env";
 import { cn, getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
-import { Bug, Check, ChevronDown, Code2, Shield, UserCheck, UserRound } from "lucide-react";
+import { BarChart3, Bug, Check, ChevronDown, Code2, Shield, UserCheck, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -323,7 +324,7 @@ const Users = () => {
     }
 
     // Role tabs apply only when not searching (search spans all users)
-    if (!query) {
+    if (!query && tabFromUrl !== "analytics") {
       if (tabFromUrl === "active") {
         filtered = filtered.filter((user) => user.checked_in_today);
       } else if (tabFromUrl === "developers") {
@@ -483,10 +484,11 @@ const Users = () => {
 
   // Always keep role tabs mounted (even at 0) so URL tab + Radix Tabs don't
   // snap back to "active" while users are still loading after Back.
-  const knownTabs = ["active", "admins", "developers", "testers", "others"] as const;
+  const knownTabs = ["active", "admins", "developers", "testers", "others", "analytics"] as const;
   const isKnownTab = (knownTabs as readonly string[]).includes(tabFromUrl);
   const isValidTab =
     tabFromUrl === "active" ||
+    tabFromUrl === "analytics" ||
     tabFromUrl === "admins" ||
     tabFromUrl === "developers" ||
     tabFromUrl === "testers" ||
@@ -537,6 +539,14 @@ const Users = () => {
           countClass: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
         }]
       : []),
+    {
+      value: "analytics",
+      label: "Analytics",
+      shortLabel: "Stats",
+      icon: BarChart3,
+      count: adminCount + developerCount + testerCount,
+      countClass: "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300",
+    },
   ];
   const activeRoleTab = roleTabs.find((tab) => tab.value === activeTab) ?? roleTabs[0];
   const roleTabGridClass =
@@ -548,7 +558,9 @@ const Users = () => {
           ? "grid-cols-3"
           : roleTabs.length === 4
             ? "grid-cols-2 lg:grid-cols-4"
-            : "grid-cols-2 lg:grid-cols-5";
+            : roleTabs.length === 5
+              ? "grid-cols-2 lg:grid-cols-5"
+              : "grid-cols-2 lg:grid-cols-6";
 
   const renderRoleTabsList = (listClassName: string) => (
     <TabsList className={listClassName}>
@@ -783,6 +795,9 @@ const Users = () => {
             {renderUsersContent()}
           </TabsContent>
         )}
+        <TabsContent value="analytics" className="space-y-6 sm:space-y-8">
+          <UserAnalytics rolePath={effectiveRole} />
+        </TabsContent>
       </Tabs>
     </section>
   </main>

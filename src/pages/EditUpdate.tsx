@@ -43,6 +43,7 @@ import {
   WhatsAppVoiceRecorder,
 } from "@/components/voice/WhatsAppVoiceRecorder";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
+import { buildAudioUrl } from "@/lib/mediaUrls";
 import { apiClient } from "@/lib/axios";
 
 const TITLE_MAX = 200;
@@ -986,7 +987,7 @@ const EditUpdate = () => {
                                 >
                                   <WhatsAppVoiceMessage
                                     id={attachment.id}
-                                    audioSource={attachment.full_url || ""}
+                                    audioSource={buildAudioUrl(attachment.file_path, attachment.full_url)}
                                     duration={attachment.duration || 0}
                                     waveform={[]}
                                     accent="sent"

@@ -77,9 +77,11 @@ export const BugDetailsCard = ({
       // Invalidate queries to refresh the bugs list and user stats
       queryClient.invalidateQueries({ queryKey: ["bugs"] });
       queryClient.invalidateQueries({ queryKey: ["bug", bug.id] });
+      queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
       queryClient.invalidateQueries({
         queryKey: ["userStats", currentUser.id],
       });
+      queryClient.invalidateQueries({ queryKey: ["userProfilePortfolio"] });
 
       // Send notification when status is changed to "fixed"
       if (field === "status" && value === "fixed") {

@@ -2,6 +2,64 @@ import { ENV } from '@/lib/env';
 import { User, UserRole } from '@/types';
 import axios from 'axios';
 
+export interface UserAnalyticsMember {
+  user_id: string;
+  username: string;
+  name: string;
+  role: string;
+  current_period: {
+    days: number;
+    hours: number;
+    avg_hours_per_day: number;
+    tasks_completed: number;
+    tasks_pending: number;
+    tasks_ongoing: number;
+    overtime_hours: number;
+    break_minutes: number;
+    avg_check_in_minutes: number | null;
+    avg_check_in_label: string | null;
+    bugs_reported: number;
+    bugs_fixed: number;
+  };
+  lookback: {
+    months: number;
+    avg_hours_per_day: number;
+    avg_days_per_month: number;
+    avg_tasks_completed_per_month: number;
+    avg_overtime_hours_per_month: number;
+  };
+}
+
+export interface UsersAnalyticsPayload {
+  period: {
+    start: string;
+    end: string;
+    name: string;
+    range: string;
+  };
+  lookback_months: number;
+  team_summary: {
+    user_count: number;
+    avg_hours_per_day: number;
+    avg_work_days: number;
+    avg_tasks_completed: number;
+    avg_overtime_hours: number;
+    total_hours: number;
+  };
+  roles: Record<
+    'admin' | 'developer' | 'tester',
+    {
+      summary: UsersAnalyticsPayload['team_summary'];
+      users: UserAnalyticsMember[];
+      rankings: {
+        high: Record<string, UserAnalyticsMember[]>;
+        low: Record<string, UserAnalyticsMember[]>;
+      };
+    }
+  >;
+  last_updated: string;
+}
+
 interface NewUserData {
   username: string;
   email: string;
@@ -113,6 +171,77 @@ export interface UserActivitySnapshot {
     updates: number;
     projects?: number;
   };
+}
+
+export interface UserPortfolioStatusStep {
+  status: string;
+  from_status?: string | null;
+  entered_at?: string | null;
+  exited_at?: string | null;
+  duration_seconds?: number | null;
+  duration_label?: string | null;
+  is_current?: boolean;
+  source?: string;
+}
+
+export interface UserPortfolioWorkItem {
+  id: string;
+  title: string;
+  status: string;
+  priority?: string | null;
+  type?: string | null;
+  kind: "bug" | "update";
+  raised_at?: string | null;
+  resolved_at?: string | null;
+  rise_duration_seconds?: number | null;
+  rise_duration_label?: string | null;
+  fix_duration_seconds?: number | null;
+  fix_duration_label?: string | null;
+  is_open?: boolean;
+  reported_by_user?: boolean;
+  fixed_by_user?: boolean;
+  reported_by_name?: string | null;
+  fixed_by_name?: string | null;
+  created_by_name?: string | null;
+  status_timeline: UserPortfolioStatusStep[];
+}
+
+export interface UserPortfolioProject {
+  id: string;
+  name: string;
+  status?: string | null;
+  is_active?: number | null;
+  member_role?: string | null;
+  assigned_at?: string | null;
+  is_member?: boolean;
+  is_creator?: boolean;
+  counts: {
+    bugs: number;
+    fixes: number;
+    updates: number;
+  };
+  bugs: UserPortfolioWorkItem[];
+  fixes: UserPortfolioWorkItem[];
+  updates: UserPortfolioWorkItem[];
+}
+
+export interface UserProfilePortfolio {
+  user: {
+    id: string;
+    username: string;
+    role: string;
+  };
+  summary: {
+    projects: number;
+    bugs_raised: number;
+    fixes: number;
+    updates: number;
+    avg_rise_duration_seconds?: number | null;
+    avg_rise_duration_label?: string | null;
+    avg_fix_duration_seconds?: number | null;
+    avg_fix_duration_label?: string | null;
+  };
+  projects: UserPortfolioProject[];
 }
 
 class UserService {
@@ -270,6 +399,17 @@ class UserService {
     return response.data;
   }
 
+  async getUsersAnalytics(opts?: { months?: number; limit?: number }): Promise<UsersAnalyticsPayload> {
+    const params = new URLSearchParams({ analytics: '1' });
+    if (opts?.months && opts.months > 0) params.set('months', String(opts.months));
+    if (opts?.limit && opts.limit > 0) params.set('limit', String(opts.limit));
+    const response = await this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?${params.toString()}`);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch user analytics');
+    }
+    return response.data as UsersAnalyticsPayload;
+  }
+
   async getActiveHours(
     userId: string,
     period: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'daily'
@@ -291,6 +431,16 @@ class UserService {
       throw new Error(response.message || 'Failed to fetch activity snapshot');
     }
     return response.data as UserActivitySnapshot;
+  }
+
+  async getProfilePortfolio(userId: string): Promise<UserProfilePortfolio> {
+    const response = await this.fetchWithAuth(
+      `${this.baseUrl}/profile_portfolio.php?id=${encodeURIComponent(userId)}`
+    );
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch profile portfolio');
+    }
+    return response.data as UserProfilePortfolio;
   }
 
   async deleteUser(userId: string, force = false): Promise<boolean> {

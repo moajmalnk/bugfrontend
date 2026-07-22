@@ -1,6 +1,7 @@
 import { ActivityList } from "@/components/activities/ActivityList";
 import { BugCard } from "@/components/bugs/BugCard";
 import { ProjectInfoOverview } from "@/components/projects/ProjectInfoOverview";
+import { ProjectAnalytics } from "@/components/projects/ProjectAnalytics";
 import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
 import Bugs from "@/pages/Bugs";
 import Fixes from "@/pages/Fixes";
@@ -84,6 +85,7 @@ import { updateService } from "@/services/updateService";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
+  BarChart3,
   Bell,
   Bug,
   BugIcon,
@@ -4090,16 +4092,92 @@ const ProjectDetails = () => {
   const [bugSort, setBugSort] = useState<string>(searchParams.get("sort") || "newest");
   const [bugPage, setBugPage] = useState(Number(searchParams.get("page") || 1));
   const [bugPageSize, setBugPageSize] = useState(Number(searchParams.get("pageSize") || 10));
+  const [projectAccessState, setProjectAccessState] = useState<
+    "checking" | "allowed" | "denied"
+  >("checking");
 
   useEffect(() => {
-    if (projectId) {
-      fetchProjectDetails();
-      fetchProjectBugs();
-      fetchMembers();
-      fetchProjectSharedTasks();
-      fetchProjectUpdates();
+    let cancelled = false;
+
+    const verifyProjectAccess = async () => {
+      if (!projectId || !currentUser) {
+        return;
+      }
+
+      if (currentUser.role === "admin") {
+        if (!cancelled) setProjectAccessState("allowed");
+        return;
+      }
+
+      if (currentUser.role !== "developer" && currentUser.role !== "tester") {
+        if (!cancelled) setProjectAccessState("allowed");
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(
+          `${ENV.API_URL}/projects/get_members.php?project_id=${projectId}`,
+          {
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        const data = await response.json();
+        const memberList = [
+          ...(data.data?.members || []),
+          ...(data.data?.admins || []),
+        ];
+        const isAssigned = memberList.some(
+          (member: { id?: string }) => String(member.id) === String(currentUser.id)
+        );
+
+        if (cancelled) return;
+
+        if (!isAssigned) {
+          setProjectAccessState("denied");
+          toast({
+            title: "Access restricted",
+            description: "You can only open projects you are assigned to.",
+          });
+          navigate(`/${currentUser.role}/projects`, { replace: true });
+          return;
+        }
+
+        setProjectAccessState("allowed");
+      } catch {
+        if (cancelled) return;
+        setProjectAccessState("denied");
+        toast({
+          title: "Access restricted",
+          description: "Unable to verify your access to this project.",
+          variant: "destructive",
+        });
+        navigate(`/${currentUser.role}/projects`, { replace: true });
+      }
+    };
+
+    setProjectAccessState("checking");
+    void verifyProjectAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, currentUser, navigate, toast]);
+
+  useEffect(() => {
+    if (!projectId || projectAccessState !== "allowed") {
+      return;
     }
-  }, [projectId]);
+
+    fetchProjectDetails();
+    fetchProjectBugs();
+    fetchMembers();
+    fetchProjectSharedTasks();
+    fetchProjectUpdates();
+  }, [projectId, projectAccessState]);
 
   // Keep tab in sync with URL changes (back/forward navigation)
   useEffect(() => {
@@ -4160,6 +4238,7 @@ const ProjectDetails = () => {
   const projectTabs = useMemo(() => {
     const tabs = [
       { value: "overview", label: "Overview", icon: Code },
+      { value: "analytics", label: "Analytics", icon: BarChart3 },
       ...(currentUser?.role === "admin" || currentUser?.role === "developer"
         ? [{ value: "bugs", label: "Bugs", icon: Bug }]
         : []),
@@ -4781,7 +4860,7 @@ const ProjectDetails = () => {
   };
 
   // Render skeleton loading UI
-  if (isLoading) {
+  if (projectAccessState === "checking" || projectAccessState === "denied" || isLoading) {
     return (
       <div
         className="space-y-6 p-3 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto"
@@ -5216,6 +5295,10 @@ const ProjectDetails = () => {
               </div>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          {projectId ? <ProjectAnalytics projectId={projectId} /> : null}
         </TabsContent>
 
         {/* Bugs Tab */}

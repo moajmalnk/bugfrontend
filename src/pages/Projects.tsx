@@ -46,6 +46,7 @@ import {
   Clock,
   Code,
   FolderKanban,
+  Lock,
   Shield,
   ShieldCheck,
   TestTube,
@@ -215,6 +216,12 @@ const Projects = () => {
     });
     return memberships;
   }, [projects, currentUser]);
+
+  const canOpenProject = useCallback(
+    (projectId: string) =>
+      currentUser?.role === "admin" || Boolean(userProjectMemberships[projectId]),
+    [currentUser?.role, userProjectMemberships]
+  );
 
   const developerOptions = useMemo(() => {
     const byId = new Map<string, string>();
@@ -665,8 +672,24 @@ const Projects = () => {
       currentUser?.role === "admin" ||
       currentUser?.role === "tester";
 
+    const showBrowseHint =
+      currentUser?.role === "developer" && activeTab === "all-projects";
+
     return (
       <>
+        {showBrowseHint ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">Browse-only directory</p>
+              <p className="mt-0.5 text-xs text-amber-900/80 dark:text-amber-100/80">
+                You can review all projects here, but only assigned projects can be opened.
+                Switch to Assigned Projects to manage your work.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {/* Professional Search and Filter Controls - show when there are projects OR when there are active filters */}
         {(projects.length > 0 || hasActiveFilters) && (
         <div className="relative min-w-0">
@@ -1108,14 +1131,22 @@ const Projects = () => {
           className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3"
           aria-label="Project list"
         >
-          {paginatedProjects.map((project, index) => (
+          {paginatedProjects.map((project, index) => {
+            const isAssigned = canOpenProject(project.id);
+            const canUseProjectActions = showProjectActions && isAssigned;
+
+            return (
             <motion.div
               key={project.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <Card className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex flex-col h-full shadow-sm transition-all duration-300 hover:shadow-2xl">
+              <Card
+                className={`group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex flex-col h-full shadow-sm transition-all duration-300 ${
+                  isAssigned ? "hover:shadow-2xl" : "border-dashed"
+                }`}
+              >
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-emerald-50/40 dark:from-blue-950/15 dark:via-transparent dark:to-emerald-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <CardHeader className="pb-2 p-4 sm:p-5">
                   <div className="flex items-center justify-between gap-2">
@@ -1136,7 +1167,7 @@ const Projects = () => {
                         {getProjectClientLabel(project)}
                       </Badge>
                     )}
-                    {project.compliance && showProjectActions && (
+                    {project.compliance && canUseProjectActions && (
                       <Badge
                         variant="outline"
                         className="text-[10px] sm:text-xs px-2 py-0.5 mb-2 rounded-full border-slate-600 text-slate-600 dark:text-slate-300"
@@ -1146,6 +1177,16 @@ const Projects = () => {
                         )}
                       </Badge>
                     )}
+                    {!isAssigned &&
+                    (currentUser?.role === "developer" || currentUser?.role === "tester") ? (
+                      <Badge
+                        variant="outline"
+                        className="mb-2 rounded-full border-slate-300/80 bg-slate-100/80 px-2 py-0.5 text-[10px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300"
+                      >
+                        <Lock className="mr-1 inline h-3 w-3" />
+                        Not assigned
+                      </Badge>
+                    ) : null}
                     </div>
                     <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
                       <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
@@ -1153,17 +1194,26 @@ const Projects = () => {
                     </div>
                   </div>
                   <CardTitle>
-                    <Link
-                      to={
-                        currentUser?.role
-                          ? `/${currentUser.role}/projects/${project.id}`
-                          : `/projects/${project.id}`
-                      }
-                      state={listFromState}
-                      className="break-words text-base sm:text-lg lg:text-xl font-semibold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent hover:opacity-90 transition-opacity"
-                    >
-                      {project.name}
-                    </Link>
+                    {isAssigned ? (
+                      <Link
+                        to={
+                          currentUser?.role
+                            ? `/${currentUser.role}/projects/${project.id}`
+                            : `/projects/${project.id}`
+                        }
+                        state={listFromState}
+                        className="break-words text-base sm:text-lg lg:text-xl font-semibold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent hover:opacity-90 transition-opacity"
+                      >
+                        {project.name}
+                      </Link>
+                    ) : (
+                      <span
+                        className="block break-words text-base sm:text-lg lg:text-xl font-semibold text-gray-700 dark:text-gray-200"
+                        title="You are not assigned to this project"
+                      >
+                        {project.name}
+                      </span>
+                    )}
                   </CardTitle>
                   <CardDescription className="break-all text-xs sm:text-sm lg:text-base mt-1 sm:mt-2 text-muted-foreground line-clamp-4">
                     {project.description}
@@ -1246,7 +1296,7 @@ const Projects = () => {
                     </div>
                   </div>
                 </CardContent>
-                {showProjectActions && (
+                {canUseProjectActions && (
                 <CardFooter className="relative pt-2 mt-auto p-4 sm:p-5">
                   <div className="grid grid-cols-2 gap-2 w-full">
                     {((currentUser?.role === "developer" && activeTab === "my-projects") ||
@@ -1297,7 +1347,7 @@ const Projects = () => {
                         </Link>
                       </Button>
                     )}
-                    {showProjectActions && (
+                    {canUseProjectActions && (
                     <Button
                       asChild
                       variant="outline"
@@ -1336,9 +1386,19 @@ const Projects = () => {
                   </div>
                 </CardFooter>
                 )}
+                {!isAssigned &&
+                (currentUser?.role === "developer" || currentUser?.role === "tester") ? (
+                  <CardFooter className="relative mt-auto border-t border-dashed border-gray-200/80 bg-gray-50/60 p-4 dark:border-gray-800/80 dark:bg-gray-900/40 sm:p-5">
+                    <div className="flex w-full items-center justify-center gap-2 text-center text-xs text-muted-foreground sm:text-sm">
+                      <Lock className="h-4 w-4 shrink-0" />
+                      <span>Overview only — assigned members can open this project</span>
+                    </div>
+                  </CardFooter>
+                ) : null}
               </Card>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
         )}
       </>

@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +22,7 @@ import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { updateService } from "@/services/updateService";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Bell, User, Calendar, Tag, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Clock, CalendarDays, Play, Timer, Flag, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Play, Timer, Loader2 } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -32,7 +31,9 @@ import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
-import { formatDetailedDate } from "@/lib/dateUtils";
+import { buildAudioUrl } from "@/lib/mediaUrls";
+import { UpdateDetailsCard } from "@/components/updates/UpdateDetailsCard";
+import { UpdateLifecycleCard } from "@/components/updates/UpdateLifecycleCard";
 
 
 // Enhanced skeleton components for better loading experience
@@ -282,6 +283,14 @@ const UpdateDetails = () => {
       });
       return;
     }
+    if (completeForm.notes.trim() === "") {
+      toast({
+        title: "Required",
+        description: "Please add completion notes before marking this update as completed.",
+        variant: "destructive",
+      });
+      return;
+    }
     completeMutation.mutate({
       completion_tested: completeForm.tested === "yes",
       completion_dev_hours: completeForm.devHours.trim() || undefined,
@@ -381,6 +390,10 @@ const UpdateDetails = () => {
   
   const canPerformActions = currentUser?.role === "admin" || (currentUser?.role === "developer" && update?.created_by === currentUser?.username) || (currentUser?.role === "tester" && update?.created_by === currentUser?.username)
 
+  const canMarkAsCompleted =
+    (currentUser?.role === "developer" || currentUser?.role === "tester") &&
+    update?.status === "approved";
+
   const canSeePlanningFields =
     currentUser?.role === "admin" || currentUser?.role === "developer";
 
@@ -391,8 +404,6 @@ const UpdateDetails = () => {
     if (Number.isNaN(d.getTime())) return null;
     return format(d, "MMM d, yyyy 'at' h:mm a");
   };
-
-  const formattedCreatedDate = formatDetailedDate(update.created_at);
 
   // Find current update index for navigation
   const currentIndex = updateList.findIndex((u) => u.id === updateId);
@@ -565,14 +576,16 @@ const UpdateDetails = () => {
                           <div key={voiceNote.id} className="relative">
                             <WhatsAppVoiceMessage
                               id={voiceNote.id}
-                              audioSource={voiceNote.full_url || `${import.meta.env.VITE_API_URL.replace('/api', '')}/${voiceNote.file_path}`}
+                              audioSource={buildAudioUrl(voiceNote.file_path, voiceNote.full_url)}
                               duration={voiceNote.duration || 0}
-                              waveform={[]}
-                              onRemove={() => {}}
+                              accent="received"
                               isActive={activeVoiceNoteId === voiceNote.id}
                               onPlay={(id) => setActiveVoiceNoteId(id)}
-                              onPause={(id) => setActiveVoiceNoteId(null)}
-                              onEnded={() => setActiveVoiceNoteId(null)}
+                              onPause={(id) => {
+                                if (id === activeVoiceNoteId) {
+                                  setActiveVoiceNoteId(null);
+                                }
+                              }}
                             />
                           </div>
                         ))}
@@ -602,13 +615,31 @@ const UpdateDetails = () => {
               </Card>
             )}
 
-            {update?.status === "approved" && canPerformActions && (
+            {update?.status === "approved" && currentUser?.role === "admin" && (
+              <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950">
+                <CardHeader>
+                  <CardTitle className="text-emerald-900 dark:text-emerald-100">Update Approved</CardTitle>
+                  <CardDescription className="text-emerald-800 dark:text-emerald-300">
+                    You approved this update. A developer or tester on the project team will mark it
+                    completed with testing notes.
+                    {formatStatusDateTime(update.approved_at) && (
+                      <span className="block mt-2 text-sm font-medium">
+                        Approved on {formatStatusDateTime(update.approved_at)}
+                      </span>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            )}
+
+            {canMarkAsCompleted && (
               <Card className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
                 <CardHeader className="flex-row items-center justify-between">
                   <div>
-                    <CardTitle className="text-blue-900 dark:text-blue-100">Update Approved</CardTitle>
+                    <CardTitle className="text-blue-900 dark:text-blue-100">Ready to Complete</CardTitle>
                     <CardDescription className="text-blue-700 dark:text-blue-400">
-                      This update has been approved and is ready to be marked as completed.
+                      This update is approved. Mark it completed with testing details and notes for
+                      the team.
                       {formatStatusDateTime(update.approved_at) && (
                         <span className="block mt-2 text-sm font-medium text-blue-800 dark:text-blue-300">
                           Approved on {formatStatusDateTime(update.approved_at)}
@@ -645,156 +676,16 @@ const UpdateDetails = () => {
             )}
           </section>
           
-          {/* Update Details Card */}
           <section className="space-y-8">
-            <Card>
-              <CardHeader><CardTitle>Details</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <Tag className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Type:</span>
-                  <Badge variant="outline" className={getTypeBadgeStyle(update.type)}>{update.type}</Badge>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Check className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Status:</span>
-                  <Badge variant="outline" className={getStatusBadgeStyle(update.status)}>{update.status}</Badge>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Bell className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Project:</span>
-                  <span className="font-medium">{update.project_name || "BugRicer"}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Created by:</span>
-                  <span className="font-medium">{update.created_by_name || update.created_by}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Created on:</span>
-                  <span className="font-medium">{formattedCreatedDate}</span>
-                </div>
-                {update.expected_date && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Expected date:</span>
-                    <span className="font-medium">{format(new Date(update.expected_date), 'MMM dd, yyyy')}</span>
-                  </div>
-                )}
-                {update.expected_time && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Expected time:</span>
-                    <span className="font-medium">{update.expected_time}</span>
-                  </div>
-                )}
-                {formatStatusDateTime(update.approved_at) && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Check className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Approved on:</span>
-                    <span className="font-medium">{formatStatusDateTime(update.approved_at)}</span>
-                  </div>
-                )}
-                {formatStatusDateTime(update.declined_at) && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <X className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Declined on:</span>
-                    <span className="font-medium">{formatStatusDateTime(update.declined_at)}</span>
-                  </div>
-                )}
-                {formatStatusDateTime(update.completed_at) && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Marked completed on:</span>
-                    <span className="font-medium">{formatStatusDateTime(update.completed_at)}</span>
-                  </div>
-                )}
-                {update.status === "completed" && update.completion_tested !== null && update.completion_tested !== undefined && (
-                  <>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Tag className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Tested:</span>
-                      <span className="font-medium">{Number(update.completion_tested) === 1 ? "Yes" : "No"}</span>
-                    </div>
-                    {update.completion_dev_hours != null &&
-                      update.completion_dev_hours !== "" &&
-                      !Number.isNaN(Number(update.completion_dev_hours)) && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Timer className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">Calculated hours (development):</span>
-                          <span className="font-medium">
-                            {Number(update.completion_dev_hours).toLocaleString(undefined, {
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            h
-                          </span>
-                        </div>
-                      )}
-                    {formatStatusDateTime(update.completion_dev_started_at) && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Development started:</span>
-                        <span className="font-medium">{formatStatusDateTime(update.completion_dev_started_at)}</span>
-                      </div>
-                    )}
-                    {formatStatusDateTime(update.completion_dev_ended_at) && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Development ended:</span>
-                        <span className="font-medium">{formatStatusDateTime(update.completion_dev_ended_at)}</span>
-                      </div>
-                    )}
-                    {update.completion_tested_by && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Tested by:</span>
-                        <span className="font-medium">{update.completion_tested_by}</span>
-                      </div>
-                    )}
-                    {update.completion_notes && (
-                      <div className="flex flex-col gap-1 text-sm pt-1">
-                        <span className="text-muted-foreground flex items-center gap-2">
-                          <File className="h-4 w-4" />
-                          Completion notes
-                        </span>
-                        <p className="text-foreground whitespace-pre-wrap rounded-lg border border-border/60 bg-muted/30 p-3 text-sm">
-                          {update.completion_notes}
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )}
-                {canSeePlanningFields && update.calculated_hours != null &&
-                  update.calculated_hours !== "" &&
-                  !Number.isNaN(Number(update.calculated_hours)) && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Timer className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Calculated hours:</span>
-                      <span className="font-medium">
-                        {Number(update.calculated_hours).toLocaleString(undefined, {
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        h
-                      </span>
-                    </div>
-                  )}
-                {canSeePlanningFields &&
-                  update.update_priority &&
-                  ["high", "medium", "low"].includes(String(update.update_priority).toLowerCase()) && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Flag className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Update priority:</span>
-                      <Badge
-                        variant="outline"
-                        className={getUpdatePriorityBadgeStyle(String(update.update_priority))}
-                      >
-                        {String(update.update_priority)}
-                      </Badge>
-                    </div>
-                  )}
-              </CardContent>
-            </Card>
+            <UpdateDetailsCard
+              update={update}
+              role={role}
+              canSeePlanningFields={canSeePlanningFields}
+              getTypeBadgeStyle={getTypeBadgeStyle}
+              getStatusBadgeStyle={getStatusBadgeStyle}
+              getUpdatePriorityBadgeStyle={getUpdatePriorityBadgeStyle}
+            />
+            <UpdateLifecycleCard update={update} />
           </section>
         </div>
       </section>
@@ -983,11 +874,11 @@ const UpdateDetails = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="complete-notes" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Optional notes about completion or testing
+                    Completion notes <span className="text-red-500">*</span>
                   </Label>
                   <Textarea
                     id="complete-notes"
-                    placeholder="Add any extra context for the team..."
+                    placeholder="Describe what was delivered, how it was tested, and any follow-up context..."
                     className="min-h-[110px] resize-none bg-white dark:bg-gray-800"
                     value={completeForm.notes}
                     onChange={(e) => setCompleteForm((f) => ({ ...f, notes: e.target.value }))}

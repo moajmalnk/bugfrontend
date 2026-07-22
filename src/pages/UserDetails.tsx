@@ -6,6 +6,7 @@ import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { UserProjectsDialog } from "@/components/users/UserProjectsDialog";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
+import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -749,6 +750,9 @@ export default function UserDetails() {
 
             {/* Stats */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <div className="xl:col-span-12">
+                <UserProjectPortfolio userId={user.id} />
+              </div>
               <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
                 <CardContent className="p-5 sm:p-6 space-y-6">
                   <UserLeaveDetails

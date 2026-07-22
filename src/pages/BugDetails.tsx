@@ -1,5 +1,6 @@
 import { BugContentCards } from "@/components/bugs/details/BugContentCards";
 import { BugDetailsCard } from "@/components/bugs/details/BugDetailsCard";
+import { BugLifecycleCard } from "@/components/bugs/details/BugLifecycleCard";
 import {
   BugHeader,
   BugHeaderSkeletonDetailed,
@@ -888,6 +889,8 @@ const BugDetails = () => {
 
       queryClient.invalidateQueries({ queryKey: ["bug", bug.id] });
       queryClient.invalidateQueries({ queryKey: ["bugs"] });
+      queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
+      queryClient.invalidateQueries({ queryKey: ["userProfilePortfolio"] });
 
       toast({
         title: "Success",
@@ -950,6 +953,7 @@ const BugDetails = () => {
               updateBugStatus={handleStatusUpdate}
               formattedUpdatedDate={formattedUpdatedDate}
             />
+            <BugLifecycleCard bugId={bug.id} />
           </section>
         </div>
       </section>
