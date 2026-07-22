@@ -1642,7 +1642,9 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
                 <p className="text-sm text-muted-foreground">
                   {search.trim()
                     ? "No projects match your search."
-                    : "No project assignments found for this user."}
+                    : data?.user?.role === "admin"
+                      ? "No projects found."
+                      : "No project assignments found for this user."}
                 </p>
               </div>
             ) : (
