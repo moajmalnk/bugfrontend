@@ -21,6 +21,7 @@ import {
 } from "@/lib/bugMetaUtils";
 import { Badge } from "@/components/ui/badge";
 import { MalayalamDateToggle } from "@/components/ui/DateDisplay";
+import { CopyTextButton } from "@/components/ui/CopyTextButton";
 import { MalayalamVoiceToolbar } from "@/components/ui/MalayalamVoiceToolbar";
 import { useMalayalamToggle } from "@/hooks/useMalayalamToggle";
 import { Bug } from "@/types";
@@ -280,13 +281,19 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
               <File className="w-5 h-5" />
               Description
             </span>
-            <MalayalamVoiceToolbar
-              englishText={descriptionEnglishText}
-              showMalayalam={descriptionInMalayalam}
-              translating={descriptionTranslating}
-              onToggleMalayalam={toggleDescriptionMalayalam}
-              getMalayalamText={getDescriptionMalayalamText}
-            />
+            <div className="inline-flex items-center gap-1">
+              <CopyTextButton
+                text={descriptionDisplayText}
+                label="description"
+              />
+              <MalayalamVoiceToolbar
+                englishText={descriptionEnglishText}
+                showMalayalam={descriptionInMalayalam}
+                translating={descriptionTranslating}
+                onToggleMalayalam={toggleDescriptionMalayalam}
+                getMalayalamText={getDescriptionMalayalamText}
+              />
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="relative">

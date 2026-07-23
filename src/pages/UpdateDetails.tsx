@@ -23,6 +23,7 @@ import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotifica
 import { updateService } from "@/services/updateService";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Play, Timer, Loader2 } from "lucide-react";
+import { CopyTextButton } from "@/components/ui/CopyTextButton";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -485,7 +486,13 @@ const UpdateDetails = () => {
           <section className="space-y-8">
             <Card>
               <CardHeader>
-                <CardTitle>Description</CardTitle>
+                <CardTitle className="flex items-center justify-between gap-2">
+                  <span>Description</span>
+                  <CopyTextButton
+                    text={update.description || ""}
+                    label="description"
+                  />
+                </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
                 <p>{update.description}</p>
