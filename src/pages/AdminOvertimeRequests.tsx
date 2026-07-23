@@ -16,6 +16,11 @@ import {
   groupAdminHoursByUser,
   type OvertimeRow,
 } from '@/pages/adminOvertimeShared';
+import { MonthFilterChips } from '@/components/ui/MonthFilterChips';
+import {
+  dateMatchesMonthFilter,
+  type MonthFilterValue,
+} from '@/lib/monthFilter';
 import { ChevronRight, FileText, Search, Timer, User, Users } from 'lucide-react';
 
 function userSubmissionDateRange(g: UserRequestGroup): { min: string; max: string } | null {
@@ -123,6 +128,7 @@ export default function AdminOvertimeRequests() {
   const [activityFilter, setActivityFilter] = useState<
     'all' | 'pending' | 'with_submissions' | 'without_submissions' | 'admin_entries'
   >('all');
+  const [monthFilter, setMonthFilter] = useState<MonthFilterValue>('all');
   const [queryWindow, setQueryWindow] = useState<{ from: string; to: string }>(() => getSubmissionWindow());
 
   const load = useCallback(async () => {
@@ -169,22 +175,45 @@ export default function AdminOvertimeRequests() {
     load();
   }, [isAdmin, load]);
 
-  const byUser = useMemo(() => groupRowsByUser(rows), [rows]);
-  const adminByUser = useMemo(() => groupAdminHoursByUser(adminHoursRows), [adminHoursRows]);
+  const monthScopedRows = useMemo(
+    () =>
+      rows.filter((r) =>
+        dateMatchesMonthFilter(String(r.submission_date || ''), monthFilter)
+      ),
+    [rows, monthFilter]
+  );
+  const monthScopedAdminRows = useMemo(
+    () =>
+      adminHoursRows.filter((r) =>
+        dateMatchesMonthFilter(String(r.submission_date || ''), monthFilter)
+      ),
+    [adminHoursRows, monthFilter]
+  );
+
+  const byUser = useMemo(() => groupRowsByUser(monthScopedRows), [monthScopedRows]);
+  const adminByUser = useMemo(
+    () => groupAdminHoursByUser(monthScopedAdminRows),
+    [monthScopedAdminRows]
+  );
 
   const displayUsers = useMemo(() => {
     const map = new Map<string, UserRequestGroup & { adminHoursCount: number }>();
-    for (const u of allUsers) {
-      if (!u.id || !u.username) continue;
-      if (u.accountActive === 0) continue;
-      map.set(u.id, {
-        userId: u.id,
-        username: u.username,
-        role: u.role,
-        list: [],
-        pending: 0,
-        adminHoursCount: 0,
-      });
+    // When a specific month is selected, only seed users who have activity that month
+    // (plus anyone matching "no submissions" later). For All, keep the full roster.
+    const seedAllUsers = monthFilter === 'all';
+    if (seedAllUsers) {
+      for (const u of allUsers) {
+        if (!u.id || !u.username) continue;
+        if (u.accountActive === 0) continue;
+        map.set(u.id, {
+          userId: u.id,
+          username: u.username,
+          role: u.role,
+          list: [],
+          pending: 0,
+          adminHoursCount: 0,
+        });
+      }
     }
     for (const g of byUser) {
       const existing = map.get(g.userId);
@@ -205,14 +234,32 @@ export default function AdminOvertimeRequests() {
         });
       }
     }
+    // Month + "no submissions": include roster users with zero OT in that month
+    if (monthFilter !== 'all' && activityFilter === 'without_submissions') {
+      for (const u of allUsers) {
+        if (!u.id || !u.username || u.accountActive === 0) continue;
+        if (map.has(u.id)) continue;
+        map.set(u.id, {
+          userId: u.id,
+          username: u.username,
+          role: u.role,
+          list: [],
+          pending: 0,
+          adminHoursCount: 0,
+        });
+      }
+    }
     return Array.from(map.values()).sort((a, b) =>
       a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })
     );
-  }, [allUsers, byUser, adminByUser]);
+  }, [allUsers, byUser, adminByUser, monthFilter, activityFilter]);
 
   const pendingTotal = useMemo(
-    () => rows.filter((r) => String(r.extra_hours_approval_status || '').toLowerCase() === 'pending').length,
-    [rows]
+    () =>
+      monthScopedRows.filter(
+        (r) => String(r.extra_hours_approval_status || '').toLowerCase() === 'pending'
+      ).length,
+    [monthScopedRows]
   );
 
   const filteredUsers = useMemo(() => {
@@ -224,7 +271,9 @@ export default function AdminOvertimeRequests() {
 
       const hasPending = u.pending > 0;
       const hasSubmissions = u.list.length > 0;
-      const hasAdminEntries = (u as { adminHoursCount?: number }).adminHoursCount ? (u as { adminHoursCount?: number }).adminHoursCount! > 0 : false;
+      const hasAdminEntries = (u as { adminHoursCount?: number }).adminHoursCount
+        ? (u as { adminHoursCount?: number }).adminHoursCount! > 0
+        : false;
 
       const matchesActivity =
         activityFilter === 'all'
@@ -249,7 +298,9 @@ export default function AdminOvertimeRequests() {
 
   const openUser = (userId: string) => {
     const enc = encodeURIComponent(userId);
-    navigate(`/${currentUser?.role}/overtime-requests/${enc}`);
+    const monthQs =
+      monthFilter !== 'all' ? `?month=${encodeURIComponent(monthFilter)}` : '';
+    navigate(`/${currentUser?.role}/overtime-requests/${enc}${monthQs}`);
   };
 
   if (!isAdmin) {
@@ -313,7 +364,7 @@ export default function AdminOvertimeRequests() {
                         Users
                       </div>
                       <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 tabular-nums leading-none">
-                        {displayUsers.length}
+                        {filteredUsers.length}
                       </div>
                     </div>
                   </div>
@@ -383,22 +434,31 @@ export default function AdminOvertimeRequests() {
                     {label}
                   </Button>
                 ))}
-                {(searchQuery || roleFilter !== 'all' || activityFilter !== 'all') && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setRoleFilter('all');
-                      setActivityFilter('all');
-                    }}
-                  >
-                    Clear filters
-                  </Button>
-                )}
               </div>
+              <MonthFilterChips
+                value={monthFilter}
+                onChange={setMonthFilter}
+                compact
+              />
+              {(searchQuery ||
+                roleFilter !== 'all' ||
+                activityFilter !== 'all' ||
+                monthFilter !== 'all') && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setRoleFilter('all');
+                    setActivityFilter('all');
+                    setMonthFilter('all');
+                  }}
+                >
+                  Clear filters
+                </Button>
+              )}
             </div>
 
             {loading ? (

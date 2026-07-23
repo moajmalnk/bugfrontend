@@ -1,7 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { Card, CardContent } from "@/components/ui/card";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { BottomSheetTabs } from "@/components/ui/BottomSheetTabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -11,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { ActiveTodayWorkSummary } from "@/components/users/ActiveTodayWorkSummary";
@@ -22,10 +21,10 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { ENV } from "@/lib/env";
-import { cn, getEffectiveRole } from "@/lib/utils";
+import { getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
-import { BarChart3, Bug, Check, ChevronDown, Code2, Shield, UserCheck, UserRound } from "lucide-react";
+import { BarChart3, Bug, Code2, Shield, UserCheck, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -189,7 +188,6 @@ const Users = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "active";
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
 
   // Undo delete hook
   const undoDelete = useUndoDelete({
@@ -548,44 +546,6 @@ const Users = () => {
       countClass: "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300",
     },
   ];
-  const activeRoleTab = roleTabs.find((tab) => tab.value === activeTab) ?? roleTabs[0];
-  const roleTabGridClass =
-    roleTabs.length <= 1
-      ? "grid-cols-1"
-      : roleTabs.length === 2
-        ? "grid-cols-2"
-        : roleTabs.length === 3
-          ? "grid-cols-3"
-          : roleTabs.length === 4
-            ? "grid-cols-2 lg:grid-cols-4"
-            : roleTabs.length === 5
-              ? "grid-cols-2 lg:grid-cols-5"
-              : "grid-cols-2 lg:grid-cols-6";
-
-  const renderRoleTabsList = (listClassName: string) => (
-    <TabsList className={listClassName}>
-      {roleTabs.map((tab) => (
-        <TabsTrigger
-          key={tab.value}
-          value={tab.value}
-          className="text-sm sm:text-base font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300"
-        >
-          <tab.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 shrink-0" />
-          <span className="hidden sm:inline">{tab.label}</span>
-          <span className="sm:hidden">{tab.shortLabel}</span>
-          <span
-            className={cn(
-              "ml-1 sm:ml-2 px-2 py-1 rounded-full text-xs font-bold tabular-nums",
-              tab.countClass
-            )}
-          >
-            {tab.count}
-          </span>
-        </TabsTrigger>
-      ))}
-    </TabsList>
-  );
-
   // Only rewrite an unknown tab after data is ready — never wipe developers/page on load
   useEffect(() => {
     if (isLoading) return;
@@ -699,83 +659,27 @@ const Users = () => {
         </div>
       </div>
 
-      {/* Professional Tabs */}
+      {/* Tabs — full row on xl+; bottom sheet on tablet/mobile (sidebar layouts) */}
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}
         className="w-full"
       >
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
-          <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-2">
-            {roleTabs.length > 2 ? (
-              <>
-                <div className="lg:hidden p-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full h-12 rounded-2xl justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70"
-                    onClick={() => setIsMobileTabSelectorOpen(true)}
-                  >
-                    <span className="flex items-center gap-2 text-sm font-semibold">
-                      {activeRoleTab?.icon && <activeRoleTab.icon className="h-4 w-4" />}
-                      {activeRoleTab?.label}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-70" />
-                  </Button>
-                </div>
-                {renderRoleTabsList(
-                  cn("hidden lg:grid w-full h-14 bg-transparent p-1", roleTabGridClass)
-                )}
-              </>
-            ) : (
-              renderRoleTabsList(cn("grid w-full h-14 bg-transparent p-1", roleTabGridClass))
-            )}
-          </div>
-        </div>
-
-          {roleTabs.length > 2 && (
-            <Drawer open={isMobileTabSelectorOpen} onOpenChange={setIsMobileTabSelectorOpen}>
-              <DrawerContent className="lg:hidden rounded-t-3xl border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
-                <DrawerHeader className="text-left pb-2">
-                  <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">Select Section</DrawerTitle>
-                  <DrawerDescription>
-                    Navigate between active check-ins and user roles
-                  </DrawerDescription>
-                </DrawerHeader>
-                <div className="px-4 pb-6 space-y-3 max-h-[65vh] overflow-y-auto">
-                  {roleTabs.map((tab) => {
-                    const isActive = activeTab === tab.value;
-                    return (
-                      <button
-                        key={tab.value}
-                        type="button"
-                        onClick={() => {
-                          handleTabChange(tab.value);
-                          setIsMobileTabSelectorOpen(false);
-                        }}
-                        className={`w-full min-h-20 rounded-3xl px-4 py-4 flex items-center justify-between transition-colors ${
-                          isActive
-                            ? "bg-gradient-to-r from-orange-500 to-red-600 text-white"
-                            : "bg-gray-100/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100"
-                        }`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${isActive ? "bg-white/20 text-white" : "bg-gray-200 dark:bg-gray-700"}`}>
-                            <tab.icon className="h-5 w-5" />
-                          </span>
-                          <span className="text-lg font-semibold">{tab.label}</span>
-                        </span>
-                        <span className={`inline-flex h-10 min-w-10 px-2 items-center justify-center rounded-full ${isActive ? "bg-gray-950 text-white" : "bg-gray-200 dark:bg-gray-700"}`}>
-                          {isActive ? <Check className="h-5 w-5" /> : <span className="text-sm font-bold">{tab.count}</span>}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </DrawerContent>
-            </Drawer>
-          )}
+        <BottomSheetTabs
+          items={roleTabs.map((tab) => ({
+            value: tab.value,
+            label: tab.label,
+            shortLabel: tab.shortLabel,
+            icon: tab.icon,
+            count: tab.count,
+            countClassName: tab.countClass,
+          }))}
+          value={activeTab}
+          onValueChange={handleTabChange}
+          title="Select Section"
+          description="Navigate between active check-ins and user roles"
+          desktopBreakpoint="xl"
+        />
 
         {/* Keep all tab panels mounted so Back to ?tab=developers does not reset */}
         <TabsContent value="active" className="space-y-6 sm:space-y-8">

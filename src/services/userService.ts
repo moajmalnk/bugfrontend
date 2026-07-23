@@ -37,6 +37,7 @@ export interface UsersAnalyticsPayload {
     end: string;
     name: string;
     range: string;
+    month?: string;
   };
   lookback_months: number;
   filters?: {
@@ -44,6 +45,7 @@ export interface UsersAnalyticsPayload {
     active_only_applied?: boolean;
     total_users_before_filter?: number;
     total_users_after_filter?: number;
+    month?: string;
   };
   team_summary: {
     user_count: number;
@@ -406,9 +408,15 @@ class UserService {
     return response.data;
   }
 
-  async getUsersAnalytics(opts?: { months?: number; limit?: number; activeOnly?: boolean }): Promise<UsersAnalyticsPayload> {
+  async getUsersAnalytics(opts?: {
+    months?: number;
+    month?: string;
+    limit?: number;
+    activeOnly?: boolean;
+  }): Promise<UsersAnalyticsPayload> {
     const params = new URLSearchParams({ analytics: '1' });
     if (opts?.months && opts.months > 0) params.set('months', String(opts.months));
+    if (opts?.month) params.set('month', opts.month);
     if (opts?.limit && opts.limit > 0) params.set('limit', String(opts.limit));
     if (opts?.activeOnly) params.set('active_only', '1');
     const response = await this.fetchWithAuth(`${ENV.API_URL}/users/work_stats.php?${params.toString()}`);

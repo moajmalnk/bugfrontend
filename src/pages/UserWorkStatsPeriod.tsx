@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { DailySubmissionDetailCard } from "@/components/users/DailySubmissionDetailCard";
+import { WorkNotesSection } from "@/components/users/WorkNotesSection";
 import {
   EMPTY_PERIOD_FILTERS,
   isPeriodFiltersActive,
@@ -32,7 +33,6 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
-  FileText,
   FolderOpen,
   Loader2,
   PlayCircle,
@@ -53,24 +53,6 @@ function parseYmdDate(value: unknown): Date | null {
   if (!ymd) return null;
   const d = new Date(`${ymd}T00:00:00`);
   return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function normalizeNote(item: unknown): { date?: string; note: string } | null {
-  if (item == null) return null;
-  if (typeof item === "string") {
-    const note = item.trim();
-    return note ? { note } : null;
-  }
-  if (typeof item === "object") {
-    const rec = item as Record<string, unknown>;
-    const noteRaw = rec.note ?? rec.notes ?? rec.text ?? rec.message ?? "";
-    const note = String(noteRaw ?? "").trim();
-    if (!note) return null;
-    const date = rec.date != null ? String(rec.date).trim() : "";
-    return date ? { date, note } : { note };
-  }
-  const note = String(item).trim();
-  return note ? { note } : null;
 }
 
 function formatDailySubmittedAt(
@@ -568,7 +550,7 @@ export default function UserWorkStatsPeriod() {
 
   return (
     <div className="min-h-[calc(100vh-1rem)] px-4 md:px-6 lg:px-8 py-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto w-full space-y-6">
         {/* Header (matches Users page style) */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
@@ -1034,53 +1016,8 @@ export default function UserWorkStatsPeriod() {
                   />
 
                   {filteredNotes.length > 0 && (
-                      <Card className="border-border/60 bg-card/60 backdrop-blur">
-                        <CardContent className="p-5 sm:p-6 space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <div className="p-2 rounded-xl bg-gradient-to-br from-slate-100 to-blue-100/60 dark:from-slate-800/60 dark:to-blue-900/20 border border-border/50">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div className="min-w-0">
-                                <h4 className="text-sm sm:text-base font-semibold leading-none">
-                                  Work Notes
-                                </h4>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Notes submitted in this period
-                                </p>
-                              </div>
-                            </div>
-                            <Badge className="w-fit bg-blue-600/90 text-white px-3 py-1 rounded-full">
-                              {filteredNotes.length}
-                            </Badge>
-                          </div>
-
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                            {filteredNotes
-                              .map(normalizeNote)
-                              .filter(Boolean)
-                              .map((n: any, idx: number) => (
-                                <div key={idx} className="relative pl-4">
-                                  <div className="absolute left-0 top-3 h-full w-px bg-gradient-to-b from-blue-500/40 via-border to-transparent" />
-                                  <div className="absolute left-[-3px] top-3 h-2.5 w-2.5 rounded-full bg-blue-500 ring-4 ring-blue-500/15" />
-                                  <Card className="border-border/60 bg-background/40 hover:bg-background/60 transition-colors">
-                                    <CardContent className="p-4">
-                                      {n.date ? (
-                                        <div className="text-[11px] text-muted-foreground mb-1">
-                                          {n.date}
-                                        </div>
-                                      ) : null}
-                                      <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                                        {n.note}
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                </div>
-                              ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
+                    <WorkNotesSection notes={filteredNotes} />
+                  )}
 
                     {groupedSubmissionsByDate.length > 0 ? (
                         <Card className="border-border/60 bg-card/60 backdrop-blur">

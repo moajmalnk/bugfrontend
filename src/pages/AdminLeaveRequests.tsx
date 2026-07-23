@@ -16,6 +16,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { listLeaveRequests, type LeaveRequest } from '@/services/leaveService';
 import { getEffectiveRole } from '@/lib/utils';
+import { MonthFilterChips } from '@/components/ui/MonthFilterChips';
+import {
+  rangeOverlapsMonthFilter,
+  type MonthFilterValue,
+} from '@/lib/monthFilter';
 
 type UserGroup = {
   userId: string;
@@ -168,18 +173,20 @@ export default function AdminLeaveRequests() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+  const [monthFilter, setMonthFilter] = useState<MonthFilterValue>('all');
 
   const load = useCallback(async () => {
     if (!isAdmin) return;
     setLoading(true);
     try {
-      const data = await listLeaveRequests(
-        statusFilter === 'pending'
+      const data = await listLeaveRequests({
+        ...(statusFilter === 'pending'
           ? { pending_only: true }
           : statusFilter === 'all'
             ? {}
-            : { status: statusFilter }
-      );
+            : { status: statusFilter }),
+        ...(monthFilter !== 'all' ? { month: monthFilter } : {}),
+      });
       setRows(data);
     } catch (e) {
       toast({
@@ -190,13 +197,22 @@ export default function AdminLeaveRequests() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, statusFilter]);
+  }, [isAdmin, statusFilter, monthFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const groups = useMemo(() => groupByUser(rows), [rows]);
+  const groups = useMemo(() => {
+    // Extra client guard: keep requests that overlap the selected month
+    const scoped =
+      monthFilter === 'all'
+        ? rows
+        : rows.filter((r) =>
+            rangeOverlapsMonthFilter(r.start_date, r.end_date, monthFilter)
+          );
+    return groupByUser(scoped);
+  }, [rows, monthFilter]);
 
   const filteredGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -217,7 +233,10 @@ export default function AdminLeaveRequests() {
   );
 
   const hasActiveFilters =
-    search.trim() !== '' || roleFilter !== 'all' || statusFilter !== 'pending';
+    search.trim() !== '' ||
+    roleFilter !== 'all' ||
+    statusFilter !== 'pending' ||
+    monthFilter !== 'all';
 
   if (!isAdmin) {
     return (
@@ -358,22 +377,30 @@ export default function AdminLeaveRequests() {
                     {rf === 'all' ? 'All roles' : rf}
                   </Button>
                 ))}
-                {hasActiveFilters && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full"
-                    onClick={() => {
-                      setSearch('');
-                      setRoleFilter('all');
-                      setStatusFilter('pending');
-                    }}
-                  >
-                    Clear filters
-                  </Button>
-                )}
               </div>
+
+              <MonthFilterChips
+                value={monthFilter}
+                onChange={setMonthFilter}
+                compact
+              />
+
+              {hasActiveFilters && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => {
+                    setSearch('');
+                    setRoleFilter('all');
+                    setStatusFilter('pending');
+                    setMonthFilter('all');
+                  }}
+                >
+                  Clear filters
+                </Button>
+              )}
             </div>
 
             {loading ? (

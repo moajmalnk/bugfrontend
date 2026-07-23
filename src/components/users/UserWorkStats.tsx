@@ -12,6 +12,7 @@ import { Calendar, Clock, TrendingUp, Users, X, CheckCircle2, AlertCircle, PlayC
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { WorkNotesSection } from "@/components/users/WorkNotesSection";
 
 interface TaskCounts {
   completed: number;
@@ -902,29 +903,7 @@ export function UserWorkStats({
 
                   {/* Work Notes */}
                   {periodDetails.notes && periodDetails.notes.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
-                        Work Notes ({periodDetails.notes.length})
-                      </h3>
-                      <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50/50 to-green-100/20 dark:from-green-950/10 dark:to-green-900/5">
-                        <CardContent className="p-4">
-                          <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {periodDetails.notes.map((item: any, idx: number) => (
-                              <div key={idx} className="flex items-start gap-3 p-2 rounded-lg bg-white/50 dark:bg-gray-800/30 hover:bg-white/70 dark:hover:bg-gray-800/50 transition-colors">
-                                <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-gray-900 dark:text-white">{item.note}</p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    {format(new Date(item.date), 'MMM dd, yyyy')}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                    <WorkNotesSection notes={periodDetails.notes} />
                   )}
 
                   {/* Daily Breakdown */}

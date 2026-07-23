@@ -18,6 +18,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn, getEffectiveRole } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { getProjectStatusLabel, type ProjectStatus } from "@/lib/utils/projectUtils";
@@ -37,6 +43,7 @@ import {
   ExternalLink,
   FolderKanban,
   Hourglass,
+  Info,
   Percent,
   RefreshCw,
   Scale,
@@ -309,6 +316,81 @@ function toneFromCoverage(percent: number | null | undefined): RatioTone {
   return "urgent";
 }
 
+/** Healthy targets used for lifecycle ratio chips (aligned with tone thresholds). */
+const RATIO_TARGETS = {
+  resolvedRate: {
+    label: "Target ≥ 80%",
+    info: "Share of raised bugs that reached a closed status. Aim for at least 80% resolved.",
+  },
+  openRate: {
+    label: "Target ≤ 25%",
+    info: "Share of raised bugs still open. Keep open backlog at or below 25% of raised bugs.",
+  },
+  fixRate: {
+    label: "Target ≥ 80%",
+    info: "Share of raised bugs marked fixed. Target is at least 80% of bugs reaching fixed status.",
+  },
+  fixesToBugs: {
+    label: "Target 1:1 (100%)",
+    info: "Attributed fixes compared to bugs raised. A healthy project approaches one fix per bug (100% coverage).",
+  },
+  avgCycle: {
+    label: "Target ≤ 7 days",
+    info: "Average time from bug raised to resolve. Healthy cycle time is 7 days or less; over 30 days is urgent.",
+  },
+  avgFix: {
+    label: "Target ≤ 7 days",
+    info: "Average time from in-progress to fixed. Aim to finish active fixes within 7 days.",
+  },
+  waitShare: {
+    label: "Target ≤ 25%",
+    info: "Share of cycle time spent waiting in pending. Keep wait share at or below 25%.",
+  },
+  activeShare: {
+    label: "Target ≥ 50%",
+    info: "Share of cycle time spent actively in progress. Aim for at least half the cycle in active work.",
+  },
+  fixToCycle: {
+    label: "Target ≥ 40%",
+    info: "Fix duration as a share of total cycle. Around 40%+ usually means work starts promptly after raise.",
+  },
+} as const;
+
+function progressTowardHigherTarget(
+  actual: number | null | undefined,
+  target: number
+): number | null {
+  if (actual === null || actual === undefined) return null;
+  return Math.max(0, Math.min(100, Math.round((actual / target) * 100)));
+}
+
+function progressTowardLowerTarget(
+  actual: number | null | undefined,
+  target: number
+): number | null {
+  if (actual === null || actual === undefined) return null;
+  if (actual <= 0) return 100;
+  if (actual <= target) {
+    return Math.round(100 - (actual / target) * 40); // 0 → 100, target → 60
+  }
+  const over = (actual - target) / target;
+  return Math.max(0, Math.round(60 - over * 60));
+}
+
+function progressTowardDurationDays(
+  seconds: number | null | undefined,
+  targetDays = 7
+): number | null {
+  if (seconds === null || seconds === undefined) return null;
+  const days = seconds / 86400;
+  if (days <= 0) return 100;
+  if (days <= targetDays) {
+    return Math.round(100 - (days / targetDays) * 30); // on-target band
+  }
+  const over = (days - targetDays) / targetDays;
+  return Math.max(0, Math.round(70 - over * 70));
+}
+
 function toneBadgeClass(tone: RatioTone) {
   return ratioToneStyles[tone].badge;
 }
@@ -370,14 +452,26 @@ function RatioChip({
   detail,
   tone = "default",
   className,
+  info,
+  target,
+  progressPercent,
 }: {
   label: string;
   value: string;
   detail?: string | null;
   tone?: RatioTone;
   className?: string;
+  info?: string | null;
+  target?: string | null;
+  /** 0–100 progress toward target (100 = fully meeting/exceeding). */
+  progressPercent?: number | null;
 }) {
   const styles = ratioToneStyles[tone];
+  const progress =
+    progressPercent === null || progressPercent === undefined
+      ? null
+      : Math.max(0, Math.min(100, progressPercent));
+
   return (
     <div
       className={cn(
@@ -387,14 +481,38 @@ function RatioChip({
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
-        <p
-          className={cn(
-            "min-w-0 flex-1 text-[10px] font-semibold uppercase leading-tight tracking-wide",
-            styles.label
-          )}
-        >
-          {label}
-        </p>
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <p
+            className={cn(
+              "min-w-0 text-[10px] font-semibold uppercase leading-tight tracking-wide",
+              styles.label
+            )}
+          >
+            {label}
+          </p>
+          {info ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex shrink-0 rounded-full p-0.5 transition-colors hover:bg-black/5 dark:hover:bg-white/10",
+                    styles.label
+                  )}
+                  aria-label={`About ${label}`}
+                >
+                  <Info className="h-3 w-3 opacity-80" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="max-w-[260px] text-xs leading-relaxed"
+              >
+                {info}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+        </div>
         {tone !== "default" ? (
           <span
             className={cn(
@@ -418,6 +536,35 @@ function RatioChip({
         <p className={cn("mt-0.5 text-[11px] leading-snug break-words", styles.detail)}>
           {detail}
         </p>
+      ) : null}
+      {target ? (
+        <p
+          className={cn(
+            "mt-1.5 text-[10px] font-semibold leading-snug tabular-nums",
+            styles.detail
+          )}
+        >
+          {target}
+        </p>
+      ) : null}
+      {progress !== null ? (
+        <div className="mt-2">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all",
+                tone === "success" && "bg-emerald-500",
+                tone === "warning" && "bg-amber-500",
+                tone === "urgent" && "bg-rose-500",
+                tone === "default" && "bg-slate-400"
+              )}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className={cn("mt-1 text-[9px] tabular-nums", styles.detail)}>
+            {progress}% of target
+          </p>
+        </div>
       ) : null}
     </div>
   );
@@ -659,6 +806,9 @@ function WorkItemDetailsBody({
             label="Wait share"
             value={formatPercent(ratios.waitRatio, 0)}
             detail="Time in pending"
+            info={RATIO_TARGETS.waitShare.info}
+            target={RATIO_TARGETS.waitShare.label}
+            progressPercent={progressTowardLowerTarget(ratios.waitRatio, 25)}
           />
         ) : null}
         {ratios.inProgressShare !== null ? (
@@ -667,6 +817,9 @@ function WorkItemDetailsBody({
             label="Active share"
             value={formatPercent(ratios.inProgressShare, 0)}
             detail="Time in progress"
+            info={RATIO_TARGETS.activeShare.info}
+            target={RATIO_TARGETS.activeShare.label}
+            progressPercent={progressTowardHigherTarget(ratios.inProgressShare, 50)}
           />
         ) : null}
         {ratios.fixToCycle !== null ? (
@@ -681,6 +834,9 @@ function WorkItemDetailsBody({
             label="Fix / cycle"
             value={formatPercent(ratios.fixToCycle, 0)}
             detail="Fixing vs total cycle"
+            info={RATIO_TARGETS.fixToCycle.info}
+            target={RATIO_TARGETS.fixToCycle.label}
+            progressPercent={progressTowardHigherTarget(ratios.fixToCycle, 40)}
           />
         ) : null}
         {item.resolved_at ? (
@@ -689,6 +845,8 @@ function WorkItemDetailsBody({
             label="Resolved"
             value={formatDateTime(item.resolved_at)}
             detail={item.is_open ? "Still open" : "Closed"}
+            info="Whether this item has a resolve timestamp. Open items still need closure."
+            target={item.is_open ? "Target: resolve" : "Target met"}
           />
         ) : (
           <RatioChip
@@ -696,6 +854,8 @@ function WorkItemDetailsBody({
             label="Resolved"
             value="Not yet"
             detail="Still open"
+            info="This item has not been resolved yet."
+            target="Target: resolve"
           />
         )}
       </div>
@@ -1055,6 +1215,7 @@ export function PortfolioProjectAnalytics({
   };
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className={cn("min-w-0 space-y-4", className)}>
       {showProjectLink ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1144,6 +1305,21 @@ export function PortfolioProjectAnalytics({
         <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           <Scale className="h-3.5 w-3.5" />
           Lifecycle ratios
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="rounded-full p-0.5 hover:bg-muted"
+                aria-label="About lifecycle ratios"
+              >
+                <Info className="h-3 w-3 opacity-70" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[280px] text-xs leading-relaxed">
+              Health scores for this project’s bug lifecycle. Each card shows the
+              current value, a target, and progress toward that target.
+            </TooltipContent>
+          </Tooltip>
         </div>
         <div className={RATIO_GRID_CLASS}>
           <RatioChip
@@ -1155,6 +1331,9 @@ export function PortfolioProjectAnalytics({
                 : "—"
             }
             detail="Closed bugs / raised"
+            info={RATIO_TARGETS.resolvedRate.info}
+            target={RATIO_TARGETS.resolvedRate.label}
+            progressPercent={progressTowardHigherTarget(insights.resolvedRatio.percent, 80)}
           />
           <RatioChip
             tone={toneFromBadRate(insights.openRatio.percent)}
@@ -1165,6 +1344,9 @@ export function PortfolioProjectAnalytics({
                 : "—"
             }
             detail="Still open / raised"
+            info={RATIO_TARGETS.openRate.info}
+            target={RATIO_TARGETS.openRate.label}
+            progressPercent={progressTowardLowerTarget(insights.openRatio.percent, 25)}
           />
           <RatioChip
             tone={toneFromGoodRate(insights.fixRate.percent)}
@@ -1175,24 +1357,36 @@ export function PortfolioProjectAnalytics({
                 : "—"
             }
             detail="Fixed status / raised"
+            info={RATIO_TARGETS.fixRate.info}
+            target={RATIO_TARGETS.fixRate.label}
+            progressPercent={progressTowardHigherTarget(insights.fixRate.percent, 80)}
           />
           <RatioChip
             tone={toneFromCoverage(insights.bugsToFixes.percent)}
             label="Fixes : bugs"
             value={insights.bugsToFixes.label}
             detail="Attributed fixes vs bugs raised"
+            info={RATIO_TARGETS.fixesToBugs.info}
+            target={RATIO_TARGETS.fixesToBugs.label}
+            progressPercent={progressTowardHigherTarget(insights.bugsToFixes.percent, 100)}
           />
           <RatioChip
             tone={toneFromDuration(insights.avgRise)}
             label="Avg cycle"
             value={formatDurationSeconds(insights.avgRise)}
             detail="Raised → resolve"
+            info={RATIO_TARGETS.avgCycle.info}
+            target={RATIO_TARGETS.avgCycle.label}
+            progressPercent={progressTowardDurationDays(insights.avgRise, 7)}
           />
           <RatioChip
             tone={toneFromDuration(insights.avgFix)}
             label="Avg fix"
             value={formatDurationSeconds(insights.avgFix)}
             detail="In progress → fixed"
+            info={RATIO_TARGETS.avgFix.info}
+            target={RATIO_TARGETS.avgFix.label}
+            progressPercent={progressTowardDurationDays(insights.avgFix, 7)}
           />
         </div>
       </div>
@@ -1259,6 +1453,7 @@ export function PortfolioProjectAnalytics({
         </TabsContent>
       </Tabs>
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -1474,6 +1669,7 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
   }, [data?.projects, summary?.fixes]);
 
   return (
+    <TooltipProvider delayDuration={200}>
     <Card className={cn("overflow-hidden border-border/60 shadow-sm", className)}>
       <CardHeader className="p-4 sm:p-5 lg:p-6 pb-3 sm:pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1575,6 +1771,21 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
               <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 <Scale className="h-3.5 w-3.5" />
                 Portfolio ratios
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="rounded-full p-0.5 hover:bg-muted"
+                      aria-label="About portfolio ratios"
+                    >
+                      <Info className="h-3 w-3 opacity-70" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[280px] text-xs leading-relaxed">
+                    Aggregate health across this user’s projects. Targets match project
+                    lifecycle standards (resolved ≥80%, open ≤25%, fixes≈bugs).
+                  </TooltipContent>
+                </Tooltip>
               </div>
               <div className={RATIO_GRID_CLASS}>
                 <RatioChip
@@ -1586,6 +1797,12 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
                       : "—"
                   }
                   detail="Closed bugs / raised"
+                  info={RATIO_TARGETS.resolvedRate.info}
+                  target={RATIO_TARGETS.resolvedRate.label}
+                  progressPercent={progressTowardHigherTarget(
+                    portfolioRatios.resolvedRate.percent,
+                    80
+                  )}
                 />
                 <RatioChip
                   tone={toneFromBadRate(portfolioRatios.openRate.percent)}
@@ -1596,6 +1813,12 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
                       : "—"
                   }
                   detail="Still open / raised"
+                  info={RATIO_TARGETS.openRate.info}
+                  target={RATIO_TARGETS.openRate.label}
+                  progressPercent={progressTowardLowerTarget(
+                    portfolioRatios.openRate.percent,
+                    25
+                  )}
                 />
                 <RatioChip
                   tone={toneFromGoodRate(portfolioRatios.fixRate.percent)}
@@ -1606,12 +1829,24 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
                       : "—"
                   }
                   detail="Fixed status / raised"
+                  info={RATIO_TARGETS.fixRate.info}
+                  target={RATIO_TARGETS.fixRate.label}
+                  progressPercent={progressTowardHigherTarget(
+                    portfolioRatios.fixRate.percent,
+                    80
+                  )}
                 />
                 <RatioChip
                   tone={toneFromCoverage(portfolioRatios.fixesToBugs.percent)}
                   label="Fixes : bugs"
                   value={portfolioRatios.fixesToBugs.label}
                   detail="Attributed fixes vs bugs raised"
+                  info={RATIO_TARGETS.fixesToBugs.info}
+                  target={RATIO_TARGETS.fixesToBugs.label}
+                  progressPercent={progressTowardHigherTarget(
+                    portfolioRatios.fixesToBugs.percent,
+                    100
+                  )}
                 />
                 <RatioChip
                   tone="default"
@@ -1622,6 +1857,8 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
                       : "—"
                   }
                   detail="Projects that have raised bugs"
+                  info="How many of this user’s projects have at least one raised bug in the portfolio window."
+                  target="Context only"
                 />
               </div>
             </div>
@@ -1681,6 +1918,7 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
         )}
       </CardContent>
     </Card>
+    </TooltipProvider>
   );
 }
 
