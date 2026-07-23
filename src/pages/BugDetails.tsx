@@ -145,8 +145,13 @@ const createDiagnosticLogger = (componentName: string) => {
         logs.shift();
       }
       
-      // Always log to console in production for debugging
-      console.log(`[${componentName}]`, message, data || '');
+      // Console only when diagnostics are explicitly enabled (avoids spam on every navigate)
+      const enableDiagnostics =
+        import.meta.env.DEV &&
+        (window as any).__ENABLE_BUG_DETAILS_DIAGNOSTICS__ === true;
+      if (enableDiagnostics) {
+        console.log(`[${componentName}]`, message, data || '');
+      }
       
       // Store in window for global access
       if (typeof window !== 'undefined') {
@@ -248,7 +253,7 @@ const BugDetails = () => {
         }
       };
       
-      if (isDevelopment || enableDiagnostics) {
+      if (enableDiagnostics) {
         console.log('[BugDetails] Diagnostic tools available at window.__BUG_DETAILS_DIAGNOSTIC__');
       }
     }

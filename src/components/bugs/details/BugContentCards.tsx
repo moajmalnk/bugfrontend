@@ -101,18 +101,14 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     if (/^https?:\/\//i.test(path)) {
       return path;
     }
-    const url = `${apiBaseUrl}/image.php?path=${encodeURIComponent(path)}`;
-    console.log('🖼️ Building image URL:', { path, apiBaseUrl, url });
-    return url;
+    return `${apiBaseUrl}/image.php?path=${encodeURIComponent(path)}`;
   };
   const buildAudioUrl = (path: string) => {
     if (/^https?:\/\//i.test(path)) {
       return path;
     }
     // Use audio.php endpoint for audio files (same as EditBugDialog)
-    const url = `${apiBaseUrl}/audio.php?path=${encodeURIComponent(path)}`;
-    console.log('🎵 Building audio URL:', { path, apiBaseUrl, url });
-    return url;
+    return `${apiBaseUrl}/audio.php?path=${encodeURIComponent(path)}`;
   };
   const buildDownloadUrl = (path: string, name?: string) => {
     const base = `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(
@@ -230,21 +226,6 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     ? ((bug as any).attachments as any[])
     : [];
   
-  // Debug: Log attachments and API URL - only when bug.id or attachments change to prevent excessive logging
-  useEffect(() => {
-    console.log('📎 BugContentCards Debug:', {
-      apiBaseUrl,
-      attachmentsCount: allAttachments.length,
-      attachments: allAttachments.map(a => ({
-        id: a.id,
-        file_name: a.file_name,
-        file_path: a.file_path,
-        file_type: a.file_type
-      })),
-      bugId: bug.id
-    });
-  }, [bug.id, bug.attachments?.length, apiBaseUrl]); // Log when bug ID, attachment count, or API URL changes
-
   // If no attachments in main array, fallback to legacy structure (for backward compatibility)
   const fallbackAttachments = allAttachments.length === 0 ? [
     ...(Array.isArray((bug as any).screenshots) ? (bug as any).screenshots.map((s: any) => ({

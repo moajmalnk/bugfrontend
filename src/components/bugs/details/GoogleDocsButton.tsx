@@ -21,9 +21,8 @@ export const GoogleDocsButton = ({ bugId }: GoogleDocsButtonProps) => {
 
   // Check connection status on mount
   useEffect(() => {
-    console.log('🔵 [GoogleDocsButton] Component mounted, bugId:', bugId);
     checkConnection();
-  }, []);
+  }, [bugId]);
 
   const checkConnection = async () => {
     setIsLoading(true);

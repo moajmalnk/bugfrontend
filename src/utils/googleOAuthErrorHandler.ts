@@ -183,20 +183,22 @@ if (typeof window !== 'undefined') {
     return check;
   };
   
-  // Auto-check on page load and show instructions if needed
-  setTimeout(() => {
-    const originInfo = googleOAuthDiagnostic.getCurrentOriginInfo();
-    const check = googleOAuthDiagnostic.checkAuthorization();
-    
-    // Show a prominent message if origin might not be authorized
-    if (check.needsSetup || originInfo.isDevelopment) {
-      console.log(
-        '%c🔍 Google OAuth Origin Check', 
-        'color: #2196F3; font-weight: bold; font-size: 14px;'
-      );
-      console.log('Current origin:', originInfo.origin);
-      console.log('If you see 403 errors, add this origin to Google Cloud Console');
-      console.log('Quick fix: Run fixGoogleOAuth() in console for detailed instructions');
-    }
-  }, 2000);
+  // Auto-check on page load only when explicitly requested
+  // (avoids console noise on every session — run fixGoogleOAuth() / checkGoogleOAuth() manually)
+  if ((window as any).__ENABLE_GOOGLE_OAUTH_ORIGIN_CHECK__ === true) {
+    setTimeout(() => {
+      const originInfo = googleOAuthDiagnostic.getCurrentOriginInfo();
+      const check = googleOAuthDiagnostic.checkAuthorization();
+
+      if (check.needsSetup || originInfo.isDevelopment) {
+        console.log(
+          '%c🔍 Google OAuth Origin Check',
+          'color: #2196F3; font-weight: bold; font-size: 14px;'
+        );
+        console.log('Current origin:', originInfo.origin);
+        console.log('If you see 403 errors, add this origin to Google Cloud Console');
+        console.log('Quick fix: Run fixGoogleOAuth() in console for detailed instructions');
+      }
+    }, 2000);
+  }
 }
