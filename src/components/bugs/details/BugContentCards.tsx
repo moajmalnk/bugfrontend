@@ -75,6 +75,24 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     englishText: descriptionEnglishText,
   } = useMalayalamToggle(bug.description || "");
 
+  const {
+    displayText: expectedDisplayText,
+    toggle: toggleExpectedMalayalam,
+    loading: expectedTranslating,
+    showMalayalam: expectedInMalayalam,
+    getMalayalamText: getExpectedMalayalamText,
+    englishText: expectedEnglishText,
+  } = useMalayalamToggle(bug.expected_result || "");
+
+  const {
+    displayText: actualDisplayText,
+    toggle: toggleActualMalayalam,
+    loading: actualTranslating,
+    showMalayalam: actualInMalayalam,
+    getMalayalamText: getActualMalayalamText,
+    englishText: actualEnglishText,
+  } = useMalayalamToggle(bug.actual_result || "");
+
   // Robust media URL helpers (use PHP endpoints to avoid CORS and set headers)
   // Use ENV.API_URL from env.ts to ensure consistency with backend
   const apiBaseUrl = ENV.API_URL;
@@ -308,16 +326,31 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
         <Card className="relative overflow-hidden rounded-2xl border border-blue-200/60 dark:border-blue-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-cyan-50/30 dark:from-blue-950/10 dark:via-transparent dark:to-cyan-950/10" />
           <CardHeader className="relative">
-            <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-              <div className="p-1 bg-blue-500 rounded-lg">
-                <File className="w-4 h-4 text-white" />
+            <CardTitle className="flex items-center justify-between gap-2 text-blue-700 dark:text-blue-300">
+              <span className="flex items-center gap-2">
+                <div className="p-1 bg-blue-500 rounded-lg">
+                  <File className="w-4 h-4 text-white" />
+                </div>
+                Expected Result
+              </span>
+              <div className="inline-flex items-center gap-1">
+                <CopyTextButton
+                  text={expectedDisplayText}
+                  label="expected result"
+                />
+                <MalayalamVoiceToolbar
+                  englishText={expectedEnglishText}
+                  showMalayalam={expectedInMalayalam}
+                  translating={expectedTranslating}
+                  onToggleMalayalam={toggleExpectedMalayalam}
+                  getMalayalamText={getExpectedMalayalamText}
+                />
               </div>
-              Expected Result
             </CardTitle>
           </CardHeader>
           <CardContent className="relative">
             <div className="prose prose-sm max-w-none dark:prose-invert">
-              <p className="whitespace-pre-wrap break-words text-blue-800 dark:text-blue-200">{bug.expected_result}</p>
+              <p className="whitespace-pre-wrap break-words text-blue-800 dark:text-blue-200">{expectedDisplayText}</p>
             </div>
           </CardContent>
         </Card>
@@ -328,16 +361,31 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
         <Card className="relative overflow-hidden rounded-2xl border border-red-200/60 dark:border-red-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-50/30 via-transparent to-pink-50/30 dark:from-red-950/10 dark:via-transparent dark:to-pink-950/10" />
           <CardHeader className="relative">
-            <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-300">
-              <div className="p-1 bg-red-500 rounded-lg">
-                <File className="w-4 h-4 text-white" />
+            <CardTitle className="flex items-center justify-between gap-2 text-red-700 dark:text-red-300">
+              <span className="flex items-center gap-2">
+                <div className="p-1 bg-red-500 rounded-lg">
+                  <File className="w-4 h-4 text-white" />
+                </div>
+                Actual Result
+              </span>
+              <div className="inline-flex items-center gap-1">
+                <CopyTextButton
+                  text={actualDisplayText}
+                  label="actual result"
+                />
+                <MalayalamVoiceToolbar
+                  englishText={actualEnglishText}
+                  showMalayalam={actualInMalayalam}
+                  translating={actualTranslating}
+                  onToggleMalayalam={toggleActualMalayalam}
+                  getMalayalamText={getActualMalayalamText}
+                />
               </div>
-              Actual Result
             </CardTitle>
           </CardHeader>
           <CardContent className="relative">
             <div className="prose prose-sm max-w-none dark:prose-invert">
-              <p className="whitespace-pre-wrap break-words text-red-800 dark:text-red-200">{bug.actual_result}</p>
+              <p className="whitespace-pre-wrap break-words text-red-800 dark:text-red-200">{actualDisplayText}</p>
             </div>
           </CardContent>
         </Card>

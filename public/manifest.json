@@ -2,15 +2,15 @@
   "name": "BugRicer - Bug Tracking & Project Management",
   "short_name": "BugRicer",
   "description": "Professional bug tracking and project management platform for development teams",
-  "start_url": "https://bugs.bugricer.com/",
+  "start_url": "/",
   "display": "standalone",
   "orientation": "any",
   "theme_color": "#2563eb",
   "background_color": "#0f172a",
-  "scope": "https://bugs.bugricer.com/",
+  "scope": "/",
   "lang": "en",
   "dir": "ltr",
-  "id": "https://bugs.bugricer.com/",
+  "id": "/",
   "categories": ["productivity", "business", "developer"],
   "icons": [
     {
@@ -62,7 +62,7 @@
     }
   ],
   "share_target": {
-    "action": "https://bugs.bugricer.com/share-target",
+    "action": "/share-target",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {

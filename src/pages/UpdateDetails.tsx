@@ -440,9 +440,16 @@ const UpdateDetails = () => {
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   {fromProject ? "Back to Project Updates" : "Back to Updates"}
                 </Button>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent break-words">
-                  {update.title}
-                </h1>
+                <div className="flex items-start gap-2">
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent break-words min-w-0 flex-1">
+                    {update.title}
+                  </h1>
+                  <CopyTextButton
+                    text={update.title || ""}
+                    label="title"
+                    className="mt-1.5 shrink-0"
+                  />
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 break-words">
                   Update ID: <span className="font-mono break-all">{update.id}</span>
                 </p>

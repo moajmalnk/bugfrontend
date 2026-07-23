@@ -173,12 +173,8 @@ const FixBug = () => {
       formData.append("fix_description", fixDescription); // Include fix description
       formData.append("fixed_by", currentUser.id); // Record who fixed it
 
-      // Send update request
-      const response = await apiClient.post('/bugs/update.php', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Send update request (do not set Content-Type — axios sets multipart boundary)
+      const response = await apiClient.post('/bugs/update.php', formData);
 
       const data = response.data as ApiResponse<Bug>;
 
@@ -233,12 +229,21 @@ const FixBug = () => {
         throw new Error(data.message || "Failed to update bug status");
       }
     } catch (error) {
+      const axiosError = error as {
+        response?: { status?: number; data?: { message?: string } };
+        message?: string;
+      };
+      const apiMessage =
+        axiosError?.response?.data?.message ||
+        (error instanceof Error ? error.message : null) ||
+        "Failed to update bug status";
+
       toast({
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to update bug status",
+        title:
+          axiosError?.response?.status === 403
+            ? "Permission denied"
+            : "Error",
+        description: apiMessage,
         variant: "destructive",
       });
     } finally {

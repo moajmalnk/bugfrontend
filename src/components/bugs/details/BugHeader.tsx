@@ -2,6 +2,7 @@ import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MalayalamDateToggle, MalayalamTextToggle } from "@/components/ui/DateDisplay";
+import { CopyTextButton } from "@/components/ui/CopyTextButton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -315,13 +316,20 @@ export const BugHeader = ({
         </button>
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
-          <div className="space-y-1">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words">
-              <MalayalamTextToggle
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-start gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words min-w-0 flex-1">
+                <MalayalamTextToggle
+                  text={bug.title}
+                  className="text-xl sm:text-2xl font-bold tracking-tight break-words"
+                />
+              </h1>
+              <CopyTextButton
                 text={bug.title}
-                className="text-xl sm:text-2xl font-bold tracking-tight break-words"
+                label="title"
+                className="mt-1 shrink-0"
               />
-            </h1>
+            </div>
             <p className="text-xs sm:text-sm text-muted-foreground">
               Project Name: {bug.project_name}
             </p>

@@ -492,7 +492,7 @@ const Fixes = () => {
                         <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                           <SelectValue placeholder="Priority" />
                         </SelectTrigger>
-                        <SelectContent position="popper" className="z-[60]">
+                        <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search priorities...">
                           <SelectItem value="all">All Priorities</SelectItem>
                           <SelectItem value="high">High Priority</SelectItem>
                           <SelectItem value="medium">Medium Priority</SelectItem>
@@ -510,7 +510,7 @@ const Fixes = () => {
                         <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                           <SelectValue placeholder="Project" />
                         </SelectTrigger>
-                        <SelectContent position="popper" className="z-[60]">
+                        <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search projects...">
                           <SelectItem value="all">All Projects</SelectItem>
                           {visibleProjects.map((project) => (
                             <SelectItem key={project.id} value={project.id}>
@@ -606,7 +606,7 @@ const Fixes = () => {
                         <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                           <SelectValue placeholder="Priority" />
                         </SelectTrigger>
-                        <SelectContent position="popper" className="z-[60]">
+                        <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search priorities...">
                           <SelectItem value="all">All Priorities</SelectItem>
                           <SelectItem value="high">High Priority</SelectItem>
                           <SelectItem value="medium">Medium Priority</SelectItem>
@@ -624,7 +624,7 @@ const Fixes = () => {
                         <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                           <SelectValue placeholder="Project" />
                         </SelectTrigger>
-                        <SelectContent position="popper" className="z-[60]">
+                        <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search projects...">
                           <SelectItem value="all">All Projects</SelectItem>
                           {visibleProjects.map((project) => (
                             <SelectItem key={project.id} value={project.id}>
@@ -729,7 +729,7 @@ const Fixes = () => {
                       <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                         <SelectValue placeholder="Priority" />
                       </SelectTrigger>
-                      <SelectContent position="popper" className="z-[60]">
+                      <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search priorities...">
                         <SelectItem value="all">All Priorities</SelectItem>
                         <SelectItem value="high">High Priority</SelectItem>
                         <SelectItem value="medium">Medium Priority</SelectItem>
@@ -747,7 +747,7 @@ const Fixes = () => {
                       <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                         <SelectValue placeholder="Project" />
                       </SelectTrigger>
-                      <SelectContent position="popper" className="z-[60]">
+                      <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search projects...">
                         <SelectItem value="all">All Projects</SelectItem>
                         {visibleProjects.map((project) => (
                           <SelectItem key={project.id} value={project.id}>

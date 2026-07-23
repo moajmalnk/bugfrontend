@@ -14,7 +14,6 @@ import { formatDetailedDate } from "@/lib/dateUtils";
 import { ENV } from "@/lib/env";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
 import { bugService } from "@/services/bugService";
-import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { notificationService } from "@/services/notificationService";
 import { whatsappService } from "@/services/whatsappService";
 import { Bug, BugStatus } from "@/types";
@@ -819,15 +818,16 @@ const BugDetails = () => {
 
   const handleStatusUpdate = async (newStatus: BugStatus) => {
     try {
-      const token = localStorage.getItem("token");
-      await apiClient.post<ApiResponse<Bug>>(
-        '/bugs/update.php',
-        {
-          id: bug.id,
-          status: newStatus,
-          updated_by: currentUser?.id, // Add the current user's ID as the updater
-        }
-      );
+      const payload: Record<string, string> = {
+        id: bug.id,
+        status: newStatus,
+        updated_by: currentUser?.id || "",
+      };
+      if (newStatus === "fixed" && currentUser?.id) {
+        payload.fixed_by = currentUser.id;
+      }
+
+      await apiClient.post<ApiResponse<Bug>>("/bugs/update.php", payload);
 
       // Update local bugList state immediately
       setBugList((prevList) =>
@@ -838,38 +838,51 @@ const BugDetails = () => {
                 status: newStatus,
                 updated_by: currentUser?.id,
                 updated_by_name: currentUser?.name,
+                ...(newStatus === "fixed" && currentUser?.id
+                  ? {
+                      fixed_by: currentUser.id,
+                      fixed_by_name: currentUser.name || currentUser.username,
+                    }
+                  : {}),
               }
             : b
         )
       );
 
-      // Send notification if new status is "fixed"
+      queryClient.setQueryData(["bug", bug.id], (prev: Bug | undefined) =>
+        prev
+          ? {
+              ...prev,
+              status: newStatus,
+              updated_by: currentUser?.id,
+              updated_by_name: currentUser?.name,
+              ...(newStatus === "fixed" && currentUser?.id
+                ? {
+                    fixed_by: currentUser.id,
+                    fixed_by_name: currentUser.name || currentUser.username,
+                  }
+                : {}),
+            }
+          : prev
+      );
+
+      // Side effects after UI is already updated — never block status change
       if (newStatus === "fixed" && bug.status !== "fixed") {
-        try {
-          const bugData = {
-            ...bug,
-            status: newStatus,
-            updated_by_name: currentUser?.name || "BugRicer", // Include updater name in notification
-          };
-
-          // Send email notification
-          await sendBugStatusUpdateNotification(bugData);
-
-          // Broadcast browser notification to all users
-          await broadcastNotificationService.broadcastStatusChange(
+        void broadcastNotificationService
+          .broadcastStatusChange(
             bug.title,
             bug.id,
             newStatus,
             currentUser?.name || "BugRicer User"
-          );
-          //console.log("Broadcast notification sent for status change");
+          )
+          .catch(() => undefined);
 
-          // Check if WhatsApp notifications are enabled and share
-          const notificationSettings = notificationService.getSettings();
-          if (
-            notificationSettings.whatsappNotifications &&
-            notificationSettings.statusChangeNotifications
-          ) {
+        const notificationSettings = notificationService.getSettings();
+        if (
+          notificationSettings.whatsappNotifications &&
+          notificationSettings.statusChangeNotifications
+        ) {
+          try {
             whatsappService.shareStatusUpdate({
               bugTitle: bug.title,
               bugId: bug.id,
@@ -880,27 +893,27 @@ const BugDetails = () => {
               bugLevel: bug.bug_level,
               alreadyRaised: bug.already_raised,
             });
-            // console.log("WhatsApp share opened for status change");
+          } catch {
+            // ignore
           }
-        } catch (notificationError) {
-          // // console.error("Failed to send notification:", notificationError);
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["bug", bug.id] });
-      queryClient.invalidateQueries({ queryKey: ["bugs"] });
-      queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
-      queryClient.invalidateQueries({ queryKey: ["userProfilePortfolio"] });
+      void queryClient.invalidateQueries({ queryKey: ["bugs"] });
+      void queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
+      void queryClient.invalidateQueries({ queryKey: ["userProfilePortfolio"] });
 
       toast({
         title: "Success",
         description: "Bug status updated successfully",
       });
     } catch (error) {
-      // // console.error("Failed to update bug status:", error);
       toast({
         title: "Error",
-        description: "Failed to update bug status",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to update bug status",
         variant: "destructive",
       });
     }
@@ -910,14 +923,6 @@ const BugDetails = () => {
 
   return (
     <main className="min-h-[60vh] bg-background px-4 py-6 md:px-6 lg:px-8 flex flex-col">
-      {/* Background refetch indicator */}
-      {isFetching && bug && (
-        <div className="fixed top-4 right-4 z-50">
-          <div className="bg-primary/10 border border-primary/20 text-primary px-3 py-2 rounded-md shadow-md text-sm font-medium animate-pulse">
-            Updating...
-          </div>
-        </div>
-      )}
       {/* Main content */}
       <section className="max-w-7xl mx-auto space-y-8 flex-1 w-full">
         <header className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">

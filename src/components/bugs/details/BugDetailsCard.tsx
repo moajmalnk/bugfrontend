@@ -9,9 +9,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { apiClient } from "@/lib/axios";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
-import { bugService } from "@/services/bugService";
-import { sendBugStatusUpdateNotification } from "@/services/emailService";
 import { notificationService } from "@/services/notificationService";
 import { whatsappService } from "@/services/whatsappService";
 import { Bug, BugStatus, Project } from "@/types";
@@ -25,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatRetestSummary } from "@/components/bugs/details/TesterVerificationPanel";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GoogleDocsButton } from "./GoogleDocsButton";
 import { BugFixCelebration } from "@/components/celebration/BugFixCelebration";
 
@@ -41,7 +40,7 @@ export const BugDetailsCard = ({
   bug,
   project,
   canUpdateStatus,
-  updateBugStatus,
+  updateBugStatus: _updateBugStatus,
   formattedUpdatedDate,
 }: BugDetailsCardProps) => {
   const { currentUser } = useAuth();
@@ -49,6 +48,10 @@ export const BugDetailsCard = ({
   const [updating, setUpdating] = useState(false);
   const [bugState, setBugState] = useState(bug);
   const [showCelebration, setShowCelebration] = useState(false);
+
+  useEffect(() => {
+    setBugState(bug);
+  }, [bug]);
 
   const handleUpdate = async (field: "status" | "priority", value: string) => {
     if (!currentUser) {
@@ -60,92 +63,113 @@ export const BugDetailsCard = ({
       return;
     }
 
+    if (bugState[field] === value) return;
+
+    const previous = bugState;
+    const markingFixed = field === "status" && value === "fixed";
+    const optimistic: Bug = {
+      ...bugState,
+      [field]: value,
+      updated_by: currentUser.id,
+      updated_by_name: currentUser.name || currentUser.username,
+      ...(markingFixed
+        ? {
+            fixed_by: currentUser.id,
+            fixed_by_name: currentUser.name || currentUser.username,
+          }
+        : {}),
+    };
+
+    // Instant UI feedback — don't wait on email/broadcast
+    setBugState(optimistic);
     setUpdating(true);
+    queryClient.setQueryData(["bug", bug.id], optimistic);
+
     try {
-      const updatedBug = {
-        ...bugState,
+      // Minimal payload so developers aren't blocked by unrelated field diffs
+      const payload: Record<string, string> = {
+        id: bug.id,
         [field]: value,
-        updated_by: currentUser.id, // Ensure the current user is set as the updater
-        updated_by_name: currentUser.name || currentUser.username, // Include the updater name
-        fixed_by:
-          field === "status" && value === "fixed" ? currentUser.id : undefined, // Set fixed_by if status is fixed
+        updated_by: currentUser.id,
       };
+      if (markingFixed) {
+        payload.fixed_by = currentUser.id;
+      }
 
-      await bugService.updateBug(updatedBug);
-      setBugState(updatedBug);
+      const response = await apiClient.post<{
+        success: boolean;
+        data?: Bug;
+        message?: string;
+      }>("/bugs/update.php", payload);
 
-      // Invalidate queries to refresh the bugs list and user stats
-      queryClient.invalidateQueries({ queryKey: ["bugs"] });
-      queryClient.invalidateQueries({ queryKey: ["bug", bug.id] });
-      queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
-      queryClient.invalidateQueries({
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || `Failed to update bug ${field}`);
+      }
+
+      const serverBug = response.data.data
+        ? { ...optimistic, ...response.data.data }
+        : optimistic;
+      setBugState(serverBug);
+      queryClient.setQueryData(["bug", bug.id], serverBug);
+
+      // Soft refresh related views without blocking the status control
+      void queryClient.invalidateQueries({ queryKey: ["bugs"] });
+      void queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
+      void queryClient.invalidateQueries({
         queryKey: ["userStats", currentUser.id],
       });
-      queryClient.invalidateQueries({ queryKey: ["userProfilePortfolio"] });
+      void queryClient.invalidateQueries({ queryKey: ["userProfilePortfolio"] });
 
-      // Send notification when status is changed to "fixed"
-      if (field === "status" && value === "fixed") {
-        // Show celebration animation
+      toast({
+        title: "Success",
+        description: `Bug ${field} updated successfully.`,
+      });
+
+      if (markingFixed) {
         setShowCelebration(true);
 
-        const notificationResult = await sendBugStatusUpdateNotification(
-          updatedBug
-        );
+        // Backend already sends in-app/push notifications after the API responds.
+        // Keep browser/WhatsApp side-effects non-blocking.
+        void broadcastNotificationService
+          .broadcastStatusChange(
+            serverBug.title,
+            serverBug.id,
+            "fixed",
+            currentUser.name || currentUser.username || "BugRicer User"
+          )
+          .catch(() => undefined);
 
-        // Broadcast browser notification to all users
-        try {
-          await broadcastNotificationService.broadcastStatusChange(
-            updatedBug.title,
-            updatedBug.id,
-            value,
-            currentUser?.name || "BugRicer User"
-          );
-          //.log("Broadcast notification sent for status change");
-        } catch (broadcastError) {
-          //.error("Failed to send broadcast notification:", broadcastError);
-        }
-
-        // Check if WhatsApp notifications are enabled and share
         const notificationSettings = notificationService.getSettings();
         if (
           notificationSettings.whatsappNotifications &&
           notificationSettings.statusChangeNotifications
         ) {
-          whatsappService.shareStatusUpdate({
-            bugTitle: updatedBug.title,
-            bugId: updatedBug.id,
-            status: value,
-            priority: updatedBug.priority,
-            updatedBy: currentUser?.name || "BugRicer User",
-            projectName: updatedBug.project_name || updatedBug.project_id,
-            bugLevel: updatedBug.bug_level,
-            alreadyRaised: updatedBug.already_raised,
-          });
-          //.log("WhatsApp share opened for status change");
+          try {
+            whatsappService.shareStatusUpdate({
+              bugTitle: serverBug.title,
+              bugId: serverBug.id,
+              status: "fixed",
+              priority: serverBug.priority,
+              updatedBy:
+                currentUser.name || currentUser.username || "BugRicer User",
+              projectName: serverBug.project_name || serverBug.project_id,
+              bugLevel: serverBug.bug_level,
+              alreadyRaised: serverBug.already_raised,
+            });
+          } catch {
+            // ignore WhatsApp share errors
+          }
         }
-
-        if (notificationResult.success) {
-          toast({
-            title: "Success",
-            description: `Bug ${field} updated and notifications sent.`,
-          });
-        } else {
-          toast({
-            title: "Warning",
-            description: `Bug ${field} updated but failed to send notifications.`,
-            variant: "default",
-          });
-        }
-      } else {
-        toast({
-          title: "Success",
-          description: `Bug ${field} updated successfully.`,
-        });
       }
     } catch (error) {
+      setBugState(previous);
+      queryClient.setQueryData(["bug", bug.id], previous);
       toast({
         title: "Error",
-        description: `Failed to update bug ${field}.`,
+        description:
+          error instanceof Error
+            ? error.message
+            : `Failed to update bug ${field}.`,
         variant: "destructive",
       });
     } finally {
@@ -168,13 +192,13 @@ export const BugDetailsCard = ({
             {canUpdateStatus ? (
               <Select
                 value={bugState.status}
-                onValueChange={(value) => handleUpdate("status", value)}
+                onValueChange={(value) => void handleUpdate("status", value)}
                 disabled={updating}
               >
                 <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent searchable={false}>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="fixed">Fixed</SelectItem>
@@ -196,13 +220,13 @@ export const BugDetailsCard = ({
             {canUpdateStatus ? (
               <Select
                 value={bugState.priority}
-                onValueChange={(value) => handleUpdate("priority", value)}
+                onValueChange={(value) => void handleUpdate("priority", value)}
                 disabled={updating}
               >
                 <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent searchable={false}>
                   <SelectItem value="high">High</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="low">Low</SelectItem>
@@ -239,7 +263,6 @@ export const BugDetailsCard = ({
             </div>
           </div>
 
-          {/* Last Updated and Updated By Section */}
           <div className="space-y-2 py-3 border-t border-border">
             <div className="flex flex-col space-y-1">
               <div className="flex justify-between items-center text-sm">
@@ -248,85 +271,38 @@ export const BugDetailsCard = ({
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Reported By:</span>
-                <span className="font-medium">
-                  {bugState.reporter_name || bug.reporter_name}
+                <span className="font-medium break-words">
+                  {bugState.reporter_name || bugState.reported_by || "Unknown"}
                 </span>
               </div>
-              {/* Add the Updated By information with null check */}
-              {(bugState.updated_by_name || bug.updated_by_name) && (
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Updated By:</span>
-                  <span className="font-medium">
-                    {bugState.updated_by_name || bug.updated_by_name}
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Updated By:</span>
+                <span className="font-medium break-words">
+                  {bugState.updated_by_name || "Unknown"}
+                </span>
+              </div>
+              {bugState.status === "fixed" && (
+                <div className="flex justify-between items-start gap-3 text-sm">
+                  <span className="text-muted-foreground shrink-0">
+                    Tester verification:
+                  </span>
+                  <span
+                    className={cn(
+                      "font-medium text-right",
+                      formatRetestSummary(bugState).toneClass
+                    )}
+                  >
+                    {formatRetestSummary(bugState).label}
                   </span>
                 </div>
-              )}
-              {/* Show Fixed By if bug is fixed */}
-              {bugState.status === "fixed" &&
-                (bugState.fixed_by_name || bug.fixed_by_name) && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Fixed By:</span>
-                    <span className="font-medium">
-                      {bugState.fixed_by_name || bug.fixed_by_name}
-                    </span>
-                  </div>
-                )}
-              {bugState.status === "fixed" && (
-                <>
-                  <div className="flex justify-between items-center text-sm gap-2">
-                    <span className="text-muted-foreground shrink-0">Retested:</span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "rounded-full text-xs",
-                        formatRetestSummary(bugState).className
-                      )}
-                    >
-                      {formatRetestSummary(bugState).label}
-                    </Badge>
-                  </div>
-                  {(bugState.tester_retested === true ||
-                    bugState.tester_retested === 1 ||
-                    String(bugState.tester_retested) === "1") && (
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Issue Fixed:</span>
-                      <span className="font-medium">
-                        {bugState.tester_issue_fixed === true ||
-                        bugState.tester_issue_fixed === 1 ||
-                        String(bugState.tester_issue_fixed) === "1"
-                          ? "Yes"
-                          : bugState.tester_issue_fixed === false ||
-                              bugState.tester_issue_fixed === 0 ||
-                              String(bugState.tester_issue_fixed) === "0"
-                            ? "No"
-                            : "—"}
-                      </span>
-                    </div>
-                  )}
-                  {(bugState.tester_verified_by_name ||
-                    bug.tester_verified_by_name) && (
-                    <div className="flex justify-between items-center text-sm gap-2">
-                      <span className="text-muted-foreground shrink-0">Verified By:</span>
-                      <span className="font-medium text-right truncate">
-                        {bugState.tester_verified_by_name ||
-                          bug.tester_verified_by_name}
-                      </span>
-                    </div>
-                  )}
-                </>
               )}
             </div>
           </div>
 
-          {/* Google Docs Integration */}
-          <div className="space-y-2 py-3 border-t border-border">
-            <Label className="text-xs sm:text-sm font-medium">BugDocs</Label>
-            <GoogleDocsButton bugId={bug.id} />
-          </div>
+          <GoogleDocsButton bug={bugState} project={project} />
         </CardContent>
       </Card>
 
-      {/* Celebration Animation */}
       <BugFixCelebration
         bug={bugState}
         isVisible={showCelebration}
