@@ -31,7 +31,6 @@ import type { User } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
-  ArrowLeft,
   AtSign,
   Bug,
   Calendar,
@@ -44,6 +43,7 @@ import {
   Pencil,
   Phone,
   Shield,
+  Timer,
   Trash2,
   UserPlus,
   UserRound,
@@ -52,8 +52,9 @@ import {
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
+import { buildAdminAddHoursPath } from "@/pages/adminOvertimeShared";
 
 type UserStatus = "active" | "idle" | "offline";
 
@@ -260,39 +261,35 @@ export default function UserDetails() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                {canManageUserProjects && user ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 rounded-xl shrink-0 border border-gray-200/60 dark:border-gray-700/60"
-                      onClick={() => navigate(usersBackPath)}
-                      aria-label="Back to Users"
-                      title="Back to Users"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <UserProjectsDialog
-                      user={user}
-                      onChanged={() => void refetch()}
-                      trigger={
-                        <Button className="h-11 rounded-xl inline-flex items-center justify-center gap-2 w-full sm:w-auto">
-                          <UserPlus className="h-4 w-4 shrink-0" />
-                          Assign Projects
-                        </Button>
-                      }
-                    />
-                  </>
-                ) : (
+                {effectiveRole === "admin" && userId ? (
                   <Button
+                    type="button"
                     variant="outline"
-                    className="h-11 rounded-xl border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-900/40 backdrop-blur hover:bg-white/80 dark:hover:bg-gray-900/60"
-                    onClick={() => navigate(usersBackPath)}
+                    className="h-11 w-full sm:w-auto rounded-xl border-blue-200 dark:border-blue-800 bg-white/70 dark:bg-gray-900/50"
+                    asChild
                   >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Users
+                    <Link
+                      to={buildAdminAddHoursPath(effectiveRole, String(userId), {
+                        returnTo: `/${effectiveRole}/users/${userId}`,
+                      })}
+                    >
+                      <Timer className="h-4 w-4 shrink-0 mr-2" />
+                      Add / Fix Hours
+                    </Link>
                   </Button>
-                )}
+                ) : null}
+                {canManageUserProjects && user ? (
+                  <UserProjectsDialog
+                    user={user}
+                    onChanged={() => void refetch()}
+                    trigger={
+                      <Button className="h-11 rounded-xl inline-flex items-center justify-center gap-2 w-full sm:w-auto">
+                        <UserPlus className="h-4 w-4 shrink-0" />
+                        Assign Projects
+                      </Button>
+                    }
+                  />
+                ) : null}
               </div>
             </div>
           </div>
