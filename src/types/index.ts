@@ -24,6 +24,8 @@ export type Bug = {
   fix_description?: string | null;
   already_raised?: boolean;
   bug_level?: BugLevel;
+  /** Multi-select classification (UI / Functional / Logical / custom) */
+  bug_types?: BugTypeRef[];
   /** NULL pending, 0 no, 1 yes — tester retested after fix */
   tester_retested?: boolean | number | null;
   /** NULL N/A, 0 still broken, 1 confirmed fixed — only when retested=yes */
@@ -62,6 +64,21 @@ export type Bug = {
 export type BugPriority = 'low' | 'medium' | 'high';
 export type BugLevel = 'normal' | 'floap' | 'utter_floap';
 export type BugStatus = 'pending' | 'in_progress' | 'fixed' | 'rejected' | 'declined';
+
+/** Lightweight type attached to a bug */
+export type BugTypeRef = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+/** Admin-managed bug type (Settings) */
+export type BugType = BugTypeRef & {
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+};
 
 export type CommonBugReason = 'already_raised' | 'duplicate';
 

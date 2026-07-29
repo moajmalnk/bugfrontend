@@ -1,4 +1,5 @@
 import { AnnouncementManager } from "@/components/settings/AnnouncementManager";
+import { BugTypesTab } from "@/components/settings/BugTypesTab";
 import { NotificationSettingsCard } from "@/components/settings/NotificationSettings";
 import { RolesTab } from "@/components/settings/RolesTab";
 // WhatsApp feature removed
@@ -34,6 +35,7 @@ import {
   Settings as SettingsIcon,
   Shield,
   Sun,
+  Tags,
   Users,
   RefreshCw,
 } from "lucide-react";
@@ -48,13 +50,19 @@ const Settings = () => {
   const [initialAutoAssign, setInitialAutoAssign] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab") || "general";
-  const initialTab = requestedTab === "whatsapp" ? "general" : requestedTab;
+  const normalizeSettingsTab = (tab: string) => {
+    if (tab === "whatsapp") return "general";
+    if (tab === "bug-types") return "types";
+    return tab;
+  };
+  const initialTab = normalizeSettingsTab(requestedTab);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
   const settingsTabs = [
     { value: "general", label: "General", shortLabel: "General", icon: SettingsIcon },
     { value: "notifications", label: "Notifications", shortLabel: "Alerts", icon: Bell },
     { value: "announcements", label: "Announcements", shortLabel: "News", icon: Megaphone },
+    { value: "types", label: "Bug Types", shortLabel: "Types", icon: Tags },
     { value: "roles", label: "Roles", shortLabel: "Roles", icon: Users },
   ];
   const activeSettingsTab =
@@ -62,8 +70,8 @@ const Settings = () => {
 
   useEffect(() => {
     const rawTab = searchParams.get("tab") || "general";
-    const urlTab = rawTab === "whatsapp" ? "general" : rawTab;
-    if (urlTab !== activeTab) setActiveTab(urlTab);
+    const normalized = normalizeSettingsTab(rawTab);
+    if (normalized !== activeTab) setActiveTab(normalized);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -197,7 +205,7 @@ const Settings = () => {
                   <ChevronDown className="h-4 w-4 opacity-70" />
                 </Button>
               </div>
-              <TabsList className="hidden lg:grid w-full grid-cols-4 h-14 bg-transparent p-1">
+              <TabsList className="hidden lg:grid w-full grid-cols-5 h-14 bg-transparent p-1">
                 {settingsTabs.map((tab) => (
                   <TabsTrigger
                     key={tab.value}
@@ -407,6 +415,30 @@ const Settings = () => {
               </div>
             </div>
           </TabsContent>
+
+          {activeTab === "types" ? (
+            <div className="space-y-6 sm:space-y-8 mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-sky-50/30 to-blue-50/30 dark:from-sky-900/20 dark:to-blue-900/20 rounded-2xl pointer-events-none" />
+                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-xl">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-gradient-to-br from-sky-500 to-blue-600 rounded-lg shrink-0">
+                      <Tags className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        Bug Types
+                      </h2>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
+                        Manage multi-select categories used when raising bugs
+                      </p>
+                    </div>
+                  </div>
+                  <BugTypesTab />
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <TabsContent value="roles" className="space-y-6 sm:space-y-8 mt-6">
             <div className="relative">

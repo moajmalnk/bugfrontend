@@ -17,6 +17,7 @@ import { Bug, BugStatus, Project } from "@/types";
 import {
   alreadyRaisedBadgeClass,
   bugLevelBadgeClass,
+  bugTypeBadgeClass,
   formatAlreadyRaisedLabel,
   formatBugLevelLabel,
 } from "@/lib/bugMetaUtils";
@@ -248,6 +249,27 @@ export const BugDetailsCard = ({
               >
                 {formatBugLevelLabel(bug.bug_level)}
               </Badge>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs sm:text-sm">Bug Type</Label>
+            <div className="p-2 border rounded-md text-xs sm:text-sm bg-muted/30 w-full">
+              {bug.bug_types && bug.bug_types.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {bug.bug_types.map((type) => (
+                    <Badge
+                      key={type.id}
+                      variant="outline"
+                      className={bugTypeBadgeClass()}
+                    >
+                      {type.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
             </div>
           </div>
 

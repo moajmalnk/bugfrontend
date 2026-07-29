@@ -458,10 +458,10 @@ export const BugFixCelebration = ({ bug, isVisible, onClose }: BugFixCelebration
   useEffect(() => {
     if (!isVisible) return;
 
-    // Auto-close after animation completes
+    // Auto-close after animation — keep snappy so users aren't blocked long
     const timer = setTimeout(() => {
       onClose();
-    }, reducedMotion ? 500 : 4500);
+    }, reducedMotion ? 400 : 2200);
 
     return () => clearTimeout(timer);
   }, [isVisible, onClose, reducedMotion]);

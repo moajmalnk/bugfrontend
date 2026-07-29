@@ -2,6 +2,10 @@ import {
   BugCard,
   BugCardGridSkeletonAnimated,
 } from "@/components/bugs/BugCard";
+import {
+  BugTypeFilterSelect,
+  bugMatchesTypeFilter,
+} from "@/components/bugs/BugTypeFilterSelect";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,16 +56,19 @@ const Bugs = () => {
     priorityFilter: "all",
     statusFilter: "all",
     projectFilter: "all",
+    bugTypeFilter: "all",
   });
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const statusFilter = filters.statusFilter || "all";
   const projectFilter = filters.projectFilter || "all";
+  const bugTypeFilter = filters.bugTypeFilter || "all";
   
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
   const setStatusFilter = (value: string) => setFilter("statusFilter", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
+  const setBugTypeFilter = (value: string) => setFilter("bugTypeFilter", value);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -114,6 +121,7 @@ const Bugs = () => {
     priorityFilter,
     statusFilter,
     projectFilter,
+    bugTypeFilter,
   ]);
 
   const fetchBugs = async (page = 1, limit = itemsPerPage) => {
@@ -211,6 +219,7 @@ const Bugs = () => {
         statusFilter === "all" || bug.status === statusFilter;
       const matchesProject =
         projectFilter === "all" || bug.project_id === projectFilter;
+      const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
       // Exclude fixed bugs from Bugs page (they should only appear on Fixes page)
       const isNotFixed = bug.status !== "fixed";
       return (
@@ -218,6 +227,7 @@ const Bugs = () => {
         matchesPriority &&
         matchesStatus &&
         matchesProject &&
+        matchesBugType &&
         isNotFixed
       );
     });
@@ -457,8 +467,13 @@ const Bugs = () => {
                             </Select>
                           </div>
 
+                          <BugTypeFilterSelect
+                            value={bugTypeFilter}
+                            onValueChange={setBugTypeFilter}
+                          />
+
                           {/* Clear Filters Button */}
-                          {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                          {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -732,7 +747,7 @@ const Bugs = () => {
                     </div>
                     <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Found</h3>
                     <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                      {searchTerm || projectFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all"
+                      {searchTerm || projectFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all" || bugTypeFilter !== "all"
                         ? "No bugs match your search criteria. Try adjusting your filters."
                         : currentUser?.role === "tester"
                         ? "You're not assigned to any bugs yet. When bugs are reported, they'll appear here."
@@ -822,8 +837,13 @@ const Bugs = () => {
                           </Select>
                         </div>
 
+                        <BugTypeFilterSelect
+                          value={bugTypeFilter}
+                          onValueChange={setBugTypeFilter}
+                        />
+
                         {/* Clear Filters Button */}
-                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -851,7 +871,7 @@ const Bugs = () => {
                   </div>
                   <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Found</h3>
                   <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                    {searchTerm || projectFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all"
+                    {searchTerm || projectFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all" || bugTypeFilter !== "all"
                       ? "No bugs match your search criteria. Try adjusting your filters."
                       : currentUser?.role === "tester"
                       ? "You're not assigned to any bugs yet. When bugs are reported, they'll appear here."

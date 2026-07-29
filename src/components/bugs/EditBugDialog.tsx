@@ -40,18 +40,30 @@ import { Bug, BugLevel, BugPriority, BugStatus, Project } from "@/types";
 import { cn } from "@/lib/utils";
 import { ENV } from "@/lib/env";
 import {
+  sortProjectsForPicker,
+  type ProjectBugStatsLite,
+  type ProjectStatus,
+  type ProjectUpdateStatsLite,
+} from "@/lib/utils/projectUtils";
+import {
   BUG_LEVEL_FORM_OPTIONS,
   isAlreadyRaised,
 } from "@/lib/bugMetaUtils";
+import { BugTypeMultiSelect } from "@/components/bugs/BugTypeMultiSelect";
+import {
+  PROJECT_PICKER_POPOVER_CLASS,
+  ProjectPickerListItemContent,
+  ProjectPickerTriggerMeta,
+  projectPickerSearchValue,
+} from "@/components/bugs/ProjectPickerMeta";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   ArrowLeft,
-  Check,
   ChevronsUpDown,
   File,
   FileImage,
@@ -69,6 +81,12 @@ import { ScreenshotDropZone } from "@/components/attachments/ScreenshotDropZone"
 
 // Character limits
 const TITLE_MAX = 255;
+
+type ProjectOption = Project & {
+  status?: ProjectStatus;
+  bug_stats?: ProjectBugStatsLite;
+  update_stats?: ProjectUpdateStatsLite;
+};
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -153,6 +171,9 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
   const [bugLevel, setBugLevel] = useState<BugLevel>(
     bug.bug_level || "normal"
   );
+  const [selectedBugTypeIds, setSelectedBugTypeIds] = useState<string[]>(() =>
+    (bug.bug_types || []).map((t) => t.id)
+  );
   const [projectId, setProjectId] = useState(bug.project_id);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
@@ -168,7 +189,7 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
     queryKey: ["projects", currentUser?.id],
     queryFn: async () => {
       const token = localStorage.getItem("token");
-      const response = await axios.get<ApiResponse<Project[]>>(
+      const response = await axios.get<ApiResponse<ProjectOption[]>>(
         `${ENV.API_URL}/projects/getAll.php`,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -179,6 +200,11 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
     },
     enabled: !!currentUser,
   });
+
+  const sortedProjects = useMemo(
+    () => sortProjectsForPicker(projects as ProjectOption[]),
+    [projects]
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -204,6 +230,7 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
     });
     setAlreadyRaised(isAlreadyRaised(bug.already_raised));
     setBugLevel(bug.bug_level || "normal");
+    setSelectedBugTypeIds((bug.bug_types || []).map((t) => t.id));
     setProjectId(bug.project_id);
 
       // Load existing attachments
@@ -469,6 +496,15 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
       formData.append("status", values.status);
       formData.append("already_raised", alreadyRaised ? "1" : "0");
       formData.append("bug_level", bugLevel);
+      // Send both array fields and JSON so PHP always receives the selection
+      formData.append("bug_types", JSON.stringify(selectedBugTypeIds));
+      selectedBugTypeIds.forEach((typeId) => {
+        formData.append("bug_type_ids[]", typeId);
+      });
+      // Always send key so clearing all types persists on update
+      if (selectedBugTypeIds.length === 0) {
+        formData.append("bug_type_ids", "");
+      }
       formData.append("project_id", projectId);
 
       // Add new screenshots
@@ -536,7 +572,20 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
 
       // Update the cache directly with the response data (includes attachments)
       if (response.data.data) {
-        queryClient.setQueryData(["bug", bug.id], response.data.data);
+        const updated = response.data.data as Bug & {
+          bug_types?: Bug["bug_types"];
+        };
+        const debug = (response.data as { _bug_types_debug?: { returned_bug_types?: Bug["bug_types"] } })
+          ._bug_types_debug;
+        if (
+          (!updated.bug_types || updated.bug_types.length === 0) &&
+          Array.isArray(debug?.returned_bug_types) &&
+          debug.returned_bug_types.length > 0
+        ) {
+          updated.bug_types = debug.returned_bug_types;
+        }
+        queryClient.setQueryData(["bug", bug.id], updated);
+        console.log("🐛 bug_types after update:", updated.bug_types, debug);
       }
 
       // Send notification if status changed to "fixed"
@@ -569,7 +618,7 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
       }
 
       // Invalidate and refetch queries to ensure consistency
-      queryClient.invalidateQueries({ queryKey: ["bug", bug.id] });
+      await queryClient.refetchQueries({ queryKey: ["bug", bug.id] });
       queryClient.invalidateQueries({ queryKey: ["bugs"] });
 
       onSuccess?.();
@@ -727,17 +776,42 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                     aria-expanded={projectPickerOpen}
                     className="h-12 w-full justify-between border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                   >
-                    <span className="truncate">
-                      {projectId
-                        ? (projects as Project[])?.find((p) => p.id === projectId)?.name ||
-                          bug.project_name ||
-                          "Select a project"
-                        : "Select a project"}
-                    </span>
+                    {(() => {
+                      const selected = (projects as ProjectOption[])?.find(
+                        (p) => p.id === projectId
+                      );
+                      const name =
+                        selected?.name || bug.project_name || null;
+                      if (!projectId || !name) {
+                        return (
+                          <span className="truncate text-muted-foreground">
+                            Select a project
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                          <span className="truncate">{name}</span>
+                          {selected && (
+                            <ProjectPickerTriggerMeta
+                              stats={{
+                                status: selected.status,
+                                bug_stats: selected.bug_stats,
+                                update_stats: selected.update_stats,
+                              }}
+                            />
+                          )}
+                        </span>
+                      );
+                    })()}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[70]" align="start">
+                <PopoverContent
+                  className={PROJECT_PICKER_POPOVER_CLASS}
+                  align="start"
+                  collisionPadding={16}
+                >
                   <Command>
                     <CommandInput placeholder="Search project..." />
                     <CommandList>
@@ -750,29 +824,40 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                         <CommandGroup>
                           <CommandItem disabled>Error loading projects</CommandItem>
                         </CommandGroup>
-                      ) : (projects as Project[])?.length === 0 ? (
+                      ) : sortedProjects.length === 0 ? (
                         <CommandGroup>
                           <CommandItem disabled>No projects available</CommandItem>
                         </CommandGroup>
                       ) : (
                         <CommandGroup>
-                          {(projects as Project[])?.map((project: Project) => (
-                            <CommandItem
-                              key={project.id}
-                              value={`${project.name} ${project.id}`}
-                              onSelect={() => {
-                                setProjectId(project.id);
-                                setProjectPickerOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${
-                                  projectId === project.id ? "opacity-100" : "opacity-0"
-                                }`}
-                              />
-                              {project.name}
-                            </CommandItem>
-                          ))}
+                          {sortedProjects.map((project) => {
+                            const stats = {
+                              status: project.status,
+                              bug_stats: project.bug_stats,
+                              update_stats: project.update_stats,
+                            };
+                            return (
+                              <CommandItem
+                                key={project.id}
+                                value={projectPickerSearchValue(
+                                  project.name,
+                                  project.id,
+                                  stats
+                                )}
+                                onSelect={() => {
+                                  setProjectId(project.id);
+                                  setProjectPickerOpen(false);
+                                }}
+                                className="items-start gap-2 py-2.5"
+                              >
+                                <ProjectPickerListItemContent
+                                  name={project.name}
+                                  selected={projectId === project.id}
+                                  stats={stats}
+                                />
+                              </CommandItem>
+                            );
+                          })}
                         </CommandGroup>
                       )}
                     </CommandList>
@@ -907,6 +992,12 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                 </div>
               </div>
             </div>
+
+            <BugTypeMultiSelect
+              selectedIds={selectedBugTypeIds}
+              onChange={setSelectedBugTypeIds}
+              disabled={isSubmitting}
+            />
 
             {/* Bug Level */}
             <div className="space-y-3">

@@ -11,6 +11,7 @@ import { bugService } from "@/services/bugService";
 import { Bug } from "@/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
+import { prefetchFixBugPage } from "@/utils/prefetchFixBug";
 import { CheckSquare, ChevronLeft, Edit2, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
@@ -411,7 +412,11 @@ export const BugHeader = ({
                   variant="default"
                   size="sm"
                   className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap"
+                  onMouseEnter={prefetchFixBugPage}
+                  onFocus={prefetchFixBugPage}
+                  onPointerDown={prefetchFixBugPage}
                   onClick={() => {
+                    prefetchFixBugPage();
                     // Preserve the from parameter when navigating to fix page
                     const fixUrl = `/${role}/bugs/${bug.id}/fix`;
                     const redirectUrl = isFromProject

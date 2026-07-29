@@ -32,6 +32,12 @@ import { useBugs } from "@/context/BugContext";
 import { ENV } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import {
+  sortProjectsForPicker,
+  type ProjectBugStatsLite,
+  type ProjectStatus,
+  type ProjectUpdateStatsLite,
+} from "@/lib/utils/projectUtils";
+import {
   finalizeShareTargetSession,
   getPendingSharePayload,
   getUnimportedShareContent,
@@ -50,11 +56,17 @@ import {
   FileImage,
   Paperclip,
   Plus,
-  Check,
   ChevronsUpDown,
   X,
 } from "lucide-react";
 import { ScreenshotDropZone } from "@/components/attachments/ScreenshotDropZone";
+import { BugTypeMultiSelect } from "@/components/bugs/BugTypeMultiSelect";
+import {
+  PROJECT_PICKER_POPOVER_CLASS,
+  ProjectPickerListItemContent,
+  ProjectPickerTriggerMeta,
+  projectPickerSearchValue,
+} from "@/components/bugs/ProjectPickerMeta";
 import {
   RecordedVoiceNote,
   WhatsAppVoiceRecorder,
@@ -64,10 +76,17 @@ import React, {
   ChangeEvent,
   FormEvent,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
+type ProjectOption = Project & {
+  status?: ProjectStatus;
+  bug_stats?: ProjectBugStatsLite;
+  update_stats?: ProjectUpdateStatsLite;
+};
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -137,6 +156,7 @@ const NewBug = () => {
   const [priority, setPriority] = useState<BugPriority>("medium");
   const [alreadyRaised, setAlreadyRaised] = useState(false);
   const [bugLevel, setBugLevel] = useState<BugLevel>("normal");
+  const [selectedBugTypeIds, setSelectedBugTypeIds] = useState<string[]>([]);
   const TITLE_MAX = 255;
 
   // File uploads
@@ -160,7 +180,7 @@ const NewBug = () => {
     queryKey: ["projects", currentUser?.id], // Include user ID in query key to prevent cross-user caching
     queryFn: async () => {
       const token = localStorage.getItem("token");
-      const response = await axios.get<ApiResponse<Project[]>>(
+      const response = await axios.get<ApiResponse<ProjectOption[]>>(
         `${ENV.API_URL}/projects/getAll.php`,
         {
           headers: {
@@ -179,6 +199,11 @@ const NewBug = () => {
     },
     enabled: !!currentUser, // Only fetch when user is available
   });
+
+  const sortedProjects = useMemo(
+    () => sortProjectsForPicker(projects as ProjectOption[]),
+    [projects]
+  );
 
   const handleVoiceRecorderComplete = ({
     blob,
@@ -244,6 +269,14 @@ const NewBug = () => {
       formData.append("status", "pending");
       formData.append("already_raised", alreadyRaised ? "1" : "0");
       formData.append("bug_level", bugLevel);
+      // Send both array fields and JSON so PHP always receives the selection
+      formData.append("bug_types", JSON.stringify(selectedBugTypeIds));
+      selectedBugTypeIds.forEach((typeId) => {
+        formData.append("bug_type_ids[]", typeId);
+      });
+      if (selectedBugTypeIds.length === 0) {
+        formData.append("bug_type_ids", "");
+      }
 
       // Add screenshots
       screenshots.forEach((file, index) => {
@@ -741,15 +774,38 @@ const NewBug = () => {
                             aria-expanded={projectPickerOpen}
                             className="h-12 w-full justify-between border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                           >
-                            <span className="truncate">
-                              {projectId
-                                ? (projects as Project[])?.find((p) => p.id === projectId)?.name || "Select a project"
-                                : "Select a project"}
-                            </span>
+                            {(() => {
+                              const selected = (projects as ProjectOption[])?.find(
+                                (p) => p.id === projectId
+                              );
+                              if (!selected) {
+                                return (
+                                  <span className="truncate text-muted-foreground">
+                                    Select a project
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                                  <span className="truncate">{selected.name}</span>
+                                  <ProjectPickerTriggerMeta
+                                    stats={{
+                                      status: selected.status,
+                                      bug_stats: selected.bug_stats,
+                                      update_stats: selected.update_stats,
+                                    }}
+                                  />
+                                </span>
+                              );
+                            })()}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[70]" align="start">
+                        <PopoverContent
+                          className={PROJECT_PICKER_POPOVER_CLASS}
+                          align="start"
+                          collisionPadding={16}
+                        >
                           <Command>
                             <CommandInput placeholder="Search project..." />
                             <CommandList>
@@ -762,29 +818,40 @@ const NewBug = () => {
                                 <CommandGroup>
                                   <CommandItem disabled>Error loading projects</CommandItem>
                                 </CommandGroup>
-                              ) : (projects as Project[])?.length === 0 ? (
+                              ) : sortedProjects.length === 0 ? (
                                 <CommandGroup>
                                   <CommandItem disabled>No projects available</CommandItem>
                                 </CommandGroup>
                               ) : (
                                 <CommandGroup>
-                                  {(projects as Project[])?.map((project: Project) => (
-                                    <CommandItem
-                                      key={project.id}
-                                      value={`${project.name} ${project.id}`}
-                                      onSelect={() => {
-                                        setProjectId(project.id);
-                                        setProjectPickerOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={`mr-2 h-4 w-4 ${
-                                          projectId === project.id ? "opacity-100" : "opacity-0"
-                                        }`}
-                                      />
-                                      {project.name}
-                                    </CommandItem>
-                                  ))}
+                                  {sortedProjects.map((project) => {
+                                    const stats = {
+                                      status: project.status,
+                                      bug_stats: project.bug_stats,
+                                      update_stats: project.update_stats,
+                                    };
+                                    return (
+                                      <CommandItem
+                                        key={project.id}
+                                        value={projectPickerSearchValue(
+                                          project.name,
+                                          project.id,
+                                          stats
+                                        )}
+                                        onSelect={() => {
+                                          setProjectId(project.id);
+                                          setProjectPickerOpen(false);
+                                        }}
+                                        className="items-start gap-2 py-2.5"
+                                      >
+                                        <ProjectPickerListItemContent
+                                          name={project.name}
+                                          selected={projectId === project.id}
+                                          stats={stats}
+                                        />
+                                      </CommandItem>
+                                    );
+                                  })}
                                 </CommandGroup>
                               )}
                             </CommandList>
@@ -877,7 +944,11 @@ const NewBug = () => {
                     </div>
                   </div>
 
-                  
+                  <BugTypeMultiSelect
+                    selectedIds={selectedBugTypeIds}
+                    onChange={setSelectedBugTypeIds}
+                    disabled={isSubmitting}
+                  />
 
                   {/* Bug Level Rating */}
                   <div className="space-y-3">

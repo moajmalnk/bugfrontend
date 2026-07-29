@@ -1,5 +1,9 @@
 import { ActivityList } from "@/components/activities/ActivityList";
 import { BugCard } from "@/components/bugs/BugCard";
+import {
+  BugTypeFilterSelect,
+  bugMatchesTypeFilter,
+} from "@/components/bugs/BugTypeFilterSelect";
 import { ProjectInfoOverview } from "@/components/projects/ProjectInfoOverview";
 import { ProjectAnalytics } from "@/components/projects/ProjectAnalytics";
 import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
@@ -658,16 +662,19 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
     priorityFilter: "all",
     statusFilter: initialStatus || "all",
     projectFilter: "all",
+    bugTypeFilter: "all",
   });
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const statusFilter = filters.statusFilter || initialStatus || "all";
   const projectFilter = filters.projectFilter || "all";
+  const bugTypeFilter = filters.bugTypeFilter || "all";
   
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
   const setStatusFilter = (value: string) => setFilter("statusFilter", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
+  const setBugTypeFilter = (value: string) => setFilter("bugTypeFilter", value);
   const [activeTab, setActiveTab] = useState(initialTab || "all-bugs");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -761,6 +768,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
         statusFilter === "all" || bug.status === statusFilter;
       const matchesProject =
         projectFilter === "all" || bug.project_id === projectFilter;
+      const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
       // Exclude fixed bugs from Bugs page
       const isNotFixed = bug.status !== "fixed";
       return (
@@ -768,6 +776,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
         matchesPriority &&
         matchesStatus &&
         matchesProject &&
+        matchesBugType &&
         isNotFixed
       );
     });
@@ -970,8 +979,13 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                           </Select>
                         </div>
 
+                        <BugTypeFilterSelect
+                          value={bugTypeFilter}
+                          onValueChange={setBugTypeFilter}
+                        />
+
                         {/* Clear Filters Button */}
-                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -1373,16 +1387,18 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                         </Select>
                       </div>
 
+                      <BugTypeFilterSelect
+                        value={bugTypeFilter}
+                        onValueChange={setBugTypeFilter}
+                      />
+
                       {/* Clear Filters Button */}
-                      {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                      {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setSearchTerm("");
-                            setPriorityFilter("all");
-                            setStatusFilter("all");
-                            setProjectFilter("all");
+                            clearFilters();
                           }}
                           className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                         >
@@ -1756,16 +1772,19 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
     priorityFilter: "all",
     statusFilter: initialStatus || "all",
     projectFilter: "all",
+    bugTypeFilter: "all",
   });
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const statusFilter = filters.statusFilter || initialStatus || "all";
   const projectFilter = filters.projectFilter || "all";
+  const bugTypeFilter = filters.bugTypeFilter || "all";
   
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
   const setStatusFilter = (value: string) => setFilter("statusFilter", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
+  const setBugTypeFilter = (value: string) => setFilter("bugTypeFilter", value);
   const [activeTab, setActiveTab] = useState(initialTab || "all-fixes");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -1861,6 +1880,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
         statusFilter === "all" || bug.status === statusFilter;
       const matchesProject =
         projectFilter === "all" || bug.project_id === projectFilter;
+      const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
       // Only show fixed bugs in Fixes page
       const isFixed = bug.status === "fixed";
       return (
@@ -1868,6 +1888,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
         matchesPriority &&
         matchesStatus &&
         matchesProject &&
+        matchesBugType &&
         isFixed
       );
     });
@@ -2067,8 +2088,13 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                           </Select>
                         </div>
 
+                        <BugTypeFilterSelect
+                          value={bugTypeFilter}
+                          onValueChange={setBugTypeFilter}
+                        />
+
                         {/* Clear Filters Button */}
-                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -2467,16 +2493,19 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                         </Select>
                       </div>
 
+                      <BugTypeFilterSelect
+                        value={bugTypeFilter}
+                        onValueChange={setBugTypeFilter}
+                        accent="emerald"
+                      />
+
                       {/* Clear Filters Button */}
-                      {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all") && (
+                      {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setSearchTerm("");
-                            setPriorityFilter("all");
-                            setStatusFilter("all");
-                            setProjectFilter("all");
+                            clearFilters();
                           }}
                           className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                         >

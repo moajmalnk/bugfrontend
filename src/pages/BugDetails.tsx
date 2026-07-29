@@ -19,6 +19,7 @@ import { whatsappService } from "@/services/whatsappService";
 import { Bug, BugStatus } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/axios";
+import { prefetchFixBugPage } from "@/utils/prefetchFixBug";
 import { ArrowLeft, ArrowRight, Lock } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
@@ -469,14 +470,16 @@ const BugDetails = () => {
         throw err;
       }
     },
-    staleTime: 5 * 60 * 1000, // Match global config: 5 minutes
+    staleTime: 0, // Always consider bug details fresh-check (bug_types must not stick empty)
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: (query) => {
-      // Only refetch if data is stale or doesn't exist
-      return !query.state.data || query.isStale();
-    },
-    refetchOnWindowFocus: false, // Already set globally but be explicit
-    enabled: isBugRoute && Boolean(bugId) && !location.pathname.includes('/fix') && !location.pathname.includes('/edit') && !location.pathname.includes('/diagnostic'),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    enabled:
+      isBugRoute &&
+      Boolean(bugId) &&
+      !location.pathname.includes("/fix") &&
+      !location.pathname.includes("/edit") &&
+      !location.pathname.includes("/diagnostic"),
     // Prevent excessive refetching
     retry: (failureCount, error: any) => {
       // Don't retry on auth errors
@@ -486,6 +489,28 @@ const BugDetails = () => {
       return failureCount < 2;
     },
   });
+
+  // Warm the Fix Bug page chunk while viewing details (admin/dev, unfixed bugs)
+  useEffect(() => {
+    if (!bug) return;
+    const canFix =
+      (currentUser?.role === "admin" || currentUser?.role === "developer") &&
+      bug.status !== "fixed";
+    if (!canFix) return;
+
+    const idle =
+      "requestIdleCallback" in window
+        ? window.requestIdleCallback(() => prefetchFixBugPage(), { timeout: 1500 })
+        : window.setTimeout(() => prefetchFixBugPage(), 300);
+
+    return () => {
+      if ("requestIdleCallback" in window) {
+        window.cancelIdleCallback(idle as number);
+      } else {
+        clearTimeout(idle as number);
+      }
+    };
+  }, [bug, currentUser?.role]);
 
   // Track location changes to detect navigation completion - Clean and efficient
   useEffect(() => {

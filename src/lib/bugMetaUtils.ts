@@ -44,6 +44,10 @@ export function alreadyRaisedBadgeClass(
     : "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700";
 }
 
+export function bugTypeBadgeClass(): string {
+  return "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800";
+}
+
 /** HTML rows for email templates */
 export function bugMetaEmailRows(bug: {
   bug_level?: BugLevel | string | null;

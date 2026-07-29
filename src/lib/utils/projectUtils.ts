@@ -59,6 +59,12 @@ export interface ProjectBugStatsLite {
   fixed: number;
 }
 
+export interface ProjectUpdateStatsLite {
+  total: number;
+  open: number;
+  completed: number;
+}
+
 export interface ProjectMemberStatsLite {
   total: number;
   developers: number;
@@ -104,6 +110,7 @@ export interface Project {
   members?: string[];
   members_detail?: ProjectMemberDetail[];
   bug_stats?: ProjectBugStatsLite;
+  update_stats?: ProjectUpdateStatsLite;
   member_stats?: ProjectMemberStatsLite;
   attachments?: ProjectAttachment[];
   compliance?: ProjectComplianceSummaryLite;
@@ -352,6 +359,71 @@ export function getProjectStatusLabel(status: ProjectStatus): string {
       return status;
   }
 }
+
+export function projectStatusBadgeClass(status?: ProjectStatus | string | null): string {
+  switch (status) {
+    case 'active':
+      return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-800';
+    case 'release_ready':
+      return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-800';
+    case 'completed':
+      return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700';
+    case 'archived':
+      return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-800';
+    default:
+      return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
+  }
+}
+
+/** Rank for picker: Ongoing first, then Release Ready, then others. */
+export function projectPickerStatusRank(status?: ProjectStatus | string | null): number {
+  switch (status) {
+    case 'active':
+      return 0;
+    case 'release_ready':
+      return 1;
+    case 'completed':
+      return 2;
+    case 'archived':
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+/**
+ * Sort projects for bug/update pickers:
+ * Ongoing first, then by open bugs ↓, open updates ↓, total updates ↓, name.
+ */
+export function sortProjectsForPicker<
+  T extends {
+    name: string;
+    status?: ProjectStatus | string | null;
+    bug_stats?: ProjectBugStatsLite | null;
+    update_stats?: ProjectUpdateStatsLite | null;
+  },
+>(projects: T[]): T[] {
+  return projects.slice().sort((a, b) => {
+    const statusDiff =
+      projectPickerStatusRank(a.status) - projectPickerStatusRank(b.status);
+    if (statusDiff !== 0) return statusDiff;
+
+    const aBugs = a.bug_stats?.open ?? 0;
+    const bBugs = b.bug_stats?.open ?? 0;
+    if (bBugs !== aBugs) return bBugs - aBugs;
+
+    const aUpdatesOpen = a.update_stats?.open ?? 0;
+    const bUpdatesOpen = b.update_stats?.open ?? 0;
+    if (bUpdatesOpen !== aUpdatesOpen) return bUpdatesOpen - aUpdatesOpen;
+
+    const aUpdatesTotal = a.update_stats?.total ?? 0;
+    const bUpdatesTotal = b.update_stats?.total ?? 0;
+    if (bUpdatesTotal !== aUpdatesTotal) return bUpdatesTotal - aUpdatesTotal;
+
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+}
+
 
 export function computeProjectDurationDays(project: Pick<Project, 'start_date' | 'created_at' | 'deadline_date' | 'status'>): number {
   const start = project.start_date || project.created_at?.slice(0, 10);

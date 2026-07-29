@@ -1,4 +1,8 @@
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
+import {
+  BugTypeFilterSelect,
+  bugMatchesTypeFilter,
+} from "@/components/bugs/BugTypeFilterSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -274,14 +278,17 @@ const Fixes = () => {
     searchTerm: "",
     priorityFilter: "all",
     projectFilter: "all",
+    bugTypeFilter: "all",
   });
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const projectFilter = filters.projectFilter || "all";
+  const bugTypeFilter = filters.bugTypeFilter || "all";
   
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
+  const setBugTypeFilter = (value: string) => setFilter("bugTypeFilter", value);
   const [projects, setProjects] = useState<Project[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "all-fixes";
@@ -354,15 +361,17 @@ const Fixes = () => {
         (bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           bug.id.toLowerCase().includes(searchTerm.toLowerCase())) &&
         (priorityFilter === "all" || bug.priority === priorityFilter) &&
-        (projectFilter === "all" || bug.project_id === projectFilter)
+        (projectFilter === "all" || bug.project_id === projectFilter) &&
+        bugMatchesTypeFilter(bug.bug_types, bugTypeFilter)
     );
-  }, [bugs, activeTab, currentUser?.id, searchTerm, priorityFilter, projectFilter]);
+  }, [bugs, activeTab, currentUser?.id, searchTerm, priorityFilter, projectFilter, bugTypeFilter]);
 
   useResetUrlPageOnChange(setCurrentPage, [
     activeTab,
     searchTerm,
     priorityFilter,
     projectFilter,
+    bugTypeFilter,
   ]);
 
   const listTotalPages = Math.max(
@@ -521,8 +530,14 @@ const Fixes = () => {
                       </Select>
                     </div>
 
+                    <BugTypeFilterSelect
+                      value={bugTypeFilter}
+                      onValueChange={setBugTypeFilter}
+                      accent="emerald"
+                    />
+
                     {/* Clear Filters Button */}
-                    {(searchTerm || priorityFilter !== "all" || projectFilter !== "all") && (
+                    {(searchTerm || priorityFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -635,8 +650,14 @@ const Fixes = () => {
                       </Select>
                     </div>
 
+                    <BugTypeFilterSelect
+                      value={bugTypeFilter}
+                      onValueChange={setBugTypeFilter}
+                      accent="emerald"
+                    />
+
                     {/* Clear Filters Button */}
-                    {(searchTerm || priorityFilter !== "all" || projectFilter !== "all") && (
+                    {(searchTerm || priorityFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -758,15 +779,19 @@ const Fixes = () => {
                     </Select>
                   </div>
 
+                  <BugTypeFilterSelect
+                    value={bugTypeFilter}
+                    onValueChange={setBugTypeFilter}
+                    accent="emerald"
+                  />
+
                   {/* Clear Filters Button */}
-                  {(searchTerm || priorityFilter !== "all" || projectFilter !== "all") && (
+                  {(searchTerm || priorityFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setSearchTerm("");
-                        setPriorityFilter("all");
-                        setProjectFilter("all");
+                        clearFilters();
                       }}
                       className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                     >

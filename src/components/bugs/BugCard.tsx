@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   alreadyRaisedBadgeClass,
   bugLevelBadgeClass,
+  bugTypeBadgeClass,
   formatBugLevelLabel,
 } from "@/lib/bugMetaUtils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
@@ -27,6 +28,11 @@ interface Bug {
   updated_by_name?: string;
   created_at: string;
   updated_at?: string;
+  bug_level?: string;
+  already_raised?: boolean | number;
+  bug_types?: { id: string; name: string; slug: string }[];
+  common_reasons?: string[];
+  duplicate_count?: number;
 }
 
 interface BugCardProps {
@@ -174,6 +180,20 @@ export function CommonBugCard({ bug }: CommonBugCardProps) {
             >
               {formatBugLevelLabel(bug.bug_level)}
             </Badge>
+            {bug.bug_types?.slice(0, 2).map((type) => (
+              <Badge
+                key={type.id}
+                variant="outline"
+                className={`text-xs ${bugTypeBadgeClass()}`}
+              >
+                {type.name}
+              </Badge>
+            ))}
+            {(bug.bug_types?.length ?? 0) > 2 ? (
+              <Badge variant="outline" className={`text-xs ${bugTypeBadgeClass()}`}>
+                +{(bug.bug_types?.length ?? 0) - 2}
+              </Badge>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">

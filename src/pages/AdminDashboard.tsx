@@ -18,6 +18,13 @@ import {
 } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -43,7 +50,7 @@ import {
 } from "@/lib/workPeriodUtils";
 import { bugService } from "@/services/bugService";
 import { projectService } from "@/services/projectService";
-import { updateService } from "@/services/updateService";
+import { updateService, type Update } from "@/services/updateService";
 import { userService } from "@/services/userService";
 import { Bug, User } from "@/types";
 import { useQuery } from "@tanstack/react-query";
@@ -63,7 +70,9 @@ import {
   Hourglass,
   LayoutDashboard,
   Lock,
+  Megaphone,
   RefreshCw,
+  Rocket,
   Timer,
   Users,
   type LucideIcon,
@@ -83,12 +92,21 @@ import {
 
 type DeadlineBucket = "overdue" | "today" | "week" | "later" | "none";
 
-type DashboardTab = "overview" | "analytics" | "bugs-fixes" | "team" | "work";
+type DashboardTab =
+  | "overview"
+  | "projects"
+  | "updates"
+  | "bugs-fixes"
+  | "analytics"
+  | "team"
+  | "work";
 
 const DASHBOARD_TABS: DashboardTab[] = [
   "overview",
-  "analytics",
+  "projects",
+  "updates",
   "bugs-fixes",
+  "analytics",
   "team",
   "work",
 ];
@@ -97,14 +115,14 @@ const DASHBOARD_TAB_ITEMS: {
   value: DashboardTab;
   label: string;
   icon: LucideIcon;
-  /** Tailwind col-span on the 12-col desktop grid */
-  colSpan: string;
 }[] = [
-  { value: "overview", label: "Overview", icon: LayoutDashboard, colSpan: "col-span-2" },
-  { value: "analytics", label: "Analytics", icon: BarChart3, colSpan: "col-span-2" },
-  { value: "bugs-fixes", label: "Bugs & Fixes", icon: BugIcon, colSpan: "col-span-3" },
-  { value: "team", label: "Team", icon: Users, colSpan: "col-span-2" },
-  { value: "work", label: "Work retention", icon: Hourglass, colSpan: "col-span-3" },
+  { value: "overview", label: "Overview", icon: LayoutDashboard },
+  { value: "projects", label: "Projects", icon: FolderKanban },
+  { value: "updates", label: "Updates", icon: Megaphone },
+  { value: "bugs-fixes", label: "Bugs & Fixes", icon: BugIcon },
+  { value: "analytics", label: "Analytics", icon: BarChart3 },
+  { value: "team", label: "Team", icon: Users },
+  { value: "work", label: "Work retention", icon: Hourglass },
 ];
 
 function parseDashboardTab(value: string | null): DashboardTab {
@@ -201,6 +219,38 @@ function deadlineTone(bucket: DeadlineBucket): string {
   return "text-muted-foreground";
 }
 
+function updateStatusBadgeClass(status: Update["status"]): string {
+  switch (status) {
+    case "pending":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
+    case "approved":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200";
+    case "completed":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
+    case "declined":
+      return "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200";
+    default:
+      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
+  }
+}
+
+function updateTypeLabel(type: Update["type"]): string {
+  if (type === "updation") return "Update";
+  if (type === "maintenance") return "Maintenance";
+  return "Feature";
+}
+
+function formatShortDate(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
@@ -254,12 +304,38 @@ async function loadDashboardData() {
   ]);
 
   const updatesByProject = new Map<string, number>();
+  const updateStatusCounts = {
+    pending: 0,
+    approved: 0,
+    declined: 0,
+    completed: 0,
+  };
+  const updateTypeCounts = {
+    feature: 0,
+    updation: 0,
+    maintenance: 0,
+  };
+
   allUpdates.forEach((u) => {
     const pid = String(u.project_id || "");
-    if (!pid) return;
-    updatesByProject.set(pid, (updatesByProject.get(pid) || 0) + 1);
+    if (pid) {
+      updatesByProject.set(pid, (updatesByProject.get(pid) || 0) + 1);
+    }
+    if (u.status in updateStatusCounts) {
+      updateStatusCounts[u.status as keyof typeof updateStatusCounts] += 1;
+    }
+    if (u.type in updateTypeCounts) {
+      updateTypeCounts[u.type as keyof typeof updateTypeCounts] += 1;
+    }
   });
 
+  const recentUpdates = allUpdates
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at || b.created_at).getTime() -
+        new Date(a.updated_at || a.created_at).getTime()
+    );
   const bugCounts: BugStatusCounts = {
     pending: pendingResult.pagination?.totalBugs ?? pendingResult.bugs.length,
     in_progress: progressResult.pagination?.totalBugs ?? progressResult.bugs.length,
@@ -359,13 +435,27 @@ async function loadDashboardData() {
     .filter((h) => h.bucket === "today" || h.bucket === "week")
     .sort((a, b) => (a.daysUntil ?? 99) - (b.daysUntil ?? 99));
 
-  const projectHealthRows = perProject.slice().sort((a, b) => {
-    const bucketRank = { overdue: 0, today: 1, week: 2, later: 3, none: 4 };
-    if (bucketRank[a.bucket] !== bucketRank[b.bucket]) {
-      return bucketRank[a.bucket] - bucketRank[b.bucket];
-    }
-    return b.openBugs - a.openBugs;
-  });
+  const releaseReady = perProject
+    .filter((h) => h.project.status === "release_ready")
+    .sort((a, b) => {
+      const bucketRank = { overdue: 0, today: 1, week: 2, later: 3, none: 4 };
+      if (bucketRank[a.bucket] !== bucketRank[b.bucket]) {
+        return bucketRank[a.bucket] - bucketRank[b.bucket];
+      }
+      return b.openBugs - a.openBugs;
+    });
+
+  // Ongoing health board — release-ready projects have their own section
+  const projectHealthRows = perProject
+    .filter((h) => h.project.status !== "release_ready")
+    .slice()
+    .sort((a, b) => {
+      const bucketRank = { overdue: 0, today: 1, week: 2, later: 3, none: 4 };
+      if (bucketRank[a.bucket] !== bucketRank[b.bucket]) {
+        return bucketRank[a.bucket] - bucketRank[b.bucket];
+      }
+      return b.openBugs - a.openBugs;
+    });
 
   const highOpenFromProjects = perProject.reduce((sum, row) => sum + row.highBugs, 0);
 
@@ -396,6 +486,7 @@ async function loadDashboardData() {
     projects,
     overdue,
     upcoming,
+    releaseReady,
     projectHealthRows,
     bugCounts,
     bugsByStatus,
@@ -409,6 +500,10 @@ async function loadDashboardData() {
     onlineNow,
     notCheckedIn,
     trackableCount: trackableProjects.length,
+    updates: recentUpdates,
+    updateStatusCounts,
+    updateTypeCounts,
+    updatesTotal: allUpdates.length,
   };
 }
 
@@ -449,6 +544,19 @@ const attendanceChartConfig = {
 const topProjectsChartConfig = {
   open: { label: "Open bugs", color: "#f59e0b" },
   fixed: { label: "Fixed", color: "#10b981" },
+} satisfies ChartConfig;
+
+const updateStatusChartConfig = {
+  pending: { label: "Pending", color: "#f59e0b" },
+  approved: { label: "Approved", color: "#3b82f6" },
+  completed: { label: "Completed", color: "#10b981" },
+  declined: { label: "Declined", color: "#f43f5e" },
+} satisfies ChartConfig;
+
+const updateTypeChartConfig = {
+  feature: { label: "Feature", color: "#8b5cf6" },
+  updation: { label: "Update", color: "#0ea5e9" },
+  maintenance: { label: "Maintenance", color: "#64748b" },
 } satisfies ChartConfig;
 
 const PANEL =
@@ -1889,6 +1997,8 @@ export default function AdminDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseDashboardTab(searchParams.get("tab"));
   const [dashTabSheetOpen, setDashTabSheetOpen] = useState(false);
+  const [updatesProjectFilter, setUpdatesProjectFilter] = useState<string>("all");
+  const [updatesStatusFilter, setUpdatesStatusFilter] = useState<string>("all");
   const activeDashTabItem =
     DASHBOARD_TAB_ITEMS.find((t) => t.value === activeTab) ?? DASHBOARD_TAB_ITEMS[0];
   const ActiveDashTabIcon = activeDashTabItem.icon;
@@ -2008,6 +2118,79 @@ export default function AdminDashboard() {
     ];
   }, [data]);
 
+  const updateStatusPieData = useMemo(() => {
+    if (!data) return [];
+    return [
+      {
+        key: "pending",
+        name: "Pending",
+        value: data.updateStatusCounts.pending,
+        fill: "var(--color-pending)",
+      },
+      {
+        key: "approved",
+        name: "Approved",
+        value: data.updateStatusCounts.approved,
+        fill: "var(--color-approved)",
+      },
+      {
+        key: "completed",
+        name: "Completed",
+        value: data.updateStatusCounts.completed,
+        fill: "var(--color-completed)",
+      },
+      {
+        key: "declined",
+        name: "Declined",
+        value: data.updateStatusCounts.declined,
+        fill: "var(--color-declined)",
+      },
+    ].filter((d) => d.value > 0);
+  }, [data]);
+
+  const updateTypeBarData = useMemo(() => {
+    if (!data) return [];
+    return [
+      { key: "feature", label: "Feature", value: data.updateTypeCounts.feature },
+      { key: "updation", label: "Update", value: data.updateTypeCounts.updation },
+      { key: "maintenance", label: "Maintenance", value: data.updateTypeCounts.maintenance },
+    ];
+  }, [data]);
+
+  const openUpdatesCount = data
+    ? data.updateStatusCounts.pending + data.updateStatusCounts.approved
+    : 0;
+
+  const updatesProjectOptions = useMemo(() => {
+    if (!data?.updates?.length) return [];
+    const byId = new Map<string, string>();
+    data.updates.forEach((u) => {
+      const id = String(u.project_id || "");
+      if (!id) return;
+      if (!byId.has(id)) {
+        byId.set(id, u.project_name || "Untitled project");
+      }
+    });
+    return Array.from(byId.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [data]);
+
+  const filteredRecentUpdates = useMemo(() => {
+    if (!data?.updates) return [];
+    return data.updates.filter((u) => {
+      if (updatesProjectFilter !== "all" && String(u.project_id) !== updatesProjectFilter) {
+        return false;
+      }
+      if (updatesStatusFilter !== "all" && u.status !== updatesStatusFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [data, updatesProjectFilter, updatesStatusFilter]);
+
+  const hasUpdatesFilters =
+    updatesProjectFilter !== "all" || updatesStatusFilter !== "all";
   if (!isAdmin) {
     return (
       <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
@@ -2039,6 +2222,7 @@ export default function AdminDashboard() {
           gradient: "from-blue-500 to-indigo-600",
           chip: "from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800",
           valueClass: "text-blue-700 dark:text-blue-300",
+          tab: "projects" as DashboardTab,
         },
         {
           title: "Overdue",
@@ -2048,6 +2232,7 @@ export default function AdminDashboard() {
           gradient: "from-red-500 to-orange-600",
           chip: "from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 border-red-200 dark:border-red-800",
           valueClass: "text-red-700 dark:text-red-300",
+          tab: "projects" as DashboardTab,
         },
         {
           title: "Due in 7 days",
@@ -2057,6 +2242,7 @@ export default function AdminDashboard() {
           gradient: "from-amber-500 to-yellow-600",
           chip: "from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800",
           valueClass: "text-amber-700 dark:text-amber-300",
+          tab: "projects" as DashboardTab,
         },
         {
           title: "Open bugs",
@@ -2066,6 +2252,7 @@ export default function AdminDashboard() {
           gradient: "from-orange-500 to-red-600",
           chip: "from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-200 dark:border-orange-800",
           valueClass: "text-orange-700 dark:text-orange-300",
+          tab: "bugs-fixes" as DashboardTab,
         },
         {
           title: "Fixed",
@@ -2075,6 +2262,7 @@ export default function AdminDashboard() {
           gradient: "from-emerald-500 to-teal-600",
           chip: "from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800",
           valueClass: "text-emerald-700 dark:text-emerald-300",
+          tab: "bugs-fixes" as DashboardTab,
         },
         {
           title: "Checked in",
@@ -2084,6 +2272,7 @@ export default function AdminDashboard() {
           gradient: "from-cyan-500 to-blue-600",
           chip: "from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 border-cyan-200 dark:border-cyan-800",
           valueClass: "text-cyan-700 dark:text-cyan-300",
+          tab: "team" as DashboardTab,
         },
       ]
     : [];
@@ -2109,20 +2298,20 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl break-words">
-                  Deadlines, project health, bugs & fixes analytics
+                  Projects, updates, deadlines, bugs & team analytics
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
                 <Button
-                  asChild
+                  type="button"
+                  variant="outline"
                   size="lg"
-                  className="h-12 px-6 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                  onClick={() => refetch()}
+                  className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                 >
-                  <Link to={`/${role}/projects`}>
-                    <FolderKanban className="mr-2 h-5 w-5" />
-                    Projects
-                  </Link>
+                  <RefreshCw className="mr-2 h-5 w-5" />
+                  Refresh
                 </Button>
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
                   <div className="p-1.5 bg-blue-500 rounded-lg">
@@ -2131,6 +2320,9 @@ export default function AdminDashboard() {
                   <div>
                     <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 tabular-nums">
                       {data?.bugCounts.open ?? "—"}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider font-semibold text-blue-600/70 dark:text-blue-300/70">
+                      Open bugs
                     </div>
                   </div>
                 </div>
@@ -2172,10 +2364,12 @@ export default function AdminDashboard() {
             {/* KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
               {kpiCards.map((card) => (
-                <div
+                <button
                   key={card.title}
+                  type="button"
+                  onClick={() => setActiveTab(card.tab)}
                   className={cn(
-                    "group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5",
+                    "group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 text-left w-full",
                     card.chip
                   )}
                 >
@@ -2191,7 +2385,7 @@ export default function AdminDashboard() {
                     {typeof card.value === "number" ? card.value.toLocaleString() : card.value}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1.5 truncate font-medium">{card.hint}</p>
-                </div>
+                </button>
               ))}
             </div>
 
@@ -2215,18 +2409,15 @@ export default function AdminDashboard() {
                     </Button>
                   </div>
 
-                  {/* Desktop: 12-col grid (2+2+3+2+3) */}
-                  <TabsList className="hidden lg:grid h-14 w-full grid-cols-12 gap-1.5 bg-transparent p-1">
+                  {/* Desktop: equal-width flex tabs */}
+                  <TabsList className="hidden lg:flex h-auto min-h-14 w-full flex-wrap gap-1.5 bg-transparent p-1">
                     {DASHBOARD_TAB_ITEMS.map((tab) => {
                       const Icon = tab.icon;
                       return (
                         <TabsTrigger
                           key={tab.value}
                           value={tab.value}
-                          className={cn(
-                            "flex h-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-1 text-sm font-semibold transition-all duration-300 data-[state=active]:border data-[state=active]:border-gray-200 data-[state=active]:bg-white data-[state=active]:shadow-lg dark:data-[state=active]:border-gray-700 dark:data-[state=active]:bg-gray-800",
-                            tab.colSpan
-                          )}
+                          className="flex h-11 min-w-[7.5rem] flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-semibold transition-all duration-300 data-[state=active]:border data-[state=active]:border-gray-200 data-[state=active]:bg-white data-[state=active]:shadow-lg dark:data-[state=active]:border-gray-700 dark:data-[state=active]:bg-gray-800"
                         >
                           <Icon className="h-4 w-4 shrink-0 opacity-80" />
                           <span className="truncate">{tab.label}</span>
@@ -2244,7 +2435,7 @@ export default function AdminDashboard() {
                       Dashboard section
                     </DrawerTitle>
                     <DrawerDescription>
-                      Jump to overview, analytics, bugs, team, or work retention
+                      Jump to overview, projects, updates, bugs, analytics, team, or work retention
                     </DrawerDescription>
                   </DrawerHeader>
                   <div className="max-h-[65vh] space-y-3 overflow-y-auto hide-scrollbar px-4 pb-6">
@@ -2348,6 +2539,25 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                <div className="space-y-4">
+                  <SectionTitle
+                    icon={Rocket}
+                    title="Release ready"
+                    description="Projects cleared for release — review open bugs before ship"
+                    gradient="from-emerald-500 to-teal-600"
+                    action={
+                      <Badge variant="outline" className="tabular-nums font-bold px-2.5 py-1">
+                        {data.releaseReady.length}
+                      </Badge>
+                    }
+                  />
+                  <DeadlineTable
+                    rows={data.releaseReady}
+                    role={role}
+                    emptyLabel="No release-ready projects right now."
+                  />
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   <ChartCard title="Bug status" description="Organization-wide pipeline" icon={BugIcon} gradient="from-orange-500 to-red-600">
                     <ChartContainer config={statusChartConfig} className="aspect-[4/3] w-full">
@@ -2392,6 +2602,569 @@ export default function AdminDashboard() {
                   </ChartCard>
                 </div>
 
+              </TabsContent>
+
+              <TabsContent value="projects" className="space-y-6 sm:space-y-8 mt-0">
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    asChild
+                    className="h-11 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg"
+                  >
+                    <Link to={`/${role}/projects`}>
+                      <FolderKanban className="mr-2 h-4 w-4" />
+                      Open Projects page
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {[
+                    {
+                      title: "Tracked",
+                      value: data.trackableCount,
+                      hint: "Active & release ready",
+                      icon: FolderKanban,
+                      tone: "text-blue-700 dark:text-blue-300",
+                      chip: "from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800",
+                      gradient: "from-blue-500 to-indigo-600",
+                    },
+                    {
+                      title: "Overdue",
+                      value: data.overdue.length,
+                      hint: "Past deadline",
+                      icon: AlertTriangle,
+                      tone: "text-red-700 dark:text-red-300",
+                      chip: "from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 border-red-200 dark:border-red-800",
+                      gradient: "from-red-500 to-orange-600",
+                    },
+                    {
+                      title: "Due soon",
+                      value: data.upcoming.length,
+                      hint: "Next 7 days",
+                      icon: CalendarClock,
+                      tone: "text-amber-700 dark:text-amber-300",
+                      chip: "from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800",
+                      gradient: "from-amber-500 to-yellow-600",
+                    },
+                    {
+                      title: "Release ready",
+                      value: data.releaseReady.length,
+                      hint: "Ready to ship",
+                      icon: Rocket,
+                      tone: "text-emerald-700 dark:text-emerald-300",
+                      chip: "from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800",
+                      gradient: "from-emerald-500 to-teal-600",
+                    },
+                  ].map((card) => (
+                    <div
+                      key={card.title}
+                      className={cn(
+                        "rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm",
+                        card.chip
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          {card.title}
+                        </span>
+                        <div
+                          className={cn(
+                            "p-2 rounded-xl bg-gradient-to-br text-white shadow-md",
+                            card.gradient
+                          )}
+                        >
+                          <card.icon className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+                      <p className={cn("text-2xl sm:text-3xl font-bold tabular-nums", card.tone)}>
+                        {card.value.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1.5 font-medium">{card.hint}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 sm:gap-6">
+                  <ChartCard
+                    title="Project status"
+                    description="Portfolio distribution by lifecycle stage"
+                    icon={FolderKanban}
+                    gradient="from-blue-500 to-indigo-600"
+                  >
+                    <ChartContainer config={projectStatusChartConfig} className="aspect-[4/3] w-full">
+                      <BarChart data={projectStatusBarData} margin={{ left: 8, right: 8, top: 8 }}>
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                        <YAxis tickLine={false} axisLine={false} width={36} />
+                        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                          {projectStatusBarData.map((entry) => (
+                            <Cell
+                              key={entry.key}
+                              fill={`var(--color-${entry.key})`}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ChartContainer>
+                  </ChartCard>
+
+                  <ChartCard
+                    title="Top open-bug load"
+                    description="Projects with the most unresolved bugs"
+                    icon={BugIcon}
+                    gradient="from-orange-500 to-red-600"
+                  >
+                    <ChartContainer config={topProjectsChartConfig} className="aspect-[4/3] w-full">
+                      <BarChart data={topProjectsBarData} layout="vertical" margin={{ left: 8, right: 8, top: 8 }}>
+                        <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                        <XAxis type="number" tickLine={false} axisLine={false} />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          width={90}
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="open" fill="var(--color-open)" radius={[0, 6, 6, 0]} />
+                      </BarChart>
+                    </ChartContainer>
+                  </ChartCard>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 sm:gap-6">
+                  <div className="space-y-4">
+                    <SectionTitle
+                      icon={AlertTriangle}
+                      title="Overdue deadlines"
+                      description="Active projects past their deadline"
+                      gradient="from-red-500 to-orange-600"
+                    />
+                    <DeadlineTable
+                      rows={data.overdue}
+                      role={role}
+                      emptyLabel="No overdue projects."
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <SectionTitle
+                      icon={CalendarClock}
+                      title="Upcoming deadlines"
+                      description="Due today or within 7 days"
+                      gradient="from-amber-500 to-yellow-600"
+                    />
+                    <DeadlineTable
+                      rows={data.upcoming}
+                      role={role}
+                      emptyLabel="No deadlines in the next 7 days."
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <SectionTitle
+                    icon={Rocket}
+                    title="Release ready"
+                    description="Projects cleared for release — review open bugs before ship"
+                    gradient="from-emerald-500 to-teal-600"
+                    action={
+                      <Badge variant="outline" className="tabular-nums font-bold px-2.5 py-1">
+                        {data.releaseReady.length}
+                      </Badge>
+                    }
+                  />
+                  <DeadlineTable
+                    rows={data.releaseReady}
+                    role={role}
+                    emptyLabel="No release-ready projects right now."
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <SectionTitle
+                    icon={FolderKanban}
+                    title="Project health"
+                    description="Ongoing projects sorted by deadline pressure, then open bugs"
+                    gradient="from-blue-500 to-indigo-600"
+                    action={
+                      <Button asChild variant="ghost" size="sm" className="font-semibold">
+                        <Link to={`/${role}/projects`}>
+                          All projects
+                          <ArrowRight className="h-4 w-4 ml-1" />
+                        </Link>
+                      </Button>
+                    }
+                  />
+                  <div className={cn(PANEL, "overflow-hidden")}>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
+                            <TableHead className="font-semibold">Project</TableHead>
+                            <TableHead className="font-semibold">Deadline</TableHead>
+                            <TableHead className="font-semibold">Status</TableHead>
+                            <TableHead className="text-right font-semibold">Open</TableHead>
+                            <TableHead className="text-right font-semibold">High</TableHead>
+                            <TableHead className="text-right font-semibold">Fixed</TableHead>
+                            <TableHead className="text-right font-semibold">Updates</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {data.projectHealthRows.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                                No ongoing projects to show.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            data.projectHealthRows.map((row) => (
+                              <TableRow key={row.project.id}>
+                                <TableCell>
+                                  <Link
+                                    to={`/${role}/projects/${row.project.id}`}
+                                    className="font-semibold hover:text-blue-600 dark:hover:text-blue-400"
+                                  >
+                                    {row.project.name}
+                                  </Link>
+                                </TableCell>
+                                <TableCell>
+                                  <div className={cn("text-sm", deadlineTone(row.bucket))}>
+                                    {row.deadline
+                                      ? formatProjectDate(row.project.deadline_date)
+                                      : "—"}
+                                  </div>
+                                  <div className={cn("text-xs", deadlineTone(row.bucket))}>
+                                    {deadlineLabel(row.bucket, row.daysUntil)}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={cn("border-0", statusBadgeClass(row.project.status))}>
+                                    {getProjectStatusLabel(row.project.status)}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums font-semibold">
+                                  {row.openBugs}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-red-600 dark:text-red-400">
+                                  {row.highBugs}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                                  {row.fixedBugs}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-sky-600 dark:text-sky-400">
+                                  {row.updatesCount}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="updates" className="space-y-6 sm:space-y-8 mt-0">
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    asChild
+                    className="h-11 bg-gradient-to-r from-violet-600 to-indigo-700 hover:from-violet-700 hover:to-indigo-800 text-white font-semibold shadow-lg"
+                  >
+                    <Link to={`/${role}/updates`}>
+                      <Megaphone className="mr-2 h-4 w-4" />
+                      Open Updates page
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {[
+                    {
+                      title: "Total",
+                      value: data.updatesTotal,
+                      hint: "All recorded updates",
+                      icon: Megaphone,
+                      tone: "text-violet-700 dark:text-violet-300",
+                      chip: "from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 border-violet-200 dark:border-violet-800",
+                      gradient: "from-violet-500 to-indigo-600",
+                    },
+                    {
+                      title: "In flight",
+                      value: openUpdatesCount,
+                      hint: "Pending + approved",
+                      icon: Timer,
+                      tone: "text-amber-700 dark:text-amber-300",
+                      chip: "from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800",
+                      gradient: "from-amber-500 to-orange-600",
+                    },
+                    {
+                      title: "Completed",
+                      value: data.updateStatusCounts.completed,
+                      hint: "Shipped updates",
+                      icon: CheckCircle2,
+                      tone: "text-emerald-700 dark:text-emerald-300",
+                      chip: "from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800",
+                      gradient: "from-emerald-500 to-teal-600",
+                    },
+                    {
+                      title: "Declined",
+                      value: data.updateStatusCounts.declined,
+                      hint: "Not moving forward",
+                      icon: AlertTriangle,
+                      tone: "text-rose-700 dark:text-rose-300",
+                      chip: "from-rose-50 to-red-50 dark:from-rose-950/30 dark:to-red-950/30 border-rose-200 dark:border-rose-800",
+                      gradient: "from-rose-500 to-red-600",
+                    },
+                  ].map((card) => (
+                    <div
+                      key={card.title}
+                      className={cn(
+                        "rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm",
+                        card.chip
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          {card.title}
+                        </span>
+                        <div
+                          className={cn(
+                            "p-2 rounded-xl bg-gradient-to-br text-white shadow-md",
+                            card.gradient
+                          )}
+                        >
+                          <card.icon className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+                      <p className={cn("text-2xl sm:text-3xl font-bold tabular-nums", card.tone)}>
+                        {card.value.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1.5 font-medium">{card.hint}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 sm:gap-6">
+                  <ChartCard
+                    title="Update status"
+                    description="Pipeline across the organization"
+                    icon={Megaphone}
+                    gradient="from-violet-500 to-indigo-600"
+                  >
+                    {updateStatusPieData.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-16 text-center">
+                        No updates recorded yet.
+                      </p>
+                    ) : (
+                      <ChartContainer config={updateStatusChartConfig} className="aspect-[4/3] w-full">
+                        <PieChart>
+                          <ChartTooltip content={<ChartTooltipContent nameKey="name" hideLabel />} />
+                          <Pie
+                            data={updateStatusPieData}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={55}
+                            outerRadius={90}
+                            strokeWidth={2}
+                          >
+                            {updateStatusPieData.map((entry) => (
+                              <Cell key={entry.key} fill={entry.fill} />
+                            ))}
+                          </Pie>
+                          <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+                        </PieChart>
+                      </ChartContainer>
+                    )}
+                  </ChartCard>
+
+                  <ChartCard
+                    title="Update types"
+                    description="Feature vs update vs maintenance mix"
+                    icon={BarChart3}
+                    gradient="from-sky-500 to-blue-600"
+                  >
+                    <ChartContainer config={updateTypeChartConfig} className="aspect-[4/3] w-full">
+                      <BarChart data={updateTypeBarData} margin={{ left: 8, right: 8, top: 8 }}>
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                        <YAxis tickLine={false} axisLine={false} width={36} />
+                        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                          {updateTypeBarData.map((entry) => (
+                            <Cell key={entry.key} fill={`var(--color-${entry.key})`} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ChartContainer>
+                  </ChartCard>
+                </div>
+
+                <div className={cn(PANEL, "p-5 sm:p-6 space-y-5")}>
+                  <SectionTitle
+                    icon={Megaphone}
+                    title="Recent updates"
+                    description={
+                      hasUpdatesFilters
+                        ? `${filteredRecentUpdates.length.toLocaleString()} matching · ${data.updatesTotal.toLocaleString()} total`
+                        : `${data.updatesTotal.toLocaleString()} total · newest activity first`
+                    }
+                    gradient="from-violet-500 to-indigo-600"
+                    action={
+                      <Button asChild variant="ghost" size="sm" className="font-semibold">
+                        <Link to={`/${role}/updates`}>
+                          All updates
+                          <ArrowRight className="h-4 w-4 ml-1" />
+                        </Link>
+                      </Button>
+                    }
+                  />
+
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Project
+                      </label>
+                      <Select
+                        value={updatesProjectFilter}
+                        onValueChange={setUpdatesProjectFilter}
+                      >
+                        <SelectTrigger className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                          <SelectValue placeholder="All projects" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[60] max-h-72">
+                          <SelectItem value="all">All projects</SelectItem>
+                          {updatesProjectOptions.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5 flex-1 min-w-0 sm:max-w-[220px]">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Status
+                      </label>
+                      <Select
+                        value={updatesStatusFilter}
+                        onValueChange={setUpdatesStatusFilter}
+                      >
+                        <SelectTrigger className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                          <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[60]">
+                          <SelectItem value="all">All statuses</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="approved">Approved</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="declined">Declined</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {hasUpdatesFilters ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 px-4 rounded-xl font-semibold shrink-0"
+                        onClick={() => {
+                          setUpdatesProjectFilter("all");
+                          setUpdatesStatusFilter("all");
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <div className="overflow-x-auto -mx-1">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
+                          <TableHead className="font-semibold">Update</TableHead>
+                          <TableHead className="font-semibold">Project</TableHead>
+                          <TableHead className="font-semibold">Type</TableHead>
+                          <TableHead className="font-semibold">Status</TableHead>
+                          <TableHead className="font-semibold">Owner</TableHead>
+                          <TableHead className="font-semibold">Updated</TableHead>
+                          <TableHead className="font-semibold text-right w-[1%]">
+                            <span className="sr-only">Actions</span>
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredRecentUpdates.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                              {hasUpdatesFilters
+                                ? "No updates match these filters."
+                                : "No updates to show."}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredRecentUpdates.slice(0, 20).map((update) => (
+                            <TableRow key={update.id}>
+                              <TableCell>
+                                <Link
+                                  to={`/${role}/updates/${update.id}`}
+                                  className="font-semibold hover:text-violet-600 dark:hover:text-violet-400 line-clamp-1 max-w-[220px] sm:max-w-xs"
+                                >
+                                  {update.title}
+                                </Link>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {update.project_id ? (
+                                  <Link
+                                    to={`/${role}/projects/${update.project_id}`}
+                                    className="hover:text-blue-600 dark:hover:text-blue-400"
+                                  >
+                                    {update.project_name || "—"}
+                                  </Link>
+                                ) : (
+                                  update.project_name || "—"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="font-medium capitalize">
+                                  {updateTypeLabel(update.type)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={cn("border-0 capitalize", updateStatusBadgeClass(update.status))}>
+                                  {update.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {update.created_by_name || "—"}
+                              </TableCell>
+                              <TableCell className="text-sm tabular-nums text-muted-foreground whitespace-nowrap">
+                                {formatShortDate(update.updated_at || update.created_at)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  asChild
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-3 rounded-lg font-semibold"
+                                >
+                                  <Link to={`/${role}/updates/${update.id}`}>
+                                    View
+                                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                                  </Link>
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="analytics" className="space-y-6 sm:space-y-8 mt-0">
@@ -2605,70 +3378,31 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div className="space-y-4">
-                  <SectionTitle
-                    icon={FolderKanban}
-                    title="Project health"
-                    description="Active projects sorted by deadline pressure, bugs, and updates"
-                    gradient="from-blue-500 to-indigo-600"
-                  />
-                  <div className={cn(PANEL, "overflow-hidden")}>
-                    <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gray-50/80 dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/50">
-                          <TableHead className="font-semibold">Project</TableHead>
-                          <TableHead className="font-semibold">Deadline</TableHead>
-                          <TableHead className="font-semibold">Status</TableHead>
-                          <TableHead className="text-right font-semibold">Open</TableHead>
-                          <TableHead className="text-right font-semibold">High</TableHead>
-                          <TableHead className="text-right font-semibold">Fixed</TableHead>
-                          <TableHead className="text-right font-semibold">Updates</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {data.projectHealthRows.slice(0, 15).map((row) => (
-                          <TableRow key={row.project.id}>
-                            <TableCell>
-                              <Link
-                                to={`/${role}/projects/${row.project.id}`}
-                                className="font-semibold hover:text-blue-600 dark:hover:text-blue-400"
-                              >
-                                {row.project.name}
-                              </Link>
-                            </TableCell>
-                            <TableCell>
-                              <div className={cn("text-sm", deadlineTone(row.bucket))}>
-                                {row.deadline
-                                  ? formatProjectDate(row.project.deadline_date)
-                                  : "—"}
-                              </div>
-                              <div className={cn("text-xs", deadlineTone(row.bucket))}>
-                                {deadlineLabel(row.bucket, row.daysUntil)}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={cn("border-0", statusBadgeClass(row.project.status))}>
-                                {getProjectStatusLabel(row.project.status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums font-semibold">
-                              {row.openBugs}
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums text-red-600 dark:text-red-400">
-                              {row.highBugs}
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                              {row.fixedBugs}
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums text-sky-600 dark:text-sky-400">
-                              {row.updatesCount}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                <div className={cn(PANEL, "p-5 sm:p-6")}>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="p-2.5 rounded-xl shadow-lg text-white shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600">
+                        <FolderKanban className="h-4 w-4 sm:h-5 sm:w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                          Need project context?
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          Deadlines, open-bug load, and update counts live in the Projects tab.
+                        </p>
+                      </div>
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 px-5 font-semibold shrink-0"
+                      onClick={() => setActiveTab("projects")}
+                    >
+                      <FolderKanban className="mr-2 h-4 w-4" />
+                      View Projects
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </TabsContent>

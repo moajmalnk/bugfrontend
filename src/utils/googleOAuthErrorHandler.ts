@@ -6,7 +6,7 @@
 import { googleOAuthDiagnostic } from './googleOAuthDiagnostic';
 
 let errorLogged = false;
-let errorCheckInterval: NodeJS.Timeout | null = null;
+let errorCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Check for Google OAuth errors in console messages
