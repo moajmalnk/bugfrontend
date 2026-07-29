@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
@@ -22,20 +21,38 @@ import { getEffectiveRole } from "@/lib/utils";
 import {
   getSearchCategoryOrder,
   getSearchEmptyHint,
+  getSearchHintChips,
   getSearchPlaceholder,
   SEARCH_GROUP_LABELS,
   type SearchCategory,
+  type SearchResult,
 } from "@/lib/globalSearchIndex";
 import {
+  Activity,
+  ArrowUpRight,
+  Bell,
   Bug,
-  CheckCircle,
-  ExternalLink,
+  Building2,
+  CheckCircle2,
+  ClipboardList,
+  CornerDownLeft,
   FileSpreadsheet,
   FileText,
   FolderKanban,
-  LayoutGrid,
+  HelpCircle,
+  LayoutDashboard,
   LifeBuoy,
+  Mail,
+  MessageSquare,
+  Phone,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  Shield,
+  User,
   Users,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -43,15 +60,55 @@ const CATEGORY_ICONS: Record<
   SearchCategory,
   React.ComponentType<{ className?: string }>
 > = {
-  pages: LayoutGrid,
+  pages: FolderKanban,
   help: LifeBuoy,
   users: Users,
+  clients: Building2,
   bugs: Bug,
-  fixes: CheckCircle,
+  fixes: CheckCircle2,
   docs: FileText,
   sheets: FileSpreadsheet,
   other: FolderKanban,
 };
+
+const PAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  "page-projects": FolderKanban,
+  "page-projects-new": Plus,
+  "page-bugs": Bug,
+  "page-bugs-new": Plus,
+  "page-fixes": CheckCircle2,
+  "page-updates": RefreshCw,
+  "page-new-update": Plus,
+  "page-profile": User,
+  "page-notifications": Bell,
+  "page-help": HelpCircle,
+  "page-bugdocs": FileText,
+  "page-bugsheets": FileSpreadsheet,
+  "page-meet": Video,
+  "page-tasks": ClipboardList,
+  "page-daily-update": ClipboardList,
+  "page-daily-work": Activity,
+  "page-reports": FileSpreadsheet,
+  "page-common-bugs": Bug,
+  "page-common-codo": FileText,
+  "page-messages": MessageSquare,
+  "page-admin-dashboard": LayoutDashboard,
+  "page-users": Users,
+  "page-clients": Building2,
+  "page-ot": ClipboardList,
+  "page-whatsapp": Phone,
+  "page-feedback": MessageSquare,
+  "page-activity": Activity,
+  "page-settings": Settings,
+  "page-bugbackup": Shield,
+};
+
+function resolveResultIcon(result: SearchResult) {
+  if (result.category === "pages" || result.category === "help") {
+    return PAGE_ICONS[result.id] ?? CATEGORY_ICONS[result.category];
+  }
+  return CATEGORY_ICONS[result.category];
+}
 
 function useDebouncedValue<T>(value: T, delay = 250): T {
   const [debounced, setDebounced] = useState(value);
@@ -80,6 +137,8 @@ export function GlobalSearchDialog() {
     permissions,
     enabled: open,
   });
+
+  const hintChips = useMemo(() => getSearchHintChips(role), [role]);
 
   const groupedResults = useMemo(() => {
     const groups = new Map<SearchCategory, typeof results>();
@@ -138,54 +197,89 @@ export function GlobalSearchDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         className={cn(
-          "overflow-hidden p-0 gap-0 shadow-2xl border-border/60",
-          "max-w-2xl w-[95vw] rounded-2xl",
-          "top-[18%] translate-y-0"
+          "overflow-hidden p-0 gap-0",
+          "max-w-xl w-[min(95vw,36rem)] rounded-xl",
+          "border border-border/70 bg-popover shadow-2xl",
+          "top-[16%] translate-y-0"
         )}
       >
-        <DialogTitle className="sr-only">Global search</DialogTitle>
+        <DialogTitle className="sr-only">Search</DialogTitle>
         <Command
           shouldFilter={false}
-          className="rounded-2xl [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-0 [&_[cmdk-input-wrapper]]:px-0"
+          className={cn(
+            "rounded-xl bg-transparent",
+            "[&_[cmdk-input-wrapper]]:border-0 [&_[cmdk-input-wrapper]]:bg-transparent [&_[cmdk-input-wrapper]]:px-0"
+          )}
         >
-          <div className="flex items-center border-b px-3">
+          <div className="border-b border-border/60 bg-transparent px-4 pt-3 pb-3">
             <CommandInput
               value={query}
               onValueChange={setQuery}
               placeholder={getSearchPlaceholder(role)}
-              className="h-12 border-0 focus:ring-0 shadow-none"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              className="h-10 border-0 bg-transparent px-0 text-[15px] shadow-none focus:ring-0 placeholder:text-muted-foreground/70"
             />
-            <kbd className="ml-2 hidden shrink-0 sm:inline-flex h-6 items-center rounded border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-              ⌘K
-            </kbd>
+            {!hasQuery && (
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                {hintChips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground"
+                  >
+                    {chip === "Email" ? (
+                      <Mail className="h-3 w-3" />
+                    ) : chip === "Phone" ? (
+                      <Phone className="h-3 w-3" />
+                    ) : null}
+                    {chip}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
-          <CommandList className="max-h-[min(50vh,420px)]">
+          <CommandList className="max-h-[min(52vh,440px)] px-2 py-2">
             {loading ? (
-              <div className="space-y-2 p-3">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={index} className="flex items-center gap-3 px-0 py-2">
-                    <Skeleton className="h-8 w-8 rounded-lg" />
+              <div className="space-y-1 px-1 py-1">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="flex items-center gap-3 px-2 py-2">
+                    <Skeleton className="h-8 w-8 rounded-md" />
                     <div className="flex-1 space-y-1.5">
-                      <Skeleton className="h-4 w-2/3" />
-                      <Skeleton className="h-3 w-1/2" />
+                      <Skeleton className="h-3.5 w-2/5" />
+                      <Skeleton className="h-3 w-1/3" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : results.length === 0 ? (
-              <CommandEmpty className="py-10 px-3 text-left text-sm text-muted-foreground">
-                {getSearchEmptyHint(role, hasQuery)}
-              </CommandEmpty>
+              <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted/60">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium text-foreground">
+                  {hasQuery ? "No results" : "Start searching"}
+                </p>
+                <p className="mt-1 max-w-[16rem] text-xs leading-relaxed text-muted-foreground">
+                  {getSearchEmptyHint(role, hasQuery)}
+                </p>
+              </div>
             ) : (
               groupedResults.map((group) => (
                 <CommandGroup
                   key={group.category}
-                  heading={hasQuery ? group.label : `${group.label} · Quick access`}
-                  className="p-0 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground/80"
+                  heading={hasQuery ? group.label : "Suggested"}
+                  className={cn(
+                    "mb-1 p-0",
+                    "[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5",
+                    "[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium",
+                    "[&_[cmdk-group-heading]]:normal-case [&_[cmdk-group-heading]]:tracking-normal",
+                    "[&_[cmdk-group-heading]]:text-muted-foreground"
+                  )}
                 >
                   {group.items.map((result) => {
-                    const Icon = CATEGORY_ICONS[result.category];
+                    const Icon = resolveResultIcon(result);
                     return (
                       <CommandItem
                         key={result.id}
@@ -193,23 +287,28 @@ export function GlobalSearchDialog() {
                         onSelect={() =>
                           handleSelect(result.href, result.external)
                         }
-                        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
+                        className={cn(
+                          "group flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2",
+                          "data-[selected=true]:bg-accent/80"
+                        )}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/50 bg-background/50">
+                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
+                          <p className="truncate text-sm font-medium leading-tight">
                             {result.title}
                           </p>
-                          {result.subtitle && (
-                            <p className="truncate text-xs text-muted-foreground">
+                          {result.subtitle ? (
+                            <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
                               {result.subtitle}
                             </p>
-                          )}
+                          ) : null}
                         </div>
-                        {result.external && (
-                          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {result.external ? (
+                          <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+                        ) : (
+                          <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70 opacity-0 group-data-[selected=true]:opacity-100" />
                         )}
                       </CommandItem>
                     );
@@ -218,6 +317,30 @@ export function GlobalSearchDialog() {
               ))
             )}
           </CommandList>
+
+          <div className="flex items-center justify-between border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <kbd className="rounded border border-border/70 bg-muted/40 px-1 py-0.5 font-medium">
+                ↵
+              </kbd>
+              Open
+              <span className="mx-1 text-border">·</span>
+              <kbd className="rounded border border-border/70 bg-muted/40 px-1 py-0.5 font-medium">
+                esc
+              </kbd>
+              Close
+            </span>
+            <span className="hidden items-center gap-3 sm:inline-flex">
+              <span className="inline-flex items-center gap-1">
+                <Mail className="h-3 w-3" />
+                Email
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                Phone
+              </span>
+            </span>
+          </div>
         </Command>
       </DialogContent>
     </Dialog>

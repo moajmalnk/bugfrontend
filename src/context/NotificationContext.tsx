@@ -52,6 +52,7 @@ interface NotificationContextType {
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
+  markNotificationsAsRead: (ids: string[]) => Promise<void>;
   clearNotifications: () => void;
   refreshNotifications: () => void;
   loadMoreNotifications: () => Promise<void>;
@@ -70,7 +71,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const { currentUser } = useAuth();
   const settings = notificationService.getSettings();
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastFetchTimeRef = useRef<Date>(new Date(0));
   const isFetchingRef = useRef<boolean>(false);
   const isFullListLoadedRef = useRef(false);
@@ -289,6 +290,37 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [totalCount, loadAllNotifications, fetchNotifications]);
 
+  const markNotificationsAsRead = useCallback(
+    async (ids: string[]) => {
+      const uniqueIds = Array.from(new Set(ids.map(String).filter(Boolean)));
+      if (uniqueIds.length === 0) return;
+
+      const idSet = new Set(uniqueIds);
+
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          idSet.has(String(notification.id))
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
+      setUnreadCount((prev) => Math.max(0, prev - uniqueIds.length));
+      setReadCount((prev) => prev + uniqueIds.length);
+
+      const numericIds = uniqueIds
+        .map((id) => parseInt(id, 10))
+        .filter((id) => Number.isFinite(id));
+
+      await notificationService.markAsRead(numericIds);
+
+      notificationService
+        .getUnreadCount()
+        .then((count) => setUnreadCount(count))
+        .catch(() => {});
+    },
+    []
+  );
+
   const clearNotifications = useCallback(async () => {
     setNotifications([]);
     setUnreadCount(0);
@@ -318,6 +350,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         addNotification,
         markAsRead,
         markAllAsRead,
+        markNotificationsAsRead,
         clearNotifications,
         refreshNotifications,
         loadMoreNotifications,

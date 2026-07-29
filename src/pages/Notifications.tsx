@@ -31,6 +31,29 @@ import { usePersistedFilters } from '@/hooks/usePersistedFilters';
 const NOTIFICATION_TABS = ['unread', 'read'] as const;
 type NotificationTab = (typeof NOTIFICATION_TABS)[number];
 
+/** Filter values shown in Notifications → Type dropdown */
+export const NOTIFICATION_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: 'All Types' },
+  { value: 'bug_fixed', label: 'Bug Fixed' },
+  { value: 'bug_created', label: 'New Bug' },
+  { value: 'status_change', label: 'Status Change' },
+  { value: 'work', label: 'Work Activity' },
+  { value: 'leave', label: 'Leave' },
+  { value: 'overtime', label: 'Overtime' },
+  { value: 'task', label: 'Tasks' },
+  { value: 'update', label: 'Updates' },
+  { value: 'meet', label: 'Meetings' },
+  { value: 'project', label: 'Projects' },
+  { value: 'doc', label: 'Docs' },
+  { value: 'sheet', label: 'Sheets' },
+  { value: 'compliance', label: 'Compliance' },
+  { value: 'codo', label: 'Codo Rules' },
+  { value: 'feedback', label: 'Feedback' },
+  { value: 'message', label: 'Messages' },
+  { value: 'user', label: 'Users' },
+  { value: 'other', label: 'Other' },
+];
+
 function parseNotificationTab(value: string | null): NotificationTab {
   return NOTIFICATION_TABS.includes(value as NotificationTab)
     ? (value as NotificationTab)
@@ -41,19 +64,41 @@ function getNotificationCategory(notification: Notification): string {
   const type = (notification.type || '').toLowerCase();
   const entityType = (notification.entity_type || '').toLowerCase();
 
-  if (type === 'bug_fixed' || type === 'status_change') return 'bug_fixed';
+  // Prefer entity_type — some types reuse ENUM fallbacks (e.g. codo → meeting_reminder)
+  if (entityType === 'codo' || entityType === 'codo_rule') return 'codo';
+  if (entityType === 'leave' || type === 'leave') return 'leave';
+  if (entityType === 'overtime' || type === 'overtime') return 'overtime';
+  if (entityType === 'feedback' || type.includes('feedback')) return 'feedback';
+  if (entityType === 'message' || type.includes('message')) return 'message';
+  if (entityType === 'user' || type.includes('user_registered')) return 'user';
+  if (entityType === 'compliance' || type.includes('compliance')) return 'compliance';
+  if (entityType === 'sheet' || type.includes('sheet')) return 'sheet';
+  if (entityType === 'doc' || type.includes('doc')) return 'doc';
+  if (entityType === 'task' || type.includes('task')) return 'task';
+  if (entityType === 'update' || type === 'update_created' || type === 'new_update') {
+    return 'update';
+  }
+  if (entityType === 'project' || type.includes('project')) return 'project';
+  if (entityType === 'meet' || type === 'meet_created' || type === 'meeting_reminder') {
+    return 'meet';
+  }
+
+  if (type === 'bug_fixed') return 'bug_fixed';
   if (type === 'bug_created' || type === 'new_bug') return 'bug_created';
+  if (type === 'status_change') return 'status_change';
+
   if (
-    ['work_check_in', 'work_break', 'work_update', 'overtime'].includes(entityType) ||
-    ['work_check_in', 'work_break', 'work_update', 'overtime'].includes(type)
+    ['work_check_in', 'work_break', 'work_update'].includes(entityType) ||
+    ['work_check_in', 'work_break', 'work_update'].includes(type)
   ) {
     return 'work';
   }
-  if (type.includes('task') || entityType === 'task') return 'task';
-  if (type.includes('update') || entityType === 'update') return 'update';
-  if (type.includes('meet') || entityType === 'meet') return 'meet';
-  if (type.includes('project') || entityType === 'project') return 'project';
-  if (type.includes('doc') || entityType === 'doc') return 'doc';
+
+  if (type.includes('codo')) return 'codo';
+  if (type.includes('meet')) return 'meet';
+  if (type.includes('update')) return 'update';
+  if (type.includes('project')) return 'project';
+
   return 'other';
 }
 
@@ -158,6 +203,7 @@ export default function Notifications() {
     isLoadingMore,
     markAsRead,
     markAllAsRead,
+    markNotificationsAsRead,
     clearNotifications,
     loadAllNotifications,
     loadMoreNotifications,
@@ -237,6 +283,10 @@ export default function Notifications() {
   const readNotifications = filteredNotifications.filter((n) => n.read);
   const filteredUnreadCount = unreadNotifications.length;
   const filteredReadCount = readNotifications.length;
+  const markableUnreadCount = hasActiveFilters ? filteredUnreadCount : unreadCount;
+  const activeTypeLabel =
+    NOTIFICATION_TYPE_OPTIONS.find((option) => option.value === typeFilter)?.label ??
+    'selected';
   const showLoadMore =
     hasMoreNotifications && (activeTab !== 'unread' || unreadCount > 0);
 
@@ -349,17 +399,30 @@ export default function Notifications() {
   const handleMarkAllAsRead = async () => {
     setIsMarkingAll(true);
     try {
-      await markAllAsRead();
-      toast({
-        title: 'Success',
-        description: 'All notifications marked as read',
-        variant: 'default',
-      });
+      if (hasActiveFilters) {
+        const ids = unreadNotifications.map((n) => String(n.id));
+        await markNotificationsAsRead(ids);
+        toast({
+          title: 'Success',
+          description:
+            typeFilter !== 'all'
+              ? `Marked ${ids.length} ${activeTypeLabel} notification${ids.length !== 1 ? 's' : ''} as read`
+              : `Marked ${ids.length} filtered notification${ids.length !== 1 ? 's' : ''} as read`,
+          variant: 'default',
+        });
+      } else {
+        await markAllAsRead();
+        toast({
+          title: 'Success',
+          description: 'All notifications marked as read',
+          variant: 'default',
+        });
+      }
       setShowMarkAllDialog(false);
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to mark all notifications as read',
+        description: 'Failed to mark notifications as read',
         variant: 'destructive',
       });
     } finally {
@@ -528,8 +591,8 @@ export default function Notifications() {
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap xl:w-auto xl:shrink-0 xl:justify-end">
                 {notifications.length > 0 && (
                   <Button
-                    onClick={() => (unreadCount > 0 ? setShowMarkAllDialog(true) : null)}
-                    disabled={unreadCount === 0 || isMarkingAll}
+                    onClick={() => (markableUnreadCount > 0 ? setShowMarkAllDialog(true) : null)}
+                    disabled={markableUnreadCount === 0 || isMarkingAll}
                     className="h-11 sm:h-12 w-full sm:w-auto px-4 sm:px-6 text-sm sm:text-base font-semibold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                   >
                     {isMarkingAll ? (
@@ -625,18 +688,19 @@ export default function Notifications() {
                         <Filter className="h-4 w-4 text-white" />
                       </div>
                       <Select value={typeFilter} onValueChange={setTypeFilter}>
-                        <SelectTrigger className="w-full min-w-0 xl:w-[11rem] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                        <SelectTrigger className="w-full min-w-0 xl:w-[13rem] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
                           <SelectValue placeholder="Type" />
                         </SelectTrigger>
-                        <SelectContent position="popper" className="z-[60]">
-                          <SelectItem value="all">All Types</SelectItem>
-                          <SelectItem value="bug_fixed">Bug Fixed</SelectItem>
-                          <SelectItem value="bug_created">New Bug</SelectItem>
-                          <SelectItem value="work">Work Activity</SelectItem>
-                          <SelectItem value="task">Tasks</SelectItem>
-                          <SelectItem value="update">Updates</SelectItem>
-                          <SelectItem value="meet">Meetings</SelectItem>
-                          <SelectItem value="project">Projects</SelectItem>
+                        <SelectContent
+                          position="popper"
+                          className="z-[60]"
+                          searchPlaceholder="Search types..."
+                        >
+                          {NOTIFICATION_TYPE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -840,10 +904,23 @@ export default function Notifications() {
       <AlertDialog open={showMarkAllDialog} onOpenChange={setShowMarkAllDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark All as Read?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {hasActiveFilters ? 'Mark Filtered as Read?' : 'Mark All as Read?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark all {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''} as read? 
-              This action cannot be undone.
+              {hasActiveFilters ? (
+                <>
+                  Mark {markableUnreadCount} unread
+                  {typeFilter !== 'all' ? ` ${activeTypeLabel}` : ' filtered'} notification
+                  {markableUnreadCount !== 1 ? 's' : ''} as read?
+                  Other notification types will stay unread.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to mark all {unreadCount} unread notification
+                  {unreadCount !== 1 ? 's' : ''} as read? This action cannot be undone.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

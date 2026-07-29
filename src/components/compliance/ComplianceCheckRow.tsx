@@ -30,7 +30,7 @@ function TranslatableField({
 
   return (
     <div className={cn('flex items-start gap-2 min-w-0', className)}>
-      <p className="min-w-0 flex-1 break-words">{loading ? '…' : displayText}</p>
+      <p className="min-w-0 flex-1 break-words whitespace-pre-line">{loading ? '…' : displayText}</p>
       <button
         type="button"
         onClick={(e) => {

@@ -4,6 +4,7 @@ import { showBugMessageInMainNav } from "@/lib/utils";
 export type SearchCategory =
   | "pages"
   | "users"
+  | "clients"
   | "bugs"
   | "fixes"
   | "docs"
@@ -226,7 +227,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-users",
     label: "Users",
     path: "/users",
-    keywords: ["users", "team", "members", "add user", "permissions"],
+    keywords: ["users", "team", "members", "add user", "permissions", "email", "phone", "contact"],
     adminOnly: true,
     subtitle: "Administration",
   },
@@ -234,7 +235,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-clients",
     label: "Clients",
     path: "/clients",
-    keywords: ["clients", "client", "corporate", "customer", "companies"],
+    keywords: ["clients", "client", "corporate", "customer", "companies", "email", "phone", "contact"],
     adminOnly: true,
     subtitle: "Administration",
   },
@@ -376,7 +377,7 @@ function entryToSearchResult(entry: PageSearchEntry): SearchResult {
     id: entry.id,
     category: isHelp ? "help" : "pages",
     title: entry.label,
-    subtitle: entry.subtitle ?? "Navigation",
+    subtitle: entry.subtitle,
     href: entry.path,
     keywords: entry.keywords,
   };
@@ -395,7 +396,7 @@ export function getVisibleTabs(
   const tabs: SearchTab[] = ["all", "pages", "help", "bugs", "fixes", "other"];
 
   if (role === "admin") {
-    tabs.splice(3, 0, "users");
+    tabs.splice(3, 0, "users", "clients");
   }
 
   if (role !== "tester") {
@@ -407,19 +408,30 @@ export function getVisibleTabs(
 }
 
 export const SEARCH_GROUP_LABELS: Record<SearchCategory, string> = {
-  pages: "Navigation",
-  help: "Help Center",
+  pages: "Pages",
+  help: "Help",
   users: "Users",
+  clients: "Clients",
   bugs: "Bugs",
   fixes: "Fixes",
-  docs: "BugDocs",
-  sheets: "BugSheets",
-  other: "Projects & updates",
+  docs: "Docs",
+  sheets: "Sheets",
+  other: "More",
 };
 
 export function getSearchCategoryOrder(role: string): SearchCategory[] {
   if (role === "admin") {
-    return ["pages", "help", "users", "bugs", "fixes", "docs", "sheets", "other"];
+    return [
+      "pages",
+      "help",
+      "users",
+      "clients",
+      "bugs",
+      "fixes",
+      "docs",
+      "sheets",
+      "other",
+    ];
   }
   if (role === "tester") {
     return ["pages", "help", "bugs", "fixes", "other"];
@@ -427,33 +439,22 @@ export function getSearchCategoryOrder(role: string): SearchCategory[] {
   return ["pages", "help", "bugs", "fixes", "docs", "sheets", "other"];
 }
 
-export function getSearchPlaceholder(role: string): string {
-  switch (role) {
-    case "admin":
-      return "Search pages, users, bugs, docs, help…";
-    case "developer":
-      return "Search your projects, bugs, docs, and help…";
-    case "tester":
-      return "Search your projects, bugs, fixes, and help…";
-    default:
-      return "Search pages, bugs, and help…";
-  }
+export function getSearchPlaceholder(_role: string): string {
+  return "Search by name, email, phone, or keyword…";
 }
 
-export function getSearchEmptyHint(role: string, hasQuery: boolean): string {
+export function getSearchEmptyHint(_role: string, hasQuery: boolean): string {
   if (hasQuery) {
-    return "No results found. Try another keyword or check spelling.";
+    return "No matches for that search.";
   }
-  switch (role) {
-    case "admin":
-      return "Type to search across navigation, users, bugs, docs, and help.";
-    case "developer":
-      return "Type to search your assigned projects, bugs, docs, and help guides.";
-    case "tester":
-      return "Type to search your assigned projects, bugs, fixes, and help guides.";
-    default:
-      return "Start typing to search across the app.";
+  return "Try a name, email, phone number, or page.";
+}
+
+export function getSearchHintChips(role: string): string[] {
+  if (role === "admin") {
+    return ["Name", "Email", "Phone", "Client", "Bug"];
   }
+  return ["Name", "Email", "Phone", "Project", "Bug"];
 }
 
 type ProjectMembershipSource = {
@@ -493,6 +494,7 @@ export function tabLabel(tab: SearchTab): string {
     pages: "Pages",
     help: "Help",
     users: "Users",
+    clients: "Clients",
     bugs: "Bugs",
     fixes: "Fixes",
     docs: "Docs",
@@ -502,13 +504,80 @@ export function tabLabel(tab: SearchTab): string {
   return labels[tab];
 }
 
+/** Digits-only form of a phone/email query fragment for flexible matching. */
+export function normalizePhoneDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/**
+ * Match free text plus phone-style queries.
+ * e.g. "8848676627" matches "+91 88486-76627" via digit normalization.
+ */
 export function matchesSearchText(
   query: string,
   ...fields: (string | undefined | null)[]
 ): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return fields.some((field) => field?.toLowerCase().includes(q));
+
+  if (fields.some((field) => field?.toLowerCase().includes(q))) {
+    return true;
+  }
+
+  const qDigits = normalizePhoneDigits(q);
+  if (qDigits.length < 4) return false;
+
+  return fields.some((field) => {
+    if (!field) return false;
+    const fieldDigits = normalizePhoneDigits(field);
+    return fieldDigits.length >= 4 && fieldDigits.includes(qDigits);
+  });
+}
+
+/** Compact contact line for search result subtitles. */
+export function formatSearchContactLine(
+  ...parts: (string | undefined | null)[]
+): string {
+  return parts
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
+}
+
+/** Collect contact-related keywords from a project (inline + linked client). */
+export function getProjectContactKeywords(project: {
+  name?: string | null;
+  description?: string | null;
+  client_name?: string | null;
+  client_location?: string | null;
+  client_contact_name?: string | null;
+  client_email?: string | null;
+  client_phone?: string | null;
+  client?: {
+    corporate_name?: string | null;
+    primary_contact_name?: string | null;
+    direct_email?: string | null;
+    direct_phone?: string | null;
+    hq_location?: string | null;
+    website?: string | null;
+  } | null;
+}): string[] {
+  const linked = project.client;
+  return [
+    project.name,
+    project.description,
+    project.client_name,
+    project.client_location,
+    project.client_contact_name,
+    project.client_email,
+    project.client_phone,
+    linked?.corporate_name,
+    linked?.primary_contact_name,
+    linked?.direct_email,
+    linked?.direct_phone,
+    linked?.hq_location,
+    linked?.website,
+  ].filter((value): value is string => Boolean(value?.trim()));
 }
 
 export function buildRolePath(role: string, path: string): string {

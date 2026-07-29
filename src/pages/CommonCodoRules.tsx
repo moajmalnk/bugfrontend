@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CodoAnalyticsPanel, computeAnalyticsCompletion } from '@/components/codo/CodoAnalyticsPanel';
 import { CodoExportPanel } from '@/components/codo/CodoExportPanel';
+import { CodoRuleBody } from '@/components/codo/CodoRuleBody';
 import { CodoRuleDialog } from '@/components/codo/CodoRuleDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -520,25 +521,22 @@ export default function CommonCodoRules() {
 
           <div className="min-w-0 flex-1 overflow-hidden">
             <div className="flex items-start justify-between gap-2 min-w-0">
-              <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="min-w-0 flex-1 space-y-2">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-snug break-words">
-                    {rule.title}
-                  </h3>
                   <span
                     className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${meta.badge}`}
                   >
                     {meta.label}
                   </span>
-                  {rule.subtitle ? (
-                    <span className="text-xs text-gray-500 dark:text-gray-400 break-words">
-                      {rule.subtitle}
-                    </span>
-                  ) : null}
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed break-words">
-                  {rule.description}
-                </p>
+
+                <CodoRuleBody
+                  ruleKey={rule.rule_key}
+                  subtitle={rule.subtitle}
+                  title={rule.title}
+                  description={rule.description}
+                />
+
                 {rule.phase === 'project' && (rule.projects?.length || 0) > 0 ? (
                   <div className="flex flex-wrap gap-1.5 pt-0.5">
                     {rule.projects!.map((p) => (
@@ -552,9 +550,6 @@ export default function CommonCodoRules() {
                     ))}
                   </div>
                 ) : null}
-                <p className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate">
-                  {rule.rule_key}
-                </p>
               </div>
 
               <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 -mt-0.5">

@@ -40,12 +40,18 @@ const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
+  <div className="flex items-center border-b px-3 bg-transparent" cmdk-input-wrapper="">
     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none",
+        "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        // Chrome/Safari autofill paints a solid white background — neutralize it
+        "[&:-webkit-autofill]:text-foreground",
+        "[&:-webkit-autofill]:[-webkit-text-fill-color:hsl(var(--foreground))]",
+        "[&:-webkit-autofill]:[transition:background-color_99999s_ease-in-out_0s]",
+        "[&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_hsl(var(--popover))]",
         className
       )}
       {...props}

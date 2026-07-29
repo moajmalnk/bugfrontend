@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bugService } from "@/services/bugService";
+import { clientService } from "@/services/clientService";
 import { googleDocsService } from "@/services/googleDocsService";
 import { googleSheetsService } from "@/services/googleSheetsService";
 import { projectService } from "@/services/projectService";
@@ -9,6 +10,8 @@ import { userService } from "@/services/userService";
 import {
   buildRolePath,
   createPermissionChecker,
+  formatSearchContactLine,
+  getProjectContactKeywords,
   getVisiblePages,
   isUserAssignedToProject,
   matchesSearchText,
@@ -18,10 +21,14 @@ import {
 } from "@/lib/globalSearchIndex";
 import type { Project } from "@/services/projectService";
 
+/** Bump when search indexing fields change so in-session cache refreshes. */
+const SEARCH_INDEX_VERSION = "contacts-v1";
+
 interface SearchCache {
   pages: SearchResult[];
   help: SearchResult[];
   users: SearchResult[];
+  clients: SearchResult[];
   bugs: SearchResult[];
   fixes: SearchResult[];
   docs: SearchResult[];
@@ -33,7 +40,7 @@ let sessionCache: SearchCache | null = null;
 let sessionCacheKey = "";
 
 function buildCacheKey(role: string, userId: string, permissions: string[]): string {
-  return `${role}:${userId}:${permissions.sort().join(",")}`;
+  return `${SEARCH_INDEX_VERSION}:${role}:${userId}:${permissions.sort().join(",")}`;
 }
 
 interface UseGlobalSearchOptions {
@@ -54,7 +61,9 @@ export function useGlobalSearch({
   enabled,
 }: UseGlobalSearchOptions) {
   const [loading, setLoading] = useState(false);
-  const [cache, setCache] = useState<SearchCache | null>(sessionCache);
+  const [cache, setCache] = useState<SearchCache | null>(
+    sessionCacheKey.startsWith(SEARCH_INDEX_VERSION) ? sessionCache : null
+  );
   const fetchStarted = useRef(false);
 
   const hasPermission = useCallback(
@@ -90,6 +99,7 @@ export function useGlobalSearch({
 
       const [
         usersResult,
+        clientsResult,
         bugsResult,
         projectsResult,
         updatesResult,
@@ -98,6 +108,7 @@ export function useGlobalSearch({
         tasksResult,
       ] = await Promise.allSettled([
         role === "admin" ? userService.getUsers() : Promise.resolve([]),
+        role === "admin" ? clientService.getClients() : Promise.resolve([]),
         bugService.getBugs({ limit: 1000 }),
         projectService.getProjects(),
         updateService.getUpdates(),
@@ -145,9 +156,43 @@ export function useGlobalSearch({
               id: `user-${user.id}`,
               category: "users" as const,
               title: user.username,
-              subtitle: [user.role, user.email].filter(Boolean).join(" · "),
+              subtitle: formatSearchContactLine(user.role, user.email, user.phone),
               href: buildRolePath(role, `/users/${user.id}`),
-              keywords: [user.username, user.email, user.role],
+              keywords: [
+                user.username,
+                user.email,
+                user.phone,
+                user.role,
+                user.name,
+              ],
+            }))
+          : [];
+
+      const clients: SearchResult[] =
+        clientsResult.status === "fulfilled"
+          ? clientsResult.value.map((client) => ({
+              id: `client-${client.id}`,
+              category: "clients" as const,
+              title: client.corporate_name,
+              subtitle: formatSearchContactLine(
+                client.primary_contact_name,
+                client.direct_email,
+                client.direct_phone
+              ),
+              href: buildRolePath(role, `/clients/${client.id}`),
+              keywords: [
+                client.corporate_name,
+                client.primary_contact_name,
+                client.direct_email,
+                client.direct_phone,
+                client.website,
+                client.hq_location,
+                client.gst_tax_id,
+                client.position,
+                client.notes,
+                client.market_industry,
+                client.commercial_status,
+              ],
             }))
           : [];
 
@@ -161,9 +206,17 @@ export function useGlobalSearch({
           id: `bug-${bug.id}`,
           category: "bugs" as const,
           title: bug.title,
-          subtitle: [bug.status, bug.project_name].filter(Boolean).join(" · "),
+          subtitle: formatSearchContactLine(bug.status, bug.project_name, bug.reporter_name),
           href: buildRolePath(role, `/bugs/${bug.id}`),
-          keywords: [bug.title, bug.description, bug.id, bug.project_name],
+          keywords: [
+            bug.title,
+            bug.description,
+            bug.expected_result,
+            bug.actual_result,
+            bug.id,
+            bug.project_name,
+            bug.reporter_name,
+          ],
         }));
 
       const fixes: SearchResult[] = allBugs
@@ -173,9 +226,18 @@ export function useGlobalSearch({
           id: `fix-${bug.id}`,
           category: "fixes" as const,
           title: bug.title,
-          subtitle: ["fixed", bug.project_name].filter(Boolean).join(" · "),
+          subtitle: formatSearchContactLine("fixed", bug.project_name, bug.reporter_name),
           href: buildRolePath(role, `/bugs/${bug.id}`),
-          keywords: [bug.title, bug.description, bug.id, bug.project_name],
+          keywords: [
+            bug.title,
+            bug.description,
+            bug.expected_result,
+            bug.actual_result,
+            bug.fix_description,
+            bug.id,
+            bug.project_name,
+            bug.reporter_name,
+          ],
         }));
 
       const docs: SearchResult[] = [];
@@ -291,13 +353,24 @@ export function useGlobalSearch({
       const other: SearchResult[] = [];
 
       accessibleProjects.forEach((project) => {
+        const contactKeywords = getProjectContactKeywords(project);
+        const clientLabel =
+          project.client?.corporate_name ||
+          project.client_name ||
+          project.client_contact_name;
+
         other.push({
           id: `project-${project.id}`,
           category: "other",
           title: project.name,
-          subtitle: "Project",
+          subtitle: formatSearchContactLine(
+            "Project",
+            clientLabel,
+            project.client_email || project.client?.direct_email,
+            project.client_phone || project.client?.direct_phone
+          ),
           href: buildRolePath(role, `/projects/${project.id}`),
-          keywords: [project.name, project.description],
+          keywords: contactKeywords,
         });
       });
 
@@ -342,6 +415,7 @@ export function useGlobalSearch({
         pages,
         help,
         users,
+        clients,
         bugs,
         fixes,
         docs,
@@ -394,6 +468,7 @@ export function useGlobalSearch({
       pages: filterResults(cache.pages, hasQuery ? 20 : 10),
       help: filterResults(cache.help, hasQuery ? 20 : 8),
       users: filterResults(cache.users),
+      clients: filterResults(cache.clients),
       bugs: filterResults(cache.bugs),
       fixes: filterResults(cache.fixes),
       docs: filterResults(cache.docs),
@@ -410,6 +485,7 @@ export function useGlobalSearch({
         ...byCategory.pages,
         ...byCategory.help,
         ...byCategory.users,
+        ...byCategory.clients,
         ...byCategory.bugs,
         ...byCategory.fixes,
         ...byCategory.docs,
