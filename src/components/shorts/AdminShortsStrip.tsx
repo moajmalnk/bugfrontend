@@ -83,9 +83,15 @@ export function AdminShortsStrip() {
   const { data: shorts = [] } = useQuery({
     queryKey: ["shorts", "published-strip"],
     queryFn: () => shortsService.list({ published: true }),
-    refetchInterval: 120_000,
+    refetchInterval: () =>
+      typeof navigator !== "undefined" &&
+      navigator.onLine &&
+      document.visibilityState === "visible"
+        ? 120_000
+        : false,
     staleTime: 60_000,
     enabled: !onShortsPage && !onUsersPage,
+    retry: false,
   });
 
   useEffect(() => {

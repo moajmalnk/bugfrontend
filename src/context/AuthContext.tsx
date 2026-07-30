@@ -192,8 +192,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const sendHeartbeat = async () => {
       try {
-        // Avoid unnecessary network errors when the browser is offline
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
+        // Pause when offline or tab is in the background (Google-style)
+        if (
+          typeof navigator !== 'undefined' &&
+          (!navigator.onLine || document.visibilityState !== 'visible')
+        ) {
           return;
         }
 
@@ -220,11 +223,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             revokeSessionForced();
           }
         }
-      } catch (error) {
-        // Silently handle errors - don't disrupt user experience in production
-        if (import.meta.env.DEV) {
-          console.error('Heartbeat failed:', error);
-        }
+      } catch {
+        // Silent — offline banner covers connectivity; avoid console spam
       }
     };
 
@@ -234,8 +234,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up interval for subsequent heartbeats
     const intervalId = setInterval(sendHeartbeat, 30000); // 30 seconds
 
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        void sendHeartbeat();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     // Cleanup interval on unmount or when user changes
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [currentUser, revokeSessionForced]);
 
   const login = async (

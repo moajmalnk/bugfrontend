@@ -187,47 +187,38 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     return () => clearInterval(interval);
   }, [isOnline]);
 
-  // Global error handler
+  // Global error handler — only surface real app/chunk failures, not background fetch noise
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
-      if (event.message.includes('Loading chunk') || 
-          event.message.includes('Failed to fetch dynamically imported module')) {
+      const message = event.message || '';
+      if (
+        message.includes('Loading chunk') ||
+        message.includes('Failed to fetch dynamically imported module')
+      ) {
         showError({
           type: 'cache',
-          message: 'Failed to load application resources. This usually happens after an update.',
+          message:
+            'Failed to load application resources. This usually happens after an update.',
           canRetry: true,
           requiresLogin: false,
-          severity: 'error'
+          severity: 'error',
         });
-      } else if (event.message.includes('Network Error') || 
-                 event.message.includes('fetch')) {
-        showError({
-          type: 'network',
-          message: 'Network error occurred. Please check your connection.',
-          canRetry: true,
-          requiresLogin: false,
-          severity: 'error'
-        });
-      } 
+      }
+      // Do not map generic "Failed to fetch" / Network Error here — those come from
+      // background polls (heartbeat, notifications) and spam Connection Issue UI.
     };
-    // else {
-    //   showError({
-    //     type: 'unknown',
-    //     message: 'An unexpected error occurred. Please refresh the page.',
-    //     canRetry: true,
-    //     requiresLogin: false,
-    //     severity: 'error'
-    //   });
-    // }
+
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      if (event.reason?.message?.includes('401') || 
-          event.reason?.message?.includes('Unauthorized')) {
+      if (
+        event.reason?.message?.includes('401') ||
+        event.reason?.message?.includes('Unauthorized')
+      ) {
         showError({
           type: 'auth',
           message: 'Your session has expired. Please log in again.',
           canRetry: false,
           requiresLogin: true,
-          severity: 'critical'
+          severity: 'critical',
         });
       }
     };
@@ -239,7 +230,7 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
-  }, []);
+  }, [showError]);
 
   const showError = useCallback((error: Partial<ErrorState>) => {
     setErrorState({

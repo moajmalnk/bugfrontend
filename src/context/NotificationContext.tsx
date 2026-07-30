@@ -94,6 +94,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Background polls: pause when offline or tab hidden
+      if (
+        !showLoading &&
+        (typeof navigator !== 'undefined' &&
+          (!navigator.onLine || document.visibilityState !== 'visible'))
+      ) {
+        return;
+      }
+
       if (isFetchingRef.current) {
         return;
       }
@@ -221,11 +230,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         fetchNotifications();
       }, 15000);
 
+      const onVisibility = () => {
+        if (document.visibilityState === 'visible' && navigator.onLine) {
+          fetchNotifications();
+        }
+      };
+      document.addEventListener('visibilitychange', onVisibility);
+
       return () => {
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
+        document.removeEventListener('visibilitychange', onVisibility);
       };
     }
   }, [currentUser?.id, fetchNotifications]);

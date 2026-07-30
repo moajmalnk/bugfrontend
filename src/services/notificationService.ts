@@ -334,10 +334,8 @@ class NotificationService {
         readCount: payload.read_count ?? 0,
         hasMore: Boolean(payload.has_more),
       };
-    } catch (error: any) {
-      if (import.meta.env.DEV) {
-        console.error('NotificationService: Error fetching notifications:', error);
-      }
+    } catch {
+      // Silent — offline / network flaps use the top banner, not console spam
       return empty;
     }
   }

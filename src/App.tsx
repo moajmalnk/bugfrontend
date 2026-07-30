@@ -156,28 +156,17 @@ function UpdateNotificationModal({ show, onAccept, onDismiss }: {
   );
 }
 
-// Offline notification banner
+// Offline notification banner — subtle status bar (not a modal/toast)
 function OfflineBanner({ show }: { show: boolean }) {
   if (!show) return null;
 
   return (
     <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        background: "#f59e0b",
-        color: "#92400e",
-        padding: "0.75rem 1rem",
-        textAlign: "center",
-        zIndex: 9998,
-        fontSize: "0.875rem",
-        fontWeight: 500,
-        boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
-      }}
+      role="status"
+      className="fixed inset-x-0 top-0 z-[9998] flex items-center justify-center gap-2 border-b border-amber-500/30 bg-amber-500/95 px-4 py-2 text-center text-sm font-medium text-amber-950 shadow-sm dark:border-amber-400/20 dark:bg-amber-600/95 dark:text-amber-50"
     >
-      📡 You're currently offline. Some features may be limited.
+      <span aria-hidden>📡</span>
+      <span>You're offline. BugRicer will reconnect automatically when you're back online.</span>
     </div>
   );
 }
@@ -221,6 +210,13 @@ function AppContent() {
       setIsOffline(false);
     });
 
+    // Native online/offline as primary signal (SW callbacks can miss flaps)
+    const onOnline = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    setIsOffline(!navigator.onLine);
+
     // Initialize offline detector as fallback
     const cleanup = initOfflineDetector();
 
@@ -232,6 +228,8 @@ function AppContent() {
       cleanup();
       cleanupShadow();
       oauthCleanup();
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
     };
   }, []);
 
