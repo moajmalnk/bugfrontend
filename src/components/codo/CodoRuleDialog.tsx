@@ -20,10 +20,40 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
 import type { CodoCommonRule, CodoRulePhase } from '@/services/codoRulesService';
-import { projectService } from '@/services/projectService';
-import type { Project } from '@/types';
-import { FolderKanban, Loader2, Pencil, Plus, Search, X } from 'lucide-react';
+import { projectService, type Project } from '@/services/projectService';
+import { ExternalLink, FolderKanban, Loader2, Pencil, Plus, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+
+/** Turn a domain or URL into an absolute http(s) href, or null if not navigable. */
+function toNavigationHref(raw?: string | null): string | null {
+  const value = (raw || '').trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  // Bare domain / path host (e.g. app.example.com or example.com/path)
+  if (/^(?:www\.)?[a-z0-9][a-z0-9.-]*\.[a-z]{2,}(?:[/:?#].*)?$/i.test(value)) {
+    return `https://${value}`;
+  }
+  return null;
+}
+
+function projectNavigationUrl(project: Project): string | null {
+  return (
+    toNavigationHref(project.vercel_domain) ||
+    toNavigationHref(project.frontend_domain) ||
+    toNavigationHref(project.backend_domain) ||
+    toNavigationHref(project.description)
+  );
+}
+
+function displayNavLabel(href: string): string {
+  try {
+    const u = new URL(href);
+    return `${u.host}${u.pathname === '/' ? '' : u.pathname}`;
+  } catch {
+    return href.replace(/^https?:\/\//i, '');
+  }
+}
 
 type Props = {
   open: boolean;
@@ -109,11 +139,19 @@ export function CodoRuleDialog({
   const filteredProjects = useMemo(() => {
     const q = projectSearch.trim().toLowerCase();
     if (!q) return projects;
-    return projects.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.description || '').toLowerCase().includes(q)
-    );
+    return projects.filter((p) => {
+      const haystack = [
+        p.name,
+        p.description,
+        p.vercel_domain,
+        p.frontend_domain,
+        p.backend_domain,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
   }, [projects, projectSearch]);
 
   const selectedProjects = useMemo(
@@ -152,7 +190,7 @@ export function CodoRuleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(96vw,560px)] max-w-none rounded-2xl p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+      <DialogContent className="w-[min(96vw,840px)] max-w-none rounded-2xl p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
         <DialogHeader className="border-b border-gray-200/50 dark:border-gray-700/50 px-6 py-5 shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white">
@@ -226,7 +264,7 @@ export function CodoRuleDialog({
                 />
               </div>
 
-              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-muted/20 max-h-48 overflow-y-auto">
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-muted/20 max-h-56 overflow-y-auto">
                 {loadingProjects ? (
                   <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -243,25 +281,52 @@ export function CodoRuleDialog({
                   <ul className="divide-y divide-border/50 p-1">
                     {filteredProjects.map((p) => {
                       const checked = projectIds.includes(p.id);
+                      const navHref = projectNavigationUrl(p);
+                      const descIsNav =
+                        !!navHref &&
+                        toNavigationHref(p.description) === navHref;
                       return (
                         <li key={p.id}>
-                          <label className="flex items-start gap-3 rounded-lg px-2.5 py-2.5 cursor-pointer hover:bg-background/70 transition-colors">
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={() => toggleProject(p.id)}
-                              className="mt-0.5"
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-medium text-foreground truncate">
-                                {p.name}
-                              </span>
-                              {p.description ? (
-                                <span className="block text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                                  {p.description}
+                          <div className="flex items-start gap-3 rounded-lg px-2.5 py-2.5 hover:bg-background/70 transition-colors">
+                            <label className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={() => toggleProject(p.id)}
+                                className="mt-0.5"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-medium text-foreground truncate">
+                                  {p.name}
                                 </span>
-                              ) : null}
-                            </span>
-                          </label>
+                                {navHref ? (
+                                  <a
+                                    href={navHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="mt-0.5 inline-flex max-w-full items-center gap-1 text-xs text-cyan-700 dark:text-cyan-300 hover:underline break-all"
+                                    title={`Open ${navHref}`}
+                                  >
+                                    <span className="truncate">{displayNavLabel(navHref)}</span>
+                                    <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
+                                  </a>
+                                ) : null}
+                                {p.description && !descIsNav ? (
+                                  <span className="block text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                                    {p.description}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </label>
+                            <Link
+                              to={`/projects/${p.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-0.5 shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                              title="Open project in BugRicer"
+                            >
+                              Open
+                            </Link>
+                          </div>
                         </li>
                       );
                     })}

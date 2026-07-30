@@ -1,3 +1,4 @@
+import { CodoRuleBody } from '@/components/codo/CodoRuleBody';
 import { MalayalamBadge } from '@/components/ui/DateDisplay';
 import { useMalayalamToggle } from '@/hooks/useMalayalamToggle';
 import { formatLocalDate } from '@/lib/utils/dateUtils';
@@ -8,6 +9,8 @@ interface ComplianceCheckRowProps {
   title: string;
   subtitle?: string;
   description: string;
+  /** When set, renders structured Requirement / Malayalam / Bad / Good like Common CODO. */
+  ruleKey?: string;
   verified: boolean;
   verifiedAt?: string | null;
   verifiedBy?: string | null;
@@ -52,6 +55,7 @@ export function ComplianceCheckRow({
   title,
   subtitle,
   description,
+  ruleKey,
   verified,
   verifiedAt,
   verifiedBy,
@@ -59,6 +63,7 @@ export function ComplianceCheckRow({
   onToggle,
 }: ComplianceCheckRowProps) {
   const canToggle = !disabled && !!onToggle;
+  const structured = Boolean(ruleKey);
 
   const handleCardClick = () => {
     if (canToggle) onToggle?.();
@@ -127,11 +132,26 @@ export function ComplianceCheckRow({
               className="text-xs font-medium text-gray-500 dark:text-gray-400"
             />
           )}
-          <TranslatableField
-            text={description}
-            label="description"
-            className="text-sm leading-relaxed text-gray-600 dark:text-gray-400"
-          />
+          {structured && ruleKey ? (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <CodoRuleBody
+                ruleKey={ruleKey}
+                title={title}
+                description={description}
+                hideHeading
+                className="pt-1"
+              />
+            </div>
+          ) : (
+            <TranslatableField
+              text={description}
+              label="description"
+              className="text-sm leading-relaxed text-gray-600 dark:text-gray-400"
+            />
+          )}
           {verified && (verifiedBy || verifiedAt) && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 border-t border-emerald-200/50 dark:border-emerald-800/30 text-xs text-emerald-700 dark:text-emerald-300">
               {verifiedBy && (

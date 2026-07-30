@@ -344,13 +344,55 @@ export default function CommonCodoRules() {
     setDialogMode('create');
     setEditing(null);
     setDialogOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.set('dialog', 'create');
+    next.delete('rule');
+    setSearchParams(next, { replace: true });
   };
 
   const openEdit = (rule: CodoCommonRule) => {
     setDialogMode('edit');
     setEditing(rule);
     setDialogOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.set('dialog', 'edit');
+    next.set('rule', String(rule.id));
+    setSearchParams(next, { replace: true });
   };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setEditing(null);
+      const next = new URLSearchParams(searchParams);
+      next.delete('dialog');
+      next.delete('rule');
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  // Deep-link: /common-codo?dialog=create | /common-codo?dialog=edit&rule=123
+  useEffect(() => {
+    const dialog = searchParams.get('dialog');
+    const ruleId = searchParams.get('rule');
+    if (dialog === 'create') {
+      setDialogMode('create');
+      setEditing(null);
+      setDialogOpen(true);
+      return;
+    }
+    if (dialog === 'edit' && ruleId) {
+      if (!rules.length) return;
+      const rule = rules.find((r) => String(r.id) === ruleId);
+      if (rule) {
+        setDialogMode('edit');
+        setEditing(rule);
+        setDialogOpen(true);
+      }
+      return;
+    }
+    // No dialog param — keep closed unless user opened another way this session
+  }, [searchParams, rules]);
 
   const handleSave = async (payload: {
     phase: CodoRulePhase;
@@ -1081,7 +1123,7 @@ export default function CommonCodoRules() {
 
       <CodoRuleDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={handleDialogOpenChange}
         mode={dialogMode}
         initial={editing}
         defaultPhase={defaultPhase}

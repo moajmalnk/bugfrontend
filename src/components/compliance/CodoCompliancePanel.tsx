@@ -327,6 +327,7 @@ export function CodoCompliancePanel({
                         key={rule.key}
                         title={`Rule ${rule.number} (${rule.titleEn})`}
                         description={rule.description}
+                        ruleKey={rule.key}
                         verified={verified}
                         verifiedBy={verifiedBy}
                         verifiedAt={verifiedAt}
@@ -408,6 +409,7 @@ export function CodoCompliancePanel({
                         key={rule.key}
                         title={rule.title}
                         description={rule.description}
+                        ruleKey={rule.key}
                         verified={verified}
                         verifiedBy={verifiedBy}
                         verifiedAt={verifiedAt}
