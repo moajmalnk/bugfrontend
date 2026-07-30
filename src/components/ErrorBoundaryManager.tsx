@@ -62,6 +62,22 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     setInactivityWarning(false);
   }, []);
 
+  const showError = useCallback((error: Partial<ErrorState>) => {
+    setErrorState({
+      type: error.type || 'unknown',
+      message: error.message || 'An unexpected error occurred',
+      canRetry: error.canRetry ?? true,
+      requiresLogin: error.requiresLogin ?? false,
+      severity: error.severity || 'error',
+      timestamp: Date.now()
+    });
+  }, []);
+
+  const clearError = useCallback(() => {
+    setErrorState(null);
+    setInactivityWarning(false);
+  }, []);
+
   // Activity monitoring - TEMPORARILY DISABLED
   useEffect(() => {
     return; // Disabled during testing
@@ -186,22 +202,6 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     const interval = setInterval(checkApiHealth, NETWORK_CHECK_INTERVAL);
     return () => clearInterval(interval);
   }, [isOnline]);
-
-  const showError = useCallback((error: Partial<ErrorState>) => {
-    setErrorState({
-      type: error.type || 'unknown',
-      message: error.message || 'An unexpected error occurred',
-      canRetry: error.canRetry ?? true,
-      requiresLogin: error.requiresLogin ?? false,
-      severity: error.severity || 'error',
-      timestamp: Date.now()
-    });
-  }, []);
-
-  const clearError = useCallback(() => {
-    setErrorState(null);
-    setInactivityWarning(false);
-  }, []);
 
   // Global error handler — only surface real app/chunk failures, not background fetch noise
   useEffect(() => {
