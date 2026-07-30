@@ -126,7 +126,9 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
         >
           <Link
             to={`/${currentUser?.role || "tester"}/bugs/${bug.id}${
-              isFromProject ? "?from=project" : ""
+              isFromProject
+                ? `?from=project&projectId=${encodeURIComponent(bug.project_id)}`
+                : ""
             }`}
             state={{ from: `${location.pathname}${location.search}` }}
           >

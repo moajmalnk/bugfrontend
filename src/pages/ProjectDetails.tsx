@@ -702,11 +702,17 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
     if (targetTab !== activeTab) setActiveTab(targetTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Keep pagination in range when filters / page size change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, priorityFilter, statusFilter, bugTypeFilter, activeTab, itemsPerPage]);
   
   // Fetch bugs data
   useEffect(() => {
     fetchBugs();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
   
   const fetchBugs = async () => {
     try {
@@ -719,7 +725,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
         limit: 1000,
       });
       setBugs(data.bugs);
-      setCurrentPage(data.pagination.currentPage);
+      setCurrentPage(1);
       setTotalBugs(data.pagination.totalBugs);
       
       // Calculate pending bugs from all fetched bugs
