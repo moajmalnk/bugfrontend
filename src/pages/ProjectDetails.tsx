@@ -680,6 +680,18 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalBugs, setTotalBugs] = useState(0);
   const [pendingBugsCount, setPendingBugsCount] = useState(0);
+
+  // Bugs list only supports pending / in_progress — drop stale filter values
+  useEffect(() => {
+    if (
+      statusFilter &&
+      statusFilter !== "all" &&
+      statusFilter !== "pending" &&
+      statusFilter !== "in_progress"
+    ) {
+      setStatusFilter("all");
+    }
+  }, [statusFilter]);
   
   // Update activeTab when initialTab changes
   useEffect(() => {
@@ -775,15 +787,16 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
       const matchesProject =
         projectFilter === "all" || bug.project_id === projectFilter;
       const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
-      // Exclude fixed bugs from Bugs page
-      const isNotFixed = bug.status !== "fixed";
+      // Bugs tab: only active work items (pending / in progress)
+      const isActiveBug =
+        bug.status === "pending" || bug.status === "in_progress";
       return (
         matchesSearch &&
         matchesPriority &&
         matchesStatus &&
         matchesProject &&
         matchesBugType &&
-        isNotFixed
+        isActiveBug
       );
     });
   };
@@ -798,7 +811,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
   
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
-    const validStatuses = ["pending", "in_progress", "declined", "rejected"];
+    const validStatuses = ["pending", "in_progress"];
     switch (tabType) {
       case "all-bugs":
         return bugs.filter((bug) => validStatuses.includes(bug.status)).length;
@@ -979,8 +992,6 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                               <SelectItem value="all">All Status</SelectItem>
                               <SelectItem value="pending">Pending</SelectItem>
                               <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="declined">Declined</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1387,8 +1398,6 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                             <SelectItem value="all">All Status</SelectItem>
                             <SelectItem value="pending">Pending</SelectItem>
                             <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="declined">Declined</SelectItem>
-                            <SelectItem value="rejected">Rejected</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1833,17 +1842,17 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
         projectId: projectId,
         page: 1,
         limit: 1000,
-        status: "fixed",
       });
-      setBugs(data.bugs);
-      setCurrentPage(data.pagination.currentPage);
-      setTotalBugs(data.pagination.totalBugs);
+      // Fixes tab: fixed + rejected (rejected = closed on our side)
+      const resolvedBugs = data.bugs.filter(
+        (bug) => bug.status === "fixed" || bug.status === "rejected"
+      );
+      setBugs(resolvedBugs);
+      setCurrentPage(1);
+      setTotalBugs(resolvedBugs.length);
       
-      // Calculate fixed bugs from all fetched bugs
-      const fixedCount = data.bugs.filter(
-        (bug) => bug.status === "fixed"
-      ).length;
-      setFixedBugsCount(fixedCount);
+      // Calculate resolved count for the badge
+      setFixedBugsCount(resolvedBugs.length);
       
       setSkeletonLoading(false);
     } catch (error) {
@@ -1887,15 +1896,16 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
       const matchesProject =
         projectFilter === "all" || bug.project_id === projectFilter;
       const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
-      // Only show fixed bugs in Fixes page
-      const isFixed = bug.status === "fixed";
+      // Fixes: fixed + rejected (rejected counts as closed on our side)
+      const isResolved =
+        bug.status === "fixed" || bug.status === "rejected";
       return (
         matchesSearch &&
         matchesPriority &&
         matchesStatus &&
         matchesProject &&
         matchesBugType &&
-        isFixed
+        isResolved
       );
     });
   };
@@ -1910,7 +1920,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
   
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
-    const validStatuses = ["fixed"];
+    const validStatuses = ["fixed", "rejected"];
     switch (tabType) {
       case "all-fixes":
         return bugs.filter((bug) => validStatuses.includes(bug.status)).length;
@@ -2090,6 +2100,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                             <SelectContent position="popper" className="z-[60]">
                               <SelectItem value="all">All Status</SelectItem>
                               <SelectItem value="fixed">Fixed</SelectItem>
+                              <SelectItem value="rejected">Rejected</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -2495,6 +2506,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                           <SelectContent position="popper" className="z-[60]">
                             <SelectItem value="all">All Status</SelectItem>
                             <SelectItem value="fixed">Fixed</SelectItem>
+                            <SelectItem value="rejected">Rejected</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -4651,10 +4663,12 @@ const ProjectDetails = () => {
     : [];
 
   const projectTabCounts = useMemo(() => {
-    const openBugStatuses = ["pending", "in_progress", "declined", "rejected"];
+    const openBugStatuses = ["pending", "in_progress"];
     return {
       bugs: bugs.filter((bug) => openBugStatuses.includes(bug.status)).length,
-      fixes: bugs.filter((bug) => bug.status === "fixed").length,
+      fixes: bugs.filter(
+        (bug) => bug.status === "fixed" || bug.status === "rejected"
+      ).length,
       updates: updates.length,
       tasks: sharedTasks.length,
     };

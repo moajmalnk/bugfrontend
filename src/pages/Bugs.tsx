@@ -74,6 +74,18 @@ const Bugs = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "all-bugs";
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Bugs list only supports pending / in_progress — drop stale filter values
+  useEffect(() => {
+    if (
+      statusFilter &&
+      statusFilter !== "all" &&
+      statusFilter !== "pending" &&
+      statusFilter !== "in_progress"
+    ) {
+      setStatusFilter("all");
+    }
+  }, [statusFilter]);
   const {
     page: currentPage,
     pageSize: itemsPerPage,
@@ -220,15 +232,16 @@ const Bugs = () => {
       const matchesProject =
         projectFilter === "all" || bug.project_id === projectFilter;
       const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
-      // Exclude fixed bugs from Bugs page (they should only appear on Fixes page)
-      const isNotFixed = bug.status !== "fixed";
+      // Bugs page: only active work items (pending / in progress)
+      const isActiveBug =
+        bug.status === "pending" || bug.status === "in_progress";
       return (
         matchesSearch &&
         matchesPriority &&
         matchesStatus &&
         matchesProject &&
         matchesBugType &&
-        isNotFixed
+        isActiveBug
       );
     });
   };
@@ -245,7 +258,7 @@ const Bugs = () => {
 
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
-    const validStatuses = ["pending", "in_progress", "declined", "rejected"];
+    const validStatuses = ["pending", "in_progress"];
     switch (tabType) {
       case "all-bugs":
         return bugs.filter((bug) => validStatuses.includes(bug.status)).length;
@@ -441,8 +454,6 @@ const Bugs = () => {
                                 <SelectItem value="all">All Status</SelectItem>
                                 <SelectItem value="pending">Pending</SelectItem>
                                 <SelectItem value="in_progress">In Progress</SelectItem>
-                                <SelectItem value="declined">Declined</SelectItem>
-                                <SelectItem value="rejected">Rejected</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -811,8 +822,6 @@ const Bugs = () => {
                               <SelectItem value="all">All Status</SelectItem>
                               <SelectItem value="pending">Pending</SelectItem>
                               <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="declined">Declined</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

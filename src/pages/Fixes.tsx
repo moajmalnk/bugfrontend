@@ -311,7 +311,6 @@ const Fixes = () => {
       bugService.getBugs({
         page: 1,
         limit: 1000,
-        status: "fixed",
       }),
   });
 
@@ -325,12 +324,17 @@ const Fixes = () => {
   const pagination = data?.pagination;
   const allProjects = projectsData ?? [];
 
+  const isResolvedFix = (status: string) =>
+    status === "fixed" || status === "rejected";
+
   // Compute role-aware visible projects for the filter
   const visibleProjects = useMemo(() => {
     if (currentUser?.role === "admin") {
       return allProjects;
     }
-    const assignedProjectIds = new Set(bugs.map((b) => String(b.project_id)));
+    const assignedProjectIds = new Set(
+      bugs.filter((b) => isResolvedFix(b.status)).map((b) => String(b.project_id))
+    );
     return allProjects.filter((p) => assignedProjectIds.has(String(p.id)));
   }, [allProjects, bugs, currentUser?.role]);
 
@@ -345,12 +349,12 @@ const Fixes = () => {
   }, [visibleProjects, projectFilter, setFilter]);
 
   const filteredBugs = useMemo(() => {
-    const fixedBugs = bugs.filter((bug) => bug.status === "fixed");
+    const resolvedBugs = bugs.filter((bug) => isResolvedFix(bug.status));
 
-    let tabFilteredBugs = fixedBugs;
+    let tabFilteredBugs = resolvedBugs;
     if (currentUser?.role === "admin" || currentUser?.role === "developer") {
       if (activeTab === "my-fixes") {
-        tabFilteredBugs = fixedBugs.filter(
+        tabFilteredBugs = resolvedBugs.filter(
           (bug) => String(bug.updated_by) === String(currentUser?.id)
         );
       }
@@ -387,19 +391,19 @@ const Fixes = () => {
     () =>
       bugs.filter(
         (b) =>
-          b.status === "fixed" &&
+          isResolvedFix(b.status) &&
           String(b.updated_by) === String(currentUser?.id)
       ).length,
     [bugs, currentUser?.id]
   );
   const allFixesCount = useMemo(
-    () => bugs.filter((b) => b.status === "fixed").length,
+    () => bugs.filter((b) => isResolvedFix(b.status)).length,
     [bugs]
   );
 
-  // Only show tabs if role allows AND there are any fixed bugs
+  // Only show tabs if role allows AND there are any resolved (fixed/rejected) bugs
   const hasAnyFixed = useMemo(
-    () => bugs.some((b) => b.status === "fixed"),
+    () => bugs.some((b) => isResolvedFix(b.status)),
     [bugs]
   );
 
@@ -462,7 +466,7 @@ const Fixes = () => {
       );
     }
 
-    if (bugs.filter((bug) => bug.status === "fixed").length === 0) {
+    if (bugs.filter((bug) => isResolvedFix(bug.status)).length === 0) {
       return (
         <div className="space-y-6 sm:space-y-8">
           {/* Always show search and filters when tabs are visible */}

@@ -759,12 +759,17 @@ const BugDetails = () => {
     const currentId = bugId ? String(bugId) : null;
     const list = bugList.filter((b) => {
       if (fromFixes) {
-        return b.status === "fixed" || (currentId && String(b.id) === currentId);
+        return (
+          b.status === "fixed" ||
+          b.status === "rejected" ||
+          (currentId != null && String(b.id) === currentId)
+        );
       }
-      // Project / default: open statuses + always include current bug
+      // Project / default: active Bugs-tab statuses + always include current bug
       return (
-        ["pending", "in_progress", "declined", "rejected"].includes(b.status) ||
-        (currentId && String(b.id) === currentId)
+        b.status === "pending" ||
+        b.status === "in_progress" ||
+        (currentId != null && String(b.id) === currentId)
       );
     });
 
@@ -1086,7 +1091,6 @@ const BugDetails = () => {
                 <span className="text-sm text-muted-foreground tabular-nums">Loading…</span>
               ) : totalBugs > 0 && currentIndex >= 0 ? (
                 <span className="text-sm font-semibold text-foreground tabular-nums">
-                  {fromFixes ? "Fixed " : ""}
                   {currentIndex + 1}
                   <span className="text-muted-foreground font-medium"> / {totalBugs}</span>
                 </span>
