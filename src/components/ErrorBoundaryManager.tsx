@@ -187,6 +187,22 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     return () => clearInterval(interval);
   }, [isOnline]);
 
+  const showError = useCallback((error: Partial<ErrorState>) => {
+    setErrorState({
+      type: error.type || 'unknown',
+      message: error.message || 'An unexpected error occurred',
+      canRetry: error.canRetry ?? true,
+      requiresLogin: error.requiresLogin ?? false,
+      severity: error.severity || 'error',
+      timestamp: Date.now()
+    });
+  }, []);
+
+  const clearError = useCallback(() => {
+    setErrorState(null);
+    setInactivityWarning(false);
+  }, []);
+
   // Global error handler — only surface real app/chunk failures, not background fetch noise
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
@@ -231,22 +247,6 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, [showError]);
-
-  const showError = useCallback((error: Partial<ErrorState>) => {
-    setErrorState({
-      type: error.type || 'unknown',
-      message: error.message || 'An unexpected error occurred',
-      canRetry: error.canRetry ?? true,
-      requiresLogin: error.requiresLogin ?? false,
-      severity: error.severity || 'error',
-      timestamp: Date.now()
-    });
-  }, []);
-
-  const clearError = useCallback(() => {
-    setErrorState(null);
-    setInactivityWarning(false);
-  }, []);
 
   const handleRetry = () => {
     clearError();
