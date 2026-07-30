@@ -12,7 +12,7 @@ export type CodoSopExample = {
 };
 
 export const CODO_SOP_EXAMPLES: Record<string, CodoSopExample> = {
-  // ── Developer Rules 1–25 ───────────────────────────────────────────────
+  // ── Developer Rules 1–32 ───────────────────────────────────────────────
   dev_rule_1: {
     bad: 'const closeModal = () => setShowModal(false); // State retained in background',
     good: `const closeModal = () => {
@@ -272,8 +272,74 @@ function backoffMs(attempt: number): number {
 }`,
     language: 'JavaScript',
   },
+  dev_rule_26: {
+    bad: 'setShowModal(true) // Back button leaves the dashboard',
+    good: `const openModal = () => {
+  setShowModal(true);
+  window.history.pushState({ modal: "edit" }, "");
+};
 
-  // ── Tester / QA Stress Matrix (7) ──────────────────────────────────────
+useEffect(() => {
+  const onPop = () => setShowModal(false);
+  window.addEventListener("popstate", onPop);
+  return () => window.removeEventListener("popstate", onPop);
+}, []);`,
+    language: 'JavaScript',
+  },
+  dev_rule_27: {
+    bad: `INSERT INTO users (name) VALUES ('test'); -- left in prod`,
+    good: `-- Use seeded local/staging only
+-- Never ship dummy "test" / "asdf" rows to production
+if (import.meta.env.PROD && /^(test|asdf)$/i.test(name)) {
+  throw new Error("Reject dummy data in production");
+}`,
+    language: 'JavaScript',
+  },
+  dev_rule_28: {
+    bad: '<div className="flex nowrap">{longTitle}</div> // Overflows',
+    good: `<div className="flex flex-wrap items-center gap-2 min-w-0">
+  <p className="truncate max-w-full">{longTitle}</p>
+</div>`,
+    language: 'CSS',
+  },
+  dev_rule_29: {
+    bad: 'setStatus("fixed"); await api.update(id); // No revert on failure',
+    good: `const prev = status;
+setStatus(next);
+try {
+  await api.updateStatus(id, next);
+} catch {
+  setStatus(prev);
+  toast({ title: "Status not saved", variant: "destructive" });
+}`,
+    language: 'JavaScript',
+  },
+  dev_rule_30: {
+    bad: '<p className="ml-4">{arabicText}</p> // Physical margin breaks RTL',
+    good: `<div dir="rtl" lang="ar" className="ms-4">
+  <input dir="rtl" value={arabicText} />
+</div>`,
+    language: 'JavaScript',
+  },
+  dev_rule_31: {
+    bad: '.list { overflow: hidden; } // Scrollbar gone on long lists',
+    good: `.list {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.list::-webkit-scrollbar { width: 6px; }`,
+    language: 'CSS',
+  },
+  dev_rule_32: {
+    bad: 'items.sort((a, b) => a.name.localeCompare(b.name)); // Mutates',
+    good: `const sorted = [...items].sort((a, b) =>
+  a.name.localeCompare(b.name)
+);
+// Or ORDER BY at the database query layer`,
+    language: 'JavaScript',
+  },
+
+  // ── Tester / QA Stress Matrix (13) ─────────────────────────────────────
   qa_apple_sandbox: {
     bad: 'Checked Chrome on desktop only — skipped Safari / iOS WebKit.',
     good: `1. Open primary screens in Safari (macOS + iOS/WebKit when available)
@@ -328,6 +394,54 @@ function backoffMs(attempt: number): number {
 2. Or force a 4xx/5xx from the API
 3. Expect an immediate Toast / inline error (not a blank hang)
 4. Pass only if the user is told what failed and can retry`,
+    language: 'QA Checklist',
+  },
+  qa_console_zero: {
+    bad: 'Ignored DevTools — shipped with red console errors.',
+    good: `1. Open DevTools (F12) → Console before testing
+2. Walk primary create / edit / delete flows
+3. Reject if any red error or uncaught exception appears
+4. Pass only with a clean console on verified paths`,
+    language: 'QA Checklist',
+  },
+  qa_high_volume: {
+    bad: 'Tested with 5 rows; never checked 100+ record views.',
+    good: `1. Load a list with 100+ records (or seed staging)
+2. Confirm pagination or infinite scroll is present
+3. Scroll / page through — UI must not stutter or freeze
+4. Pass only if scale controls work under load`,
+    language: 'QA Checklist',
+  },
+  qa_script_injection: {
+    bad: 'Accepted <script>alert("xss")</script> and executed it.',
+    good: `1. Paste <script>alert('xss')</script> into text fields
+2. Save and re-open the record / page
+3. Script must not execute; layout must not break
+4. Pass only if input is escaped / sanitized safely`,
+    language: 'QA Checklist',
+  },
+  qa_modal_scope: {
+    bad: 'Used a full-screen modal for a simple delete confirm.',
+    good: `1. Delete confirm → Small (~400px)
+2. Standard create/edit form → Medium (~600px)
+3. Complex multi-section data → Large (950px+)
+4. Pass only if modal size matches the task`,
+    language: 'QA Checklist',
+  },
+  qa_rtl_stress: {
+    bad: 'Arabic + numbers reversed caret / digit order.',
+    good: `1. Enter Arabic text mixed with numerals
+2. Confirm dir="rtl" and caret stay correct
+3. Numbers must not reverse incorrectly
+4. Pass only if RTL typography holds under stress`,
+    language: 'QA Checklist',
+  },
+  qa_browser_back: {
+    bad: 'Back exited the dashboard instead of closing the top modal.',
+    good: `1. Open modal → drawer → nested tab (layered)
+2. Press browser Back once per layer
+3. Top overlay closes; app stays on the page
+4. Pass only if history sync closes overlays in order`,
     language: 'QA Checklist',
   },
 };

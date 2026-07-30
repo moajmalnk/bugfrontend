@@ -189,6 +189,55 @@ export const DEVELOPER_RULES: DeveloperRule[] = [
     description:
       'Write explicit JSDoc/PHPDoc explaining the Why behind complex helper functions and business logic.\n\nMalayalam: സങ്കീർണ്ണ ഹെൽപ്പർ ഫംഗ്ഷനുകളുടെയും ബിസിനസ് ലോജിക്കിന്റെയും Why വിശദീകരിക്കുന്ന JSDoc/PHPDoc എഴുതണം.',
   },
+  {
+    key: 'dev_rule_26',
+    number: 26,
+    titleEn: 'SPA Router History Sync',
+    description:
+      'Modals, side drawers, and deep tabs must push state to router history. Clicking browser "Back" must close overlays sequentially instead of exiting the dashboard view.\n\nMalayalam: ബ്രൗസറിന്റെ "Back" ബട്ടൺ അടിക്കുമ്പോൾ ആപ്പ് ക്ലോസ് ആവാതെ മുൻപത്തെ മോഡലോ ടാബോ ഓർഡറിൽ ക്ലോസ് ആവണം.',
+  },
+  {
+    key: 'dev_rule_27',
+    number: 27,
+    titleEn: 'Strict Test-Data Clearance',
+    description:
+      'Never leave dummy records (e.g., "test", "asdf") in production DB. Mock tests must run inside seeded development environments only.\n\nMalayalam: പ്രൊഡക്ഷൻ ഡാറ്റാബേസിൽ "test", "asdf" തുടങ്ങിയ അനാവശ്യ എൻട്രികൾ ഒരിക്കലും ഇടരുത്.',
+  },
+  {
+    key: 'dev_rule_28',
+    number: 28,
+    titleEn: 'Layout Alignment Containment',
+    description:
+      'Use flex-wrap and responsive grid clamps. Dynamic content length must never break container dimensions or cause page overflow shifts.\n\nMalayalam: ഡാറ്റ കൂടുമ്പോൾ ഡിസൈൻ അലൈൻമെന്റ് തെറ്റാനോ വെറുതെ സ്പേസ് വരാനോ പാടില്ല.',
+  },
+  {
+    key: 'dev_rule_29',
+    number: 29,
+    titleEn: 'Dynamic Status Feedback Toast',
+    description:
+      'Optimistic UI updates must revert instantly with a Toast error if the backend API fails to persist state changes.\n\nMalayalam: സ്റ്റാറ്റസ് ചേഞ്ച് ചെയ്യുമ്പോൾ ബാക്ക്എൻഡിൽ മാറിയില്ലെങ്കിൽ സ്ക്രീനിൽ ഉടൻ എറർ ടോസ്റ്റ് കാണിക്കണം.',
+  },
+  {
+    key: 'dev_rule_30',
+    number: 30,
+    titleEn: 'RTL Typography Safeguards',
+    description:
+      'Localized Arabic strings must maintain explicit dir="rtl" containers and CSS logical properties (margin-inline-start).\n\nMalayalam: അറബിക് ഫീൽഡുകൾ റൈറ്റ്-ടു-ലെഫ്റ്റ് (dir="rtl") ആയി കൃത്യമായ ഫോർമാറ്റിൽ ആയിരിക്കണം.',
+  },
+  {
+    key: 'dev_rule_31',
+    number: 31,
+    titleEn: 'Native Scrollbar Preservation',
+    description:
+      'Never use global overflow: hidden on container scroll wrappers without fallback custom slim scrollbars.\n\nMalayalam: ലിസ്റ്റ് വലിയതായാൽ സ്ക്രോൾബാർ അപ്രത്യക്ഷമാവരുത്; Codo സ്ലിം സ്ക്രോൾബാർ കാണിച്ചിരിക്കണം.',
+  },
+  {
+    key: 'dev_rule_32',
+    number: 32,
+    titleEn: 'Immutable Array Sorting',
+    description:
+      'Sorting operations on datasets must create explicit copy instances ([...data].sort()) or perform sorting at database query level.\n\nMalayalam: ഡാറ്റാബേസിൽ നിന്നോ അറേയിൽ നിന്നോ ഓർഡർ കാണിക്കുമ്പോൾ ഡാറ്റ തെറ്റിയ മുൻഗണനയിൽ വരാൻ പാടില്ല.',
+  },
 ];
 
 export const QA_STRESS_RULES: QaStressRule[] = [
@@ -196,13 +245,13 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     key: 'qa_apple_sandbox',
     title: 'The Apple Ecosystem Sandbox',
     description:
-      'Test cross-platform layout rendering across Safari environments. Confirm layout structures, card radii, and shadow boundaries scale without breaking.\n\nMalayalam: Safari പരിതസ്ഥിതികളിലുടനീളം ക്രോസ്-പ്ലാറ്റ്ഫോം ലേഔട്ട് റെൻഡറിംഗ് പരിശോധിക്കുക. കാർഡ് റേഡിയസ്, ഷാഡോ ബൗണ്ടറികൾ തകരാതെ സ്കെയിൽ ചെയ്യുന്നുണ്ടെന്ന് ഉറപ്പാക്കുക.',
+      'Test layouts on Safari / iOS WebKit. Reject if flexbox elements, custom scrollbars, or shadows break.\n\nMalayalam: Safari പരിതസ്ഥിതികളിലുടനീളം ക്രോസ്-പ്ലാറ്റ്ഫോം ലേഔട്ട് റെൻഡറിംഗ് പരിശോധിക്കുക. കാർഡ് റേഡിയസ്, ഷാഡോ ബൗണ്ടറികൾ തകരാതെ സ്കെയിൽ ചെയ്യുന്നുണ്ടെന്ന് ഉറപ്പാക്കുക.',
   },
   {
     key: 'qa_click_attack',
     title: 'The Click Attack Safeguard',
     description:
-      'Stress-test button structures via continuous high-speed double and triple clicks. Ensure execution locks prevent duplicate API records.\n\nMalayalam: ബട്ടണുകളിൽ തുടർച്ചയായ ഉയർന്ന വേഗത്തിലുള്ള ഡബിൾ/ട്രിപ്പിൾ ക്ലിക്കുകൾ ചെയ്ത് സ്ട്രെസ്-ടെസ്റ്റ് ചെയ്യുക. ഡ്യൂപ്ലിക്കേറ്റ് API റെക്കോർഡുകൾ തടയുന്ന ലോക്കുകൾ ഉറപ്പാക്കുക.',
+      'Stress-test button structures via continuous high-speed double and triple clicks. Ensure execution locks prevent duplicate API records. Reject if duplicate calls fire or spinner is missing.\n\nMalayalam: ബട്ടണുകളിൽ തുടർച്ചയായ ഉയർന്ന വേഗത്തിലുള്ള ഡബിൾ/ട്രിപ്പിൾ ക്ലിക്കുകൾ ചെയ്ത് സ്ട്രെസ്-ടെസ്റ്റ് ചെയ്യുക. ഡ്യൂപ്ലിക്കേറ്റ് API റെക്കോർഡുകൾ തടയുന്ന ലോക്കുകൾ ഉറപ്പാക്കുക.',
   },
   {
     key: 'qa_theme_interruption',
@@ -233,6 +282,42 @@ export const QA_STRESS_RULES: QaStressRule[] = [
     title: 'The Network Break Strategy',
     description:
       'Drop network visibility mid-action or check server error routing. Confirm immediate user notifications via interactive Toast alerts.\n\nMalayalam: ആക്ഷൻ നടക്കുമ്പോൾ നെറ്റ്‌വർക്ക് ഡ്രോപ്പ് ചെയ്യുകയോ സർവർ എറർ റൂട്ടിംഗ് പരിശോധിക്കുകയോ ചെയ്യുക. Toast അലേർട്ടുകൾ ഉടൻ കാണിക്കുന്നുണ്ടെന്ന് ഉറപ്പാക്കുക.',
+  },
+  {
+    key: 'qa_console_zero',
+    title: 'Console Zero-Tolerance',
+    description:
+      'Keep Browser DevTools open (F12) during verification. Reject the build if ANY red error appears in the console.\n\nMalayalam: ടെസ്റ്റ് ചെയ്യുമ്പോൾ DevTools (F12) തുറന്ന് വയ്ക്കുക. കൺസോളിൽ റെഡ് എറർ വന്നാൽ ബിൽഡ് റിജക്ട് ചെയ്യണം.',
+  },
+  {
+    key: 'qa_high_volume',
+    title: 'High-Volume Scale Audit',
+    description:
+      'Load views with 100+ records. Reject if pagination is missing or the UI stutters under load.\n\nMalayalam: 100+ റെക്കോർഡുകളുള്ള വ്യൂകൾ ലോഡ് ചെയ്യുക. പേജിനേഷൻ ഇല്ലെങ്കിലോ UI സ്റ്റട്ടർ ആയാലോ റിജക്ട് ചെയ്യുക.',
+  },
+  {
+    key: 'qa_script_injection',
+    title: 'Script Injection Test',
+    description:
+      'Input <script>alert(\'xss\')</script> into form fields. Reject if the string executes or breaks layout rendering.\n\nMalayalam: ഫോം ഫീൽഡുകളിൽ സ്ക്രിപ്റ്റ് ഇൻജക്ഷൻ സ്ട്രിംഗ് നൽകുക. എക്സിക്യൂട്ട് ആയാലോ ലേഔട്ട് തകർന്നാലോ റിജക്ട് ചെയ്യുക.',
+  },
+  {
+    key: 'qa_modal_scope',
+    title: 'Modal Overlay Scope',
+    description:
+      'Verify Small (400px) modals for deletes, Medium (600px) for standard forms, and Large (950px+) for complex data.\n\nMalayalam: Delete-ന് Small (400px), സാധാരണ ഫോമുകൾക്ക് Medium (600px), കോംപ്ലക്സ് ഡാറ്റയ്ക്ക് Large (950px+) മോഡലുകൾ ഉറപ്പാക്കുക.',
+  },
+  {
+    key: 'qa_rtl_stress',
+    title: 'RTL Language Stress Test',
+    description:
+      'Enter Arabic strings mixed with numbers. Reject if carets misalign or numbers reverse order.\n\nMalayalam: അറബിക് ടെക്സ്റ്റും നമ്പറുകളും കലർത്തി ടെസ്റ്റ് ചെയ്യുക. കാരറ്റ്/നമ്പർ അലൈൻമെന്റ് തെറ്റിയാൽ റിജക്ട് ചെയ്യുക.',
+  },
+  {
+    key: 'qa_browser_back',
+    title: 'Browser Back Button Drill',
+    description:
+      'Open layered overlays and press browser Back. Reject if the app exits the view instead of closing the top modal.\n\nMalayalam: ലെയർഡ് ഓവർലേകൾ തുറന്ന് browser Back അമർത്തുക. ടോപ്പ് മോഡൽ അടയ്ക്കാതെ പേജ് വിട്ടാൽ റിജക്ട് ചെയ്യുക.',
   },
 ];
 
