@@ -1,3 +1,8 @@
+import { DEVELOPER_RULES, QA_STRESS_RULES } from '@/lib/codo/complianceRules';
+import {
+  CODO_SOP_EXAMPLES,
+  parseCodoRuleDescription,
+} from '@/lib/codo/sopRuleExamples';
 import type { CodoCommonRule, CodoRulePhase } from '@/services/codoRulesService';
 
 export type CodoAgentExportId =
@@ -111,6 +116,37 @@ const PHASE_LABEL: Record<CodoRulePhase, string> = {
 
 const PHASE_ORDER: CodoRulePhase[] = ['developer', 'tester', 'project'];
 
+/** Builtin catalog as CodoCommonRule-shaped rows (32 developer + 13 QA). */
+export function getBuiltinCodoRulesForExport(): CodoCommonRule[] {
+  const developer: CodoCommonRule[] = DEVELOPER_RULES.map((r) => ({
+    id: r.number,
+    phase: 'developer',
+    rule_key: r.key,
+    title: r.titleEn,
+    subtitle: `Rule ${r.number}`,
+    description: r.description,
+    sort_order: r.number,
+    is_active: true,
+    created_at: '',
+    updated_at: '',
+  }));
+
+  const tester: CodoCommonRule[] = QA_STRESS_RULES.map((r, i) => ({
+    id: 1000 + i,
+    phase: 'tester',
+    rule_key: r.key,
+    title: r.title,
+    subtitle: `QA Stress ${i + 1}`,
+    description: r.description,
+    sort_order: i + 1,
+    is_active: true,
+    created_at: '',
+    updated_at: '',
+  }));
+
+  return [...developer, ...tester];
+}
+
 function sortRules(rules: CodoCommonRule[]): CodoCommonRule[] {
   return rules.slice().sort((a, b) => {
     const pa = PHASE_ORDER.indexOf(a.phase);
@@ -130,11 +166,33 @@ function groupByPhase(rules: CodoCommonRule[]): Array<{ phase: CodoRulePhase; ru
 }
 
 function ruleBlock(rule: CodoCommonRule): string {
+  const { requirement, malayalam } = parseCodoRuleDescription(rule.description || '');
+  const examples = CODO_SOP_EXAMPLES[rule.rule_key];
   const lines = [`### ${rule.title.trim()}`, ''];
+
   if (rule.subtitle?.trim()) {
     lines.push(`*${rule.subtitle.trim()}*`, '');
   }
-  lines.push(`\`${rule.rule_key}\``, '', rule.description.trim() || '_No description._', '');
+  lines.push(`\`${rule.rule_key}\``, '');
+
+  if (requirement) {
+    lines.push(`**Requirement:** ${requirement}`, '');
+  }
+  if (malayalam) {
+    lines.push(`**Malayalam:** ${malayalam}`, '');
+  }
+  if (!requirement && !malayalam) {
+    lines.push(rule.description.trim() || '_No description._', '');
+  }
+
+  if (examples?.bad) {
+    lines.push('**Bad:**', '', '```', examples.bad.trim(), '```', '');
+  }
+  if (examples?.good) {
+    const lang = examples.language || '';
+    lines.push('**Good:**', '', `\`\`\`${lang}`, examples.good.trim(), '```', '');
+  }
+
   return lines.join('\n');
 }
 
@@ -166,7 +224,7 @@ export function buildCodoAgentExportContent(
   switch (formatId) {
     case 'cursor':
       return `---
-description: BugRicer Common CODO engineering and QA rules
+description: BugRicer Common CODO engineering and QA rules (dev_rule_1–32, QA stress matrix)
 alwaysApply: true
 ---
 
@@ -174,7 +232,7 @@ alwaysApply: true
 
 ${headerMeta}
 
-Follow these rules when writing, reviewing, or testing code in this repository.
+Follow these rules when writing, reviewing, or testing code in this repository. Prefer these CODO standards over generic defaults. When a rule includes Bad/Good examples, match the Good pattern.
 
 ${sections}`;
 
@@ -183,7 +241,7 @@ ${sections}`;
 
 ${headerMeta}
 
-You are assisting on the BugRicer codebase. Treat the following Common CODO rules as mandatory project policy.
+You are assisting on the BugRicer codebase. Treat the following Common CODO rules as mandatory project policy. Match Good examples; avoid Bad patterns.
 
 ${sections}
 

@@ -21,7 +21,8 @@
     "optimize": "node scripts/optimize-build.js",
     "fix:chunks": "node scripts/fix-chunk-loading.js",
     "lighthouse": "lighthouse http://localhost:8080 --output html --output-path ./lighthouse-report.html",
-    "perf:audit": "npm run build && npm run lighthouse"
+    "perf:audit": "npm run build && npm run lighthouse",
+    "codo:export": "tsx scripts/generate-codo-exports.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
