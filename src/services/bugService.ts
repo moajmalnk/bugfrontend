@@ -15,6 +15,16 @@ export interface BugLifecycleStep {
   actor_name?: string | null;
 }
 
+export interface BugConversionEvent {
+  from_project_id?: string | null;
+  from_project_name?: string | null;
+  to_project_id?: string | null;
+  to_project_name?: string | null;
+  actor_name?: string | null;
+  created_at?: string | null;
+  description?: string | null;
+}
+
 export interface BugLifecycle {
   bug_id: string;
   title?: string;
@@ -38,6 +48,7 @@ export interface BugLifecycle {
   active_share_percent?: number | null;
   fix_to_cycle_percent?: number | null;
   status_timeline: BugLifecycleStep[];
+  conversion_history?: BugConversionEvent[];
   activity_count?: number;
   actors?: {
     reporter_name?: string | null;
@@ -119,6 +130,17 @@ export const bugService = {
       return response.data.data;
     }
     throw new Error('Failed to update bug');
+  },
+
+  async convertBug(bugId: string, projectId: string): Promise<Bug> {
+    const response = await apiClient.post<{ success: boolean; data: Bug; message?: string }>(
+      `${API_ENDPOINT}/convert.php`,
+      { bug_id: bugId, project_id: projectId }
+    );
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || 'Failed to convert bug');
   },
 
   async deleteBug(id: string): Promise<void> {

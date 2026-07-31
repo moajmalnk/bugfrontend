@@ -28,7 +28,11 @@ import { Bug } from "@/types";
 import { ENV } from "@/lib/env";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { cn } from "@/lib/utils";
+import { formatLocalDate } from "@/lib/utils/dateUtils";
+import { bugService } from "@/services/bugService";
+import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowRightLeft,
   Briefcase,
   Calendar,
   ClipboardCheck,
@@ -57,6 +61,14 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
   useEffect(() => {
     setActiveVoiceId(null);
   }, [bug.id]);
+
+  const { data: lifecycle } = useQuery({
+    queryKey: ["bugLifecycle", bug.id],
+    queryFn: () => bugService.getBugLifecycle(bug.id),
+    enabled: !!bug.id,
+    staleTime: 30_000,
+  });
+  const conversionHistory = lifecycle?.conversion_history || [];
 
   const [screenshotViewerOpen, setScreenshotViewerOpen] = useState(false);
   const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState(0);
@@ -712,6 +724,46 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                   {bug.project_name || "Unknown"}
                 </span>
               </div>
+              {conversionHistory.length > 0 && (
+                <div className="rounded-xl border border-sky-200/50 bg-sky-50/40 p-3 dark:border-sky-800/40 dark:bg-sky-950/20 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-200">
+                      Conversion history
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="ml-auto h-5 rounded-full px-2 text-[10px]"
+                    >
+                      {conversionHistory.length}
+                    </Badge>
+                  </div>
+                  <ul className="space-y-2">
+                    {[...conversionHistory].reverse().map((event, index) => (
+                      <li
+                        key={`${event.created_at || "c"}-${index}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        <div className="flex flex-wrap items-center gap-1.5 text-foreground">
+                          <span className="font-medium">
+                            {event.from_project_name || "Unknown"}
+                          </span>
+                          <ArrowRightLeft className="h-3 w-3 text-sky-600 dark:text-sky-400" />
+                          <span className="font-medium">
+                            {event.to_project_name || "Unknown"}
+                          </span>
+                        </div>
+                        <p className="mt-0.5">
+                          {event.created_at
+                            ? formatLocalDate(event.created_at, "datetime")
+                            : "—"}
+                          {event.actor_name ? ` · ${event.actor_name}` : ""}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">Bug Level:</span>
                 <Badge variant="outline" className={bugLevelBadgeClass(bug.bug_level)}>

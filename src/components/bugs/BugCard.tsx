@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConvertBugDialog } from "@/components/bugs/ConvertBugDialog";
 import { useAuth } from "@/context/AuthContext";
 import {
   alreadyRaisedBadgeClass,
@@ -10,8 +11,9 @@ import {
   formatBugLevelLabel,
 } from "@/lib/bugMetaUtils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
-import { CommonBug } from "@/types";
-import { Copy } from "lucide-react";
+import { CommonBug, Bug as BugType } from "@/types";
+import { ArrowRightLeft, Copy } from "lucide-react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 interface Bug {
@@ -38,6 +40,7 @@ interface Bug {
 interface BugCardProps {
   bug: Bug;
   onDelete?: () => void;
+  onConverted?: (updated: BugType) => void;
 }
 
 const priorityColors = {
@@ -60,10 +63,16 @@ function formatDateTime(dateStr: string) {
   return formatLocalDate(dateStr, "datetime");
 }
 
-export function BugCard({ bug, onDelete }: BugCardProps) {
+function canConvertBug(role?: string | null) {
+  return role === "admin" || role === "developer" || role === "tester";
+}
+
+export function BugCard({ bug, onDelete, onConverted }: BugCardProps) {
   const location = useLocation();
   const { currentUser } = useAuth();
   const isFromProject = location.pathname.includes("/projects/");
+  const [convertOpen, setConvertOpen] = useState(false);
+  const showConvert = canConvertBug(currentUser?.role);
 
   return (
     <Card className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm w-full h-full p-4 sm:p-5 hover:shadow-xl transition-all duration-300">
@@ -118,6 +127,18 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
       </div>
 
       <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">
+        {showConvert && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setConvertOpen(true)}
+            className="text-xs sm:text-sm h-9 px-3 bg-white dark:bg-gray-800 border-sky-200 dark:border-sky-800 hover:bg-sky-50 dark:hover:bg-sky-900/20 hover:border-sky-400 dark:hover:border-sky-600 text-sky-700 dark:text-sky-300 font-semibold shadow-sm transition-all duration-300"
+          >
+            <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
+            Convert
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -137,6 +158,15 @@ export function BugCard({ bug, onDelete }: BugCardProps) {
         </Button>
       </div>
       </div>
+
+      {showConvert && (
+        <ConvertBugDialog
+          bug={bug}
+          open={convertOpen}
+          onOpenChange={setConvertOpen}
+          onConverted={onConverted}
+        />
+      )}
     </Card>
   );
 }

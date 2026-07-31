@@ -1,4 +1,5 @@
 import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
+import { ConvertBugDialog } from "@/components/bugs/ConvertBugDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MalayalamDateToggle, MalayalamTextToggle } from "@/components/ui/DateDisplay";
@@ -12,10 +13,11 @@ import { Bug } from "@/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { prefetchFixBugPage } from "@/utils/prefetchFixBug";
-import { CheckSquare, ChevronLeft, Edit2, Share2, Trash2 } from "lucide-react";
+import { ArrowRightLeft, CheckSquare, ChevronLeft, Edit2, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 
 const UNDO_DELETE_DURATION = 10;
 
@@ -49,9 +51,15 @@ export const BugHeader = ({
 }: BugHeaderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { currentUser: authUser } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const canConvert =
+    currentUser?.role === "admin" ||
+    currentUser?.role === "developer" ||
+    currentUser?.role === "tester";
 
   const searchParams = new URLSearchParams(location.search);
   const fromParam = searchParams.get("from");
@@ -365,6 +373,20 @@ export const BugHeader = ({
               </Button>
             )}
 
+            {canConvert && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap border-sky-200 text-sky-700 hover:bg-sky-50 hover:border-sky-300 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-900/20"
+                onClick={() => setConvertOpen(true)}
+                title="Convert to another project"
+              >
+                <ArrowRightLeft className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Convert</span>
+              </Button>
+            )}
+
             {/* General Share Button */}
             <Button
               variant="outline"
@@ -463,6 +485,25 @@ export const BugHeader = ({
         onConfirmNow={handleSpotDeleteClick}
         isConfirming={isDeleting}
       />
+
+      {canConvert && (
+        <ConvertBugDialog
+          bug={bug}
+          open={convertOpen}
+          onOpenChange={setConvertOpen}
+          onConverted={(updated) => {
+            queryClient.setQueryData(["bug", bug.id], updated);
+            if (
+              isFromProject &&
+              String(updated.project_id) !== String(bug.project_id)
+            ) {
+              navigate(`/${role}/projects/${updated.project_id}?tab=bugs`, {
+                replace: true,
+              });
+            }
+          }}
+        />
+      )}
     </>
   );
 };

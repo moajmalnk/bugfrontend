@@ -1,3 +1,4 @@
+import { ConvertBugDialog } from "@/components/bugs/ConvertBugDialog";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import {
   BugTypeFilterSelect,
@@ -26,9 +27,10 @@ import { useAuth } from "@/context/AuthContext";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import { Project, projectService } from "@/services/projectService";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  ArrowRightLeft,
   Bug,
   Calendar,
   CheckCircle,
@@ -137,8 +139,12 @@ const getPriorityBadgeVariant = (
 const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
   const { currentUser } = useAuth();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const role = currentUser?.role;
   const project = projects.find(p => p.id === bug.project_id);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const canConvert =
+    role === "admin" || role === "developer" || role === "tester";
 
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-[1.02] hover:-translate-y-1">
@@ -248,7 +254,19 @@ const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
         </div>
 
         {/* Action Button */}
-        <div className="mt-6 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+        <div className="mt-6 pt-4 border-t border-gray-200/50 dark:border-gray-700/50 flex flex-col sm:flex-row gap-2">
+          {canConvert && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setConvertOpen(true)}
+              className="w-full sm:w-auto h-11 border-sky-200 text-sky-700 hover:bg-sky-50 hover:border-sky-300 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-900/20 font-semibold"
+            >
+              <ArrowRightLeft className="h-4 w-4 mr-2" />
+              Convert
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -264,6 +282,22 @@ const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
           </Button>
         </div>
       </div>
+
+      {canConvert && (
+        <ConvertBugDialog
+          bug={{
+            id: bug.id,
+            title: bug.title,
+            project_id: bug.project_id,
+            project_name: project?.name || bug.project_name,
+          }}
+          open={convertOpen}
+          onOpenChange={setConvertOpen}
+          onConverted={() => {
+            queryClient.invalidateQueries({ queryKey: ["bugs"] });
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1349,7 +1349,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
             ) : (
               <div className="grid gap-4 grid-cols-1">
                 {paginatedBugs.map((bug) => (
-                  <BugCard key={bug.id} bug={bug} />
+                  <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
                 ))}
               </div>
             )}
@@ -1762,7 +1762,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
             ) : (
               <div className="grid gap-4 grid-cols-1">
                 {paginatedBugs.map((bug) => (
-                  <BugCard key={bug.id} bug={bug} />
+                  <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
                 ))}
               </div>
             )}
@@ -2458,7 +2458,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
             ) : (
               <div className="grid gap-4 grid-cols-1">
                 {paginatedBugs.map((bug) => (
-                  <BugCard key={bug.id} bug={bug} />
+                  <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
                 ))}
               </div>
             )}
@@ -2872,7 +2872,7 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
             ) : (
               <div className="grid gap-4 grid-cols-1">
                 {paginatedBugs.map((bug) => (
-                  <BugCard key={bug.id} bug={bug} />
+                  <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
                 ))}
               </div>
             )}

@@ -773,7 +773,7 @@ const Bugs = () => {
                   aria-label="Bug list"
                 >
                   {paginatedBugs.map((bug) => (
-                    <BugCard key={bug.id} bug={bug} />
+                    <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
                   ))}
                 </div>
               )}
@@ -1151,7 +1151,7 @@ const Bugs = () => {
                   aria-label="Bug list"
                 >
                   {paginatedBugs.map((bug) => (
-                    <BugCard key={bug.id} bug={bug} />
+                    <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
                   ))}
                 </div>
               )}

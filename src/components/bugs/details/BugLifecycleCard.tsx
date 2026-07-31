@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
-import { bugService, type BugLifecycle, type BugLifecycleStep } from "@/services/bugService";
+import { bugService, type BugConversionEvent, type BugLifecycleStep } from "@/services/bugService";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowRightLeft,
   CalendarClock,
   CheckCircle2,
   Clock3,
@@ -341,6 +342,63 @@ function LifecycleSkeleton() {
   );
 }
 
+function ConversionHistory({ events }: { events: BugConversionEvent[] }) {
+  if (!events.length) {
+    return (
+      <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 px-4 py-5 text-center text-sm text-muted-foreground">
+        No project conversions yet.
+      </div>
+    );
+  }
+
+  return (
+    <ol className="space-y-3">
+      {[...events].reverse().map((event, index) => {
+        const fromName = event.from_project_name || "Unknown project";
+        const toName = event.to_project_name || "Unknown project";
+        return (
+          <li
+            key={`${event.created_at || "conv"}-${index}`}
+            className="relative rounded-xl border border-sky-200/50 bg-sky-50/40 p-3.5 dark:border-sky-800/40 dark:bg-sky-950/20"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/15 text-sky-700 dark:text-sky-300">
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                </span>
+                Converted to another project
+              </div>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {event.created_at ? formatLocalDate(event.created_at, "datetime") : "—"}
+              </span>
+            </div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
+              <Badge
+                variant="outline"
+                className="max-w-full truncate border-border/70 bg-background/80 font-medium"
+              >
+                {fromName}
+              </Badge>
+              <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
+              <Badge
+                variant="outline"
+                className="max-w-full truncate border-sky-300/70 bg-sky-100/60 font-medium text-sky-900 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-100"
+              >
+                {toName}
+              </Badge>
+            </div>
+            {event.actor_name ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                by <span className="font-medium text-foreground">{event.actor_name}</span>
+              </p>
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export function BugLifecycleCard({ bugId, className }: BugLifecycleCardProps) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["bugLifecycle", bugId],
@@ -507,6 +565,19 @@ export function BugLifecycleCard({ bugId, className }: BugLifecycleCardProps) {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Conversion history
+                </p>
+                <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px]">
+                  {(data.conversion_history || []).length} move
+                  {(data.conversion_history || []).length === 1 ? "" : "s"}
+                </Badge>
+              </div>
+              <ConversionHistory events={data.conversion_history || []} />
             </div>
 
             <div>
