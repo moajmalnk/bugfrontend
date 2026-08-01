@@ -20,9 +20,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { updateService } from "@/services/updateService";
+import { apiClient } from "@/lib/axios";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Play, Timer, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Play, Timer, Loader2, Code2 } from "lucide-react";
 import { CopyTextButton } from "@/components/ui/CopyTextButton";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
@@ -31,10 +33,19 @@ import { useToast } from "@/components/ui/use-toast";
 import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { format } from "date-fns";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { buildAudioUrl } from "@/lib/mediaUrls";
 import { UpdateDetailsCard } from "@/components/updates/UpdateDetailsCard";
 import { UpdateLifecycleCard } from "@/components/updates/UpdateLifecycleCard";
+
+type ProjectMemberOption = {
+  id: string;
+  username: string;
+  email?: string;
+  role?: string;
+  user_role?: string;
+  member_role?: string;
+};
 
 
 // Enhanced skeleton components for better loading experience
@@ -165,6 +176,7 @@ const UpdateDetails = () => {
     devStarted: "",
     devEnded: "",
     testedBy: "",
+    developedBy: "",
     notes: "",
   });
   const [updateList, setUpdateList] = useState<any[]>([]);
@@ -200,6 +212,54 @@ const UpdateDetails = () => {
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
+
+  const { data: projectMembersData, isLoading: membersLoading } = useQuery({
+    queryKey: ["project-members", update?.project_id],
+    queryFn: async () => {
+      const res = await apiClient.get<{
+        success: boolean;
+        data: { members: ProjectMemberOption[]; admins: ProjectMemberOption[] };
+      }>(`/projects/get_members.php?project_id=${update!.project_id}`);
+      return res.data.data;
+    },
+    enabled: !!update?.project_id && showCompleteDialog,
+    staleTime: 60_000,
+  });
+
+  const { testerOptions, developerOptions } = useMemo(() => {
+    const members = projectMembersData?.members || [];
+    const admins = projectMembersData?.admins || [];
+    const byId = new Map<string, ProjectMemberOption>();
+
+    const upsert = (person: ProjectMemberOption) => {
+      if (!person?.id) return;
+      byId.set(String(person.id), person);
+    };
+    members.forEach(upsert);
+    admins.forEach(upsert);
+
+    const people = Array.from(byId.values()).sort((a, b) =>
+      (a.username || "").localeCompare(b.username || "")
+    );
+
+    const roleOf = (p: ProjectMemberOption) =>
+      String(p.user_role || p.member_role || p.role || "").toLowerCase();
+
+    const testers = people.filter((p) => {
+      const r = roleOf(p);
+      return r === "tester" || r.includes("tester");
+    });
+    const developers = people.filter((p) => {
+      const r = roleOf(p);
+      return r === "developer" || r.includes("developer");
+    });
+
+    // If project membership roles don't separate cleanly, fall back to full list
+    return {
+      testerOptions: testers.length > 0 ? testers : people,
+      developerOptions: developers.length > 0 ? developers : people,
+    };
+  }, [projectMembersData]);
 
   const updatesListFallback = `/${currentUser?.role || "admin"}/updates`;
   const updatesBackPath = fromProject
@@ -270,6 +330,7 @@ const UpdateDetails = () => {
         devStarted: "",
         devEnded: "",
         testedBy: "",
+        developedBy: "",
         notes: "",
       });
     }
@@ -280,6 +341,22 @@ const UpdateDetails = () => {
       toast({
         title: "Required",
         description: "Please select whether this update was tested (yes or no).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (completeForm.tested === "yes" && !completeForm.testedBy.trim()) {
+      toast({
+        title: "Required",
+        description: "Please select who tested this update.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!completeForm.developedBy.trim()) {
+      toast({
+        title: "Required",
+        description: "Please select who developed this update.",
         variant: "destructive",
       });
       return;
@@ -298,6 +375,7 @@ const UpdateDetails = () => {
       completion_dev_started_at: completeForm.devStarted || undefined,
       completion_dev_ended_at: completeForm.devEnded || undefined,
       completion_tested_by: completeForm.testedBy.trim() || undefined,
+      completion_developed_by: completeForm.developedBy.trim() || undefined,
       completion_notes: completeForm.notes.trim() || undefined,
     });
   };
@@ -800,31 +878,62 @@ const UpdateDetails = () => {
                   <Select
                     value={completeForm.tested || undefined}
                     onValueChange={(v) =>
-                      setCompleteForm((f) => ({ ...f, tested: v as "yes" | "no" }))
+                      setCompleteForm((f) => ({
+                        ...f,
+                        tested: v as "yes" | "no",
+                        testedBy: v === "no" ? "" : f.testedBy,
+                      }))
                     }
                   >
                     <SelectTrigger id="complete-tested" className="h-11 bg-white dark:bg-gray-800">
                       <SelectValue placeholder="Select yes or no" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" className="z-[220]">
                       <SelectItem value="yes">Yes</SelectItem>
                       <SelectItem value="no">No</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="complete-tested-by" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Who tested (name)
-                  </Label>
-                  <Input
-                    id="complete-tested-by"
-                    placeholder="Tester name"
-                    value={completeForm.testedBy}
-                    onChange={(e) => setCompleteForm((f) => ({ ...f, testedBy: e.target.value }))}
-                    className="h-11 bg-white dark:bg-gray-800"
-                  />
-                </div>
+                {completeForm.tested === "yes" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="complete-tested-by" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Who tested <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={completeForm.testedBy || undefined}
+                      onValueChange={(v) =>
+                        setCompleteForm((f) => ({ ...f, testedBy: v }))
+                      }
+                      disabled={membersLoading}
+                    >
+                      <SelectTrigger id="complete-tested-by" className="h-11 bg-white dark:bg-gray-800">
+                        <SelectValue
+                          placeholder={
+                            membersLoading
+                              ? "Loading testers…"
+                              : testerOptions.length
+                                ? "Select a tester"
+                                : "No testers found"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent
+                        position="popper"
+                        className="z-[220] max-h-60 overflow-y-auto"
+                      >
+                        {testerOptions.map((person) => (
+                          <SelectItem key={person.id} value={person.username}>
+                            {person.username}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Testers assigned to this project.
+                    </p>
+                  </div>
+                )}
               </section>
 
               <section className="space-y-4 rounded-2xl border border-gray-200/70 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
@@ -833,6 +942,47 @@ const UpdateDetails = () => {
                     <Timer className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Development</h3>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="complete-developed-by" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Who developed <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={completeForm.developedBy || undefined}
+                    onValueChange={(v) =>
+                      setCompleteForm((f) => ({ ...f, developedBy: v }))
+                    }
+                    disabled={membersLoading}
+                  >
+                    <SelectTrigger id="complete-developed-by" className="h-11 bg-white dark:bg-gray-800">
+                      <SelectValue
+                        placeholder={
+                          membersLoading
+                            ? "Loading developers…"
+                            : developerOptions.length
+                              ? "Select a developer"
+                              : "No developers found"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent
+                      position="popper"
+                      className="z-[220] max-h-60 overflow-y-auto"
+                    >
+                      {developerOptions.map((person) => (
+                        <SelectItem key={person.id} value={person.username}>
+                          <span className="inline-flex items-center gap-2">
+                            <Code2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            {person.username}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Developers assigned to this project.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -853,26 +1003,28 @@ const UpdateDetails = () => {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="complete-dev-started" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Development started
                     </Label>
-                    <Input
-                      id="complete-dev-started"
-                      type="datetime-local"
+                    <DatePicker
                       value={completeForm.devStarted}
-                      onChange={(e) => setCompleteForm((f) => ({ ...f, devStarted: e.target.value }))}
+                      onChange={(v) =>
+                        setCompleteForm((f) => ({ ...f, devStarted: v }))
+                      }
+                      placeholder="Pick start date"
                       className="h-11 bg-white dark:bg-gray-800"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="complete-dev-ended" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Development ended
                     </Label>
-                    <Input
-                      id="complete-dev-ended"
-                      type="datetime-local"
+                    <DatePicker
                       value={completeForm.devEnded}
-                      onChange={(e) => setCompleteForm((f) => ({ ...f, devEnded: e.target.value }))}
+                      onChange={(v) =>
+                        setCompleteForm((f) => ({ ...f, devEnded: v }))
+                      }
+                      placeholder="Pick end date"
                       className="h-11 bg-white dark:bg-gray-800"
                     />
                   </div>

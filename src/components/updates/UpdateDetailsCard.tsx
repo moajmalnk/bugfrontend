@@ -136,6 +136,11 @@ export function UpdateDetailsCard({
                   <span className="font-medium">{update.completion_tested_by}</span>
                 </DetailField>
               ) : null}
+              {update.completion_developed_by ? (
+                <DetailField label="Developed by" icon={User}>
+                  <span className="font-medium">{update.completion_developed_by}</span>
+                </DetailField>
+              ) : null}
               {update.completion_dev_hours != null &&
               update.completion_dev_hours !== "" &&
               !Number.isNaN(Number(update.completion_dev_hours)) ? (

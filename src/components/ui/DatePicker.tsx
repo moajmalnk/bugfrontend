@@ -36,7 +36,7 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
   }, [disableFuture, allowOnlyTodayAndYesterday]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button variant="outline" className={`w-full justify-start text-left font-normal text-xs sm:text-sm ${className || ''}`}>
           <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
@@ -53,6 +53,7 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
         sideOffset={4}
         collisionPadding={8}
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onWheel={(e) => e.stopPropagation()}
       >
         <Calendar
           mode="single"

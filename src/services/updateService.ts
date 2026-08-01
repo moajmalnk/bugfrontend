@@ -36,6 +36,7 @@ export interface Update {
   completion_dev_started_at?: string | null;
   completion_dev_ended_at?: string | null;
   completion_tested_by?: string | null;
+  completion_developed_by?: string | null;
   completion_notes?: string | null;
   attachments?: Attachment[];
   screenshots?: Attachment[];
@@ -118,6 +119,7 @@ class UpdateService {
       completion_dev_started_at?: string;
       completion_dev_ended_at?: string;
       completion_tested_by?: string;
+      completion_developed_by?: string;
       completion_notes?: string;
     }
   ): Promise<string> {

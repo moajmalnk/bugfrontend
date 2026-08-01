@@ -15,6 +15,7 @@ import {
   Percent,
   Timer,
   UserRound,
+  Wrench,
 } from "lucide-react";
 import { useMemo } from "react";
 
@@ -449,6 +450,15 @@ export function UpdateLifecycleCard({ update, className }: UpdateLifecycleCardPr
                     Tested by
                   </span>
                   <span className="font-medium text-right">{update.completion_tested_by}</span>
+                </div>
+              ) : null}
+              {update.completion_developed_by ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                    <Wrench className="h-3.5 w-3.5" />
+                    Developed by
+                  </span>
+                  <span className="font-medium text-right">{update.completion_developed_by}</span>
                 </div>
               ) : null}
               {update.expected_date ? (
