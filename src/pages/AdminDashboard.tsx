@@ -1340,34 +1340,259 @@ function resolveWorkPeriod(
   };
 }
 
+type DashboardPeriod = ReturnType<typeof resolveWorkPeriod>;
+
+function dateInPeriod(
+  iso: string | null | undefined,
+  from: string,
+  to: string
+): boolean {
+  if (!iso) return false;
+  const raw = String(iso).trim();
+  const ymd =
+    /^\d{4}-\d{2}-\d{2}/.test(raw)
+      ? raw.slice(0, 10)
+      : toLocalCalendarDateString(new Date(raw));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+  return ymd >= from && ymd <= to;
+}
+
+function bugTouchesPeriod(bug: Bug, from: string, to: string): boolean {
+  return (
+    dateInPeriod(bug.created_at, from, to) ||
+    dateInPeriod(bug.updated_at, from, to)
+  );
+}
+
+function updateTouchesPeriod(
+  update: { created_at?: string; updated_at?: string | null },
+  from: string,
+  to: string
+): boolean {
+  return (
+    dateInPeriod(update.created_at, from, to) ||
+    dateInPeriod(update.updated_at, from, to)
+  );
+}
+
+function DashboardPeriodFilter({
+  preset,
+  customFrom,
+  customTo,
+  period,
+  onPresetChange,
+  onCustomFromChange,
+  onCustomToChange,
+  isFetching,
+}: {
+  preset: WorkPeriodPreset;
+  customFrom: string;
+  customTo: string;
+  period: DashboardPeriod;
+  onPresetChange: (value: WorkPeriodPreset) => void;
+  onCustomFromChange: (value: string) => void;
+  onCustomToChange: (value: string) => void;
+  isFetching?: boolean;
+}) {
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const activePreset =
+    WORK_PERIOD_PRESETS.find((p) => p.value === preset) ?? WORK_PERIOD_PRESETS[3];
+  const ActivePresetIcon = activePreset.icon;
+
+  const selectPreset = (value: WorkPeriodPreset) => {
+    onPresetChange(value);
+    setFilterSheetOpen(false);
+    if (value === "custom" && !customFrom) {
+      const today = toLocalCalendarDateString(new Date());
+      onCustomFromChange(shiftCalendarDate(today, -6));
+      onCustomToChange(today);
+    }
+  };
+
+  return (
+    <>
+      <div className="relative">
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-50/40 via-transparent to-violet-50/30 dark:from-indigo-950/15 dark:via-transparent dark:to-violet-950/10 pointer-events-none" />
+        <div className="relative rounded-2xl border border-gray-200/60 dark:border-gray-700/60 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm p-2 space-y-2">
+          <div className="p-1 lg:hidden">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 w-full justify-between rounded-2xl border-gray-200/70 bg-white/70 dark:border-gray-700/70 dark:bg-gray-800/70"
+              onClick={() => setFilterSheetOpen(true)}
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold min-w-0">
+                <ActivePresetIcon className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" />
+                <span className="truncate">{activePreset.label}</span>
+                <span className="truncate text-xs font-medium text-muted-foreground">
+                  · {period.rangeLabel}
+                </span>
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+            </Button>
+          </div>
+
+          <div className="hidden lg:grid grid-cols-12 gap-1.5 p-1">
+            {WORK_PERIOD_PRESETS.map((item) => {
+              const Icon = item.icon;
+              const isActive = preset === item.value;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => selectPreset(item.value)}
+                  className={cn(
+                    "col-span-2 flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-3 text-sm font-semibold transition-all duration-200",
+                    isActive
+                      ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-lg border border-gray-200 dark:border-gray-700"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/70 dark:hover:bg-gray-800/60"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0 opacity-80" />
+                  <span className="truncate">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {preset === "custom" ? (
+            <div className="grid grid-cols-12 gap-2 px-1 pb-1">
+              <div className="col-span-12 sm:col-span-6 lg:col-span-3 space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-0.5">
+                  From
+                </p>
+                <DatePicker
+                  value={customFrom}
+                  onChange={onCustomFromChange}
+                  placeholder="Start date"
+                  disableFuture
+                />
+              </div>
+              <div className="col-span-12 sm:col-span-6 lg:col-span-3 space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-0.5">
+                  To
+                </p>
+                <DatePicker
+                  value={customTo}
+                  onChange={onCustomToChange}
+                  placeholder="End date"
+                  disableFuture
+                />
+              </div>
+              <div className="col-span-12 lg:col-span-6 flex items-end">
+                <p className="text-sm text-muted-foreground pb-2">
+                  Showing{" "}
+                  <span className="font-semibold text-foreground">
+                    {period.rangeLabel}
+                  </span>
+                  {isFetching ? " · updating…" : null}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="hidden lg:flex px-2 pb-1">
+              <p className="text-xs text-muted-foreground">
+                Period ·{" "}
+                <span className="font-semibold text-foreground">
+                  {period.rangeLabel}
+                </span>
+                {isFetching ? " · updating…" : null}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Drawer open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+        <DrawerContent className="rounded-t-3xl border-gray-200/70 bg-white/95 backdrop-blur-sm dark:border-gray-800/70 dark:bg-gray-900/95 lg:hidden">
+          <DrawerHeader className="pb-2 text-left">
+            <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+              Period filter
+            </DrawerTitle>
+            <DrawerDescription>
+              Today, yesterday, week, month, year, or a custom range
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="max-h-[65vh] space-y-3 overflow-y-auto hide-scrollbar px-4 pb-6">
+            {WORK_PERIOD_PRESETS.map((item) => {
+              const isActive = preset === item.value;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => selectPreset(item.value)}
+                  className={cn(
+                    "flex min-h-16 w-full items-center justify-between rounded-3xl px-4 py-4 transition-colors",
+                    isActive
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-100/80 text-gray-900 dark:bg-gray-800/80 dark:text-gray-100"
+                  )}
+                >
+                  <span className="flex items-center gap-3 min-w-0">
+                    <span
+                      className={cn(
+                        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                        isActive ? "bg-indigo-500/80" : "bg-gray-200 dark:bg-gray-700"
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="text-lg font-semibold truncate">{item.label}</span>
+                  </span>
+                  {isActive ? <Check className="h-5 w-5 shrink-0" /> : null}
+                </button>
+              );
+            })}
+            {preset === "custom" ? (
+              <div className="grid grid-cols-1 gap-3 pt-2">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    From
+                  </p>
+                  <DatePicker
+                    value={customFrom}
+                    onChange={onCustomFromChange}
+                    placeholder="Start date"
+                    disableFuture
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    To
+                  </p>
+                  <DatePicker
+                    value={customTo}
+                    onChange={onCustomToChange}
+                    placeholder="End date"
+                    disableFuture
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </>
+  );
+}
+
 function WorkRetentionTab({
   trackableUsers,
   role,
   enabled,
+  period,
 }: {
   trackableUsers: User[];
   role: string;
   enabled: boolean;
+  period: DashboardPeriod;
 }) {
-  const [preset, setPreset] = useState<WorkPeriodPreset>("month");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-
-  const period = useMemo(
-    () => resolveWorkPeriod(preset, customFrom, customTo),
-    [preset, customFrom, customTo]
-  );
-
-  const activePreset =
-    WORK_PERIOD_PRESETS.find((p) => p.value === preset) ?? WORK_PERIOD_PRESETS[3];
-  const ActivePresetIcon = activePreset.icon;
 
   const {
     data: teamStats,
     isLoading,
     isError,
-    isFetching,
     refetch,
   } = useQuery({
     queryKey: ["admin-ops-work-retention", period.from, period.to],
@@ -1432,105 +1657,11 @@ function WorkRetentionTab({
     [rows]
   );
 
-  const selectPreset = (value: WorkPeriodPreset) => {
-    setPreset(value);
-    setFilterSheetOpen(false);
-    if (value === "custom" && !customFrom) {
-      const today = toLocalCalendarDateString(new Date());
-      setCustomFrom(shiftCalendarDate(today, -6));
-      setCustomTo(today);
-    }
-  };
-
   const periodStartForLink = getCalendarMonthStart(period.from);
-
-  const filterBar = (
-    <div className="relative">
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-50/40 via-transparent to-violet-50/30 dark:from-indigo-950/15 dark:via-transparent dark:to-violet-950/10 pointer-events-none" />
-      <div className="relative rounded-2xl border border-gray-200/60 dark:border-gray-700/60 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm p-2 space-y-2">
-        {/* Mobile / tablet */}
-        <div className="p-1 lg:hidden">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-12 w-full justify-between rounded-2xl border-gray-200/70 bg-white/70 dark:border-gray-700/70 dark:bg-gray-800/70"
-            onClick={() => setFilterSheetOpen(true)}
-          >
-            <span className="flex items-center gap-2 text-sm font-semibold min-w-0">
-              <ActivePresetIcon className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" />
-              <span className="truncate">{activePreset.label}</span>
-              <span className="truncate text-xs font-medium text-muted-foreground">
-                · {period.rangeLabel}
-              </span>
-            </span>
-            <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-          </Button>
-        </div>
-
-        {/* Desktop: 12-col presets */}
-        <div className="hidden lg:grid grid-cols-12 gap-1.5 p-1">
-          {WORK_PERIOD_PRESETS.map((item) => {
-            const Icon = item.icon;
-            const isActive = preset === item.value;
-            return (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => selectPreset(item.value)}
-                className={cn(
-                  "col-span-2 flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-3 text-sm font-semibold transition-all duration-200",
-                  isActive
-                    ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-lg border border-gray-200 dark:border-gray-700"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/70 dark:hover:bg-gray-800/60"
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {preset === "custom" ? (
-          <div className="grid grid-cols-12 gap-2 px-1 pb-1">
-            <div className="col-span-12 sm:col-span-6 lg:col-span-3 space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-0.5">
-                From
-              </p>
-              <DatePicker
-                value={customFrom}
-                onChange={setCustomFrom}
-                placeholder="Start date"
-                disableFuture
-              />
-            </div>
-            <div className="col-span-12 sm:col-span-6 lg:col-span-3 space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-0.5">
-                To
-              </p>
-              <DatePicker
-                value={customTo}
-                onChange={setCustomTo}
-                placeholder="End date"
-                disableFuture
-              />
-            </div>
-            <div className="col-span-12 lg:col-span-6 flex items-end">
-              <p className="text-sm text-muted-foreground pb-2">
-                Showing <span className="font-semibold text-foreground">{period.rangeLabel}</span>
-                {isFetching ? " · updating…" : null}
-              </p>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        {filterBar}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-28 rounded-2xl" />
@@ -1548,7 +1679,6 @@ function WorkRetentionTab({
   if (isError) {
     return (
       <div className="space-y-6">
-        {filterBar}
         <div className={cn(PANEL, "p-10 text-center space-y-3")}>
           <AlertTriangle className="h-8 w-8 mx-auto text-amber-500" />
           <p className="font-semibold text-gray-900 dark:text-white">Couldn’t load work retention</p>
@@ -1566,53 +1696,6 @@ function WorkRetentionTab({
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {filterBar}
-
-      <Drawer open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
-        <DrawerContent className="rounded-t-3xl border-gray-200/70 bg-white/95 backdrop-blur-sm dark:border-gray-800/70 dark:bg-gray-900/95 lg:hidden">
-          <DrawerHeader className="pb-2 text-left">
-            <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
-              Period filter
-            </DrawerTitle>
-            <DrawerDescription>
-              Today, yesterday, week, month, year, or a custom range
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="max-h-[65vh] space-y-3 overflow-y-auto hide-scrollbar px-4 pb-6">
-            {WORK_PERIOD_PRESETS.map((item) => {
-              const isActive = preset === item.value;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => selectPreset(item.value)}
-                  className={cn(
-                    "flex min-h-16 w-full items-center justify-between rounded-3xl px-4 py-4 transition-colors",
-                    isActive
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-100/80 text-gray-900 dark:bg-gray-800/80 dark:text-gray-100"
-                  )}
-                >
-                  <span className="flex items-center gap-3 min-w-0">
-                    <span
-                      className={cn(
-                        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                        isActive ? "bg-indigo-500/80" : "bg-gray-200 dark:bg-gray-700"
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className="text-lg font-semibold truncate">{item.label}</span>
-                  </span>
-                  {isActive ? <Check className="h-5 w-5 shrink-0" /> : null}
-                </button>
-              );
-            })}
-          </div>
-        </DrawerContent>
-      </Drawer>
-
       <div className="grid grid-cols-12 gap-3 sm:gap-4">
         {[
           {
@@ -1999,6 +2082,13 @@ export default function AdminDashboard() {
   const [dashTabSheetOpen, setDashTabSheetOpen] = useState(false);
   const [updatesProjectFilter, setUpdatesProjectFilter] = useState<string>("all");
   const [updatesStatusFilter, setUpdatesStatusFilter] = useState<string>("all");
+  const [periodPreset, setPeriodPreset] = useState<WorkPeriodPreset>("month");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const period = useMemo(
+    () => resolveWorkPeriod(periodPreset, customFrom, customTo),
+    [periodPreset, customFrom, customTo]
+  );
   const activeDashTabItem =
     DASHBOARD_TAB_ITEMS.find((t) => t.value === activeTab) ?? DASHBOARD_TAB_ITEMS[0];
   const ActiveDashTabIcon = activeDashTabItem.icon;
@@ -2028,30 +2118,101 @@ export default function AdminDashboard() {
     refetchOnWindowFocus: false,
   });
 
+  /** Bugs/updates scoped to the shared period filter; live metrics stay on `data`. */
+  const view = useMemo(() => {
+    if (!data) return null;
+    const { from, to } = period;
+    const bugsByStatus: Record<BugStatusKey, Bug[]> = {
+      pending: data.bugsByStatus.pending.filter((b) => bugTouchesPeriod(b, from, to)),
+      in_progress: data.bugsByStatus.in_progress.filter((b) =>
+        bugTouchesPeriod(b, from, to)
+      ),
+      fixed: data.bugsByStatus.fixed.filter((b) => bugTouchesPeriod(b, from, to)),
+      declined: data.bugsByStatus.declined.filter((b) => bugTouchesPeriod(b, from, to)),
+      rejected: data.bugsByStatus.rejected.filter((b) => bugTouchesPeriod(b, from, to)),
+    };
+    const openBugs = sortByPriorityThenDate([
+      ...bugsByStatus.pending,
+      ...bugsByStatus.in_progress,
+    ]);
+    const bugCounts: BugStatusCounts = {
+      pending: bugsByStatus.pending.length,
+      in_progress: bugsByStatus.in_progress.length,
+      fixed: bugsByStatus.fixed.length,
+      declined: bugsByStatus.declined.length,
+      rejected: bugsByStatus.rejected.length,
+      total: 0,
+      open: 0,
+    };
+    bugCounts.open = bugCounts.pending + bugCounts.in_progress;
+    bugCounts.total =
+      bugCounts.open + bugCounts.fixed + bugCounts.declined + bugCounts.rejected;
+
+    const scaledPriority: PriorityCounts = { high: 0, medium: 0, low: 0 };
+    openBugs.forEach((b) => {
+      scaledPriority[b.priority] = (scaledPriority[b.priority] || 0) + 1;
+    });
+    const highOpenFromProjects = openBugs.filter((b) => b.priority === "high").length;
+
+    const updates = data.updates.filter((u) => updateTouchesPeriod(u, from, to));
+    const updateStatusCounts = {
+      pending: 0,
+      approved: 0,
+      declined: 0,
+      completed: 0,
+    };
+    const updateTypeCounts = {
+      feature: 0,
+      updation: 0,
+      maintenance: 0,
+    };
+    updates.forEach((u) => {
+      if (u.status in updateStatusCounts) {
+        updateStatusCounts[u.status as keyof typeof updateStatusCounts] += 1;
+      }
+      if (u.type in updateTypeCounts) {
+        updateTypeCounts[u.type as keyof typeof updateTypeCounts] += 1;
+      }
+    });
+
+    return {
+      ...data,
+      bugsByStatus,
+      openBugs,
+      bugCounts,
+      scaledPriority,
+      highOpenFromProjects,
+      updates,
+      updateStatusCounts,
+      updateTypeCounts,
+      updatesTotal: updates.length,
+    };
+  }, [data, period]);
+
   const statusPieData = useMemo(() => {
-    if (!data) return [];
+    if (!view) return [];
     return [
-      { key: "pending", name: "Pending", value: data.bugCounts.pending, fill: "var(--color-pending)" },
+      { key: "pending", name: "Pending", value: view.bugCounts.pending, fill: "var(--color-pending)" },
       {
         key: "in_progress",
         name: "In progress",
-        value: data.bugCounts.in_progress,
+        value: view.bugCounts.in_progress,
         fill: "var(--color-in_progress)",
       },
-      { key: "fixed", name: "Fixed", value: data.bugCounts.fixed, fill: "var(--color-fixed)" },
-      { key: "declined", name: "Declined", value: data.bugCounts.declined, fill: "var(--color-declined)" },
-      { key: "rejected", name: "Rejected", value: data.bugCounts.rejected, fill: "var(--color-rejected)" },
+      { key: "fixed", name: "Fixed", value: view.bugCounts.fixed, fill: "var(--color-fixed)" },
+      { key: "declined", name: "Declined", value: view.bugCounts.declined, fill: "var(--color-declined)" },
+      { key: "rejected", name: "Rejected", value: view.bugCounts.rejected, fill: "var(--color-rejected)" },
     ].filter((d) => d.value > 0);
-  }, [data]);
+  }, [view]);
 
   const priorityPieData = useMemo(() => {
-    if (!data) return [];
+    if (!view) return [];
     return [
-      { key: "high", name: "High", value: data.scaledPriority.high, fill: "var(--color-high)" },
-      { key: "medium", name: "Medium", value: data.scaledPriority.medium, fill: "var(--color-medium)" },
-      { key: "low", name: "Low", value: data.scaledPriority.low, fill: "var(--color-low)" },
+      { key: "high", name: "High", value: view.scaledPriority.high, fill: "var(--color-high)" },
+      { key: "medium", name: "Medium", value: view.scaledPriority.medium, fill: "var(--color-medium)" },
+      { key: "low", name: "Low", value: view.scaledPriority.low, fill: "var(--color-low)" },
     ].filter((d) => d.value > 0);
-  }, [data]);
+  }, [view]);
 
   const deadlinePieData = useMemo(() => {
     if (!data) return [];
@@ -2109,62 +2270,62 @@ export default function AdminDashboard() {
   }, [data]);
 
   const bugVsFixBarData = useMemo(() => {
-    if (!data) return [];
+    if (!view) return [];
     return [
-      { label: "Open", value: data.bugCounts.open, fill: "#f59e0b" },
-      { label: "Fixed", value: data.bugCounts.fixed, fill: "#10b981" },
-      { label: "Pending", value: data.bugCounts.pending, fill: "#fb923c" },
-      { label: "In progress", value: data.bugCounts.in_progress, fill: "#3b82f6" },
+      { label: "Open", value: view.bugCounts.open, fill: "#f59e0b" },
+      { label: "Fixed", value: view.bugCounts.fixed, fill: "#10b981" },
+      { label: "Pending", value: view.bugCounts.pending, fill: "#fb923c" },
+      { label: "In progress", value: view.bugCounts.in_progress, fill: "#3b82f6" },
     ];
-  }, [data]);
+  }, [view]);
 
   const updateStatusPieData = useMemo(() => {
-    if (!data) return [];
+    if (!view) return [];
     return [
       {
         key: "pending",
         name: "Pending",
-        value: data.updateStatusCounts.pending,
+        value: view.updateStatusCounts.pending,
         fill: "var(--color-pending)",
       },
       {
         key: "approved",
         name: "Approved",
-        value: data.updateStatusCounts.approved,
+        value: view.updateStatusCounts.approved,
         fill: "var(--color-approved)",
       },
       {
         key: "completed",
         name: "Completed",
-        value: data.updateStatusCounts.completed,
+        value: view.updateStatusCounts.completed,
         fill: "var(--color-completed)",
       },
       {
         key: "declined",
         name: "Declined",
-        value: data.updateStatusCounts.declined,
+        value: view.updateStatusCounts.declined,
         fill: "var(--color-declined)",
       },
     ].filter((d) => d.value > 0);
-  }, [data]);
+  }, [view]);
 
   const updateTypeBarData = useMemo(() => {
-    if (!data) return [];
+    if (!view) return [];
     return [
-      { key: "feature", label: "Feature", value: data.updateTypeCounts.feature },
-      { key: "updation", label: "Update", value: data.updateTypeCounts.updation },
-      { key: "maintenance", label: "Maintenance", value: data.updateTypeCounts.maintenance },
+      { key: "feature", label: "Feature", value: view.updateTypeCounts.feature },
+      { key: "updation", label: "Update", value: view.updateTypeCounts.updation },
+      { key: "maintenance", label: "Maintenance", value: view.updateTypeCounts.maintenance },
     ];
-  }, [data]);
+  }, [view]);
 
-  const openUpdatesCount = data
-    ? data.updateStatusCounts.pending + data.updateStatusCounts.approved
+  const openUpdatesCount = view
+    ? view.updateStatusCounts.pending + view.updateStatusCounts.approved
     : 0;
 
   const updatesProjectOptions = useMemo(() => {
-    if (!data?.updates?.length) return [];
+    if (!view?.updates?.length) return [];
     const byId = new Map<string, string>();
-    data.updates.forEach((u) => {
+    view.updates.forEach((u) => {
       const id = String(u.project_id || "");
       if (!id) return;
       if (!byId.has(id)) {
@@ -2174,11 +2335,11 @@ export default function AdminDashboard() {
     return Array.from(byId.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [data]);
+  }, [view]);
 
   const filteredRecentUpdates = useMemo(() => {
-    if (!data?.updates) return [];
-    return data.updates.filter((u) => {
+    if (!view?.updates) return [];
+    return view.updates.filter((u) => {
       if (updatesProjectFilter !== "all" && String(u.project_id) !== updatesProjectFilter) {
         return false;
       }
@@ -2187,7 +2348,7 @@ export default function AdminDashboard() {
       }
       return true;
     });
-  }, [data, updatesProjectFilter, updatesStatusFilter]);
+  }, [view, updatesProjectFilter, updatesStatusFilter]);
 
   const hasUpdatesFilters =
     updatesProjectFilter !== "all" || updatesStatusFilter !== "all";
@@ -2212,7 +2373,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const kpiCards = data
+  const kpiCards = data && view
     ? [
         {
           title: "Active projects",
@@ -2246,8 +2407,8 @@ export default function AdminDashboard() {
         },
         {
           title: "Open bugs",
-          value: data.bugCounts.open,
-          hint: `${data.highOpenFromProjects} high priority`,
+          value: view.bugCounts.open,
+          hint: `${view.highOpenFromProjects} high priority`,
           icon: BugIcon,
           gradient: "from-orange-500 to-red-600",
           chip: "from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-200 dark:border-orange-800",
@@ -2256,8 +2417,8 @@ export default function AdminDashboard() {
         },
         {
           title: "Fixed",
-          value: data.bugCounts.fixed,
-          hint: "Resolved bugs",
+          value: view.bugCounts.fixed,
+          hint: `In ${period.title.toLowerCase()}`,
           icon: CheckCircle2,
           gradient: "from-emerald-500 to-teal-600",
           chip: "from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800",
@@ -2319,7 +2480,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 tabular-nums">
-                      {data?.bugCounts.open ?? "—"}
+                      {view?.bugCounts.open ?? data?.bugCounts.open ?? "—"}
                     </div>
                     <div className="text-[10px] uppercase tracking-wider font-semibold text-blue-600/70 dark:text-blue-300/70">
                       Open bugs
@@ -2350,7 +2511,7 @@ export default function AdminDashboard() {
               <Skeleton className="h-72 rounded-2xl" />
             </div>
           </div>
-        ) : isError || !data ? (
+        ) : isError || !data || !view ? (
           <div className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 via-yellow-50/30 to-red-50/50 dark:from-orange-950/20 dark:via-yellow-950/10 dark:to-red-950/20 rounded-2xl" />
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 text-center space-y-4">
@@ -2473,8 +2634,18 @@ export default function AdminDashboard() {
                 </DrawerContent>
               </Drawer>
 
+              <DashboardPeriodFilter
+                preset={periodPreset}
+                customFrom={customFrom}
+                customTo={customTo}
+                period={period}
+                onPresetChange={setPeriodPreset}
+                onCustomFromChange={setCustomFrom}
+                onCustomToChange={setCustomTo}
+              />
+
               <TabsContent value="overview" className="space-y-6 sm:space-y-8 mt-0">
-                <BugPipelineCard bugCounts={data.bugCounts} role={role} />
+                <BugPipelineCard bugCounts={view.bugCounts} role={role} />
 
                 <div className={cn(PANEL, "p-5 sm:p-6 space-y-4")}>
                   <SectionTitle
@@ -2492,10 +2663,10 @@ export default function AdminDashboard() {
                     }
                   />
                   <StatusBugsTable
-                    bugs={data.openBugs}
+                    bugs={view.openBugs}
                     role={role}
                     mode="open"
-                    emptyLabel="No open bugs right now."
+                    emptyLabel="No open bugs in this period."
                     pageSize={12}
                   />
                 </div>
@@ -2885,8 +3056,8 @@ export default function AdminDashboard() {
                   {[
                     {
                       title: "Total",
-                      value: data.updatesTotal,
-                      hint: "All recorded updates",
+                      value: view.updatesTotal,
+                      hint: "In selected period",
                       icon: Megaphone,
                       tone: "text-violet-700 dark:text-violet-300",
                       chip: "from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 border-violet-200 dark:border-violet-800",
@@ -2903,7 +3074,7 @@ export default function AdminDashboard() {
                     },
                     {
                       title: "Completed",
-                      value: data.updateStatusCounts.completed,
+                      value: view.updateStatusCounts.completed,
                       hint: "Shipped updates",
                       icon: CheckCircle2,
                       tone: "text-emerald-700 dark:text-emerald-300",
@@ -2912,7 +3083,7 @@ export default function AdminDashboard() {
                     },
                     {
                       title: "Declined",
-                      value: data.updateStatusCounts.declined,
+                      value: view.updateStatusCounts.declined,
                       hint: "Not moving forward",
                       icon: AlertTriangle,
                       tone: "text-rose-700 dark:text-rose-300",
@@ -3009,8 +3180,8 @@ export default function AdminDashboard() {
                     title="Recent updates"
                     description={
                       hasUpdatesFilters
-                        ? `${filteredRecentUpdates.length.toLocaleString()} matching · ${data.updatesTotal.toLocaleString()} total`
-                        : `${data.updatesTotal.toLocaleString()} total · newest activity first`
+                        ? `${filteredRecentUpdates.length.toLocaleString()} matching · ${view.updatesTotal.toLocaleString()} in period`
+                        : `${view.updatesTotal.toLocaleString()} in period · newest activity first`
                     }
                     gradient="from-violet-500 to-indigo-600"
                     action={
@@ -3291,15 +3462,15 @@ export default function AdminDashboard() {
                     <ChartContainer config={statusChartConfig} className="aspect-[4/3] w-full">
                       <BarChart
                         data={[
-                          { label: "Pending", value: data.bugCounts.pending, key: "pending" },
+                          { label: "Pending", value: view.bugCounts.pending, key: "pending" },
                           {
                             label: "In progress",
-                            value: data.bugCounts.in_progress,
+                            value: view.bugCounts.in_progress,
                             key: "in_progress",
                           },
-                          { label: "Fixed", value: data.bugCounts.fixed, key: "fixed" },
-                          { label: "Declined", value: data.bugCounts.declined, key: "declined" },
-                          { label: "Rejected", value: data.bugCounts.rejected, key: "rejected" },
+                          { label: "Fixed", value: view.bugCounts.fixed, key: "fixed" },
+                          { label: "Declined", value: view.bugCounts.declined, key: "declined" },
+                          { label: "Rejected", value: view.bugCounts.rejected, key: "rejected" },
                         ]}
                         margin={{ left: 8, right: 8, top: 8 }}
                       >
@@ -3342,7 +3513,7 @@ export default function AdminDashboard() {
                   </Button>
                 </div>
 
-                <BugPipelineCard bugCounts={data.bugCounts} role={role} />
+                <BugPipelineCard bugCounts={view.bugCounts} role={role} />
 
                 <div className={cn(PANEL, "p-5 sm:p-6 space-y-5")}>
                   <SectionTitle
@@ -3351,14 +3522,14 @@ export default function AdminDashboard() {
                     description="Full lists — pending, in progress, fixed, declined, rejected"
                     gradient="from-orange-500 to-red-600"
                   />
-                  <BugsFixesStatusPanel data={data} role={role} defaultStatus="open" />
+                  <BugsFixesStatusPanel data={view} role={role} defaultStatus="open" />
                 </div>
 
                 <div className={cn(PANEL, "p-5 sm:p-6 space-y-5")}>
                   <SectionTitle
                     icon={CheckCircle2}
                     title="Fixes"
-                    description={`Resolved bugs (${data.bugCounts.fixed.toLocaleString()} total)`}
+                    description={`Resolved bugs (${view.bugCounts.fixed.toLocaleString()} in period)`}
                     gradient="from-emerald-500 to-teal-600"
                     action={
                       <Button asChild variant="ghost" size="sm" className="font-semibold">
@@ -3370,7 +3541,7 @@ export default function AdminDashboard() {
                     }
                   />
                   <StatusBugsTable
-                    bugs={data.bugsByStatus.fixed}
+                    bugs={view.bugsByStatus.fixed}
                     role={role}
                     mode="fixed"
                     emptyLabel="No fixed bugs yet."
@@ -3550,6 +3721,7 @@ export default function AdminDashboard() {
                   trackableUsers={data.trackableUsers}
                   role={role}
                   enabled={isAdmin && activeTab === "work"}
+                  period={period}
                 />
               </TabsContent>
             </Tabs>
