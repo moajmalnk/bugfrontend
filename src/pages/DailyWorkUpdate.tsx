@@ -13,7 +13,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2 } from 'lucide-react';
+import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2, LocateFixed } from 'lucide-react';
 import { projectService, Project } from '@/services/projectService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -28,6 +28,7 @@ import { assertDeviceClockMatchesServer } from '@/lib/deviceClock';
 import {
   getCheckInPosition,
   OfficeLocationError,
+  queryGeolocationPermission,
   resolveOfficeConfig,
   type CheckInPosition,
 } from '@/lib/officeLocation';
@@ -75,6 +76,37 @@ function clearDailyWorkDraft(userId: string | number, date: string) {
   }
 }
 
+/**
+ * Why: After DB check-in rows are deleted, drafts can still force Checkout.
+ * Strip phantom check_in_time from all drafts for this user when today has no open session.
+ */
+function stripPhantomCheckInDrafts(userId: string | number) {
+  try {
+    const prefix = `bugRicer:dailyWorkDraft:v${DAILY_WORK_DRAFT_VERSION}:${userId}:`;
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(prefix)) keys.push(key);
+    }
+    for (const key of keys) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw) as DailyWorkDraftStored;
+        if (!parsed?.form?.check_in_time) continue;
+        parsed.form = { ...parsed.form, check_in_time: undefined };
+        parsed.isOnBreak = false;
+        parsed.breakStartedAtIso = null;
+        localStorage.setItem(key, JSON.stringify(parsed));
+      } catch {
+        /* ignore bad draft keys */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 function countTaskLines(text?: string) {
   if (!text) return 0;
   return text
@@ -108,15 +140,9 @@ function clearProjectUpdateNotes(updates: Record<string, ProjectWorkUpdate>) {
 }
 
 function isWorkSubmissionRowComplete(row: any) {
+  // Why: Checkout is complete once hours are logged — tasks / WFH-office are not required.
   const hours = Number(row.hours_today || 0);
-  if (hours < 1) return false;
-  return (
-    countTaskLines(row.completed_tasks) +
-      countTaskLines(row.pending_tasks) +
-      countTaskLines(row.ongoing_tasks) +
-      countTaskLines(row.notes) >
-    0
-  );
+  return hours >= 1;
 }
 
 function parsePlannedProjectsFromRow(existingSubmission: any): string[] {
@@ -322,8 +348,19 @@ export function DailyWorkFlowPanel({
 
   const verifyOfficeLocation = useCallback(async () => {
     setOfficeGeoStatus('checking');
-    setOfficeGeoMessage('Verifying office location…');
     setOfficePosition(null);
+
+    const permission = await queryGeolocationPermission();
+    if (permission === 'denied') {
+      setOfficeGeoMessage(
+        'Location is blocked for this site. Tap the lock icon in the address bar → Site settings → Location → Allow, then tap Allow location again.'
+      );
+    } else if (permission === 'prompt') {
+      setOfficeGeoMessage('Waiting for location access… Allow location when your browser asks.');
+    } else {
+      setOfficeGeoMessage('Getting your location…');
+    }
+
     try {
       const pos = await getCheckInPosition(officeGeoConfig);
       setOfficePosition(pos);
@@ -345,6 +382,15 @@ export function DailyWorkFlowPanel({
       throw e instanceof Error ? e : new Error(msg);
     }
   }, [officeGeoConfig]);
+
+  /** Why: Retry must re-trigger geolocation from a user click so the browser can show Allow. */
+  const retryOfficeLocation = useCallback(async () => {
+    try {
+      await verifyOfficeLocation();
+    } catch {
+      // status/message already set by verifyOfficeLocation
+    }
+  }, [verifyOfficeLocation]);
 
   const selectWorkMode = useCallback(
     async (mode: WorkMode) => {
@@ -532,13 +578,8 @@ export function DailyWorkFlowPanel({
       ? true
       : requestedExtraHours > 0 && requestedExtraHours <= 16 && approvalReason.trim().length > 0;
 
-    // Check if at least one task field has content
-    const hasTasks = countItems(form.completed_tasks) > 0 ||
-      countItems(form.pending_tasks) > 0 ||
-      countItems(form.ongoing_tasks) > 0 ||
-      countItems(form.notes) > 0;
-
-    return hasDate && hasHours && hasTasks && overtimeRequestValid;
+    // Why: Checkout must not require tasks or Office/WFH — those apply at check-in only.
+    return hasDate && hasHours && overtimeRequestValid;
   }, [form, requestAdminApproval, requestedExtraHours, approvalReason]);
 
   const taskCounts = useMemo(() => {
@@ -696,14 +737,7 @@ export function DailyWorkFlowPanel({
         }
       }
 
-      // Validate that at least one task field has content
-      const hasTasks = countItems(form.completed_tasks) > 0 ||
-        countItems(form.pending_tasks) > 0 ||
-        countItems(form.ongoing_tasks) > 0 ||
-        countItems(form.notes) > 0;
-      if (!hasTasks) {
-        throw new Error('Please enter at least one task in Completed, Pending, Ongoing, or Upcoming fields');
-      }
+      // Tasks / project notes are optional at checkout (Office/WFH is check-in only).
       
       toast({ 
         title: isEditing ? 'Updating...' : 'Checking out...',
@@ -1340,16 +1374,16 @@ export function DailyWorkFlowPanel({
           setServerToday(resolvedServerToday);
         }
 
-        const openSession = submissions.find(
-          (s) => s.check_in_time && !isWorkSubmissionRowComplete(s)
+        // Why: Only today's incomplete check-in is an open session. Other month days
+        // (or deleted DB rows with leftover local drafts) must not force Checkout.
+        const todayRow = submissions.find(
+          (s) => String(s.submission_date) === String(resolvedServerToday)
         );
-        const attendanceDate = String(
-          openSession?.submission_date || resolvedServerToday
+        const hasOpenServerSession = Boolean(
+          todayRow?.check_in_time && !isWorkSubmissionRowComplete(todayRow)
         );
-
-        const existingSubmission = submissions.find(
-          (s) => String(s.submission_date) === attendanceDate
-        );
+        const attendanceDate = resolvedServerToday;
+        const existingSubmission = todayRow;
 
         let draft: DailyWorkDraftStored | null = null;
         try {
@@ -1368,6 +1402,19 @@ export function DailyWorkFlowPanel({
           }
         } catch {
           draft = null;
+        }
+
+        // Why: After admin deletes check-in rows, drafts can still claim check_in_time.
+        if (!hasOpenServerSession) {
+          stripPhantomCheckInDrafts(userId);
+          if (draft?.form?.check_in_time) {
+            draft = {
+              ...draft,
+              form: { ...draft.form, check_in_time: undefined },
+              isOnBreak: false,
+              breakStartedAtIso: null,
+            };
+          }
         }
 
         if (cancelled) return;
@@ -1445,8 +1492,10 @@ export function DailyWorkFlowPanel({
             setForm((prev) => ({
               ...prev,
               submission_date: attendanceDate,
-              check_in_time:
-                existingSubmission.check_in_time || draft.form.check_in_time,
+              // Prefer server check-in; never invent a session from draft alone.
+              check_in_time: hasOpenServerSession
+                ? existingSubmission.check_in_time || undefined
+                : undefined,
               hours_today: draft.form.hours_today ?? prev.hours_today,
               planned_work_status:
                 draft.form.planned_work_status ?? prev.planned_work_status,
@@ -1473,17 +1522,24 @@ export function DailyWorkFlowPanel({
                 ? draft.projectUpdates
                 : projectUpdatesMapFromRow(existingSubmission);
             setProjectUpdates(clearProjectUpdateNotes(baseProjectUpdates));
-            if (draft.isOnBreak && draft.breakStartedAtIso) {
+            if (
+              hasOpenServerSession &&
+              draft.isOnBreak &&
+              draft.breakStartedAtIso
+            ) {
               setIsOnBreak(true);
               setBreakStartedAt(new Date(draft.breakStartedAtIso));
             } else {
               setIsOnBreak(false);
               setBreakStartedAt(null);
             }
+            setTodaySubmissionComplete(false);
           } else {
             setForm((prev) => ({
               ...prev,
-              check_in_time: existingSubmission.check_in_time || undefined,
+              check_in_time: hasOpenServerSession
+                ? existingSubmission.check_in_time || undefined
+                : undefined,
               ...emptyCheckoutFormFields(),
             }));
             setBreakEntries(serverBreaks);
@@ -1509,7 +1565,8 @@ export function DailyWorkFlowPanel({
           setForm((prev) => ({
             ...prev,
             submission_date: attendanceDate,
-            check_in_time: draft.form.check_in_time,
+            // No server row for today — never restore a phantom check-in from draft.
+            check_in_time: undefined,
             hours_today: draft.form.hours_today ?? prev.hours_today,
             planned_work_status:
               draft.form.planned_work_status ?? prev.planned_work_status,
@@ -1522,13 +1579,8 @@ export function DailyWorkFlowPanel({
           setRequestedExtraHours(0);
           setApprovalReason('');
           setProjectUpdates(clearProjectUpdateNotes(draft.projectUpdates || {}));
-          if (draft.isOnBreak && draft.breakStartedAtIso) {
-            setIsOnBreak(true);
-            setBreakStartedAt(new Date(draft.breakStartedAtIso));
-          } else {
-            setIsOnBreak(false);
-            setBreakStartedAt(null);
-          }
+          setIsOnBreak(false);
+          setBreakStartedAt(null);
           setTodaySubmissionComplete(false);
         } else {
           setForm((prev) => ({
@@ -2089,7 +2141,7 @@ export function DailyWorkFlowPanel({
               </div>
               {workMode === 'office' ? (
                 <div
-                  className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${
+                  className={`flex items-start gap-3 rounded-xl border px-3 py-3 text-xs ${
                     officeGeoStatus === 'ok'
                       ? 'border-emerald-300/80 bg-emerald-50/90 text-emerald-900 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-100'
                       : officeGeoStatus === 'error'
@@ -2098,23 +2150,32 @@ export function DailyWorkFlowPanel({
                   }`}
                 >
                   {officeGeoStatus === 'checking' ? (
-                    <Loader2 className="h-3.5 w-3.5 shrink-0 mt-0.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 shrink-0 mt-0.5 animate-spin" />
                   ) : (
-                    <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                   )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <p className="font-medium leading-relaxed">
                       {officeGeoMessage ||
                         `Office check-in requires your location within ${officeGeoConfig.radiusM} m of ${officeGeoConfig.label}.`}
                     </p>
                     {officeGeoStatus === 'error' ? (
-                      <button
+                      <Button
                         type="button"
-                        className="mt-1 underline font-semibold"
-                        onClick={() => void verifyOfficeLocation()}
+                        variant="outline"
+                        size="sm"
+                        disabled={isCheckingIn}
+                        onClick={() => void retryOfficeLocation()}
+                        className="h-9 rounded-xl border-rose-300/80 bg-background/90 px-3 text-xs font-semibold text-rose-900 hover:bg-rose-100 dark:border-rose-700/60 dark:text-rose-100 dark:hover:bg-rose-950/60"
                       >
-                        Retry location
-                      </button>
+                        <LocateFixed className="h-3.5 w-3.5 mr-1.5" />
+                        Allow location
+                      </Button>
+                    ) : null}
+                    {officeGeoStatus === 'checking' ? (
+                      <p className="text-[11px] opacity-80">
+                        Look for the browser location prompt and choose Allow.
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -2328,7 +2389,7 @@ export function DailyWorkFlowPanel({
                   {checkoutWizardStep === 'form'
                     ? isEditing
                       ? 'Review and update your daily work submission.'
-                      : 'Review and submit your daily work before checking out.'
+                      : 'Log hours to check out. Tasks and project notes are optional — Office/WFH was already set at check-in.'
                     : 'Copy or share your daily work update.'}
                 </DialogDescription>
               </DialogHeader>
@@ -2460,7 +2521,7 @@ export function DailyWorkFlowPanel({
                       <div className="min-w-0 flex-1">
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white">Daily Tasks</h3>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Fill at least one task field to complete checkout
+                          Optional — add tasks if you want them on today’s summary
                           {taskCounts.total > 0 ? (
                             <span className="ml-1 font-medium text-emerald-600 dark:text-emerald-400">
                               · {taskCounts.total} {taskCounts.total === 1 ? 'item' : 'items'} total
@@ -2581,7 +2642,7 @@ export function DailyWorkFlowPanel({
                         <AlertTriangle className="h-4 w-4 text-white" />
                       </div>
                       <p className="text-sm leading-relaxed text-red-700 dark:text-red-300">
-                        Please complete date, hours (1–8), and at least one task field before checkout.
+                        Set hours worked (1–8) to complete checkout. Tasks and Office/WFH are not required here.
                       </p>
                     </div>
                   ) : null}

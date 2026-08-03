@@ -33,7 +33,10 @@ import {
   Bell,
   Bug,
   Building2,
+  CalendarClock,
   CheckCircle2,
+  Clapperboard,
+  ClipboardCheck,
   ClipboardList,
   CornerDownLeft,
   FileSpreadsheet,
@@ -43,13 +46,17 @@ import {
   LayoutDashboard,
   LifeBuoy,
   Mail,
+  MapPin,
   MessageSquare,
   Phone,
+  PlaneTakeoff,
   Plus,
   RefreshCw,
   Search,
   Settings,
   Shield,
+  Signal,
+  Timer,
   User,
   Users,
   Video,
@@ -87,20 +94,40 @@ const PAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   "page-meet": Video,
   "page-tasks": ClipboardList,
   "page-daily-update": ClipboardList,
-  "page-daily-work": Activity,
+  "page-daily-work": CalendarClock,
+  "page-leave": PlaneTakeoff,
+  "page-leave-requests": PlaneTakeoff,
   "page-reports": FileSpreadsheet,
   "page-common-bugs": Bug,
-  "page-common-codo": FileText,
+  "page-common-codo": ClipboardCheck,
   "page-messages": MessageSquare,
   "page-admin-dashboard": LayoutDashboard,
   "page-users": Users,
+  "page-attendance-exceptions": CalendarClock,
   "page-clients": Building2,
-  "page-ot": ClipboardList,
+  "page-ot": Timer,
   "page-whatsapp": Phone,
   "page-feedback": MessageSquare,
   "page-activity": Activity,
+  "page-push-coverage": Signal,
+  "page-shorts": Clapperboard,
   "page-settings": Settings,
+  "page-office-location": MapPin,
   "page-bugbackup": Shield,
+};
+
+const CHIP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  Email: Mail,
+  Phone: Phone,
+  Leave: PlaneTakeoff,
+  Attendance: CalendarClock,
+  "Check-in": CalendarClock,
+  CODO: ClipboardCheck,
+  Bug: Bug,
+  Help: HelpCircle,
+  Project: FolderKanban,
+  Client: Building2,
+  Name: User,
 };
 
 function resolveResultIcon(result: SearchResult) {
@@ -223,19 +250,20 @@ export function GlobalSearchDialog() {
             />
             {!hasQuery && (
               <div className="mt-2.5 flex flex-wrap gap-1.5">
-                {hintChips.map((chip) => (
-                  <span
-                    key={chip}
-                    className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground"
-                  >
-                    {chip === "Email" ? (
-                      <Mail className="h-3 w-3" />
-                    ) : chip === "Phone" ? (
-                      <Phone className="h-3 w-3" />
-                    ) : null}
-                    {chip}
-                  </span>
-                ))}
+                {hintChips.map((chip) => {
+                  const ChipIcon = CHIP_ICONS[chip];
+                  return (
+                    <button
+                      key={chip}
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-xl border border-border/50 bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                      onClick={() => setQuery(chip)}
+                    >
+                      {ChipIcon ? <ChipIcon className="h-3 w-3" /> : null}
+                      {chip}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -336,8 +364,8 @@ export function GlobalSearchDialog() {
                 Email
               </span>
               <span className="inline-flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                Phone
+                <CalendarClock className="h-3 w-3" />
+                Attendance
               </span>
             </span>
           </div>

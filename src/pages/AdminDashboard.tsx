@@ -61,6 +61,7 @@ import { projectService } from "@/services/projectService";
 import { updateService, type Update } from "@/services/updateService";
 import { userService } from "@/services/userService";
 import { RecentDeadlineRemindersPanel } from "@/components/dashboard/RecentDeadlineRemindersPanel";
+import { MonthlyOpsTimelinePanel } from "@/components/dashboard/MonthlyOpsTimelinePanel";
 import { Bug, User } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -77,6 +78,7 @@ import {
   Clock,
   FolderKanban,
   Hourglass,
+  Infinity,
   LayoutDashboard,
   Lock,
   Megaphone,
@@ -1199,6 +1201,7 @@ function workStatusBadgeClass(status: WorkRetentionRow["status"]): string {
 }
 
 type WorkPeriodPreset =
+  | "all"
   | "today"
   | "yesterday"
   | "week"
@@ -1214,6 +1217,7 @@ const WORK_PERIOD_PRESETS: {
   label: string;
   icon: LucideIcon;
 }[] = [
+  { value: "all", label: "All", icon: Infinity },
   { value: "today", label: "Today", icon: Clock },
   { value: "yesterday", label: "Yesterday", icon: CalendarDays },
   { value: "week", label: "This week", icon: CalendarDays },
@@ -1283,6 +1287,15 @@ function resolveWorkPeriod(
   const today = toLocalCalendarDateString(new Date());
   const yesterday = shiftCalendarDate(today, -1);
 
+  if (preset === "all") {
+    return {
+      from: "2015-01-01",
+      to: today,
+      title: "All time",
+      rangeLabel: "All records",
+      hoursLabel: "Total hours",
+    };
+  }
   if (preset === "today") {
     return {
       from: today,
@@ -1432,7 +1445,9 @@ function DashboardPeriodFilter({
   isFetching?: boolean;
 }) {
   const activePreset =
-    WORK_PERIOD_PRESETS.find((p) => p.value === preset) ?? WORK_PERIOD_PRESETS[4];
+    WORK_PERIOD_PRESETS.find((p) => p.value === preset) ??
+    WORK_PERIOD_PRESETS.find((p) => p.value === "month") ??
+    WORK_PERIOD_PRESETS[0];
   const ActivePresetIcon = activePreset.icon;
 
   const selectPreset = (value: WorkPeriodPreset) => {
@@ -1970,11 +1985,11 @@ function AttendancePeoplePanel({
       : "from-amber-50/50 via-transparent to-orange-50/20 dark:from-amber-950/20 dark:via-transparent dark:to-orange-950/10";
 
   return (
-    <div className={cn(PANEL, "flex flex-col")}>
+    <div className={cn(PANEL, "flex flex-col h-full min-h-0 w-full")}>
       <div className={cn("absolute inset-0 bg-gradient-to-br pointer-events-none", wash)} />
       <div className={cn("absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b", accentBar)} />
-      <div className="relative flex flex-col flex-1 p-5 sm:p-6 pl-6 space-y-5">
-        <div className="flex items-start justify-between gap-4">
+      <div className="relative flex flex-col flex-1 min-h-0 p-5 sm:p-6 pl-6 gap-5">
+        <div className="flex items-start justify-between gap-4 shrink-0">
           <div className="flex items-start gap-3 min-w-0">
             <div
               className={cn(
@@ -2002,16 +2017,16 @@ function AttendancePeoplePanel({
         </div>
 
         {count === 0 ? (
-          <div className="flex-1 flex items-center justify-center rounded-2xl border border-dashed border-gray-200/80 dark:border-gray-700/80 py-12 px-4">
+          <div className="flex-1 min-h-[12rem] flex items-center justify-center rounded-2xl border border-dashed border-gray-200/80 dark:border-gray-700/80 py-12 px-4">
             <p className="text-sm text-muted-foreground text-center">{emptyLabel}</p>
           </div>
         ) : (
-          <ul className="flex-1 space-y-0.5 max-h-80 overflow-y-auto hide-scrollbar divide-y divide-gray-100/80 dark:divide-gray-800/60">
+          <ul className="flex-1 min-h-0 max-h-80 overflow-y-auto hide-scrollbar divide-y divide-gray-100/80 dark:divide-gray-800/60">
             {children}
           </ul>
         )}
 
-        {footer ? <div className="pt-1">{footer}</div> : null}
+        {footer ? <div className="pt-1 shrink-0 mt-auto">{footer}</div> : null}
       </div>
     </div>
   );
@@ -2584,6 +2599,8 @@ export default function AdminDashboard() {
 
               <TabsContent value="overview" className="space-y-6 sm:space-y-8 mt-0">
                 <BugPipelineCard bugCounts={view.bugCounts} role={role} />
+
+                <MonthlyOpsTimelinePanel enabled={isAdmin} />
 
                 <div className={cn(PANEL, "p-5 sm:p-6 space-y-4")}>
                   <SectionTitle
@@ -3581,8 +3598,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-12 gap-5 sm:gap-6">
-                  <div className="col-span-12 lg:col-span-6">
+                <div className="grid grid-cols-12 gap-5 sm:gap-6 items-stretch">
+                  <div className="col-span-12 lg:col-span-6 flex">
                     <AttendancePeoplePanel
                       title="Checked in today"
                       description="Team members who started work"
@@ -3607,7 +3624,7 @@ export default function AdminDashboard() {
                     </AttendancePeoplePanel>
                   </div>
 
-                  <div className="col-span-12 lg:col-span-6">
+                  <div className="col-span-12 lg:col-span-6 flex">
                     <AttendancePeoplePanel
                       title="Not checked in"
                       description="Developers and testers still offline"

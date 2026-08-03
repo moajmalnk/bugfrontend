@@ -3,6 +3,8 @@ import { onMessage, type MessagePayload } from "firebase/messaging";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { getFirebaseMessagingInstance } from "@/firebase-messaging-sw";
+import { notificationService } from "@/services/notificationService";
+import { bindNotificationSoundUnlock } from "@/lib/notificationSound";
 
 function resolvePayload(payload: MessagePayload) {
   const data = payload.data ?? {};
@@ -37,6 +39,7 @@ function showSystemNotification(
       badge: "/notification-badge-96.png",
       tag: `bugricer-${url}`,
       renotify: true,
+      silent: true, // OS chime + bug-tune would double; we play BugRicer audio ourselves.
       data: { url },
     };
     if (image) {
@@ -63,6 +66,10 @@ const FirebaseListener = () => {
   const { currentUser } = useAuth();
 
   useEffect(() => {
+    bindNotificationSoundUnlock();
+  }, []);
+
+  useEffect(() => {
     if (!currentUser || !("serviceWorker" in navigator)) {
       return;
     }
@@ -87,6 +94,8 @@ const FirebaseListener = () => {
           title: resolved.title,
           description: resolved.body,
         });
+
+        notificationService.playNotificationSound();
 
         // Also try a system notification (helps when toast is easy to miss)
         showSystemNotification(

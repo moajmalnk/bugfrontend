@@ -18,7 +18,7 @@ class BroadcastNotificationService {
   private pollInterval: number = 30000; // 30 seconds
   private lastCheckTime: string = new Date().toISOString();
   private isPolling: boolean = false;
-  private intervalId: NodeJS.Timeout | null = null;
+  private intervalId: ReturnType<typeof setInterval> | null = null;
 
   // Helper method to get role-neutral URL for sharing
   private getRoleBasedUrl(path: string): string {
@@ -199,7 +199,7 @@ class BroadcastNotificationService {
         icon: '/favicon.ico',
         tag: `broadcast-${notification.id}`,
         requireInteraction: false,
-        silent: false
+        silent: true, // BugRicer chime plays separately
       });
 
       // Play sound if enabled

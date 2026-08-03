@@ -34,6 +34,7 @@ import {
   ClipboardCheck,
   LayoutDashboard,
   Clapperboard,
+  CalendarClock,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
@@ -336,6 +337,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/leave-requests"
                       icon={<PlaneTakeoff className="h-5 w-5" />}
                       label="Leave requests"
+                    />
+                  )}
+
+                  {hasUsersPermission && (
+                    <NavLink
+                      to="/attendance-exceptions"
+                      icon={<CalendarClock className="h-5 w-5" />}
+                      label="Attendance exceptions"
                     />
                   )}
 

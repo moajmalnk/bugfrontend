@@ -1,6 +1,10 @@
 import { AnnouncementManager } from "@/components/settings/AnnouncementManager";
 import { BugTypesTab } from "@/components/settings/BugTypesTab";
 import { NotificationSettingsCard } from "@/components/settings/NotificationSettings";
+import {
+  OfficeLocationMapPicker,
+  OfficeLocationMapPreview,
+} from "@/components/settings/OfficeLocationMapPicker";
 import { RolesTab } from "@/components/settings/RolesTab";
 // WhatsApp feature removed
 import { Button } from "@/components/ui/button";
@@ -37,6 +41,7 @@ import {
   Bell,
   Check,
   ChevronDown,
+  Map,
   MapPin,
   Megaphone,
   Moon,
@@ -68,6 +73,7 @@ const Settings = () => {
   );
   const [loadingOfficeSettings, setLoadingOfficeSettings] = useState(true);
   const [savingOfficeSettings, setSavingOfficeSettings] = useState(false);
+  const [officeMapOpen, setOfficeMapOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab") || "general";
   const normalizeSettingsTab = (tab: string) => {
@@ -498,7 +504,7 @@ const Settings = () => {
                           <Skeleton className="col-span-12 h-10 rounded-xl" />
                           <Skeleton className="col-span-12 md:col-span-6 h-10 rounded-xl" />
                           <Skeleton className="col-span-12 md:col-span-6 h-10 rounded-xl" />
-                          <Skeleton className="col-span-12 md:col-span-6 h-10 rounded-xl" />
+                          <Skeleton className="col-span-12 h-44 rounded-xl" />
                         </div>
                       ) : (
                         <div className="grid grid-cols-12 gap-4">
@@ -520,7 +526,46 @@ const Settings = () => {
                               className="h-11 rounded-xl"
                             />
                           </div>
-                          <div className="col-span-12 md:col-span-6 space-y-2">
+
+                          <div className="col-span-12 space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <Label className="text-sm font-medium">Map preview</Label>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  className="h-10 rounded-xl"
+                                  onClick={() => setOfficeMapOpen(true)}
+                                >
+                                  <Map className="h-4 w-4 mr-2" />
+                                  Choose on map
+                                </Button>
+                                <a
+                                  href={`https://www.google.com/maps?q=${encodeURIComponent(
+                                    `${officeLocation.office_lat},${officeLocation.office_lng}`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-border px-4 text-sm font-medium text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/40"
+                                >
+                                  <MapPin className="h-4 w-4" />
+                                  Open in Google Maps
+                                </a>
+                              </div>
+                            </div>
+                            <OfficeLocationMapPreview
+                              lat={officeLocation.office_lat}
+                              lng={officeLocation.office_lng}
+                              radiusM={officeLocation.office_radius_m}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Blue circle = allowed Office check-in radius (
+                              {officeLocation.office_radius_m} m). Click{" "}
+                              <span className="font-medium text-foreground">Choose on map</span> to
+                              search, drop a pin, or use GPS.
+                            </p>
+                          </div>
+
+                          <div className="col-span-12 md:col-span-4 space-y-2">
                             <Label htmlFor="officeLat" className="text-sm font-medium">
                               Latitude
                             </Label>
@@ -539,7 +584,7 @@ const Settings = () => {
                               className="h-11 rounded-xl"
                             />
                           </div>
-                          <div className="col-span-12 md:col-span-6 space-y-2">
+                          <div className="col-span-12 md:col-span-4 space-y-2">
                             <Label htmlFor="officeLng" className="text-sm font-medium">
                               Longitude
                             </Label>
@@ -558,7 +603,7 @@ const Settings = () => {
                               className="h-11 rounded-xl"
                             />
                           </div>
-                          <div className="col-span-12 md:col-span-6 space-y-2">
+                          <div className="col-span-12 md:col-span-4 space-y-2">
                             <Label htmlFor="officeRadius" className="text-sm font-medium">
                               Allowed radius (meters)
                             </Label>
@@ -584,22 +629,22 @@ const Settings = () => {
                               Recommended 200–500 m for indoor GPS drift. Range: 50–5000 m.
                             </p>
                           </div>
-                          <div className="col-span-12 md:col-span-6 flex items-end">
-                            <a
-                              href={`https://www.google.com/maps?q=${encodeURIComponent(
-                                `${officeLocation.office_lat},${officeLocation.office_lng}`
-                              )}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex h-11 items-center gap-2 rounded-xl border border-border px-4 text-sm font-medium text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/40"
-                            >
-                              <MapPin className="h-4 w-4" />
-                              Preview on Google Maps
-                            </a>
-                          </div>
                         </div>
                       )}
                     </div>
+
+                    <OfficeLocationMapPicker
+                      open={officeMapOpen}
+                      onOpenChange={setOfficeMapOpen}
+                      value={officeLocation}
+                      onApply={(next) => {
+                        setOfficeLocation(next);
+                        toast({
+                          title: "Location selected",
+                          description: "Review the preview, then Save Settings to apply.",
+                        });
+                      }}
+                    />
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-gray-200/50 dark:border-gray-700/50">
                       <Button

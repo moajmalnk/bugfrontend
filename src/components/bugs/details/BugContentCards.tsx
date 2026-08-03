@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,6 +12,7 @@ import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
 import {
   formatRetestSummary,
   TesterVerificationPanel,
+  triState,
 } from "@/components/bugs/details/TesterVerificationPanel";
 import { formatDetailedDate } from "@/lib/dateUtils";
 import {
@@ -53,6 +54,8 @@ interface BugContentCardsProps {
   bug: Bug;
   onBugUpdated?: (bug: Bug) => void;
 }
+
+type BugAttachmentItem = NonNullable<Bug["attachments"]>[number];
 
 export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
   const queryClient = useQueryClient();
@@ -120,27 +123,27 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
   // Use ENV.API_URL from env.ts to ensure consistency with backend
   const apiBaseUrl = ENV.API_URL;
 
-  const buildImageUrl = (path: string) => {
+  const buildImageUrl = useCallback((path: string) => {
     if (/^https?:\/\//i.test(path)) {
       return path;
     }
     return `${apiBaseUrl}/image.php?path=${encodeURIComponent(path)}`;
-  };
-  const buildAudioUrl = (path: string) => {
+  }, [apiBaseUrl]);
+  const buildAudioUrl = useCallback((path: string) => {
     if (/^https?:\/\//i.test(path)) {
       return path;
     }
     // Use audio.php endpoint for audio files (same as EditBugDialog)
     return `${apiBaseUrl}/audio.php?path=${encodeURIComponent(path)}`;
-  };
-  const buildDownloadUrl = (path: string, name?: string) => {
+  }, [apiBaseUrl]);
+  const buildDownloadUrl = useCallback((path: string, name?: string) => {
     const base = `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(
       path
     )}`;
     const withName = name ? `${base}&name=${encodeURIComponent(name)}` : base;
     // Also include bug_id for better compatibility
     return `${withName}&bug_id=${encodeURIComponent(bug.id)}`;
-  };
+  }, [apiBaseUrl, bug.id]);
 
   // Cleanup audio elements when component unmounts
   const formatTime = (seconds: number) => {
@@ -155,7 +158,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     let cancelled = false;
 
     const seed: { [key: string]: number } = {};
-    const missing: typeof bug.attachments = [];
+    const missing: BugAttachmentItem[] = [];
 
     for (const attachment of bug.attachments) {
       const isAudio =
@@ -195,7 +198,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     return () => {
       cancelled = true;
     };
-  }, [bug.attachments]);
+  }, [bug.attachments, buildAudioUrl]);
 
   const downloadAttachment = (attachment: {
     file_path: string;
@@ -233,30 +236,31 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     setScreenshotViewerOpen(true);
   };
 
-  // Use only the main attachments array from backend to avoid duplicates
-  // The backend creates both 'attachments' and separate 'screenshots'/'files' arrays
-  // We should only use the main 'attachments' array to prevent duplicates
-  const allAttachments = Array.isArray((bug as any).attachments)
-    ? ((bug as any).attachments as any[])
+  // Prefer main attachments array; fall back to legacy screenshots/files.
+  const allAttachments: BugAttachmentItem[] = Array.isArray(bug.attachments)
+    ? bug.attachments
     : [];
-  
-  // If no attachments in main array, fallback to legacy structure (for backward compatibility)
-  const fallbackAttachments = allAttachments.length === 0 ? [
-    ...(Array.isArray((bug as any).screenshots) ? (bug as any).screenshots.map((s: any) => ({
-      id: s.id,
-      file_name: s.name,
-      file_path: s.path,
-      file_type: s.type || "image/*",
-    })) : []),
-    ...(Array.isArray((bug as any).files) ? (bug as any).files.map((f: any) => ({
-      id: f.id,
-      file_name: f.name,
-      file_path: f.path,
-      file_type: f.type || "application/octet-stream",
-    })) : [])
-  ] : [];
 
-  const finalAttachments = allAttachments.length > 0 ? allAttachments : fallbackAttachments;
+  const fallbackAttachments: BugAttachmentItem[] =
+    allAttachments.length === 0
+      ? [
+          ...(bug.screenshots ?? []).map((s) => ({
+            id: s.id,
+            file_name: s.name,
+            file_path: s.path,
+            file_type: s.type || "image/*",
+          })),
+          ...(bug.files ?? []).map((f) => ({
+            id: f.id,
+            file_name: f.name,
+            file_path: f.path,
+            file_type: f.type || "application/octet-stream",
+          })),
+        ]
+      : [];
+
+  const finalAttachments =
+    allAttachments.length > 0 ? allAttachments : fallbackAttachments;
 
   // Separate by type from final attachments list
   const screenshots = finalAttachments.filter(
@@ -939,49 +943,39 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                 })()}
               </div>
 
+              {(() => {
+                const retested = triState(bug.tester_retested);
+                const issueFixed = triState(bug.tester_issue_fixed);
+                return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium">Tester tested again:</span>
                   <Badge variant="outline" className="rounded-full">
-                    {bug.tester_retested === true ||
-                    bug.tester_retested === 1 ||
-                    bug.tester_retested === "1"
+                    {retested === "yes"
                       ? "Yes"
-                      : bug.tester_retested === false ||
-                          bug.tester_retested === 0 ||
-                          bug.tester_retested === "0"
+                      : retested === "no"
                         ? "No"
                         : "Not recorded"}
                   </Badge>
                 </div>
 
-                {(bug.tester_retested === true ||
-                  bug.tester_retested === 1 ||
-                  bug.tester_retested === "1") && (
+                {retested === "yes" && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">Issue fixed:</span>
                     <Badge
                       variant="outline"
                       className={cn(
                         "rounded-full",
-                        bug.tester_issue_fixed === true ||
-                          bug.tester_issue_fixed === 1 ||
-                          bug.tester_issue_fixed === "1"
+                        issueFixed === "yes"
                           ? "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"
-                          : bug.tester_issue_fixed === false ||
-                              bug.tester_issue_fixed === 0 ||
-                              bug.tester_issue_fixed === "0"
+                          : issueFixed === "no"
                             ? "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800"
                             : ""
                       )}
                     >
-                      {bug.tester_issue_fixed === true ||
-                      bug.tester_issue_fixed === 1 ||
-                      bug.tester_issue_fixed === "1"
+                      {issueFixed === "yes"
                         ? "Yes"
-                        : bug.tester_issue_fixed === false ||
-                            bug.tester_issue_fixed === 0 ||
-                            bug.tester_issue_fixed === "0"
+                        : issueFixed === "no"
                           ? "No"
                           : "Not recorded"}
                     </Badge>
@@ -1017,6 +1011,8 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                   </div>
                 ) : null}
               </div>
+                );
+              })()}
             </div>
           )}
         </CardContent>

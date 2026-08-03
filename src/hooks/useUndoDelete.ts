@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface UseUndoDeleteOptions {
   duration?: number; // Duration in seconds
@@ -21,6 +21,11 @@ export const useUndoDelete = ({
 }: UseUndoDeleteOptions): UseUndoDeleteReturn => {
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [timeLeft, setTimeLeft] = useState(duration);
+  const onConfirmRef = useRef(onConfirm);
+  const onUndoRef = useRef(onUndo);
+
+  onConfirmRef.current = onConfirm;
+  onUndoRef.current = onUndo;
 
   const startCountdown = useCallback(() => {
     setIsCountingDown(true);
@@ -30,37 +35,33 @@ export const useUndoDelete = ({
   const cancelCountdown = useCallback(() => {
     setIsCountingDown(false);
     setTimeLeft(duration);
-    onUndo?.();
-  }, [duration, onUndo]);
+    onUndoRef.current?.();
+  }, [duration]);
 
   const confirmDelete = useCallback(() => {
     setIsCountingDown(false);
     setTimeLeft(duration);
-    onConfirm();
-  }, [duration, onConfirm]);
+    onConfirmRef.current();
+  }, [duration]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    if (!isCountingDown) return;
 
-    if (isCountingDown && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            setIsCountingDown(false);
-            onConfirm();
-            return duration;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (timeLeft <= 0) {
+      setIsCountingDown(false);
+      setTimeLeft(duration);
+      onConfirmRef.current();
+      return;
     }
 
+    const timeoutId = window.setTimeout(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
     return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
+      window.clearTimeout(timeoutId);
     };
-  }, [isCountingDown, timeLeft, duration, onConfirm]);
+  }, [isCountingDown, timeLeft, duration]);
 
   return {
     isCountingDown,

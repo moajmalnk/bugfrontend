@@ -22,7 +22,7 @@ import {
 import type { Project } from "@/services/projectService";
 
 /** Bump when search indexing fields change so in-session cache refreshes. */
-const SEARCH_INDEX_VERSION = "contacts-v1";
+const SEARCH_INDEX_VERSION = "features-attendance-v3";
 
 interface SearchCache {
   pages: SearchResult[];
@@ -465,7 +465,7 @@ export function useGlobalSearch({
     const hasQuery = Boolean(query.trim());
 
     const byCategory: Record<SearchCategory, SearchResult[]> = {
-      pages: filterResults(cache.pages, hasQuery ? 20 : 10),
+      pages: filterResults(cache.pages, hasQuery ? 24 : 14),
       help: filterResults(cache.help, hasQuery ? 20 : 8),
       users: filterResults(cache.users),
       clients: filterResults(cache.clients),

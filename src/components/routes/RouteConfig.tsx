@@ -154,6 +154,7 @@ const DailyWorkUpdate = lazy(() => import("@/pages/DailyWorkUpdate"));
 const LeaveRequests = lazy(() => import("@/pages/LeaveRequests"));
 const AdminLeaveRequests = lazy(() => import("@/pages/AdminLeaveRequests"));
 const AdminLeaveUserDetail = lazy(() => import("@/pages/AdminLeaveUserDetail"));
+const AdminAttendanceExceptions = lazy(() => import("@/pages/AdminAttendanceExceptions"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const CommonBugs = lazy(() => import("@/pages/CommonBugs"));
 const CommonCodoRules = lazy(() => import("@/pages/CommonCodoRules"));
@@ -339,6 +340,7 @@ const RouteConfig = () => {
       <Route path="/overtime-requests" element={<RolePathRedirect suffix="overtime-requests" />} />
       <Route path="/leave" element={<RolePathRedirect suffix="leave" />} />
       <Route path="/leave-requests" element={<RolePathRedirect suffix="leave-requests" />} />
+      <Route path="/attendance-exceptions" element={<RolePathRedirect suffix="attendance-exceptions" />} />
       <Route path="/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
       <Route path="/push-coverage" element={<RolePathRedirect suffix="push-coverage" />} />
       <Route path="/shorts/:shortId" element={<RolePathRedirect suffix="shorts/:shortId" />} />
@@ -406,6 +408,7 @@ const RouteConfig = () => {
           <Route path="overtime-requests" element={<AdminOvertimeRequests />} />
           <Route path="leave-requests/:userId" element={<AdminLeaveUserDetail />} />
           <Route path="leave-requests" element={<AdminLeaveRequests />} />
+          <Route path="attendance-exceptions" element={<AdminAttendanceExceptions />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
           <Route path="common-bugs" element={<CommonBugs />} />
           <Route path="common-codo" element={<CommonCodoRules />} />

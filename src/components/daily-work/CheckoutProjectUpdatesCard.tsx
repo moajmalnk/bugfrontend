@@ -55,7 +55,7 @@ export function CheckoutProjectUpdatesCard({
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-gray-900 dark:text-white">Project Progress</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Update status, progress, and notes for each project you worked on today
+            Optional — status, progress, and notes for projects you worked on today
           </p>
         </div>
       </div>

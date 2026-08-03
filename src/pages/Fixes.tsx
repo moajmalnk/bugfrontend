@@ -372,7 +372,18 @@ const Fixes = () => {
 
   const { data, isLoading, error } = useQuery<{
     bugs: BugType[];
-    pagination: any;
+    pagination: {
+      currentPage?: number;
+      totalPages?: number;
+      totalBugs?: number;
+      limit?: number;
+      counts?: {
+        open?: number;
+        resolved?: number;
+        myOpen?: number;
+        myResolved?: number;
+      };
+    };
   }>({
     queryKey: [
       "bugs",
@@ -412,10 +423,11 @@ const Fixes = () => {
     staleTime: 60_000,
   });
 
-  const bugs = data?.bugs ?? [];
-  const allProjects = projectsData ?? [];
-
-  const visibleProjects = useMemo(() => allProjects, [allProjects]);
+  const bugs = useMemo(() => data?.bugs ?? [], [data?.bugs]);
+  const visibleProjects = useMemo(
+    () => projectsData ?? [],
+    [projectsData]
+  );
 
   const uniqueFixers = useMemo(
     () =>
@@ -462,9 +474,9 @@ const Fixes = () => {
       fixedByFilter !== "all" &&
       !uniqueFixers.some((f) => String(f.id) === String(fixedByFilter))
     ) {
-      setFixedByFilter("all");
+      setFilter("fixedByFilter", "all");
     }
-  }, [uniqueFixers, fixedByFilter]);
+  }, [uniqueFixers, fixedByFilter, setFilter]);
 
   // Verification is derived client-side; keep as a page-level refine when set
   const filteredBugs = useMemo(() => {
@@ -1062,7 +1074,7 @@ const Fixes = () => {
               </TableHeader>
             <TableBody>
               {paginatedBugs.map((bug, index) => {
-                const project = allProjects.find(p => p.id === bug.project_id);
+                const project = visibleProjects.find(p => p.id === bug.project_id);
                 return (
                   <TableRow
                     key={bug.id}
@@ -1147,7 +1159,7 @@ const Fixes = () => {
           
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {paginatedBugs.map((bug) => (
-              <BugCard key={bug.id} bug={bug} projects={allProjects} />
+              <BugCard key={bug.id} bug={bug} projects={visibleProjects} />
             ))}
           </div>
         </div>

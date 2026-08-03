@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-function triState(value: boolean | number | string | null | undefined): "yes" | "no" | "unset" {
+export function triState(value: boolean | number | string | null | undefined): "yes" | "no" | "unset" {
   if (value === true || value === 1 || value === "1") return "yes";
   if (value === false || value === 0 || value === "0") return "no";
   return "unset";

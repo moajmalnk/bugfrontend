@@ -34,16 +34,22 @@ import {
   FileText,
   X
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
 import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { clearGoogleOAuthCache, handleGoogleOAuthError } from '@/utils/googleOAuthUtils';
+import type { User } from "@/types";
 
 type LoginMethod = "username" | "email" | "otp" | "forgot" | "magic";
 
-type ApiResponse = { success: boolean; message?: string; user?: any };
+type AuthApiResponse = {
+  success: boolean;
+  message?: string;
+  token?: string;
+  user?: User;
+};
 
 const Login = () => {
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("username");
@@ -115,11 +121,62 @@ const Login = () => {
     };
   }, []);
 
+  const handleMagicLinkVerification = useCallback(
+    async (token: string) => {
+      setIsLoading(true);
+      try {
+        const response = await axios.post<AuthApiResponse>(
+          `${API_BASE_URL}/verify_magic_link_simple.php`,
+          { token }
+        );
+
+        const data = response.data;
+        if (data.success && data.token && data.user) {
+          const { token: jwtToken, user } = data;
+          localStorage.setItem("token", jwtToken);
+          sessionStorage.setItem("token", jwtToken);
+
+          await loginWithToken(user, jwtToken);
+
+          setShowSuccess(true);
+          setIsAnimating(true);
+
+          toast({
+            title: "Welcome back! ✨",
+            description: `Signed in with magic link as ${user.username}`,
+            variant: "default",
+          });
+
+          setTimeout(() => {
+            setShowSuccess(false);
+            setIsAnimating(false);
+            navigate(`/${user.role}/projects`, { replace: true });
+          }, 1500);
+        } else {
+          throw new Error(data.message || "Magic link verification failed");
+        }
+      } catch (error: unknown) {
+        console.error("Magic link verification error:", error);
+        toast({
+          title: "Magic Link Error",
+          description: extractApiErrorMessage(
+            error,
+            "Invalid or expired magic link"
+          ),
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loginWithToken, navigate]
+  );
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const magicToken = urlParams.get("magic_token");
     if (magicToken) {
-      handleMagicLinkVerification(magicToken);
+      void handleMagicLinkVerification(magicToken);
       return;
     }
 
@@ -128,7 +185,7 @@ const Login = () => {
     if (isAuthenticated && currentUser?.role && token) {
       navigate(`/${currentUser.role}/projects`, { replace: true });
     }
-  }, [isAuthenticated, currentUser, navigate]);
+  }, [isAuthenticated, currentUser, navigate, handleMagicLinkVerification]);
 
   if (isAuthLoading) {
     // Show loading spinner
@@ -180,11 +237,11 @@ const Login = () => {
         }
         payload = { method: "mail", email };
       }
-      const response = await axios.post<ApiResponse>(
+      const response = await axios.post<AuthApiResponse>(
         `${API_BASE_URL}/send_otp.php`,
         payload
       );
-      const data = response.data as any;
+      const data = response.data;
       if (data.success) {
         setOtpSent(true);
         setOtpCountdown(60);
@@ -203,13 +260,13 @@ const Login = () => {
       } else {
         throw new Error(data.message || "Failed to send OTP");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description:
-          error?.response?.data?.message ||
-          error.message ||
-          "Failed to send OTP. Please try again.",
+        description: extractApiErrorMessage(
+          error,
+          "Failed to send OTP. Please try again."
+        ),
         variant: "destructive",
       });
     } finally {
@@ -224,7 +281,7 @@ const Login = () => {
     try {
       await assertDeviceClockMatchesServer('sign in');
       let success = false;
-      let user = null;
+      let user: User | null = null;
 
       switch (loginMethod) {
         case "username":
@@ -246,11 +303,11 @@ const Login = () => {
             });
             return;
           }
-          const response = await axios.post<ApiResponse>(
+          const response = await axios.post<AuthApiResponse>(
             `${API_BASE_URL}/login.php`,
             { identifier, password }
           );
-          const data = response.data as any;
+          const data = response.data;
           if (data.success && data.token && data.user) {
             await loginWithToken(data.user, data.token);
             success = true;
@@ -295,16 +352,16 @@ const Login = () => {
             }
             payload = { method: "mail", email, otp };
           }
-          const response = await axios.post<ApiResponse>(
+          const response = await axios.post<AuthApiResponse>(
             `${API_BASE_URL}/verify_otp.php`,
             payload
           );
-          const data = response.data as any;
-          if (data.success) {
+          const data = response.data;
+          if (data.success && data.user) {
             success = true;
             user = data.user;
             if (data.token) {
-              loginWithToken(user, data.token);
+              await loginWithToken(user, data.token);
             }
           } else {
             toast({
@@ -329,7 +386,7 @@ const Login = () => {
           navigate(`/${user.role}/projects`, { replace: true });
         }, 1500);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const description = getNetworkErrorMessage(error, extractApiErrorMessage(error, "An error occurred during login"));
       if (description.toLowerCase().includes('device shows')) {
         setDeviceClockWarning(description);
@@ -339,52 +396,6 @@ const Login = () => {
           ? "Login blocked"
           : "Error",
         description,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleMagicLinkVerification = async (token: string) => {
-    setIsLoading(true);
-    try {
-      const response = await axios.post(`${API_BASE_URL}/verify_magic_link_simple.php`, {
-        token: token
-      });
-
-      if ((response.data as any).success) {
-        const { token: jwtToken, user } = response.data as { token: string; user: any };
-        localStorage.setItem("token", jwtToken);
-        sessionStorage.setItem("token", jwtToken);
-        
-        // Update auth context
-        loginWithToken(user, jwtToken);
-        
-        // Show success animation
-        setShowSuccess(true);
-        setIsAnimating(true);
-        
-        toast({
-          title: "Welcome back! ✨",
-          description: `Signed in with magic link as ${user.username}`,
-          variant: "default",
-        });
-        
-        setTimeout(() => {
-          setShowSuccess(false);
-          setIsAnimating(false);
-          // Navigate to the appropriate dashboard based on user role
-          navigate(`/${user.role}/projects`, { replace: true });
-        }, 1500);
-      } else {
-        throw new Error((response.data as any).message || "Magic link verification failed");
-      }
-    } catch (error: any) {
-      console.error("Magic link verification error:", error);
-      toast({
-        title: "Magic Link Error",
-        description: (error.response?.data as any)?.message || "Invalid or expired magic link",
         variant: "destructive",
       });
     } finally {
@@ -423,11 +434,11 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/forgot_password.php`, { 
+      const response = await axios.post<AuthApiResponse>(`${API_BASE_URL}/forgot_password.php`, { 
         email: email.trim().toLowerCase() 
       });
       
-      const data = response.data as any;
+      const data = response.data;
       if (data.success) {
         toast({
           title: "Reset Link Sent",
@@ -442,10 +453,13 @@ const Login = () => {
       } else {
         throw new Error(data.message || "Failed to send reset link");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error?.response?.data?.message || error.message || "Failed to send reset link. Please try again.",
+        description: extractApiErrorMessage(
+          error,
+          "Failed to send reset link. Please try again."
+        ),
         variant: "destructive",
       });
     } finally {
@@ -474,11 +488,11 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/send_magic_link_simple.php`, { 
+      const response = await axios.post<AuthApiResponse>(`${API_BASE_URL}/send_magic_link_simple.php`, { 
         email: email.trim().toLowerCase() 
       });
       
-      const data = response.data as any;
+      const data = response.data;
       if (data.success) {
         toast({
           title: "Magic Link Sent! ✨",
@@ -493,10 +507,13 @@ const Login = () => {
       } else {
         throw new Error(data.message || "Failed to send magic link");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error?.response?.data?.message || error.message || "Failed to send magic link. Please try again.",
+        description: extractApiErrorMessage(
+          error,
+          "Failed to send magic link. Please try again."
+        ),
         variant: "destructive",
       });
     } finally {
@@ -516,17 +533,17 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/google-login.php`, {
+      const response = await axios.post<AuthApiResponse>(`${API_BASE_URL}/google-login.php`, {
         id_token: credentialResponse.credential
       });
       
-      const data = response.data as any;
+      const data = response.data;
       if (data.success && data.token && data.user) {
         // Store the token
         localStorage.setItem("token", data.token);
         
         // Update auth context
-        loginWithToken(data.user, data.token);
+        await loginWithToken(data.user, data.token);
         
         // Show success animation
         setShowSuccess(true);
@@ -536,15 +553,18 @@ const Login = () => {
           setShowSuccess(false);
           setIsAnimating(false);
           // Navigate to the appropriate dashboard based on user role
-          navigate(`/${data.user.role}/projects`, { replace: true });
+          navigate(`/${data.user!.role}/projects`, { replace: true });
         }, 1500);
       } else {
         throw new Error(data.message || "Google Sign-In failed");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Google Sign-In Failed",
-        description: error?.response?.data?.message || error.message || "Failed to sign in with Google. Please try again.",
+        description: extractApiErrorMessage(
+          error,
+          "Failed to sign in with Google. Please try again."
+        ),
         variant: "destructive",
       });
     } finally {

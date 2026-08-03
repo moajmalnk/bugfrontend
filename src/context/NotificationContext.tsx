@@ -75,6 +75,21 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const lastFetchTimeRef = useRef<Date>(new Date(0));
   const isFetchingRef = useRef<boolean>(false);
   const isFullListLoadedRef = useRef(false);
+  const previousUnreadRef = useRef<number | null>(null);
+  const hasHydratedUnreadRef = useRef(false);
+
+  const maybePlayNewNotificationSound = useCallback((nextUnread: number) => {
+    if (!hasHydratedUnreadRef.current) {
+      previousUnreadRef.current = nextUnread;
+      hasHydratedUnreadRef.current = true;
+      return;
+    }
+    const prev = previousUnreadRef.current ?? 0;
+    previousUnreadRef.current = nextUnread;
+    if (nextUnread > prev && notificationService.getSettings().notificationSound) {
+      notificationService.playNotificationSound();
+    }
+  }, []);
 
   const applyFetchResult = useCallback(
     (result: Awaited<ReturnType<typeof notificationService.getUserNotifications>>, append = false) => {
@@ -84,8 +99,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setReadCount(result.readCount);
       setTotalCount(result.total);
       setHasMoreNotifications(result.hasMore);
+      if (!append) {
+        maybePlayNewNotificationSound(result.unreadCount);
+      }
     },
-    []
+    [maybePlayNewNotificationSound]
   );
 
   const fetchNotifications = useCallback(
@@ -138,6 +156,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             }
             return [...newOnes, ...prev];
           });
+          maybePlayNewNotificationSound(result.unreadCount);
           lastFetchTimeRef.current = new Date();
           return;
         }
@@ -153,7 +172,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [currentUser, applyFetchResult]
+    [currentUser, applyFetchResult, maybePlayNewNotificationSound]
   );
 
   const loadMoreNotifications = useCallback(async () => {
@@ -224,6 +243,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (currentUser) {
+      hasHydratedUnreadRef.current = false;
+      previousUnreadRef.current = null;
       fetchNotifications(true);
 
       pollingIntervalRef.current = setInterval(() => {

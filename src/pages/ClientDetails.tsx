@@ -40,7 +40,7 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getReturnPathFromState } from '@/hooks/useUrlPagination';
 
@@ -149,7 +149,7 @@ const ClientDetails = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const loadClient = async () => {
+  const loadClient = useCallback(async () => {
     if (!clientId) return;
     setIsLoading(true);
     try {
@@ -164,11 +164,11 @@ const ClientDetails = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [clientId]);
 
   useEffect(() => {
-    loadClient();
-  }, [clientId]);
+    void loadClient();
+  }, [loadClient]);
 
   if (currentUser?.role !== 'admin') {
     return (

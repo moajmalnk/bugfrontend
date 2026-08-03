@@ -48,93 +48,104 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-projects",
     label: "Projects",
     path: "/projects",
-    keywords: ["projects", "project", "team"],
+    keywords: ["projects", "project", "team", "portfolio"],
   },
   {
     id: "page-bugs",
     label: "Bugs",
     path: "/bugs",
-    keywords: ["bugs", "bug", "issues", "report"],
+    keywords: ["bugs", "bug", "issues", "report", "defect", "ticket"],
   },
   {
     id: "page-bugs-new",
     label: "New Bug",
     path: "/bugs/new",
-    keywords: ["new bug", "report bug", "create bug", "submit bug"],
+    keywords: ["new bug", "report bug", "create bug", "submit bug", "raise bug"],
   },
   {
     id: "page-fixes",
     label: "Fixes",
     path: "/fixes",
-    keywords: ["fixes", "fixed", "resolved", "verify"],
+    keywords: ["fixes", "fixed", "resolved", "verify", "verification"],
   },
   {
     id: "page-updates",
     label: "Updates",
     path: "/updates",
-    keywords: ["updates", "update", "release notes", "changelog"],
+    keywords: ["updates", "update", "release notes", "changelog", "release"],
   },
   {
     id: "page-new-update",
     label: "New Update",
     path: "/new-update",
-    keywords: ["new update", "create update", "release note"],
-  },
-  {
-    id: "page-profile",
-    label: "Profile",
-    path: "/profile",
-    keywords: ["profile", "account", "password", "avatar", "me"],
-  },
-  {
-    id: "page-notifications",
-    label: "Notifications",
-    path: "/notifications",
-    keywords: ["notifications", "alerts", "push", "bell"],
-  },
-  {
-    id: "page-help",
-    label: "Help & Support",
-    path: "/help",
-    keywords: ["help", "support", "guide", "documentation", "how to", "tutorial", "docs"],
-    subtitle: "Help center",
+    keywords: ["new update", "create update", "release note", "publish update"],
   },
 
-  // —— Admin only ——
+  // —— Attendance & work (non-tester) ——
   {
-    id: "page-projects-new",
-    label: "New Project",
-    path: "/projects/new",
-    keywords: ["new project", "create project"],
-    adminOnly: true,
-    subtitle: "Administration",
+    id: "page-daily-work",
+    label: "Daily Work Update",
+    path: "/daily-work-update",
+    keywords: [
+      "daily work",
+      "work update",
+      "work hours",
+      "check in",
+      "check-in",
+      "checkout",
+      "check out",
+      "attendance",
+      "clock in",
+      "overtime",
+      "ot",
+      "hours",
+      "wfh",
+      "work from home",
+      "office",
+      "late",
+      "office only",
+      "geofence",
+      "gps",
+      "break",
+    ],
+    excludeRoles: ["tester"],
+    showWhen: (ctx) =>
+      ctx.hasPermission("TASKS_VIEW_ALL") ||
+      ctx.hasPermission("TASKS_VIEW_ASSIGNED") ||
+      ctx.hasPermission("TASKS_CREATE"),
+    subtitle: "Check-in · Hours · OT",
   },
   {
-    id: "page-bugdocs",
-    label: "BugDocs",
-    path: "/bugdocs",
-    keywords: ["docs", "documents", "bugdocs", "google docs"],
+    id: "page-leave",
+    label: "My Leave",
+    path: "/leave",
+    keywords: [
+      "leave",
+      "my leave",
+      "pto",
+      "vacation",
+      "holiday",
+      "absent",
+      "time off",
+      "sick leave",
+      "casual leave",
+    ],
     excludeRoles: ["tester"],
-  },
-  {
-    id: "page-bugsheets",
-    label: "BugSheets",
-    path: "/bugsheets",
-    keywords: ["sheets", "spreadsheet", "bugsheets", "google sheets"],
-    excludeRoles: ["tester"],
-  },
-  {
-    id: "page-meet",
-    label: "BugMeet",
-    path: "/meet?tab=shared-meets",
-    keywords: ["meet", "meeting", "video", "bugmeet", "conference"],
-    excludeRoles: ["tester"],
+    subtitle: "Attendance",
   },
   {
     id: "page-tasks",
     label: "BugToDo",
     path: "/my-tasks?tab=shared-tasks",
-    keywords: ["tasks", "todo", "bugtodo", "shared tasks", "check in"],
+    keywords: [
+      "tasks",
+      "todo",
+      "bugtodo",
+      "shared tasks",
+      "check in",
+      "assignments",
+      "my tasks",
+    ],
     excludeRoles: ["tester"],
     showWhen: (ctx) =>
       ctx.hasPermission("TASKS_VIEW_ALL") ||
@@ -145,7 +156,14 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-daily-update",
     label: "BugUpdate",
     path: "/daily-update",
-    keywords: ["daily update", "bugupdate", "status report"],
+    keywords: [
+      "daily update",
+      "bugupdate",
+      "status report",
+      "standup",
+      "progress",
+      "blockers",
+    ],
     excludeRoles: ["tester"],
     showWhen: (ctx) =>
       ctx.hasPermission("DAILY_UPDATE_CREATE") ||
@@ -154,45 +172,69 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       ctx.hasPermission("UPDATES_CREATE"),
   },
   {
-    id: "page-daily-work",
-    label: "Daily Work Update",
-    path: "/daily-work-update",
-    keywords: [
-      "daily work",
-      "work update",
-      "work hours",
-      "check in",
-      "checkout",
-      "overtime",
-      "ot",
-      "hours",
-    ],
+    id: "page-meet",
+    label: "BugMeet",
+    path: "/meet?tab=shared-meets",
+    keywords: ["meet", "meeting", "video", "bugmeet", "conference", "call", "lobby"],
     excludeRoles: ["tester"],
-    showWhen: (ctx) =>
-      ctx.hasPermission("TASKS_VIEW_ALL") ||
-      ctx.hasPermission("TASKS_VIEW_ASSIGNED") ||
-      ctx.hasPermission("TASKS_CREATE"),
   },
   {
-    id: "page-reports",
-    label: "Reports",
-    path: "/reports",
-    keywords: ["reports", "analytics", "statistics", "metrics"],
-    adminOnly: true,
-    subtitle: "Administration",
+    id: "page-bugdocs",
+    label: "BugDocs",
+    path: "/bugdocs",
+    keywords: ["docs", "documents", "bugdocs", "google docs", "templates"],
+    excludeRoles: ["tester"],
+  },
+  {
+    id: "page-bugsheets",
+    label: "BugSheets",
+    path: "/bugsheets",
+    keywords: ["sheets", "spreadsheet", "bugsheets", "google sheets"],
+    excludeRoles: ["tester"],
+  },
+
+  // —— Account & help ——
+  {
+    id: "page-profile",
+    label: "Profile",
+    path: "/profile",
+    keywords: ["profile", "account", "password", "avatar", "me", "my account"],
+  },
+  {
+    id: "page-notifications",
+    label: "Notifications",
+    path: "/notifications",
+    keywords: ["notifications", "alerts", "push", "bell", "inbox"],
+  },
+  {
+    id: "page-help",
+    label: "Help & Support",
+    path: "/help",
+    keywords: ["help", "support", "guide", "documentation", "how to", "tutorial", "docs", "faq"],
+    subtitle: "Help center",
   },
   {
     id: "page-common-bugs",
     label: "Common Bugs",
     path: "/common-bugs",
-    keywords: ["common bugs", "duplicate", "already raised", "recurring"],
+    keywords: ["common bugs", "duplicate", "already raised", "recurring", "known issues"],
     roles: ["admin", "developer"],
   },
   {
     id: "page-common-codo",
-    label: "Common CODO",
+    label: "CODO Rules",
     path: "/common-codo",
-    keywords: ["codo", "common codo", "compliance", "rules", "qa", "developer matrix"],
+    keywords: [
+      "codo",
+      "common codo",
+      "codo rules",
+      "compliance",
+      "rules",
+      "qa",
+      "developer matrix",
+      "quality",
+      "standards",
+    ],
     roles: ["admin", "developer", "tester"],
   },
 
@@ -201,12 +243,28 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-messages",
     label: "BugMessage",
     path: "/messages",
-    keywords: ["messages", "chat", "bugmessage", "team chat"],
+    keywords: ["messages", "chat", "bugmessage", "team chat", "dm", "inbox"],
     showWhen: (ctx) =>
       showBugMessageInMainNav(ctx.role) || ctx.hasPermission("MESSAGING_VIEW"),
   },
 
-  // —— Administration (admin role) ——
+  // —— Admin create / ops ——
+  {
+    id: "page-projects-new",
+    label: "New Project",
+    path: "/projects/new",
+    keywords: ["new project", "create project", "add project"],
+    adminOnly: true,
+    subtitle: "Administration",
+  },
+  {
+    id: "page-reports",
+    label: "Reports",
+    path: "/reports",
+    keywords: ["reports", "analytics", "statistics", "metrics", "insights"],
+    adminOnly: true,
+    subtitle: "Administration",
+  },
   {
     id: "page-admin-dashboard",
     label: "Ops Dashboard",
@@ -219,6 +277,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "overview",
       "project health",
       "admin home",
+      "home",
     ],
     adminOnly: true,
     subtitle: "Administration",
@@ -227,15 +286,56 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-users",
     label: "Users",
     path: "/users",
-    keywords: ["users", "team", "members", "add user", "permissions", "email", "phone", "contact"],
+    keywords: [
+      "users",
+      "team",
+      "members",
+      "add user",
+      "permissions",
+      "email",
+      "phone",
+      "contact",
+      "staff",
+      "employees",
+    ],
     adminOnly: true,
     subtitle: "Administration",
+  },
+  {
+    id: "page-attendance-exceptions",
+    label: "Attendance Exceptions",
+    path: "/attendance-exceptions",
+    keywords: [
+      "attendance exception",
+      "attendance exceptions",
+      "allow wfh",
+      "wfh exception",
+      "forgive late",
+      "unmark late",
+      "late strike",
+      "office only",
+      "day exception",
+      "grant exception",
+      "wfh allowed",
+    ],
+    adminOnly: true,
+    subtitle: "Attendance",
   },
   {
     id: "page-clients",
     label: "Clients",
     path: "/clients",
-    keywords: ["clients", "client", "corporate", "customer", "companies", "email", "phone", "contact"],
+    keywords: [
+      "clients",
+      "client",
+      "corporate",
+      "customer",
+      "companies",
+      "email",
+      "phone",
+      "contact",
+      "crm",
+    ],
     adminOnly: true,
     subtitle: "Administration",
   },
@@ -243,17 +343,30 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-ot",
     label: "OT Requests",
     path: "/overtime-requests",
-    keywords: ["overtime", "ot", "requests", "extra hours", "approval"],
+    keywords: ["overtime", "ot", "requests", "extra hours", "approval", "ot requests"],
     adminOnly: true,
-    subtitle: "Administration",
+    subtitle: "Attendance",
   },
-
-  // —— Administration (permission-gated) ——
+  {
+    id: "page-leave-requests",
+    label: "Leave Requests",
+    path: "/leave-requests",
+    keywords: [
+      "leave requests",
+      "approve leave",
+      "pto approval",
+      "vacation approval",
+      "leave admin",
+      "leave management",
+    ],
+    adminOnly: true,
+    subtitle: "Attendance",
+  },
   {
     id: "page-whatsapp",
     label: "WhatsApp",
     path: "/whatsapp-messages",
-    keywords: ["whatsapp", "messages", "bulk", "notify"],
+    keywords: ["whatsapp", "messages", "bulk", "notify", "wa"],
     permission: "MESSAGING_CREATE",
     subtitle: "Administration",
   },
@@ -261,7 +374,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-feedback",
     label: "Feedbacks",
     path: "/feedback-stats",
-    keywords: ["feedback", "stats", "rating", "satisfaction"],
+    keywords: ["feedback", "stats", "rating", "satisfaction", "nps"],
     permission: "FEEDBACK_VIEW",
     subtitle: "Administration",
   },
@@ -269,8 +382,32 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     id: "page-activity",
     label: "Activities",
     path: "/activity",
-    keywords: ["activity", "log", "audit", "history"],
+    keywords: ["activity", "log", "audit", "history", "timeline"],
     permission: "ACTIVITY_VIEW",
+    subtitle: "Administration",
+  },
+  {
+    id: "page-push-coverage",
+    label: "Push Coverage",
+    path: "/push-coverage",
+    keywords: [
+      "push",
+      "push coverage",
+      "fcm",
+      "notification tokens",
+      "devices",
+      "coverage",
+      "firebase",
+    ],
+    adminOnly: true,
+    subtitle: "Administration",
+  },
+  {
+    id: "page-shorts",
+    label: "Shorts",
+    path: "/shorts",
+    keywords: ["shorts", "videos", "clips", "reel", "media"],
+    adminOnly: true,
     subtitle: "Administration",
   },
   {
@@ -285,15 +422,40 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "announcements",
       "notifications",
       "dark mode",
+      "theme",
+      "general",
     ],
     permission: "SETTINGS_EDIT",
     subtitle: "Administration",
   },
   {
+    id: "page-office-location",
+    label: "Office Check-in Location",
+    path: "/settings?tab=general",
+    keywords: [
+      "office location",
+      "office check-in",
+      "geofence",
+      "gps",
+      "wired in",
+      "coworks",
+      "check-in radius",
+      "office radius",
+      "lat",
+      "lng",
+      "latitude",
+      "longitude",
+      "map",
+      "office coords",
+    ],
+    permission: "SETTINGS_EDIT",
+    subtitle: "Settings · General",
+  },
+  {
     id: "page-bugbackup",
     label: "BugBackup",
     path: "/bugbackup",
-    keywords: ["backup", "bugbackup", "restore", "database", "archive"],
+    keywords: ["backup", "bugbackup", "restore", "database", "archive", "export"],
     permission: "SETTINGS_EDIT",
     subtitle: "Administration",
   },
@@ -439,22 +601,31 @@ export function getSearchCategoryOrder(role: string): SearchCategory[] {
   return ["pages", "help", "bugs", "fixes", "docs", "sheets", "other"];
 }
 
-export function getSearchPlaceholder(_role: string): string {
-  return "Search by name, email, phone, or keyword…";
+export function getSearchPlaceholder(role: string): string {
+  if (role === "admin") {
+    return "Search users, leave, attendance, bugs, settings…";
+  }
+  if (role === "tester") {
+    return "Search bugs, projects, CODO rules, help…";
+  }
+  return "Search check-in, leave, bugs, projects, or keyword…";
 }
 
 export function getSearchEmptyHint(_role: string, hasQuery: boolean): string {
   if (hasQuery) {
     return "No matches for that search.";
   }
-  return "Try a name, email, phone number, or page.";
+  return "Try a name, email, phone, leave, attendance, or page.";
 }
 
 export function getSearchHintChips(role: string): string[] {
   if (role === "admin") {
-    return ["Name", "Email", "Phone", "Client", "Bug"];
+    return ["Name", "Email", "Leave", "Attendance", "Bug"];
   }
-  return ["Name", "Email", "Phone", "Project", "Bug"];
+  if (role === "tester") {
+    return ["Name", "Project", "Bug", "CODO", "Help"];
+  }
+  return ["Name", "Email", "Check-in", "Leave", "Bug"];
 }
 
 type ProjectMembershipSource = {

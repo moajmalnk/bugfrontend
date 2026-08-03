@@ -42,6 +42,7 @@ import {
   ChevronRight,
   ExternalLink,
   FolderKanban,
+  FoldVertical,
   Hourglass,
   Info,
   Percent,
@@ -49,9 +50,10 @@ import {
   Scale,
   Search,
   Timer,
+  UnfoldVertical,
   Wrench,
 } from "lucide-react";
-import { useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 
 type UserProjectPortfolioProps = {
@@ -1587,6 +1589,8 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  /** Why: Portfolio opens collapsed; expand is opt-in via accordion or Expand all. */
+  const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>([]);
   const [selectedProject, setSelectedProject] = useState<UserPortfolioProject | null>(null);
   const [projectSheetOpen, setProjectSheetOpen] = useState(false);
   const rolePath = getEffectiveRole(currentUser) || "admin";
@@ -1597,6 +1601,11 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
     setSelectedProject(project);
     setProjectSheetOpen(true);
   };
+
+  useEffect(() => {
+    setExpandedProjectIds([]);
+    setSearch("");
+  }, [userId]);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["userProfilePortfolio", userId],
@@ -1632,6 +1641,18 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
       return timeB - timeA;
     });
   }, [data?.projects, search]);
+
+  const allProjectsExpanded =
+    filteredProjects.length > 0 &&
+    filteredProjects.every((project) => expandedProjectIds.includes(project.id));
+
+  const toggleExpandAllProjects = () => {
+    if (allProjectsExpanded) {
+      setExpandedProjectIds([]);
+      return;
+    }
+    setExpandedProjectIds(filteredProjects.map((project) => project.id));
+  };
 
   const summary = data?.summary;
 
@@ -1863,14 +1884,35 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
               </div>
             </div>
 
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search projects, bugs, fixes, or updates…"
-                className="pl-9 h-10 rounded-xl"
-              />
+            <div className="grid grid-cols-12 gap-3 items-center">
+              <div className="relative col-span-12 lg:col-span-9 xl:col-span-10">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search projects, bugs, fixes, or updates…"
+                  className="pl-9 h-10 rounded-xl"
+                />
+              </div>
+              <div className="hidden lg:block col-span-12 lg:col-span-3 xl:col-span-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={filteredProjects.length === 0}
+                  onClick={toggleExpandAllProjects}
+                  className="h-10 w-full rounded-xl gap-2"
+                  aria-label={allProjectsExpanded ? "Collapse all projects" : "Expand all projects"}
+                >
+                  {allProjectsExpanded ? (
+                    <FoldVertical className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <UnfoldVertical className="h-4 w-4 shrink-0" />
+                  )}
+                  <span className="truncate">
+                    {allProjectsExpanded ? "Collapse all" : "Expand all"}
+                  </span>
+                </Button>
+              </div>
             </div>
 
             {filteredProjects.length === 0 ? (
@@ -1895,7 +1937,12 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
                     />
                   ))}
                 </div>
-                <Accordion type="multiple" className="hidden space-y-3 lg:block">
+                <Accordion
+                  type="multiple"
+                  value={expandedProjectIds}
+                  onValueChange={setExpandedProjectIds}
+                  className="hidden space-y-3 lg:block"
+                >
                   {filteredProjects.map((project) => (
                     <ProjectPortfolioCard
                       key={project.id}

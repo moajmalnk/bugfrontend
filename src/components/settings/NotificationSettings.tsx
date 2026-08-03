@@ -201,12 +201,9 @@ export function NotificationSettingsCard() {
     if (settings.browserNotifications) {
       const success = await notificationService.sendTestNotification();
       if (success) {
-        if (settings.notificationSound) {
-          notificationService.playNotificationSound();
-        }
         toast({
           title: "Test notification sent",
-          description: "Check your browser notifications.",
+          description: "Check your browser notifications — BugRicer chime should play.",
         });
       } else {
         toast({
@@ -461,11 +458,11 @@ export function NotificationSettingsCard() {
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-50/40 via-transparent to-pink-50/40 dark:from-purple-950/15 dark:via-transparent dark:to-pink-950/15 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <div className="relative p-6 sm:p-8">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
+                    <div className="flex items-start gap-4 min-w-0">
+                      <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg shrink-0">
                         <Volume2 className="h-6 w-6 text-white" />
                       </div>
-                      <div className="space-y-2 flex-1">
+                      <div className="space-y-2 flex-1 min-w-0">
                         <Label
                           htmlFor="notificationSound"
                           className="text-xl font-bold text-gray-900 dark:text-white cursor-pointer"
@@ -473,18 +470,36 @@ export function NotificationSettingsCard() {
                           Notification Sound
                         </Label>
                         <p className="text-gray-600 dark:text-gray-400 text-base">
-                          Play a sound when receiving browser notifications
+                          Play the BugRicer chime when new alerts arrive in the app
                         </p>
                       </div>
                     </div>
-                    <Switch
-                      id="notificationSound"
-                      checked={settings.notificationSound}
-                      onCheckedChange={(checked) =>
-                        handleSettingChange("notificationSound", checked)
-                      }
-                      className="scale-125"
-                    />
+                    <div className="flex items-center gap-3 shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-10 rounded-xl"
+                        onClick={() => {
+                          notificationService.playNotificationSound({ force: true });
+                          toast({
+                            title: 'Playing BugRicer chime',
+                            description: 'This is the sound all users hear for new notifications.',
+                          });
+                        }}
+                      >
+                        <Volume2 className="h-4 w-4 mr-2" />
+                        Preview
+                      </Button>
+                      <Switch
+                        id="notificationSound"
+                        checked={settings.notificationSound}
+                        onCheckedChange={(checked) =>
+                          handleSettingChange("notificationSound", checked)
+                        }
+                        className="scale-125"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

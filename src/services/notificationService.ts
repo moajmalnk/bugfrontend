@@ -115,17 +115,21 @@ class NotificationService {
       badge: '/notification-badge-96.png',
     });
 
+    this.playNotificationSound({ force: true });
+
     return true;
   }
 
-  playNotificationSound(): void {
+  playNotificationSound(options?: { force?: boolean }): void {
     const settings = this.getSettings();
-    if (settings.notificationSound) {
-      const audio = new Audio('/notification.mp3');  // Add this sound file to your public folder
-      audio.play().catch(() => {
-        // Ignore autoplay errors
-      });
+    if (!options?.force && !settings.notificationSound) {
+      return;
     }
+
+    void import('@/lib/notificationSound').then(({ playBugTune, bindNotificationSoundUnlock }) => {
+      bindNotificationSoundUnlock();
+      void playBugTune({ force: options?.force === true });
+    });
   }
 
   async sendBugNotification(title: string, body: string, type: 'new' | 'status_change' = 'status_change'): Promise<boolean> {
@@ -157,7 +161,8 @@ class NotificationService {
       body,
       icon: '/notification-icon.png',
       badge: '/notification-badge-96.png',
-      tag: `bug-${type}-${Date.now()}` // Prevents duplicate notifications
+      tag: `bug-${type}-${Date.now()}`, // Prevents duplicate notifications
+      silent: true, // BugRicer chime plays separately
     });
 
     // Play notification sound if enabled

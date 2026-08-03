@@ -62,6 +62,72 @@ export interface BugLifecycle {
 
 const API_ENDPOINT = '/bugs';
 
+export type MonthlyOpsMonth = {
+  month: string;
+  label: string;
+  bugs_created: number;
+  bugs_fixed: number;
+  bugs_declined: number;
+  bugs_rejected: number;
+  bugs_closed: number;
+  bugs_high_created: number;
+  updates_created: number;
+  updates_completed: number;
+  activity: number;
+  fix_rate: number | null;
+  close_rate: number | null;
+  update_to_bug_ratio: number | null;
+  avg_fix_duration_seconds: number | null;
+  avg_fix_duration_label: string | null;
+  avg_fix_days: number | null;
+  fix_sample_count: number;
+  retention_delta_days: number | null;
+  retention_trend: "improving" | "slowing" | "stable" | null;
+};
+
+export type MonthlyOpsTimeline = {
+  first_month: string;
+  last_month: string;
+  month_count: number;
+  months: MonthlyOpsMonth[];
+  totals: {
+    bugs_created: number;
+    bugs_fixed: number;
+    bugs_declined: number;
+    bugs_rejected: number;
+    updates_created: number;
+    updates_completed: number;
+    bugs_high_created: number;
+  };
+  avg_fix_rate: number | null;
+  avg_fix_duration_seconds: number | null;
+  avg_fix_duration_label: string | null;
+  avg_fix_days: number | null;
+  fix_sample_count: number;
+  retention_growth: {
+    from_month: string;
+    from_label: string;
+    to_month: string;
+    to_label: string;
+    delta_days: number;
+    delta_percent: number | null;
+    direction: "improving" | "slowing" | "stable";
+  } | null;
+  fastest_month: {
+    month: string;
+    label: string;
+    avg_fix_duration_label: string | null;
+    avg_fix_days: number | null;
+  } | null;
+  slowest_month: {
+    month: string;
+    label: string;
+    avg_fix_duration_label: string | null;
+    avg_fix_days: number | null;
+  } | null;
+  peak_month: { month: string; label: string; activity: number } | null;
+};
+
 export type BugListParams = {
   projectId?: string | number;
   page?: number;
@@ -170,6 +236,21 @@ export const bugService = {
       return response.data.data;
     }
     throw new Error(response.data.message || "Failed to load dashboard bug stats");
+  },
+
+  /**
+   * Why: Overview monthly timeline needs full SQL month buckets from first bug → now.
+   */
+  async getMonthlyTimeline(): Promise<MonthlyOpsTimeline> {
+    const response = await apiClient.get<{
+      success: boolean;
+      data: MonthlyOpsTimeline;
+      message?: string;
+    }>("/bugs/monthlyTimeline.php");
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || "Failed to load monthly timeline");
   },
 
   async getBug(id: string): Promise<Bug> {

@@ -24,6 +24,8 @@ export type CheckInPosition = {
 
 export type OfficeLocationErrorCode = 'denied' | 'unavailable' | 'timeout' | 'out_of_range' | 'unsupported';
 
+export type GeolocationPermissionState = 'granted' | 'prompt' | 'denied' | 'unknown';
+
 export class OfficeLocationError extends Error {
   code: OfficeLocationErrorCode;
   distanceM?: number;
@@ -64,8 +66,30 @@ export function resolveOfficeConfig(partial?: Partial<OfficeGeoConfig> | null): 
   };
 }
 
+/** Why: Know if Retry can show the browser prompt vs needs Site Settings unlock. */
+export async function queryGeolocationPermission(): Promise<GeolocationPermissionState> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) {
+      return 'unknown';
+    }
+    const result = await navigator.permissions.query({
+      name: 'geolocation' as PermissionName,
+    });
+    if (result.state === 'granted' || result.state === 'prompt' || result.state === 'denied') {
+      return result.state;
+    }
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+const LOCATION_DENIED_MESSAGE =
+  'Location is blocked for this site. Tap the lock icon in the address bar → Site settings → Location → Allow, then tap Allow location again.';
+
 /**
  * Request current GPS and verify it is within the office geofence.
+ * Always asks for a fresh reading (maximumAge: 0) so Retry can re-prompt when allowed.
  */
 export function getCheckInPosition(config?: Partial<OfficeGeoConfig> | null): Promise<CheckInPosition> {
   const office = resolveOfficeConfig(config);
@@ -114,12 +138,7 @@ export function getCheckInPosition(config?: Partial<OfficeGeoConfig> | null): Pr
       },
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
-          reject(
-            new OfficeLocationError(
-              'denied',
-              'Allow location access to check in as Office, or choose WFH.'
-            )
-          );
+          reject(new OfficeLocationError('denied', LOCATION_DENIED_MESSAGE));
           return;
         }
         if (err.code === err.TIMEOUT) {
@@ -140,7 +159,7 @@ export function getCheckInPosition(config?: Partial<OfficeGeoConfig> | null): Pr
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 20000,
         maximumAge: 0,
       }
     );

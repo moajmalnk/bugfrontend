@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
-import type { ChatGroup, ChatMessage, TypingIndicator } from "@/types";
+import type { ChatGroup, TypingIndicator } from "@/types";
 import { ArrowLeft, UserPlus, Users } from "lucide-react";
 import { memo } from "react";
 import { MessageSearch } from "./MessageSearch";
@@ -12,7 +12,7 @@ interface ChatHeaderProps {
   typingUsers: TypingIndicator[];
   onBackToChatList?: () => void;
   onOpenGroupMembers?: () => void;
-  onMessageClick: (message: ChatMessage) => void;
+  onMessageClick: (messageId: string) => void;
 }
 
 export const ChatHeader = memo(function ChatHeader({

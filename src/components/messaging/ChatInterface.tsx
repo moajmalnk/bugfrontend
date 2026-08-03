@@ -64,6 +64,8 @@ import { PinnedMessages } from "./PinnedMessages";
 
 type DocumentPreviewKind = "pdf" | "image" | "video" | "audio" | "text" | "none";
 
+type SendChatMessagePayload = Parameters<typeof MessagingService.sendMessage>[0];
+
 const MAX_CHAT_IMAGE_DROP_BYTES = 100 * 1024 * 1024;
 
 function documentPreviewKind(fileName: string): DocumentPreviewKind {
@@ -266,25 +268,31 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isImageDropActive, setIsImageDropActive] = useState(false);
   const [isImageDropUploading, setIsImageDropUploading] = useState(false);
 
-  const updateSidebarPreview = (message: ChatMessage) => {
-    if (!selectedGroup || !onChatActivity) return;
-    onChatActivity({
-      groupId: selectedGroup.id,
-      preview: getMessagePreview(message),
-      senderId: String(message.sender_id),
-      senderName: message.sender_name || "You",
-      lastMessageAt: message.created_at,
-    });
-  };
+  const updateSidebarPreview = useCallback(
+    (message: ChatMessage) => {
+      if (!selectedGroup || !onChatActivity) return;
+      onChatActivity({
+        groupId: selectedGroup.id,
+        preview: getMessagePreview(message),
+        senderId: String(message.sender_id),
+        senderName: message.sender_name || "You",
+        lastMessageAt: message.created_at,
+      });
+    },
+    [selectedGroup, onChatActivity]
+  );
 
-  const scheduleSidebarPreview = (message: ChatMessage) => {
-    if (!onChatActivity) return;
-    if (sidebarBumpTimerRef.current) clearTimeout(sidebarBumpTimerRef.current);
-    sidebarBumpTimerRef.current = setTimeout(() => {
-      updateSidebarPreview(message);
-      sidebarBumpTimerRef.current = null;
-    }, 400);
-  };
+  const scheduleSidebarPreview = useCallback(
+    (message: ChatMessage) => {
+      if (!onChatActivity) return;
+      if (sidebarBumpTimerRef.current) clearTimeout(sidebarBumpTimerRef.current);
+      sidebarBumpTimerRef.current = setTimeout(() => {
+        updateSidebarPreview(message);
+        sidebarBumpTimerRef.current = null;
+      }, 400);
+    },
+    [onChatActivity, updateSidebarPreview]
+  );
 
   const displaySenderLabel = (name?: string | null) => {
     if (!name || name === "0") return "Member";
@@ -344,9 +352,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   useEffect(() => {
     if (selectedGroup) {
-      loadMessages();
+      void loadMessages();
       startPolling();
-      loadAvailableGroups();
+      void loadAvailableGroups();
     } else {
       setMessages([]);
       setCurrentPage(1);
@@ -365,6 +373,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         sidebarBumpTimerRef.current = null;
       }
     };
+    // Load/poll when the selected chat changes; handlers close over latest selectedGroup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid restarting poll on handler identity churn
   }, [selectedGroup]);
 
   const loadAvailableGroups = async () => {
@@ -524,8 +534,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       created_at: now,
       updated_at: now,
       sender_name:
-        (currentUser as any)?.username ||
-        (currentUser as any)?.name ||
+        currentUser?.username ||
+        currentUser?.name ||
         currentUser?.email ||
         "You",
       sender_email: currentUser?.email || "",
@@ -546,16 +556,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
 
     try {
-      const messageData: any = {
+      const messageData: SendChatMessagePayload = {
         group_id: selectedGroup.id,
-        message_type: "text",
+        message_type: replySnapshot ? "reply" : "text",
         content: messageContent,
+        ...(replySnapshot
+          ? { reply_to_message_id: replySnapshot.id }
+          : {}),
       };
-
-      if (replySnapshot) {
-        messageData.message_type = "reply";
-        messageData.reply_to_message_id = replySnapshot?.id;
-      }
 
       const sentMessage = await MessagingService.sendMessage(messageData);
       shouldAutoScrollRef.current = true;
@@ -926,7 +934,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
-  const handleMediaUploadSuccess = async (mediaData: any) => {
+  const handleMediaUploadSuccess = async (mediaData: SendChatMessagePayload) => {
     try {
       const sentMessage = MessagingService.mergeMediaMessage(
         await MessagingService.sendMessage(mediaData),
@@ -1025,7 +1033,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     } finally {
       setIsImageDropUploading(false);
     }
-  }, [isImageDropUploading, newMessage, selectedGroup, toast]);
+  }, [isImageDropUploading, newMessage, selectedGroup, toast, updateSidebarPreview]);
 
   const handleChatImageDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -1159,7 +1167,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         typingUsers={typingUsers}
         onBackToChatList={showBackButton ? onBackToChatList : undefined}
         onOpenGroupMembers={onOpenGroupMembers}
-        onMessageClick={(message) => handleMessageClick(message.id)}
+        onMessageClick={handleMessageClick}
       />
 
       {/* Pinned Messages - Fixed below header */}

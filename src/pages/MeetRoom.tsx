@@ -70,6 +70,28 @@ interface PeerConnection {
   isConnected: boolean;
 }
 
+type PeerSignalPayload = {
+  sdp?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+};
+
+type WindowWithWebkitAudio = Window & {
+  webkitAudioContext?: typeof AudioContext;
+};
+
+function getDomExceptionName(err: unknown): string | undefined {
+  if (err && typeof err === "object" && "name" in err) {
+    const name = (err as { name?: unknown }).name;
+    return typeof name === "string" ? name : undefined;
+  }
+  return undefined;
+}
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
+}
+
 export default function MeetRoom() {
   const { code } = useParams();
   const navigate = useNavigate();
@@ -153,6 +175,13 @@ export default function MeetRoom() {
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
   const meetingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const performanceMonitorRef = useRef<{ [key: string]: number }>({});
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const recordingUrlRef = useRef<string>('');
+  const errorRef = useRef<string | null>(null);
+
+  localStreamRef.current = localStream;
+  recordingUrlRef.current = recordingUrl;
+  errorRef.current = error;
 
   const wsUrl = useMemo(() => {
     return WS_URL;
@@ -401,6 +430,86 @@ export default function MeetRoom() {
     return pc;
   }, [localStream, code, wsRef]);
 
+  const handleSignalRef = useRef<
+    (fromId: string, signal: PeerSignalPayload) => Promise<void>
+  >(async () => {});
+  const getAvailableDevicesRef = useRef<() => Promise<void>>(async () => {});
+
+  const handleSignal = useCallback(async (fromId: string, signal: PeerSignalPayload) => {
+    try {
+      const peer = peersRef.current[fromId];
+      
+      // Only handle signals for existing peer connections
+      if (!peer) {
+        console.log(`No peer connection found for ${fromId}, ignoring signal`);
+        return;
+      }
+
+      const pc = peer.pc;
+      
+      if (signal.sdp) {
+        const desc = new RTCSessionDescription(signal.sdp);
+        console.log(`Handling ${desc.type} from peer ${fromId}, current state: ${pc.signalingState}`);
+        
+        if (desc.type === 'offer') {
+          // Professional offer handling - only reset if in conflicting state
+          console.log(`Handling offer from ${fromId}, current state: ${pc.signalingState}`);
+          
+          let currentPc = pc;
+          
+          // Only reset if we're in a conflicting signaling state
+          if (pc.signalingState !== 'stable' && pc.signalingState !== 'closed') {
+            console.log(`⚠️ Signaling conflict detected, resetting connection for ${fromId}`);
+            pc.close();
+            currentPc = createPeerConnection(fromId);
+            setPeers(prev => ({
+              ...prev,
+              [fromId]: { pc: currentPc, isConnected: false }
+            }));
+            peersRef.current[fromId] = { pc: currentPc, isConnected: false };
+          }
+          
+          try {
+            await currentPc.setRemoteDescription(desc);
+            const answer = await currentPc.createAnswer();
+            await currentPc.setLocalDescription(answer);
+            
+            wsRef.current?.send(JSON.stringify({
+              type: 'signal',
+              code,
+              payload: { to: fromId, signal: { sdp: answer } }
+            }));
+            console.log(`✅ Professional answer sent to ${fromId}`);
+          } catch (error) {
+            console.error(`❌ Error handling offer from ${fromId}:`, error);
+          }
+        } else if (desc.type === 'answer') {
+          // Professional answer handling - only process if we're expecting it
+          console.log(`Handling answer from ${fromId}, current state: ${pc.signalingState}`);
+          
+          if (pc.signalingState === 'have-local-offer') {
+            try {
+              await pc.setRemoteDescription(desc);
+              console.log(`✅ Professional answer processed for ${fromId}`);
+            } catch (error) {
+              console.error(`❌ Error handling answer from ${fromId}:`, error);
+            }
+          } else {
+            console.log(`⚠️ Skipping answer from ${fromId} - not in have-local-offer state: ${pc.signalingState}`);
+          }
+        }
+      } else if (signal.candidate) {
+        if (pc.remoteDescription) {
+          await pc.addIceCandidate(signal.candidate);
+        }
+      }
+    } catch (err) {
+      console.error(`Error handling signal from ${fromId}:`, err);
+    }
+  }, [code, createPeerConnection]);
+
+  handleSignalRef.current = handleSignal;
+
   const connectWebSocket = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     
@@ -439,7 +548,18 @@ export default function MeetRoom() {
           console.log('WebSocket message received:', msg.type, msg);
           
         if (msg.type === 'peers') {
-            const existingPeers = msg.peers.filter((id: string) => id !== (ws as any).resourceId);
+            const selfId =
+              msg.selfId != null
+                ? String(msg.selfId)
+                : msg.you != null
+                  ? String(msg.you)
+                  : undefined;
+            const peerIds: string[] = Array.isArray(msg.peers)
+              ? msg.peers.map((id: string | number) => String(id))
+              : [];
+            const existingPeers = selfId
+              ? peerIds.filter((id) => id !== selfId)
+              : peerIds;
             setParticipantCount(existingPeers.length + 1);
             
             // Create peer connections for existing participants
@@ -572,8 +692,8 @@ export default function MeetRoom() {
           
         if (msg.type === 'signal') {
             const fromId = msg.from;
-          const signal = msg.signal;
-            await handleSignal(fromId, signal);
+          const signal = msg.signal as PeerSignalPayload;
+            await handleSignalRef.current(String(fromId), signal);
           }
           
           // Handle chat messages
@@ -638,80 +758,7 @@ export default function MeetRoom() {
       setError('Failed to connect to meeting server');
       setIsConnecting(false);
     }
-  }, [wsUrl, code, createPeerConnection]);
-
-  const handleSignal = async (fromId: string, signal: any) => {
-    try {
-      const peer = peersRef.current[fromId];
-      
-      // Only handle signals for existing peer connections
-      if (!peer) {
-        console.log(`No peer connection found for ${fromId}, ignoring signal`);
-        return;
-      }
-
-      const pc = peer.pc;
-      
-      if (signal.sdp) {
-        const desc = new RTCSessionDescription(signal.sdp);
-        console.log(`Handling ${desc.type} from peer ${fromId}, current state: ${pc.signalingState}`);
-        
-        if (desc.type === 'offer') {
-          // Professional offer handling - only reset if in conflicting state
-          console.log(`Handling offer from ${fromId}, current state: ${pc.signalingState}`);
-          
-          let currentPc = pc;
-          
-          // Only reset if we're in a conflicting signaling state
-          if (pc.signalingState !== 'stable' && pc.signalingState !== 'closed') {
-            console.log(`⚠️ Signaling conflict detected, resetting connection for ${fromId}`);
-            pc.close();
-            currentPc = createPeerConnection(fromId);
-            setPeers(prev => ({
-              ...prev,
-              [fromId]: { pc: currentPc, isConnected: false }
-            }));
-            peersRef.current[fromId] = { pc: currentPc, isConnected: false };
-          }
-          
-          try {
-            await currentPc.setRemoteDescription(desc);
-            const answer = await currentPc.createAnswer();
-            await currentPc.setLocalDescription(answer);
-            
-            wsRef.current?.send(JSON.stringify({
-              type: 'signal',
-              code,
-              payload: { to: fromId, signal: { sdp: answer } }
-            }));
-            console.log(`✅ Professional answer sent to ${fromId}`);
-          } catch (error) {
-            console.error(`❌ Error handling offer from ${fromId}:`, error);
-          }
-        } else if (desc.type === 'answer') {
-          // Professional answer handling - only process if we're expecting it
-          console.log(`Handling answer from ${fromId}, current state: ${pc.signalingState}`);
-          
-          if (pc.signalingState === 'have-local-offer') {
-            try {
-              await pc.setRemoteDescription(desc);
-              console.log(`✅ Professional answer processed for ${fromId}`);
-            } catch (error) {
-              console.error(`❌ Error handling answer from ${fromId}:`, error);
-            }
-          } else {
-            console.log(`⚠️ Skipping answer from ${fromId} - not in have-local-offer state: ${pc.signalingState}`);
-          }
-        }
-      } else if (signal.candidate) {
-        if (pc.remoteDescription) {
-          await pc.addIceCandidate(signal.candidate);
-        }
-      }
-    } catch (err) {
-      console.error(`Error handling signal from ${fromId}:`, err);
-    }
-  };
+  }, [wsUrl, code, createPeerConnection, currentUser?.name, currentUser?.username, currentUser?.role, getParticipantName, isConnected]);
 
   const initializeMeeting = useCallback(async () => {
     if (isInitialized.current) {
@@ -720,7 +767,7 @@ export default function MeetRoom() {
     }
     
     // Reset initialization flag if there's an error
-    if (error) {
+    if (errorRef.current) {
       isInitialized.current = false;
     }
     
@@ -738,7 +785,7 @@ export default function MeetRoom() {
       }, 10000); // 10 second timeout
       
       // Get available devices first
-      await getAvailableDevices();
+      await getAvailableDevicesRef.current();
       
       // Get user media with professional constraints
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -814,30 +861,33 @@ export default function MeetRoom() {
       
       // Connect WebSocket immediately
       connectWebSocket();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to initialize meeting:', err);
       
       // Check if it's a permission error
-      if (err.name === 'NotAllowedError') {
+      const errName = getDomExceptionName(err);
+      if (errName === 'NotAllowedError') {
         setError('Camera and microphone access denied. Please allow access and refresh the page.');
-      } else if (err.name === 'NotFoundError') {
+      } else if (errName === 'NotFoundError') {
         setError('No camera or microphone found. Please connect a device and refresh the page.');
       } else {
-        setError(err.message || 'Failed to start meeting');
+        setError(getErrorMessage(err, 'Failed to start meeting'));
       }
       
       setIsConnecting(false);
       toast.error('Failed to start meeting');
     }
-  }, [code]);
+  }, [code, connectWebSocket, selectedAudioDevice, selectedVideoDevice]);
 
   useEffect(() => {
-    initializeMeeting();
+    void initializeMeeting();
 
     return () => {
-      // Clean up all resources
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
+      // Read current timeout on unmount (may be set after mount during reconnect).
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: clear latest reconnect timer
+      const reconnectTimeout = reconnectTimeoutRef.current;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
       }
       leaveMeeting(code!);
       if (wsRef.current) {
@@ -857,7 +907,7 @@ export default function MeetRoom() {
         cancelAnimationFrame(animationFrameRef.current);
       }
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close();
+        void audioContextRef.current.close();
       }
       
       // Clean up recording
@@ -867,13 +917,13 @@ export default function MeetRoom() {
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
       }
-      if (recordingUrl) {
-        URL.revokeObjectURL(recordingUrl);
+      if (recordingUrlRef.current) {
+        URL.revokeObjectURL(recordingUrlRef.current);
       }
       
-      localStream?.getTracks().forEach(t => t.stop());
+      localStreamRef.current?.getTracks().forEach(t => t.stop());
     };
-  }, [code]); // Remove initializeMeeting from dependencies
+  }, [code, initializeMeeting]);
 
   // Update local video when stream changes
   useEffect(() => {
@@ -1098,7 +1148,7 @@ export default function MeetRoom() {
   };
 
   // Professional device management
-  const getAvailableDevices = async () => {
+  const getAvailableDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       setAvailableDevices(devices);
@@ -1116,12 +1166,20 @@ export default function MeetRoom() {
     } catch (err) {
       console.error('Error getting devices:', err);
     }
-  };
+  }, [selectedVideoDevice, selectedAudioDevice]);
+
+  getAvailableDevicesRef.current = getAvailableDevices;
 
   // Audio level monitoring
   const setupAudioLevelMonitoring = (stream: MediaStream) => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtx =
+        window.AudioContext ||
+        (window as WindowWithWebkitAudio).webkitAudioContext;
+      if (!AudioCtx) {
+        throw new Error('AudioContext is not supported in this browser');
+      }
+      const audioContext = new AudioCtx();
       const analyser = audioContext.createAnalyser();
       const microphone = audioContext.createMediaStreamSource(stream);
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -1256,12 +1314,13 @@ export default function MeetRoom() {
         setIsScreenSharing(false);
         toast.info('Screen sharing stopped');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error toggling screen share:', err);
       
-      if (err.name === 'NotAllowedError') {
+      const errName = getDomExceptionName(err);
+      if (errName === 'NotAllowedError') {
         toast.error('Screen sharing permission denied. Please allow screen sharing and try again.');
-      } else if (err.name === 'NotFoundError') {
+      } else if (errName === 'NotFoundError') {
         toast.error('No screen sharing source available.');
       } else {
         toast.error('Failed to toggle screen sharing');

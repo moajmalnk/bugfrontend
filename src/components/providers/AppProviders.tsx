@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { AuthProvider } from '@/context/AuthContext';
@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
+import { bindNotificationSoundUnlock } from '@/lib/notificationSound';
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -15,6 +16,10 @@ interface AppProvidersProps {
 
 // Providers that don't need router context
 export const CoreProviders = ({ children, queryClient }: AppProvidersProps) => {
+  useEffect(() => {
+    bindNotificationSoundUnlock();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

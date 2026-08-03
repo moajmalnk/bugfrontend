@@ -3,10 +3,19 @@
  * These should only be used in development mode
  */
 
-// Global reference to the loading error modal hook (for testing)
-let globalLoadingErrorModal: any = null;
+type LoadingErrorModalControls = {
+  showModal: () => void;
+};
 
-export function setGlobalLoadingErrorModal(modal: any) {
+type LoadingErrorTestWindow = Window & {
+  triggerLoadingErrorModal?: () => void;
+  simulateChunkLoadingError?: () => void;
+};
+
+// Global reference to the loading error modal hook (for testing)
+let globalLoadingErrorModal: LoadingErrorModalControls | null = null;
+
+export function setGlobalLoadingErrorModal(modal: LoadingErrorModalControls) {
   globalLoadingErrorModal = modal;
 }
 
@@ -32,14 +41,16 @@ export function simulateChunkLoadingError() {
     // Simulate a chunk loading error
     const error = new Error('Loading chunk 123 failed');
     error.name = 'ChunkLoadError';
-    
+
     // Dispatch a custom error event
-    window.dispatchEvent(new ErrorEvent('error', {
-      message: 'Loading chunk 123 failed',
-      filename: 'http://localhost:3000/assets/chunk-123.js',
-      error: error
-    }));
-    
+    window.dispatchEvent(
+      new ErrorEvent('error', {
+        message: 'Loading chunk 123 failed',
+        filename: 'http://localhost:3000/assets/chunk-123.js',
+        error: error,
+      })
+    );
+
     console.log('Simulated chunk loading error for testing');
   } else {
     console.warn('simulateChunkLoadingError can only be used in development mode');
@@ -48,6 +59,7 @@ export function simulateChunkLoadingError() {
 
 // Make functions available globally in development for easy testing
 if (process.env.NODE_ENV === 'development') {
-  (window as any).triggerLoadingErrorModal = triggerLoadingErrorModal;
-  (window as any).simulateChunkLoadingError = simulateChunkLoadingError;
+  const testWindow = window as LoadingErrorTestWindow;
+  testWindow.triggerLoadingErrorModal = triggerLoadingErrorModal;
+  testWindow.simulateChunkLoadingError = simulateChunkLoadingError;
 }

@@ -3,6 +3,17 @@
  * Handles registration, updates, and communication with service worker
  */
 
+type ServiceWorkerRequest =
+  | { type: "CLEAR_CACHE" }
+  | { type: "GET_VERSION" }
+  | { type: "SKIP_WAITING" };
+
+type ServiceWorkerResponse = {
+  success?: boolean;
+  version?: string;
+  error?: string;
+};
+
 export interface ServiceWorkerManager {
   register(): Promise<ServiceWorkerRegistration | null>;
   unregister(): Promise<boolean>;
@@ -94,13 +105,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
       throw new Error('Service worker not registered');
     }
 
-    try {
-      await this.registration.update();
-      // console.log('[SW Manager] Service worker update check completed');
-    } catch (error) {
-      // console.error('[SW Manager] Service worker update failed:', error);
-      throw error;
-    }
+    await this.registration.update();
   }
 
   /**
@@ -164,7 +169,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
   /**
    * Send message to service worker with promise-based response
    */
-  private sendMessage(message: any): Promise<any> {
+  private sendMessage(message: ServiceWorkerRequest): Promise<ServiceWorkerResponse> {
     return new Promise((resolve, reject) => {
       if (!this.registration?.active) {
         reject(new Error('No active service worker'));
@@ -172,8 +177,8 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
       }
 
       const messageChannel = new MessageChannel();
-      messageChannel.port1.onmessage = (event) => {
-        resolve(event.data);
+      messageChannel.port1.onmessage = (event: MessageEvent<ServiceWorkerResponse>) => {
+        resolve(event.data ?? {});
       };
 
       // Timeout after 5 seconds

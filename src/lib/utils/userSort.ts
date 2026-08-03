@@ -1,13 +1,13 @@
 import type { User } from "@/types";
 
-type SortableUser = Pick<
-  User,
-  "account_active" | "status" | "username" | "name"
+/** Partial user shape — pickers often only have username/name/id. */
+type SortableUser = Partial<
+  Pick<User, "account_active" | "status" | "username" | "name">
 > & { id?: string };
 
 /** Account enabled (or unknown) → 0; deactivated → 1 */
 export function accountActiveRank(
-  user?: Pick<User, "account_active"> | null
+  user?: { account_active?: number | null } | null
 ): number {
   if (!user) return 1;
   if (user.account_active == null) return 0;
