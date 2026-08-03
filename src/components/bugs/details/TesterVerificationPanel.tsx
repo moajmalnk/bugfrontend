@@ -22,6 +22,18 @@ import {
   WhatsAppVoiceRecorder,
 } from "@/components/voice/WhatsAppVoiceRecorder";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import {
   CheckCircle2,
   ClipboardCheck,
   FileImage,
@@ -219,6 +231,8 @@ interface TesterVerificationPanelProps {
 export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPanelProps) {
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const role = String(currentUser?.role || "").toLowerCase();
   const canVerify = role === "admin" || role === "tester";
   const apiBaseUrl = ENV.API_URL;
@@ -240,6 +254,7 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
   const [attachmentsToDelete, setAttachmentsToDelete] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
+  const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
 
   useEffect(() => {
     setRetested(triState(bug.tester_retested));
@@ -287,6 +302,15 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
     retested !== "unset" &&
     (retested === "no" || issueFixed !== "unset");
 
+  const willReopenToBugs =
+    bug.status === "fixed" || bug.status === "rejected"
+      ? retested === "yes" && issueFixed === "no"
+      : false;
+
+  const bugsListPath = currentUser?.role
+    ? `/${currentUser.role}/bugs`
+    : "/bugs";
+
   const buildImageUrl = (path: string) =>
     `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(path)}`;
   const buildAudioUrl = (path: string) =>
@@ -326,9 +350,20 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
     setVoiceNotes([]);
   };
 
+  const requestSave = () => {
+    if (!canSave || !currentUser?.id || saving) return;
+    if (willReopenToBugs) {
+      setReopenConfirmOpen(true);
+      return;
+    }
+    void handleSave();
+  };
+
   const handleSave = async () => {
     if (!canSave || !currentUser?.id) return;
+    setReopenConfirmOpen(false);
     setSaving(true);
+    const reopen = willReopenToBugs;
     try {
       const formData = new FormData();
       formData.append("id", bug.id);
@@ -343,6 +378,9 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
       formData.append("verification_upload", "1");
       formData.append("upload_context", "verification");
       formData.append("updated_by", currentUser.id);
+      if (reopen) {
+        formData.append("status", "pending");
+      }
 
       screenshots.forEach((file) => formData.append("screenshots[]", file));
       files.forEach((file) => formData.append("files[]", file));
@@ -361,16 +399,37 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
         formData.append("attachments_to_delete", JSON.stringify(attachmentsToDelete));
       }
 
-      const response = await apiClient.post<{ success: boolean; data: Bug; message?: string }>(
-        "/bugs/update.php",
-        formData
-      );
+      const response = await apiClient.post<{
+        success: boolean;
+        data: Bug & { _reopened_after_failed_verification?: boolean };
+        message?: string;
+      }>("/bugs/update.php", formData);
       if (!response.data.success || !response.data.data) {
         throw new Error(response.data.message || "Failed to save verification");
       }
       clearLocalMedia();
       setAttachmentsToDelete([]);
-      onUpdated?.(response.data.data);
+      const updated = response.data.data;
+      onUpdated?.(updated);
+
+      const didReopen =
+        reopen ||
+        updated._reopened_after_failed_verification === true ||
+        updated.status === "pending";
+
+      await queryClient.invalidateQueries({ queryKey: ["bugs"] });
+      await queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
+
+      if (didReopen && reopen) {
+        toast({
+          title: "Bug reopened",
+          description:
+            "Marked still broken and moved back to Bugs for developers to fix again.",
+        });
+        navigate(bugsListPath, { replace: true });
+        return;
+      }
+
       toast({
         title: "Verification saved",
         description: "Retest details and evidence were updated.",
@@ -887,30 +946,36 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" />
-              Visible to admin &amp; tester editors
+              {willReopenToBugs
+                ? "Still broken → reopens bug and leaves Fixes"
+                : "Visible to admin & tester editors"}
             </div>
             <Button
               type="button"
               size="sm"
               disabled={!canSave || saving}
-              onClick={handleSave}
-              className="rounded-xl"
+              onClick={requestSave}
+              className={cn(
+                "rounded-xl",
+                willReopenToBugs &&
+                  "bg-orange-600 hover:bg-orange-700 text-white"
+              )}
             >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving…
+                  {willReopenToBugs ? "Reopening…" : "Saving…"}
                 </>
               ) : (
                 <>
-                  {issueFixed === "yes" ? (
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                  ) : issueFixed === "no" ? (
+                  {willReopenToBugs ? (
                     <XCircle className="h-4 w-4 mr-2" />
+                  ) : issueFixed === "yes" ? (
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
                   ) : (
                     <ClipboardCheck className="h-4 w-4 mr-2" />
                   )}
-                  Save verification
+                  {willReopenToBugs ? "Reopen & move to Bugs" : "Save verification"}
                 </>
               )}
             </Button>
@@ -925,6 +990,34 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
           ) : null}
         </div>
       )}
+
+      <AlertDialog open={reopenConfirmOpen} onOpenChange={setReopenConfirmOpen}>
+        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reopen this bug?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You marked the fix as still broken. This will move the bug from{" "}
+              <strong>Fixes</strong> back to <strong>Bugs</strong> as pending so
+              developers can work on it again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving} className="rounded-xl">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving}
+              className="rounded-xl bg-orange-600 hover:bg-orange-700"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleSave();
+              }}
+            >
+              Reopen &amp; go to Bugs
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -179,6 +179,7 @@ const BugDetails = () => {
   const [searchParams] = useSearchParams();
   const [bugList, setBugList] = useState<Bug[]>([]);
   const [bugListLoading, setBugListLoading] = useState(true);
+  const bugListCountRef = useRef(0);
   const [projectId, setProjectId] = useState<string | null>(null);
   const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigationFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -401,6 +402,9 @@ const BugDetails = () => {
     },
     [toast]
   );
+
+  const idsEqual = (a: unknown, b: unknown) =>
+    a != null && b != null && String(a) === String(b);
   
   // Check if user came from project / fixes page
   const fromProject = searchParams.get("from") === "project";
@@ -516,23 +520,21 @@ const BugDetails = () => {
 
   // Track location changes to detect navigation completion - Clean and efficient
   useEffect(() => {
-    console.debug("[BugDetails] location change detected", {
-      pathname: location.pathname,
-      bugId,
-      isBugRoute,
-    });
-
     const currentPath = location.pathname;
     const pathChanged = previousLocationRef.current !== currentPath;
+    const pathBugId = currentPath.split("/bugs/")[1]?.split(/[/?#]/)[0] ?? null;
     
     if (pathChanged) {
-      const pathBugId = currentPath.split('/bugs/')[1]?.split('?')[0];
       previousLocationRef.current = currentPath;
       
-      // Clear navigation state when we reach the target bug
-      if (navigatingToBugIdRef.current && pathBugId === navigatingToBugIdRef.current) {
+      // Clear navigation state when we reach the target bug (string-normalized)
+      if (navigatingToBugIdRef.current && idsEqual(pathBugId, navigatingToBugIdRef.current)) {
         clearNavigationState({ reason: "success" });
-      } else if (navigatingToBugIdRef.current && pathBugId && pathBugId !== navigatingToBugIdRef.current) {
+      } else if (
+        navigatingToBugIdRef.current &&
+        pathBugId &&
+        !idsEqual(pathBugId, navigatingToBugIdRef.current)
+      ) {
         // Navigation was interrupted or redirected
         clearNavigationState({ reason: "cancelled" });
       } else if (navigatingToBugIdRef.current && !pathBugId) {
@@ -542,7 +544,7 @@ const BugDetails = () => {
     }
     
     // Fallback: Clear navigation state if bugId param matches target
-    if (navigatingToBugIdRef.current && bugId === navigatingToBugIdRef.current) {
+    if (navigatingToBugIdRef.current && idsEqual(bugId, navigatingToBugIdRef.current)) {
       clearNavigationState({ reason: "success" });
     }
   }, [location.pathname, bugId, clearNavigationState]);
@@ -559,14 +561,28 @@ const BugDetails = () => {
     }
 
     // Check if navigation succeeded by matching bugId or loaded bug data
-    const navigationSucceeded = 
-      (targetId === bugId) || 
-      (!isFetching && !isLoading && bug?.id === targetId);
+    const navigationSucceeded =
+      idsEqual(targetId, bugId) ||
+      (!isFetching && !isLoading && idsEqual(bug?.id, targetId));
 
     if (navigationSucceeded) {
       clearNavigationState({ reason: "success" });
     }
   }, [bugId, bug?.id, isNavigating, isFetching, isLoading, clearNavigationState]);
+
+  // Failsafe: never leave Next/Prev stuck in Loading forever
+  useEffect(() => {
+    if (!isNavigating) return;
+    const failsafe = window.setTimeout(() => {
+      if (!navigatingToBugIdRef.current) return;
+      const url = lastTargetUrlRef.current;
+      clearNavigationState({ reason: "timeout", targetUrl: url ?? undefined });
+      if (url && !idsEqual(bugId, url.split("/bugs/")[1]?.split(/[/?#]/)[0])) {
+        window.location.assign(url);
+      }
+    }, 3500);
+    return () => window.clearTimeout(failsafe);
+  }, [isNavigating, bugId, clearNavigationState]);
 
   // Remove manual refetch - React Query handles this automatically with refetchOnMount
   // The query will refetch when bugId changes if data is stale or missing
@@ -628,27 +644,40 @@ const BugDetails = () => {
   const navigationProjectId =
     projectIdFromQuery || projectId || bug?.project_id || null;
 
-  // Fetch sibling bugs for Previous / Next — always scope to the current project when known
+  // Fetch sibling bugs for Previous / Next
+  // - from=project → that project only
+  // - from Bugs list (default) → all accessible bugs (same as Bugs page scope)
   useEffect(() => {
     let isMounted = true;
     
     const isDevelopment = import.meta.env.DEV;
     const enableDiagnostics = (window as any).__ENABLE_BUG_DETAILS_DIAGNOSTICS__ === true;
+    const scopeToProject = fromProject && Boolean(navigationProjectId);
     
     if (isDevelopment || enableDiagnostics) {
       diagnosticLogger.log('Bug list fetch effect triggered', {
         fromProject,
+        fromFixes,
         navigationProjectId,
+        scopeToProject,
         userId: currentUser?.id
       });
     }
     
     const timeoutId = setTimeout(() => {
       const fetchStartTime = performance.now();
-      setBugListLoading(true);
+      // Soft loading: keep Prev/Next clickable while list refreshes
+      if (bugListCountRef.current === 0) {
+        setBugListLoading(true);
+      }
       
       if (isDevelopment || enableDiagnostics) {
-        diagnosticLogger.log('Bug list fetch started', { fromProject, navigationProjectId });
+        diagnosticLogger.log('Bug list fetch started', {
+          fromProject,
+          fromFixes,
+          navigationProjectId,
+          scopeToProject,
+        });
       }
       
       requestAnimationFrame(() => {
@@ -659,8 +688,8 @@ const BugDetails = () => {
         bugService
           .getBugs({
             page: 1,
-            limit: 500,
-            ...(navigationProjectId ? { projectId: navigationProjectId } : {}),
+            limit: 1000,
+            ...(scopeToProject ? { projectId: navigationProjectId! } : {}),
           })
           .then((res) => {
             const fetchDuration = performance.now() - fetchStartTime;
@@ -675,22 +704,12 @@ const BugDetails = () => {
             const updateState = () => {
               if (!isMounted) return;
               
-              const currentId = bugId ? String(bugId) : null;
               let filteredBugs = res.bugs || [];
               
-              if (navigationProjectId) {
+              if (scopeToProject && navigationProjectId) {
                 filteredBugs = filteredBugs.filter(
                   (b) => String(b.project_id) === String(navigationProjectId)
                 );
-              }
-
-              // Always keep the open bug in the list so nav never collapses to empty
-              if (
-                bug &&
-                currentId &&
-                !filteredBugs.some((b) => String(b.id) === currentId)
-              ) {
-                filteredBugs = [bug, ...filteredBugs];
               }
 
               // Stable order for sequential Previous / Next (newest first)
@@ -706,11 +725,13 @@ const BugDetails = () => {
                   totalBugs: res.bugs?.length ?? 0,
                   filteredBugs: filteredBugs.length,
                   fromProject,
+                  scopeToProject,
                   navigationProjectId
                 });
               }
               
               setBugList(filteredBugs);
+              bugListCountRef.current = filteredBugs.length;
               setBugListLoading(false);
             };
             
@@ -735,10 +756,6 @@ const BugDetails = () => {
             }
             
             console.error("[BugDetails] Error fetching bug list:", error);
-            // Fallback: at least navigate within a one-item list
-            if (bug && bugId) {
-              setBugList([bug]);
-            }
             setBugListLoading(false);
           });
       });
@@ -751,7 +768,9 @@ const BugDetails = () => {
         diagnosticLogger.log('Bug list fetch effect cleanup', { bugId });
       }
     };
-  }, [navigationProjectId, fromProject, bugId, bug]);
+    // Intentionally omit `bug` — injecting current bug is handled in filteredBugList
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigationProjectId, fromProject, fromFixes]);
 
   // Memoize filtered bug list for adjacent navigation
   // MUST be before any early returns to follow Rules of Hooks
@@ -765,7 +784,7 @@ const BugDetails = () => {
           (currentId != null && String(b.id) === currentId)
         );
       }
-      // Project / default: active Bugs-tab statuses + always include current bug
+      // Bugs list / project: active Bugs-tab statuses + always include current bug
       return (
         b.status === "pending" ||
         b.status === "in_progress" ||
@@ -787,10 +806,12 @@ const BugDetails = () => {
     const currentIndex = currentId
       ? filteredBugList.findIndex((b) => String(b.id) === currentId)
       : -1;
-    const prevBugId = currentIndex > 0 ? filteredBugList[currentIndex - 1]?.id : null;
-    const nextBugId = currentIndex >= 0 && currentIndex < filteredBugList.length - 1
-      ? filteredBugList[currentIndex + 1]?.id
-      : null;
+    const prevBugId =
+      currentIndex > 0 ? String(filteredBugList[currentIndex - 1]?.id ?? "") || null : null;
+    const nextBugId =
+      currentIndex >= 0 && currentIndex < filteredBugList.length - 1
+        ? String(filteredBugList[currentIndex + 1]?.id ?? "") || null
+        : null;
     const totalBugs = filteredBugList.length;
     
     return { currentIndex, prevBugId, nextBugId, totalBugs };
@@ -801,11 +822,12 @@ const BugDetails = () => {
   const buildSiblingUrl = (targetId: string) => {
     const role = currentUser?.role || "tester";
     const params = new URLSearchParams();
+    // Preserve entry context only — do NOT stamp from=project just because bug has a project_id
     if (fromFixes) {
       params.set("from", "fixes");
-    } else if (fromProject || navigationProjectId) {
+    } else if (fromProject) {
       params.set("from", "project");
-      if (navigationProjectId) params.set("projectId", navigationProjectId);
+      if (navigationProjectId) params.set("projectId", String(navigationProjectId));
     }
     const qs = params.toString();
     return `/${role}/bugs/${targetId}${qs ? `?${qs}` : ""}`;
@@ -1043,17 +1065,23 @@ const BugDetails = () => {
                 isNavigating ? "cursor-wait" : ""
               }`}
               onClick={() => {
-                if (isNavigating || !prevBugId || bugListLoading || isLoading || prevBugId === bugId) {
+                if (
+                  isNavigating ||
+                  !prevBugId ||
+                  bugListLoading ||
+                  isLoading ||
+                  idsEqual(prevBugId, bugId)
+                ) {
                   return;
                 }
                 const url = buildSiblingUrl(prevBugId);
                 lastTargetUrlRef.current = url;
                 setIsNavigating(true);
-                navigatingToBugIdRef.current = prevBugId;
+                navigatingToBugIdRef.current = String(prevBugId);
                 chunkLoadErrorRef.current = false;
 
                 navigationTimeoutRef.current = setTimeout(() => {
-                  if (navigatingToBugIdRef.current === prevBugId) {
+                  if (idsEqual(navigatingToBugIdRef.current, prevBugId)) {
                     window.location.assign(url);
                     clearNavigationState({
                       reason: "timeout",
@@ -1073,7 +1101,7 @@ const BugDetails = () => {
               disabled={!prevBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Previous bug"
             >
-              {isNavigating && navigatingToBugIdRef.current === prevBugId ? (
+              {isNavigating && idsEqual(navigatingToBugIdRef.current, prevBugId) ? (
                 <>
                   <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   <span className="hidden sm:inline">Loading…</span>
@@ -1105,17 +1133,23 @@ const BugDetails = () => {
                 isNavigating ? "cursor-wait" : ""
               }`}
               onClick={() => {
-                if (isNavigating || !nextBugId || bugListLoading || isLoading || nextBugId === bugId) {
+                if (
+                  isNavigating ||
+                  !nextBugId ||
+                  bugListLoading ||
+                  isLoading ||
+                  idsEqual(nextBugId, bugId)
+                ) {
                   return;
                 }
                 const url = buildSiblingUrl(nextBugId);
                 lastTargetUrlRef.current = url;
                 setIsNavigating(true);
-                navigatingToBugIdRef.current = nextBugId;
+                navigatingToBugIdRef.current = String(nextBugId);
                 chunkLoadErrorRef.current = false;
 
                 navigationTimeoutRef.current = setTimeout(() => {
-                  if (navigatingToBugIdRef.current === nextBugId) {
+                  if (idsEqual(navigatingToBugIdRef.current, nextBugId)) {
                     window.location.assign(url);
                     clearNavigationState({
                       reason: "timeout",
@@ -1135,7 +1169,7 @@ const BugDetails = () => {
               disabled={!nextBugId || bugListLoading || isLoading || isNavigating}
               aria-label="Next bug"
             >
-              {isNavigating && navigatingToBugIdRef.current === nextBugId ? (
+              {isNavigating && idsEqual(navigatingToBugIdRef.current, nextBugId) ? (
                 <>
                   <span className="hidden sm:inline">Loading…</span>
                   <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />

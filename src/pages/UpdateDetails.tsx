@@ -24,17 +24,31 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { updateService } from "@/services/updateService";
 import { apiClient } from "@/lib/axios";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Check, X, Trash2, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Play, Timer, Loader2, Code2, ChevronLeft, Edit2, Share2, CheckSquare } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, X, Trash2, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Play, Timer, Loader2, Code2, ChevronLeft, Edit2, Share2, CheckSquare, Eye, Download, Video, ArrowRightLeft } from "lucide-react";
 import { CopyTextButton } from "@/components/ui/CopyTextButton";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getReturnPathFromState, useMergeSearchParam } from "@/hooks/useUrlPagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
+import { ScreenshotViewer } from "@/components/ui/ScreenshotViewer";
+import { DocumentPreviewBody } from "@/components/attachments/DocumentPreviewBody";
+import { ConvertUpdateDialog } from "@/components/updates/ConvertUpdateDialog";
 import { format } from "date-fns";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { buildAudioUrl } from "@/lib/mediaUrls";
+import { ENV } from "@/lib/env";
 import { UpdateDetailsCard } from "@/components/updates/UpdateDetailsCard";
 import { UpdateLifecycleCard } from "@/components/updates/UpdateLifecycleCard";
 import { userService } from "@/services/userService";
@@ -52,6 +66,12 @@ type ProjectMemberOption = {
   account_active?: number;
   status?: "active" | "idle" | "offline";
 };
+
+/** Sentinel so Radix Select stays controlled (never switches from undefined → string). */
+const SELECT_UNSET = "__unset__";
+
+const resolveSelectValue = (value: string) =>
+  value === SELECT_UNSET ? "" : value;
 
 
 // Enhanced skeleton components for better loading experience
@@ -176,6 +196,7 @@ const UpdateDetails = () => {
 
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
+  const [showDiscardCompleteDialog, setShowDiscardCompleteDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(
     () => searchParams.get("action") === "complete"
   );
@@ -192,6 +213,14 @@ const UpdateDetails = () => {
   const [updateListLoading, setUpdateListLoading] = useState(true);
   const [isDeletingUpdate, setIsDeletingUpdate] = useState(false);
   const [activeVoiceNoteId, setActiveVoiceNoteId] = useState<string | null>(null);
+  const [screenshotViewerOpen, setScreenshotViewerOpen] = useState(false);
+  const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState(0);
+  const [attachmentPreview, setAttachmentPreview] = useState<{
+    url: string;
+    file_name: string;
+    file_path: string;
+  } | null>(null);
+  const [convertOpen, setConvertOpen] = useState(false);
   const completeNavPushedRef = useRef(false);
 
   // Undo delete hook
@@ -380,13 +409,11 @@ const UpdateDetails = () => {
 
   const closeCompleteDialog = useCallback(
     (options?: { force?: boolean }) => {
-      if (
-        !options?.force &&
-        isCompleteFormDirty &&
-        !window.confirm("You have unsaved changes. Discard them?")
-      ) {
+      if (!options?.force && isCompleteFormDirty) {
+        setShowDiscardCompleteDialog(true);
         return;
       }
+      setShowDiscardCompleteDialog(false);
       setShowCompleteDialog(false);
       if (searchParams.get("action") === "complete") {
         if (completeNavPushedRef.current) {
@@ -399,6 +426,11 @@ const UpdateDetails = () => {
     },
     [isCompleteFormDirty, mergeSearchParam, navigate, searchParams]
   );
+
+  const confirmDiscardComplete = useCallback(() => {
+    setShowDiscardCompleteDialog(false);
+    closeCompleteDialog({ force: true });
+  }, [closeCompleteDialog]);
 
   // Keep dialog synced with ?action=complete (deep links + browser Back)
   useEffect(() => {
@@ -578,6 +610,73 @@ const UpdateDetails = () => {
   const canSeePlanningFields =
     currentUser?.role === "admin" || currentUser?.role === "developer";
 
+  const canConvertUpdate =
+    currentUser?.role === "admin" ||
+    currentUser?.role === "developer" ||
+    currentUser?.role === "tester";
+
+  const apiBaseUrl = ENV.API_URL.replace(/\/$/, "");
+  const buildImageUrl = (path: string) => {
+    if (!path) return "";
+    if (/^https?:\/\//i.test(path)) return path;
+    return `${apiBaseUrl}/image.php?path=${encodeURIComponent(path)}`;
+  };
+  const buildDownloadUrl = (path: string, name?: string) => {
+    const base = `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(path)}`;
+    const withName = name ? `${base}&name=${encodeURIComponent(name)}` : base;
+    return `${withName}&update_id=${encodeURIComponent(update.id)}`;
+  };
+
+  const isImageAttachment = (att: {
+    file_type?: string;
+    file_name?: string;
+  }) =>
+    att.file_type === "screenshot" ||
+    !!att.file_type?.startsWith("image/") ||
+    !!att.file_name?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+
+  // Prefer screenshots array; also include image files so preview gallery is complete
+  const previewScreenshots = [
+    ...(Array.isArray(update.screenshots) ? update.screenshots : []),
+    ...(Array.isArray(update.files)
+      ? update.files.filter(
+          (f: any) =>
+            isImageAttachment(f) &&
+            !(update.screenshots || []).some((s: any) => s.id === f.id)
+        )
+      : []),
+  ];
+
+  const otherFiles = (Array.isArray(update.files) ? update.files : []).filter(
+    (f: any) => !isImageAttachment(f)
+  );
+
+  const openScreenshotViewer = (index: number) => {
+    setSelectedScreenshotIndex(index);
+    setScreenshotViewerOpen(true);
+  };
+  const openAttachmentPreview = (file: {
+    file_name: string;
+    file_path: string;
+  }) => {
+    setAttachmentPreview({
+      url: buildDownloadUrl(file.file_path, file.file_name),
+      file_name: file.file_name,
+      file_path: file.file_path,
+    });
+  };
+  const downloadAttachment = (file: { file_path: string; file_name: string }) => {
+    const link = document.createElement("a");
+    link.href = buildDownloadUrl(file.file_path, file.file_name);
+    link.download = file.file_name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  const isVideoFile = (file: { file_type?: string; file_name?: string }) =>
+    file.file_type?.startsWith("video/") ||
+    !!file.file_name?.match(/\.(mp4|webm|mov|avi|mkv|m4v)$/i);
+
   const formatStatusDateTime = (value: string | null | undefined) => {
     if (!value) return null;
     const normalized = value.includes("T") ? value : value.replace(" ", "T");
@@ -729,6 +828,19 @@ const UpdateDetails = () => {
                   />
                 )}
 
+                {canConvertUpdate && update.status !== "declined" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    title="Convert update"
+                    aria-label="Convert update"
+                    className="h-9 w-9 p-0 shrink-0"
+                    onClick={() => setConvertOpen(true)}
+                  >
+                    <ArrowRightLeft className="h-4 w-4" />
+                  </Button>
+                )}
+
                 {canMarkAsCompleted && (
                   <Button
                     variant="default"
@@ -796,79 +908,130 @@ const UpdateDetails = () => {
               </CardContent>
             </Card>
             
-            {/* Attachments Card - Moved here to be more prominent */}
-            {((update.attachments_count && update.attachments_count > 0) || 
-              (update.screenshots && update.screenshots.length > 0) || 
-              (update.files && update.files.length > 0) || 
+            {/* Attachments — in-app Screenshot Preview (same as Bugs), never new tab */}
+            {((update.attachments_count && update.attachments_count > 0) ||
+              previewScreenshots.length > 0 ||
+              otherFiles.length > 0 ||
               (update.voice_notes && update.voice_notes.length > 0)) && (
               <Card>
-                <CardHeader><CardTitle>Attachments</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle>Attachments</CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Screenshots */}
-                  {update.screenshots && update.screenshots.length > 0 && (
+                  {previewScreenshots.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
                         <ImagePlus className="h-4 w-4" />
-                        Screenshots ({update.screenshots.length})
+                        Screenshots ({previewScreenshots.length})
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {update.screenshots.map((screenshot: any) => (
-                          <div key={screenshot.id} className="relative rounded-xl border border-gray-200 dark:border-gray-700 p-2 group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800">
-                            <a href={screenshot.full_url || `${import.meta.env.VITE_API_URL.replace('/api', '')}/${screenshot.file_path}`} target="_blank" rel="noopener noreferrer" className="block">
-                              <img 
-                                src={screenshot.full_url || `${import.meta.env.VITE_API_URL.replace('/api', '')}/${screenshot.file_path}`} 
-                                alt={screenshot.file_name} 
-                                className="h-32 w-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity" 
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {previewScreenshots.map((screenshot: any, index: number) => (
+                          <button
+                            key={screenshot.id || `${screenshot.file_path}-${index}`}
+                            type="button"
+                            className="relative group text-left rounded-xl border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800 hover:shadow-md transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openScreenshotViewer(index);
+                            }}
+                          >
+                            <div className="relative aspect-[9/16] max-h-48 bg-muted rounded-lg overflow-hidden border">
+                              <img
+                                src={buildImageUrl(screenshot.file_path)}
+                                alt={screenshot.file_name || `Screenshot ${index + 1}`}
+                                className="h-full w-full object-cover"
+                                draggable={false}
                                 onError={(e) => {
-                                  // Fallback if image fails to load
-                                  (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" fill="%23999"%3EImage%3C/text%3E%3C/svg%3E';
+                                  (e.target as HTMLImageElement).src =
+                                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23ddd' width='100' height='100'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='%23999'%3EImage%3C/text%3E%3C/svg%3E";
                                 }}
                               />
-                            </a>
-                            <div className="text-xs truncate mt-2 px-1 text-gray-600 dark:text-gray-400 font-medium">{screenshot.file_name}</div>
-                          </div>
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-2 rounded-xl bg-white/90 px-3 py-1.5 text-sm font-medium text-black">
+                                  <Eye className="w-4 h-4" />
+                                  View
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-xs truncate mt-2 px-1 text-muted-foreground font-medium">
+                              {screenshot.file_name}
+                            </div>
+                          </button>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Files */}
-                  {update.files && update.files.length > 0 && (
+                  {otherFiles.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
                         <Paperclip className="h-4 w-4" />
-                        Files ({update.files.length})
+                        Files ({otherFiles.length})
                       </div>
                       <div className="space-y-2">
-                        {update.files.map((file: any) => (
-                          <a 
-                            key={file.id} 
-                            href={file.full_url || `${import.meta.env.VITE_API_URL.replace('/api', '')}/${file.file_path}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
-                          >
-                            <div className="flex items-center space-x-3 overflow-hidden">
-                              {file.full_url && file.file_type?.startsWith('image/') ? (
-                                <img src={file.full_url} alt={file.file_name} className="h-10 w-10 object-cover rounded-lg" />
-                              ) : (
-                                <div className="h-10 w-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
-                                  <File className="h-5 w-5 text-gray-400" />
+                        {otherFiles.map((file: any) => {
+                          const isVideo = isVideoFile(file);
+                          return (
+                            <div
+                              key={file.id}
+                              className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-sm bg-white dark:bg-gray-800"
+                            >
+                              <div className="flex items-center space-x-3 overflow-hidden min-w-0">
+                                {isVideo ? (
+                                  <Video className="h-8 w-8 text-blue-500 shrink-0" />
+                                ) : (
+                                  <div className="h-10 w-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg shrink-0">
+                                    <File className="h-5 w-5 text-gray-400" />
+                                  </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate font-medium text-gray-700 dark:text-gray-300">
+                                    {file.file_name}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    {file.file_size
+                                      ? `${(file.file_size / 1024).toFixed(1)} KB`
+                                      : ""}
+                                  </div>
                                 </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate font-medium text-gray-700 dark:text-gray-300">{file.file_name}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">{file.file_size ? `${(file.file_size / 1024).toFixed(1)} KB` : ''}</div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    openAttachmentPreview(file);
+                                  }}
+                                  title="View attachment"
+                                  className="hover:text-blue-600"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  <span className="sr-only">View</span>
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    downloadAttachment(file);
+                                  }}
+                                  title="Download attachment"
+                                >
+                                  <Download className="h-4 w-4" />
+                                  <span className="sr-only">Download</span>
+                                </Button>
                               </div>
                             </div>
-                            <File className="h-4 w-4 text-gray-400" />
-                          </a>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
 
-                  {/* Voice Notes */}
                   {update.voice_notes && update.voice_notes.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -880,7 +1043,10 @@ const UpdateDetails = () => {
                           <div key={voiceNote.id} className="relative">
                             <WhatsAppVoiceMessage
                               id={voiceNote.id}
-                              audioSource={buildAudioUrl(voiceNote.file_path, voiceNote.full_url)}
+                              audioSource={buildAudioUrl(
+                                voiceNote.file_path,
+                                voiceNote.full_url
+                              )}
                               duration={voiceNote.duration || 0}
                               accent="received"
                               isActive={activeVoiceNoteId === voiceNote.id}
@@ -899,6 +1065,75 @@ const UpdateDetails = () => {
                 </CardContent>
               </Card>
             )}
+
+            {previewScreenshots.length > 0 && (
+              <ScreenshotViewer
+                screenshots={previewScreenshots.map((s: any) => ({
+                  id: String(s.id),
+                  file_name: s.file_name || "screenshot",
+                  file_path: s.file_path,
+                  file_type: s.file_type || "image/*",
+                  project_name: update.project_name,
+                }))}
+                open={screenshotViewerOpen}
+                onOpenChange={setScreenshotViewerOpen}
+                initialIndex={selectedScreenshotIndex}
+              />
+            )}
+
+            <Dialog
+              open={!!attachmentPreview}
+              onOpenChange={(open) => {
+                if (!open) setAttachmentPreview(null);
+              }}
+            >
+              <DialogContent
+                className="max-w-4xl w-[calc(100vw-1.5rem)] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-2xl"
+                showCloseButton={false}
+              >
+                {attachmentPreview && (
+                  <>
+                    <DialogHeader className="relative flex flex-row items-center gap-2 space-y-0 border-b bg-background px-4 py-3 pr-3 text-left shrink-0">
+                      <DialogTitle className="text-base truncate leading-tight flex-1 min-w-0">
+                        {attachmentPreview.file_name}
+                      </DialogTitle>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-2 h-8 w-8 p-0 rounded-full hover:bg-muted"
+                        onClick={() => setAttachmentPreview(null)}
+                        aria-label="Close preview"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </DialogHeader>
+                    <div className="flex-1 min-h-[200px] overflow-auto bg-muted/20">
+                      <DocumentPreviewBody
+                        url={attachmentPreview.url}
+                        fileName={attachmentPreview.file_name}
+                      />
+                    </div>
+                    <div className="px-4 py-3 border-t shrink-0 flex flex-wrap items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          downloadAttachment({
+                            file_path: attachmentPreview.file_path,
+                            file_name: attachmentPreview.file_name,
+                          })
+                        }
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </DialogContent>
+            </Dialog>
             
             {currentUser?.role === "admin" && update?.status === "pending" && (
               <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
@@ -1045,6 +1280,45 @@ const UpdateDetails = () => {
       {/* Confirmation Dialogs */}
       <ConfirmationDialog open={showApproveDialog} onOpenChange={setShowApproveDialog} onConfirm={() => approveMutation.mutate()} title="Approve Update" description="Are you sure you want to approve this update?" confirmText="Approve" isLoading={approveMutation.isPending} />
       <ConfirmationDialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog} onConfirm={() => declineMutation.mutate()} title="Decline Update" description="Are you sure you want to decline this update? This cannot be undone." confirmText="Decline" isLoading={declineMutation.isPending} variant="destructive" />
+
+      {canConvertUpdate && (
+        <ConvertUpdateDialog
+          update={update}
+          open={convertOpen}
+          onOpenChange={setConvertOpen}
+          onConverted={(updated) => {
+            queryClient.setQueryData(["update", updateId], updated);
+            refetch();
+          }}
+        />
+      )}
+
+      <AlertDialog
+        open={showDiscardCompleteDialog}
+        onOpenChange={setShowDiscardCompleteDialog}
+      >
+        <AlertDialogContent className="max-w-[400px] rounded-2xl border-border/60 gap-4">
+          <AlertDialogHeader className="text-left space-y-2">
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved completion details. Discard them and close this
+              dialog?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="rounded-xl mt-0">
+              Keep editing
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDiscardComplete}
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog
         open={showCompleteDialog}
         onOpenChange={(open) => {
@@ -1096,19 +1370,23 @@ const UpdateDetails = () => {
                     Was this update tested? <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={completeForm.tested || undefined}
-                    onValueChange={(v) =>
+                    value={completeForm.tested || SELECT_UNSET}
+                    onValueChange={(v) => {
+                      const tested = resolveSelectValue(v) as "" | "yes" | "no";
                       setCompleteForm((f) => ({
                         ...f,
-                        tested: v as "yes" | "no",
-                        testedBy: v === "no" ? "" : f.testedBy,
-                      }))
-                    }
+                        tested: tested === "yes" || tested === "no" ? tested : "",
+                        testedBy: tested === "no" ? "" : f.testedBy,
+                      }));
+                    }}
                   >
                     <SelectTrigger id="complete-tested" className="h-11 bg-white dark:bg-gray-800">
                       <SelectValue placeholder="Select yes or no" />
                     </SelectTrigger>
                     <SelectContent position="popper" className="z-[220]">
+                      <SelectItem value={SELECT_UNSET} disabled className="hidden">
+                        Select yes or no
+                      </SelectItem>
                       <SelectItem value="yes">Yes</SelectItem>
                       <SelectItem value="no">No</SelectItem>
                     </SelectContent>
@@ -1121,9 +1399,12 @@ const UpdateDetails = () => {
                       Who tested <span className="text-red-500">*</span>
                     </Label>
                     <Select
-                      value={completeForm.testedBy || undefined}
+                      value={completeForm.testedBy || SELECT_UNSET}
                       onValueChange={(v) =>
-                        setCompleteForm((f) => ({ ...f, testedBy: v }))
+                        setCompleteForm((f) => ({
+                          ...f,
+                          testedBy: resolveSelectValue(v),
+                        }))
                       }
                       disabled={membersLoading}
                     >
@@ -1142,6 +1423,9 @@ const UpdateDetails = () => {
                         position="popper"
                         className="z-[220] max-h-60 overflow-y-auto"
                       >
+                        <SelectItem value={SELECT_UNSET} disabled className="hidden">
+                          Select a tester
+                        </SelectItem>
                         {testerOptions.map((person) => (
                           <SelectItem key={person.id} value={person.username}>
                             {person.username}
@@ -1169,9 +1453,12 @@ const UpdateDetails = () => {
                     Who developed <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={completeForm.developedBy || undefined}
+                    value={completeForm.developedBy || SELECT_UNSET}
                     onValueChange={(v) =>
-                      setCompleteForm((f) => ({ ...f, developedBy: v }))
+                      setCompleteForm((f) => ({
+                        ...f,
+                        developedBy: resolveSelectValue(v),
+                      }))
                     }
                     disabled={membersLoading}
                   >
@@ -1190,6 +1477,9 @@ const UpdateDetails = () => {
                       position="popper"
                       className="z-[220] max-h-60 overflow-y-auto"
                     >
+                      <SelectItem value={SELECT_UNSET} disabled className="hidden">
+                        Select a developer
+                      </SelectItem>
                       {developerOptions.map((person) => (
                         <SelectItem key={person.id} value={person.username}>
                           <span className="inline-flex items-center gap-2">
@@ -1331,14 +1621,14 @@ const ConfirmationDialog = ({ open, onOpenChange, onConfirm, title, description,
     variant?: 'default' | 'destructive';
 }) => (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent className="max-w-[400px] rounded-2xl">
             <DialogHeader>
                 <DialogTitle>{title}</DialogTitle>
                 <DialogDescription>{description}</DialogDescription>
             </DialogHeader>
             <DialogFooter className="sm:justify-end gap-2">
-                 <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                 <Button type="button" variant={variant} onClick={onConfirm} disabled={isLoading}>
+                 <DialogClose asChild><Button type="button" variant="outline" className="rounded-xl">Cancel</Button></DialogClose>
+                 <Button type="button" variant={variant} className="rounded-xl" onClick={onConfirm} disabled={isLoading}>
                     {isLoading ? `${confirmText}...` : confirmText}
                  </Button>
             </DialogFooter>

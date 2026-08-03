@@ -13,6 +13,9 @@ export interface BugLifecycleStep {
   is_current?: boolean;
   source?: string;
   actor_name?: string | null;
+  /** raised | fixed | reopened | status_changed */
+  event_label?: string | null;
+  reason?: string | null;
 }
 
 export interface BugConversionEvent {
@@ -59,20 +62,114 @@ export interface BugLifecycle {
 
 const API_ENDPOINT = '/bugs';
 
+export type BugListParams = {
+  projectId?: string | number;
+  page?: number;
+  limit?: number;
+  /** Single status or CSV, e.g. "pending,in_progress" or "fixed,rejected" */
+  status?: string;
+  /** Reporter filter (reported_by) */
+  userId?: string | number;
+  search?: string;
+  priority?: string;
+  fixedBy?: string | number;
+  bugTypeId?: string | number;
+};
+
 export const bugService = {
-  async getBugs({ projectId, page = 1, limit = 10, status, userId }: { projectId?: any; page?: number; limit?: number; status?: any; userId?: any; } = {}): Promise<{ bugs: Bug[], pagination: any }> {
-    let url = `/bugs/getAll.php?page=${page}&limit=${limit}`;
-    if (projectId) url += `&project_id=${projectId}`;
-    if (status) url += `&status=${status}`;
-    if (userId) url += `&user_id=${userId}`;
-    const response = await apiClient.get<{ success: boolean, data: { bugs: Bug[], pagination: any } }>(url);
+  async getBugs({
+    projectId,
+    page = 1,
+    limit = 10,
+    status,
+    userId,
+    search,
+    priority,
+    fixedBy,
+    bugTypeId,
+  }: BugListParams = {}): Promise<{ bugs: Bug[]; pagination: any }> {
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    if (projectId != null && projectId !== "" && projectId !== "all") {
+      params.set("project_id", String(projectId));
+    }
+    if (status) params.set("status", String(status));
+    if (userId != null && userId !== "" && userId !== "all") {
+      params.set("user_id", String(userId));
+    }
+    if (search?.trim()) params.set("search", search.trim());
+    if (priority && priority !== "all") params.set("priority", priority);
+    if (fixedBy != null && fixedBy !== "" && fixedBy !== "all") {
+      params.set("fixed_by", String(fixedBy));
+    }
+    if (bugTypeId != null && bugTypeId !== "" && bugTypeId !== "all") {
+      params.set("bug_type_id", String(bugTypeId));
+    }
+
+    const response = await apiClient.get<{
+      success: boolean;
+      data: { bugs: Bug[]; pagination: any };
+    }>(`/bugs/getAll.php?${params.toString()}`);
     if (response.data.success && response.data.data?.bugs) {
       return {
         bugs: Array.isArray(response.data.data.bugs) ? response.data.data.bugs : [],
-        pagination: response.data.data.pagination
+        pagination: response.data.data.pagination,
       };
     }
-    return { bugs: [], pagination: { currentPage: 1, totalPages: 1, totalBugs: 0, limit } };
+    return {
+      bugs: [],
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalBugs: 0,
+        limit,
+        counts: { open: 0, resolved: 0, myOpen: 0, myResolved: 0 },
+      },
+    };
+  },
+
+  /**
+   * Why: Dashboard KPIs need full SQL COUNTs (optional from/to), not LIMIT samples.
+   */
+  async getDashboardStats(opts: { from?: string; to?: string } = {}): Promise<{
+    from: string | null;
+    to: string | null;
+    pending: number;
+    in_progress: number;
+    fixed: number;
+    declined: number;
+    rejected: number;
+    open: number;
+    resolved: number;
+    total: number;
+    open_priority: { high: number; medium: number; low: number };
+  }> {
+    const params = new URLSearchParams();
+    if (opts.from) params.set("from", opts.from);
+    if (opts.to) params.set("to", opts.to);
+    const qs = params.toString();
+    const response = await apiClient.get<{
+      success: boolean;
+      data: {
+        from: string | null;
+        to: string | null;
+        pending: number;
+        in_progress: number;
+        fixed: number;
+        declined: number;
+        rejected: number;
+        open: number;
+        resolved: number;
+        total: number;
+        open_priority: { high: number; medium: number; low: number };
+      };
+      message?: string;
+    }>(`/bugs/dashboardStats.php${qs ? `?${qs}` : ""}`);
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || "Failed to load dashboard bug stats");
   },
 
   async getBug(id: string): Promise<Bug> {
@@ -141,6 +238,25 @@ export const bugService = {
       return response.data.data;
     }
     throw new Error(response.data.message || 'Failed to convert bug');
+  },
+
+  async convertToUpdate(
+    bugId: string,
+    payload: { type: 'feature' | 'updation' | 'maintenance'; project_id?: string }
+  ): Promise<{ update: { id: string; project_id: string; title?: string; project_name?: string }; update_id: string; bug_id: string }> {
+    const response = await apiClient.post<{
+      success: boolean;
+      data?: { update: { id: string; project_id: string; title?: string; project_name?: string }; update_id: string; bug_id: string };
+      message?: string;
+    }>(`${API_ENDPOINT}/convert_to_update.php`, {
+      bug_id: bugId,
+      type: payload.type,
+      project_id: payload.project_id,
+    });
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || 'Failed to convert bug to update');
   },
 
   async deleteBug(id: string): Promise<void> {

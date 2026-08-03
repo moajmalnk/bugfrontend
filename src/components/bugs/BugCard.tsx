@@ -72,7 +72,8 @@ export function BugCard({ bug, onDelete, onConverted }: BugCardProps) {
   const { currentUser } = useAuth();
   const isFromProject = location.pathname.includes("/projects/");
   const [convertOpen, setConvertOpen] = useState(false);
-  const showConvert = canConvertBug(currentUser?.role);
+  const showConvert =
+    canConvertBug(currentUser?.role) && bug.status !== "declined";
 
   return (
     <Card className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm w-full h-full p-4 sm:p-5 hover:shadow-xl transition-all duration-300">

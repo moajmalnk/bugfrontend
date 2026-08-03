@@ -2,7 +2,6 @@ import { ConvertBugDialog } from "@/components/bugs/ConvertBugDialog";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import {
   BugTypeFilterSelect,
-  bugMatchesTypeFilter,
 } from "@/components/bugs/BugTypeFilterSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,7 @@ import {
   User,
   UserCheck,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import {
@@ -59,6 +58,10 @@ import {
   VERIFICATION_FILTER_OPTIONS,
 } from "@/components/bugs/details/TesterVerificationPanel";
 import { cn } from "@/lib/utils";
+import { userService } from "@/services/userService";
+import { sortNamedUsersActiveFirst } from "@/lib/utils/userSort";
+
+const RESOLVED_BUG_STATUSES = "fixed,rejected";
 
 // Enhanced table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -335,7 +338,6 @@ const Fixes = () => {
   const setBugTypeFilter = (value: string) => setFilter("bugTypeFilter", value);
   const setFixedByFilter = (value: string) => setFilter("fixedByFilter", value);
   const setVerificationFilter = (value: string) => setFilter("verificationFilter", value);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "all-fixes";
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -348,16 +350,54 @@ const Fixes = () => {
     clampToTotalPages,
   } = useUrlPagination({ defaultPageSize: 10 });
 
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Sync activeTab with URL
+  useEffect(() => {
+    const urlTab = searchParams.get("tab") || "all-fixes";
+    if (urlTab !== activeTab) setActiveTab(urlTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const fixerIdForQuery =
+    activeTab === "my-fixes"
+      ? currentUser?.id
+      : fixedByFilter !== "all"
+        ? fixedByFilter
+        : undefined;
+
   const { data, isLoading, error } = useQuery<{
     bugs: BugType[];
     pagination: any;
   }>({
-    queryKey: ["bugs"],
+    queryKey: [
+      "bugs",
+      "resolved-list",
+      currentPage,
+      itemsPerPage,
+      projectFilter,
+      fixerIdForQuery,
+      debouncedSearch,
+      priorityFilter,
+      bugTypeFilter,
+      activeTab,
+    ],
     queryFn: () =>
       bugService.getBugs({
-        page: 1,
-        limit: 1000,
+        page: currentPage,
+        limit: itemsPerPage,
+        status: RESOLVED_BUG_STATUSES,
+        projectId: projectFilter !== "all" ? projectFilter : undefined,
+        search: debouncedSearch || undefined,
+        priority: priorityFilter !== "all" ? priorityFilter : undefined,
+        fixedBy: fixerIdForQuery,
+        bugTypeId: bugTypeFilter !== "all" ? bugTypeFilter : undefined,
       }),
+    placeholderData: (prev) => prev,
   });
 
   // Fetch projects
@@ -366,43 +406,38 @@ const Fixes = () => {
     queryFn: () => projectService.getProjects(),
   });
 
+  const { data: directoryUsers = [] } = useQuery({
+    queryKey: ["users", "directory"],
+    queryFn: () => userService.getUsers(),
+    staleTime: 60_000,
+  });
+
   const bugs = data?.bugs ?? [];
-  const pagination = data?.pagination;
   const allProjects = projectsData ?? [];
 
-  const isResolvedFix = (status: string) =>
-    status === "fixed" || status === "rejected";
+  const visibleProjects = useMemo(() => allProjects, [allProjects]);
 
-  const getFixerId = (bug: BugType) =>
-    String(bug.fixed_by || bug.updated_by || "").trim();
-  const getFixerName = (bug: BugType) =>
-    bug.fixed_by_name || bug.updated_by_name || "Unknown";
-
-  // Compute role-aware visible projects for the filter
-  const visibleProjects = useMemo(() => {
-    if (currentUser?.role === "admin") {
-      return allProjects;
-    }
-    const assignedProjectIds = new Set(
-      bugs.filter((b) => isResolvedFix(b.status)).map((b) => String(b.project_id))
-    );
-    return allProjects.filter((p) => assignedProjectIds.has(String(p.id)));
-  }, [allProjects, bugs, currentUser?.role]);
-
-  const uniqueFixers = useMemo(() => {
-    const byId = new Map<string, string>();
-    bugs.forEach((bug) => {
-      if (!isResolvedFix(bug.status)) return;
-      const id = getFixerId(bug);
-      if (!id) return;
-      if (!byId.has(id)) {
-        byId.set(id, getFixerName(bug));
-      }
-    });
-    return Array.from(byId.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [bugs]);
+  const uniqueFixers = useMemo(
+    () =>
+      sortNamedUsersActiveFirst(
+        directoryUsers
+          .filter((u: { role?: string }) => {
+            const role = String(u.role || "").toLowerCase();
+            return (
+              !role ||
+              role === "developer" ||
+              role === "admin" ||
+              role === "tester"
+            );
+          })
+          .map((u: { id: string | number; username?: string; name?: string }) => ({
+            id: String(u.id),
+            name: u.username || u.name || "Unknown",
+          })),
+        directoryUsers
+      ),
+    [directoryUsers]
+  );
 
   const hasActiveFilters =
     !!searchTerm ||
@@ -431,44 +466,17 @@ const Fixes = () => {
     }
   }, [uniqueFixers, fixedByFilter]);
 
+  // Verification is derived client-side; keep as a page-level refine when set
   const filteredBugs = useMemo(() => {
-    const resolvedBugs = bugs.filter((bug) => isResolvedFix(bug.status));
-
-    let tabFilteredBugs = resolvedBugs;
-    if (currentUser?.role === "admin" || currentUser?.role === "developer") {
-      if (activeTab === "my-fixes") {
-        tabFilteredBugs = resolvedBugs.filter(
-          (bug) => getFixerId(bug) === String(currentUser?.id)
-        );
-      }
-    }
-
-    return tabFilteredBugs.filter(
-      (bug) =>
-        (bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          bug.id.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        (priorityFilter === "all" || bug.priority === priorityFilter) &&
-        (projectFilter === "all" || bug.project_id === projectFilter) &&
-        bugMatchesTypeFilter(bug.bug_types, bugTypeFilter) &&
-        (fixedByFilter === "all" || getFixerId(bug) === String(fixedByFilter)) &&
-        (verificationFilter === "all" ||
-          getVerificationFilterKey(bug) === verificationFilter)
+    if (verificationFilter === "all") return bugs;
+    return bugs.filter(
+      (bug) => getVerificationFilterKey(bug) === verificationFilter
     );
-  }, [
-    bugs,
-    activeTab,
-    currentUser?.id,
-    searchTerm,
-    priorityFilter,
-    projectFilter,
-    bugTypeFilter,
-    fixedByFilter,
-    verificationFilter,
-  ]);
+  }, [bugs, verificationFilter]);
 
   useResetUrlPageOnChange(setCurrentPage, [
     activeTab,
-    searchTerm,
+    debouncedSearch,
     priorityFilter,
     projectFilter,
     bugTypeFilter,
@@ -476,24 +484,34 @@ const Fixes = () => {
     verificationFilter,
   ]);
 
+  const totalFiltered =
+    verificationFilter === "all"
+      ? data?.pagination?.totalBugs ?? 0
+      : filteredBugs.length;
   const listTotalPages = Math.max(
     1,
-    Math.ceil(filteredBugs.length / itemsPerPage) || 1
+    verificationFilter === "all"
+      ? data?.pagination?.totalPages ||
+          Math.ceil(totalFiltered / itemsPerPage) ||
+          1
+      : Math.ceil(filteredBugs.length / itemsPerPage) || 1
   );
   useClampUrlPage(clampToTotalPages, listTotalPages);
+
+  const paginatedBugs =
+    verificationFilter === "all"
+      ? filteredBugs
+      : filteredBugs.slice(
+          (currentPage - 1) * itemsPerPage,
+          currentPage * itemsPerPage
+        );
 
   const showTabs =
     currentUser?.role === "admin" || currentUser?.role === "developer";
 
-  const myFixesCount = useMemo(
-    () =>
-      bugs.filter(
-        (b) =>
-          isResolvedFix(b.status) &&
-          getFixerId(b) === String(currentUser?.id)
-      ).length,
-    [bugs, currentUser?.id]
-  );
+  const allFixesCount = data?.pagination?.counts?.resolved ?? totalFiltered;
+  const myFixesCount = data?.pagination?.counts?.myResolved ?? 0;
+  const hasAnyFixed = allFixesCount > 0;
 
   const filterTriggerClass =
     "w-full min-w-0 max-w-full h-11 overflow-hidden bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-0 data-[state=open]:ring-2 data-[state=open]:ring-blue-500/40";
@@ -643,19 +661,9 @@ const Fixes = () => {
       </div>
     </div>
   );
-  const allFixesCount = useMemo(
-    () => bugs.filter((b) => isResolvedFix(b.status)).length,
-    [bugs]
-  );
-
-  // Only show tabs if role allows AND there are any resolved (fixed/rejected) bugs
-  const hasAnyFixed = useMemo(
-    () => bugs.some((b) => isResolvedFix(b.status)),
-    [bugs]
-  );
 
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading && !data) {
       return (
         <div className="space-y-6">
           {/* Desktop & Tablet Table Skeleton */}
@@ -713,7 +721,7 @@ const Fixes = () => {
       );
     }
 
-    if (bugs.filter((bug) => isResolvedFix(bug.status)).length === 0) {
+    if (allFixesCount === 0 && !hasActiveFilters) {
       return (
         <div className="space-y-6 sm:space-y-8">
           {searchFilterBar}
@@ -780,12 +788,7 @@ const Fixes = () => {
       );
     }
 
-    const totalFiltered = filteredBugs.length;
-    const paginatedBugs = filteredBugs.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage
-    );
-    const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+    const totalPages = listTotalPages;
 
     return (
       <div className="space-y-6 sm:space-y-8">

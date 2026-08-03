@@ -151,6 +151,35 @@ class UpdateService {
       throw error;
     }
   }
+
+  async convertProject(updateId: string, projectId: string): Promise<Update> {
+    const response = await apiClient.post<{ success: boolean; data: Update; message?: string }>(
+      `/updates/convert.php`,
+      { update_id: updateId, project_id: projectId }
+    );
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || 'Failed to convert update');
+  }
+
+  async convertToBug(
+    updateId: string,
+    payload?: { project_id?: string }
+  ): Promise<{ bug: { id: string; project_id: string; title?: string; project_name?: string }; bug_id: string; update_id: string }> {
+    const response = await apiClient.post<{
+      success: boolean;
+      data?: { bug: { id: string; project_id: string; title?: string; project_name?: string }; bug_id: string; update_id: string };
+      message?: string;
+    }>(`/updates/convert_to_bug.php`, {
+      update_id: updateId,
+      project_id: payload?.project_id,
+    });
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || 'Failed to convert update to bug');
+  }
 }
 
 export const updateService = new UpdateService(); 

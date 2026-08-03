@@ -9,8 +9,9 @@ import type {
   ProjectCategory,
   TaggedProjectFile,
 } from '@/lib/utils/projectUtils';
+import { assetSlotLinkKey, hasValidAssetLink } from '@/lib/utils/projectUtils';
 import { File, FolderOpen, Link2, Paperclip, X } from 'lucide-react';
-import { ChangeEvent, useRef } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 function formatBytes(size: number): string {
   if (size < 1024) return `${size} B`;
@@ -55,54 +56,6 @@ function tagFiles(
   });
 }
 
-/** One Drive/cloud folder link per category — paste a link or upload files below. */
-function CategoryDriveLink({
-  category,
-  value,
-  onChange,
-  requiredHint,
-}: {
-  category: ProjectCategory;
-  value: string;
-  onChange: (url: string) => void;
-  requiredHint?: boolean;
-}) {
-  return (
-    <div className="rounded-xl border border-border/50 bg-background/70 px-3 py-2.5 space-y-1.5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          <Link2 className="h-3.5 w-3.5 shrink-0" />
-          Drive folder link
-          {requiredHint ? <span className="text-red-500">*</span> : null}
-        </span>
-        <span className="font-normal text-muted-foreground/80">or upload files below</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Input
-          type="url"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="https://drive.google.com/drive/folders/…"
-          className="h-9 text-sm"
-          aria-label={`${category} Drive folder link`}
-        />
-        {value.trim() ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 w-9 p-0 shrink-0"
-            onClick={() => onChange('')}
-            aria-label="Clear Drive link"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function FileSlot({
   title,
   hint,
@@ -114,6 +67,8 @@ function FileSlot({
   directory,
   pending,
   existing,
+  linkValue,
+  onLinkChange,
   onAdd,
   onRemovePending,
 }: {
@@ -127,10 +82,19 @@ function FileSlot({
   directory?: boolean;
   pending: TaggedProjectFile[];
   existing: ProjectAttachment[];
+  linkValue: string;
+  onLinkChange: (url: string) => void;
   onAdd: (files: TaggedProjectFile[]) => void;
   onRemovePending: (file: TaggedProjectFile) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
+  const [linkOpen, setLinkOpen] = useState(() => Boolean(linkValue.trim()));
+
+  useEffect(() => {
+    if (linkValue.trim()) setLinkOpen(true);
+  }, [linkValue]);
+
   const slotPending = pending.filter(
     (f) =>
       f.category === category &&
@@ -149,41 +113,93 @@ function FileSlot({
     e.target.value = '';
   };
 
+  const openLink = () => {
+    setLinkOpen(true);
+    requestAnimationFrame(() => linkInputRef.current?.focus());
+  };
+
+  const linkOk = hasValidAssetLink(linkValue);
+
   return (
-    <div className="rounded-xl border border-border/60 bg-background/60 p-3 sm:p-4 space-y-3">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-xl border border-border/60 bg-background/60 p-3 sm:p-4 space-y-3 min-w-0">
+      <div className="space-y-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">
             {title}
             {required ? <span className="text-red-500 ml-1">*</span> : null}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 break-words">{hint}</p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9 shrink-0 rounded-lg"
-          onClick={() => inputRef.current?.click()}
-        >
-          {directory ? (
-            <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-          ) : (
-            <Paperclip className="h-3.5 w-3.5 mr-1.5" />
-          )}
-          {directory ? 'Folder' : 'Upload'}
-        </Button>
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          accept={accept}
-          multiple
-          // @ts-expect-error webkitdirectory is non-standard but widely supported
-          webkitdirectory={directory ? '' : undefined}
-          directory={directory ? '' : undefined}
-          onChange={handleChange}
-        />
+
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
+          <Button
+            type="button"
+            variant={linkOpen || linkOk ? 'default' : 'outline'}
+            size="sm"
+            className={cn(
+              'h-10 w-full sm:w-auto sm:min-w-[5.75rem] flex-1 sm:flex-none rounded-lg justify-center',
+              linkOk && 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+            )}
+            onClick={openLink}
+          >
+            <Link2 className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+            Link
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 w-full sm:w-auto sm:min-w-[5.75rem] flex-1 sm:flex-none rounded-lg justify-center"
+            onClick={() => inputRef.current?.click()}
+          >
+            {directory ? (
+              <FolderOpen className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+            ) : (
+              <Paperclip className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+            )}
+            {directory ? 'Folder' : 'Upload'}
+          </Button>
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            accept={accept}
+            multiple
+            // @ts-expect-error webkitdirectory is non-standard but widely supported
+            webkitdirectory={directory ? '' : undefined}
+            directory={directory ? '' : undefined}
+            onChange={handleChange}
+          />
+        </div>
+
+        {linkOpen && (
+          <div className="flex items-center gap-2 min-w-0">
+            <Input
+              ref={linkInputRef}
+              type="url"
+              value={linkValue}
+              onChange={(e) => onLinkChange(e.target.value)}
+              placeholder="Paste Drive / cloud link…"
+              className="h-10 text-sm min-w-0 flex-1"
+              aria-label={`${title} Drive link`}
+            />
+            {linkValue.trim() ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-10 w-10 p-0 shrink-0"
+                onClick={() => {
+                  onLinkChange('');
+                  setLinkOpen(false);
+                }}
+                aria-label="Clear link"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            ) : null}
+          </div>
+        )}
       </div>
 
       {(slotExisting.length > 0 || slotPending.length > 0) && (
@@ -191,7 +207,7 @@ function FileSlot({
           {slotExisting.map((att) => (
             <li
               key={att.id}
-              className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2 text-xs"
+              className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2 text-xs min-w-0"
             >
               <File className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="truncate font-medium flex-1">{att.file_name}</span>
@@ -201,7 +217,7 @@ function FileSlot({
           {slotPending.map((file, idx) => (
             <li
               key={`${file.name}-${file.folder}-${idx}`}
-              className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2 text-xs"
+              className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2 text-xs min-w-0"
             >
               <File className="h-3.5 w-3.5 shrink-0 text-primary" />
               <span className="truncate font-medium flex-1">
@@ -211,7 +227,7 @@ function FileSlot({
               <span className="text-muted-foreground shrink-0">{formatBytes(file.size)}</span>
               <button
                 type="button"
-                className="p-1 rounded hover:bg-muted"
+                className="p-1 rounded hover:bg-muted shrink-0"
                 onClick={() => onRemovePending(file)}
                 aria-label="Remove file"
               >
@@ -283,8 +299,17 @@ export function ProjectCategoryAssets({
     onPendingFilesChange(pendingFiles.filter((f) => f !== target));
   };
 
-  const setLink = (category: ProjectCategory, url: string) => {
-    onAssetLinksChange({ ...assetLinks, [category]: url });
+  const slotLinkProps = (category: ProjectCategory, folder: string, slotKey?: string) => {
+    const key = assetSlotLinkKey(category, folder, slotKey);
+    return {
+      linkValue: assetLinks[key] || '',
+      onLinkChange: (url: string) => {
+        const next = { ...assetLinks };
+        if (url.trim()) next[key] = url.trim();
+        else delete next[key];
+        onAssetLinksChange(next);
+      },
+    };
   };
 
   if (categories.length === 0) return null;
@@ -296,17 +321,13 @@ export function ProjectCategoryAssets({
           <div>
             <h4 className="text-sm font-bold text-sky-800 dark:text-sky-200">WEB assets</h4>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Required: Drive folder link, or <code className="text-[11px]">.env</code> +{' '}
-              <code className="text-[11px]">.json</code> + README uploads
+              Required per slot: <strong className="font-semibold">Link</strong> or{' '}
+              <strong className="font-semibold">Upload</strong> for{' '}
+              <code className="text-[11px]">.env</code>,{' '}
+              <code className="text-[11px]">.json</code>, and README
             </p>
           </div>
-          <CategoryDriveLink
-            category="WEB"
-            value={assetLinks.WEB || ''}
-            onChange={(url) => setLink('WEB', url)}
-            requiredHint
-          />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <FileSlot
               title=".env"
               hint="Environment variables (prefer sanitized examples)"
@@ -319,6 +340,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('WEB', 'config', 'web_env')}
             />
             <FileSlot
               title="JSON config"
@@ -332,6 +354,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('WEB', 'config', 'web_json')}
             />
             <FileSlot
               title="README"
@@ -345,6 +368,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('WEB', 'docs', 'web_readme')}
             />
           </div>
         </div>
@@ -357,15 +381,9 @@ export function ProjectCategoryAssets({
               APP publisher & files
             </h4>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Play Store / developer account details and folder-based assets (recommended)
+              Play Store details plus assets — use Link or Folder/Upload on each card
             </p>
           </div>
-
-          <CategoryDriveLink
-            category="APP"
-            value={assetLinks.APP || ''}
-            onChange={(url) => setLink('APP', url)}
-          />
 
           <div className="overflow-hidden rounded-xl border border-border/60 bg-background/70">
             <div className="divide-y divide-border/50">
@@ -390,7 +408,7 @@ export function ProjectCategoryAssets({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
             <FileSlot
               title="app files"
               hint="local.properties, key.properties, google-services.json"
@@ -402,6 +420,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('APP', 'app_files')}
             />
             <FileSlot
               title="key_store"
@@ -414,6 +433,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('APP', 'key_store')}
             />
             <FileSlot
               title="builds"
@@ -427,6 +447,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('APP', 'builds', 'android_builds')}
             />
             <FileSlot
               title="Mac / iOS IPA"
@@ -439,6 +460,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('APP', 'builds', 'mac_ipa')}
             />
           </div>
         </div>
@@ -449,15 +471,10 @@ export function ProjectCategoryAssets({
           <div>
             <h4 className="text-sm font-bold text-violet-800 dark:text-violet-200">PWA assets</h4>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Manifest, service worker, and icons (recommended)
+              Manifest, service worker, and icons — Link or Upload
             </p>
           </div>
-          <CategoryDriveLink
-            category="PWA"
-            value={assetLinks.PWA || ''}
-            onChange={(url) => setLink('PWA', url)}
-          />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <FileSlot
               title="manifest.json"
               hint="Web app manifest"
@@ -469,6 +486,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('PWA', 'pwa', 'pwa_manifest')}
             />
             <FileSlot
               title="Service worker"
@@ -481,6 +499,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('PWA', 'pwa', 'pwa_sw')}
             />
             <FileSlot
               title="Icons"
@@ -492,6 +511,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('PWA', 'icons')}
             />
           </div>
         </div>
@@ -502,15 +522,10 @@ export function ProjectCategoryAssets({
           <div>
             <h4 className="text-sm font-bold text-amber-800 dark:text-amber-200">SEO assets</h4>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Crawl rules, sitemap, keywords, and notes (recommended)
+              Crawl rules, sitemap, keywords, and notes — Link or Upload
             </p>
           </div>
-          <CategoryDriveLink
-            category="SEO"
-            value={assetLinks.SEO || ''}
-            onChange={(url) => setLink('SEO', url)}
-          />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <FileSlot
               title="robots.txt"
               hint="Crawl directives"
@@ -522,6 +537,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('SEO', 'seo', 'seo_robots')}
             />
             <FileSlot
               title="sitemap.xml"
@@ -534,6 +550,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('SEO', 'seo', 'seo_sitemap')}
             />
             <FileSlot
               title="Keywords"
@@ -546,6 +563,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('SEO', 'seo', 'seo_keywords')}
             />
             <FileSlot
               title="SEO notes"
@@ -558,6 +576,7 @@ export function ProjectCategoryAssets({
               existing={existingAttachments}
               onAdd={addFiles}
               onRemovePending={removePending}
+              {...slotLinkProps('SEO', 'seo', 'seo_notes')}
             />
           </div>
         </div>
@@ -570,14 +589,9 @@ export function ProjectCategoryAssets({
               Creative assets
             </h4>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Brand kit, designs, and media (folder upload recommended)
+              Brand kit, designs, and media — Link or Folder
             </p>
           </div>
-          <CategoryDriveLink
-            category="CREATIVE"
-            value={assetLinks.CREATIVE || ''}
-            onChange={(url) => setLink('CREATIVE', url)}
-          />
           <FileSlot
             title="Brand / creative folder"
             hint="Images, PDF, ZIP, design exports"
@@ -589,6 +603,7 @@ export function ProjectCategoryAssets({
             existing={existingAttachments}
             onAdd={addFiles}
             onRemovePending={removePending}
+            {...slotLinkProps('CREATIVE', 'creative')}
           />
         </div>
       )}

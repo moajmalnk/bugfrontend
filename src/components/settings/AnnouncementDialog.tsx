@@ -372,10 +372,11 @@ export const AnnouncementDialog = ({
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
+                        <PopoverContent className="w-auto p-0 max-w-[min(100vw-1.5rem,300px)] overflow-hidden rounded-2xl z-[200]" align="start" collisionPadding={12}>
                           <Calendar
                             mode="single"
                             selected={field.value ?? undefined}
+                            defaultMonth={field.value ?? undefined}
                             onSelect={field.onChange}
                             initialFocus
                           />

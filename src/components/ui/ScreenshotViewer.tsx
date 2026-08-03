@@ -703,7 +703,15 @@ export function ScreenshotViewer({
   if (screenshots.length === 0) return null;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose} >
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        // Only run close/reset when Dialog requests close — never treat open=true as close.
+        if (!nextOpen) {
+          handleClose();
+        }
+      }}
+    >
       <DialogTitle className="sr-only">Screenshot Viewer</DialogTitle>
       <DialogDescription className="sr-only">
         Interactive screenshot viewer with zoom, pan, and navigation controls
@@ -946,15 +954,17 @@ export function ScreenshotViewer({
                     <Maximize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   )}
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={deleteScreenshot}
-                  className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive"
-                  title="Delete"
-                >
-                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </Button>
+                {bug_id ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={deleteScreenshot}
+                    className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive"
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </Button>
+                ) : null}
                 <Button
                   variant="ghost"
                   size="sm"

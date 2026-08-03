@@ -1,6 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { feedbackService, FeedbackStatus } from '@/services/feedbackService';
+import {
+  feedbackService,
+  FEEDBACK_ENGAGE_MS,
+  getOrCreateFeedbackSessionStart,
+  clearFeedbackSessionStart,
+} from '@/services/feedbackService';
 import { toast } from '@/hooks/use-toast';
 
 export interface UseFeedbackReturn {
@@ -13,16 +18,33 @@ export interface UseFeedbackReturn {
   dismissFeedback: () => Promise<void>;
 }
 
+/**
+ * Feedback prompt rules:
+ * - Logged-in users only
+ * - Auto-show after 5 minutes of use in this login session
+ * - After Submit → never show again
+ * - After Maybe Later → show again only after 1 week
+ */
 export function useFeedback(): UseFeedbackReturn {
   const { isAuthenticated, currentUser } = useAuth();
-  const [shouldShowFeedback, setShouldShowFeedback] = useState(false);
+  const [eligible, setEligible] = useState(false);
+  const [engagementReady, setEngagementReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const hasAutoOpened = useRef(false);
 
-  // Check if user should see feedback prompt
+  const shouldShowFeedback = eligible && engagementReady;
+
+  const resetPrompt = useCallback(() => {
+    setEligible(false);
+    setEngagementReady(false);
+    setIsModalOpen(false);
+    hasAutoOpened.current = false;
+  }, []);
+
   const checkFeedbackStatus = useCallback(async () => {
     if (!isAuthenticated || !currentUser) {
-      setShouldShowFeedback(false);
+      resetPrompt();
       setIsLoading(false);
       return;
     }
@@ -30,40 +52,53 @@ export function useFeedback(): UseFeedbackReturn {
     try {
       setIsLoading(true);
       const shouldShow = await feedbackService.shouldShowFeedback();
-      setShouldShowFeedback(shouldShow);
-    } catch (error) {
-      console.error('Error checking feedback status:', error);
-      setShouldShowFeedback(false);
+      setEligible(shouldShow);
+    } catch {
+      setEligible(false);
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, currentUser]);
+  }, [isAuthenticated, currentUser, resetPrompt]);
 
-  // Initial check when component mounts or user changes
   useEffect(() => {
-    checkFeedbackStatus();
+    void checkFeedbackStatus();
   }, [checkFeedbackStatus]);
 
-  // Refresh feedback status when user changes
   useEffect(() => {
-    if (isAuthenticated && currentUser) {
-      checkFeedbackStatus();
-    } else if (!isAuthenticated) {
-      // Clear feedback status when user logs out
-      setShouldShowFeedback(false);
-      setIsModalOpen(false);
+    if (!isAuthenticated) {
+      clearFeedbackSessionStart();
+      resetPrompt();
     }
-  }, [isAuthenticated, currentUser, checkFeedbackStatus]);
+  }, [isAuthenticated, resetPrompt]);
 
-  // Auto-show feedback modal after a delay if user should see it
+  // 5-minute engagement gate after login for this browser session
   useEffect(() => {
-    if (shouldShowFeedback && !isModalOpen) {
-      // Show feedback after 30 seconds of being on the app
-      const timer = setTimeout(() => {
-        setIsModalOpen(true);
-      }, 30000); // 30 seconds delay
+    if (!isAuthenticated || !currentUser || !eligible) {
+      setEngagementReady(false);
+      return;
+    }
 
-      return () => clearTimeout(timer);
+    const startedAt = getOrCreateFeedbackSessionStart();
+    const remaining = FEEDBACK_ENGAGE_MS - (Date.now() - startedAt);
+
+    if (remaining <= 0) {
+      setEngagementReady(true);
+      return;
+    }
+
+    setEngagementReady(false);
+    const timer = window.setTimeout(() => {
+      setEngagementReady(true);
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [isAuthenticated, currentUser, eligible]);
+
+  // Auto-open modal once when eligible + 5 minutes elapsed
+  useEffect(() => {
+    if (shouldShowFeedback && !isModalOpen && !hasAutoOpened.current) {
+      hasAutoOpened.current = true;
+      setIsModalOpen(true);
     }
   }, [shouldShowFeedback, isModalOpen]);
 
@@ -75,54 +110,53 @@ export function useFeedback(): UseFeedbackReturn {
     setIsModalOpen(false);
   }, []);
 
-  const submitFeedback = useCallback(async (rating: number, feedbackText?: string) => {
-    try {
-      await feedbackService.submitFeedback(rating, feedbackText);
-      feedbackService.markFeedbackAsSubmitted();
-      setShouldShowFeedback(false);
-      setIsModalOpen(false);
-      
-      toast({
-        title: "Thank You!",
-        description: "Your feedback has been submitted successfully.",
-      });
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      toast({
-        title: "Submission Failed",
-        description: error instanceof Error ? error.message : "Failed to submit feedback. Please try again.",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  }, []);
+  const submitFeedback = useCallback(
+    async (rating: number, feedbackText?: string) => {
+      try {
+        await feedbackService.submitFeedback(rating, feedbackText);
+        feedbackService.markFeedbackAsSubmitted();
+        resetPrompt();
+
+        toast({
+          title: 'Thank You!',
+          description: 'Your feedback has been submitted successfully.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Submission Failed',
+          description:
+            error instanceof Error
+              ? error.message
+              : 'Failed to submit feedback. Please try again.',
+          variant: 'destructive',
+        });
+        throw error;
+      }
+    },
+    [resetPrompt]
+  );
 
   const dismissFeedback = useCallback(async () => {
     try {
       await feedbackService.dismissFeedback();
-      setIsModalOpen(false);
-      // Don't set shouldShowFeedback to false here, as user might want to submit later
+      feedbackService.markFeedbackDismissed();
+      resetPrompt();
     } catch (error) {
-      console.error('Error dismissing feedback:', error);
-      
-      // If the error is that feedback has already been submitted, 
-      // that's actually fine - just close the modal
       if (error instanceof Error && error.message.includes('already been submitted')) {
-        console.log('Feedback already submitted, closing modal');
-        setIsModalOpen(false);
-        setShouldShowFeedback(false);
+        feedbackService.markFeedbackAsSubmitted();
+        resetPrompt();
         return;
       }
-      
-      // For other errors, still close modal but show a message
+
+      feedbackService.markFeedbackDismissed();
+      resetPrompt();
+
       toast({
-        title: "Notice",
-        description: "Feedback prompt closed. You can still provide feedback later if needed.",
-        variant: "default",
+        title: 'Maybe later',
+        description: "We'll ask again in about a week.",
       });
-      setIsModalOpen(false);
     }
-  }, []);
+  }, [resetPrompt]);
 
   return {
     shouldShowFeedback,

@@ -26,10 +26,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { projectService } from "@/services/projectService";
-import { updateService } from "@/services/updateService";
+import { updateService, type Update } from "@/services/updateService";
 import { userService } from "@/services/userService";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Bell, Lock, Plus, Search, User, FolderOpen, Filter, RotateCcw, Layers, CircleDot } from "lucide-react";
+import { AlertCircle, Bell, Lock, Plus, Search, User, FolderOpen, Filter, RotateCcw, Layers, CircleDot, ArrowRightLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
@@ -42,6 +42,7 @@ import {
   listReturnState,
 } from "@/hooks/useUrlPagination";
 import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
+import { ConvertUpdateDialog } from "@/components/updates/ConvertUpdateDialog";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { sortUsernamesActiveFirst } from "@/lib/utils/userSort";
 
@@ -150,6 +151,12 @@ const Updates = () => {
 
   // Draft for the input only — avoids remount/focus loss and URL churn on every keystroke
   const [searchDraft, setSearchDraft] = useState(searchTerm);
+  const [convertTarget, setConvertTarget] = useState<Update | null>(null);
+
+  const canConvertUpdate =
+    currentUser?.role === "admin" ||
+    currentUser?.role === "developer" ||
+    currentUser?.role === "tester";
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -721,7 +728,7 @@ const Updates = () => {
                       <TableHead className="min-w-[170px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                         Approved / Declined
                       </TableHead>
-                      <TableHead className="w-[100px] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                      <TableHead className="w-[180px] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -771,24 +778,38 @@ const Updates = () => {
                             <span className="text-muted-foreground italic">Awaiting approval</span>
                           )}
                         </TableCell>
-                        <TableCell className="w-[100px] pr-4 text-right py-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            className="h-9 sm:h-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
-                          >
-                            <Link
-                              to={
-                                currentUser?.role
-                                  ? `/${currentUser.role}/updates/${update.id}`
-                                  : `/updates/${update.id}`
-                              }
-                              state={listFromState}
+                        <TableCell className="w-[160px] pr-4 text-right py-4">
+                          <div className="flex items-center justify-end gap-2">
+                            {canConvertUpdate && update.status !== "declined" && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setConvertTarget(update)}
+                                className="text-xs sm:text-sm h-9 px-3 bg-white dark:bg-gray-800 border-sky-200 dark:border-sky-800 hover:bg-sky-50 dark:hover:bg-sky-900/20 hover:border-sky-400 dark:hover:border-sky-600 text-sky-700 dark:text-sky-300 font-semibold shadow-sm transition-all duration-300"
+                              >
+                                <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
+                                Convert
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                              className="h-9 sm:h-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                             >
-                              View
-                            </Link>
-                          </Button>
+                              <Link
+                                to={
+                                  currentUser?.role
+                                    ? `/${currentUser.role}/updates/${update.id}`
+                                    : `/updates/${update.id}`
+                                }
+                                state={listFromState}
+                              >
+                                View
+                              </Link>
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -840,12 +861,24 @@ const Updates = () => {
                     <UpdateTimingInfo update={update} />
                   </CardContent>
                   <CardFooter className="flex-col items-start gap-3 p-4 sm:p-5 pt-0">
-                    <div className="flex justify-end w-full gap-2">
+                    <div className="flex justify-end w-full gap-2 flex-wrap">
+                      {canConvertUpdate && update.status !== "declined" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setConvertTarget(update)}
+                          className="h-11 px-3 shrink-0 bg-white dark:bg-gray-800 border-sky-200 dark:border-sky-800 hover:bg-sky-50 dark:hover:bg-sky-900/20 hover:border-sky-400 dark:hover:border-sky-600 text-sky-700 dark:text-sky-300 font-semibold shadow-sm transition-all duration-300"
+                        >
+                          <ArrowRightLeft className="h-4 w-4 mr-1.5" />
+                          Convert
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
                         asChild
-                        className="w-full h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                        className="flex-1 min-w-[7rem] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
                       >
                         <Link
                           to={
@@ -967,6 +1000,16 @@ const Updates = () => {
           </div>
         )}
       </section>
+
+      {convertTarget && (
+        <ConvertUpdateDialog
+          update={convertTarget}
+          open={!!convertTarget}
+          onOpenChange={(open) => {
+            if (!open) setConvertTarget(null);
+          }}
+        />
+      )}
     </main>
   );
 };

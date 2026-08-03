@@ -363,11 +363,14 @@ function AppContent() {
       if (button) {
         // Check if button becomes stuck after 3 seconds
         setTimeout(() => {
-          if (button.disabled && button.textContent?.includes('Loading') || button.textContent?.includes('Creating')) {
-            console.warn('⚠️ [Global] Button still disabled/loading after 3s:', {
-              text: button.textContent?.trim(),
+          const text = button.textContent || "";
+          const looksLoading =
+            text.includes("Loading") || text.includes("Creating");
+          if (button.disabled && looksLoading) {
+            console.warn("⚠️ [Global] Button still disabled/loading after 3s:", {
+              text: text.trim(),
               disabled: button.disabled,
-              className: button.className
+              className: button.className,
             });
           }
         }, 3000);

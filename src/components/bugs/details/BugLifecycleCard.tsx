@@ -115,17 +115,13 @@ function toneFromDuration(seconds: number | null | undefined): RatioTone {
 
 function getLifecycleShares(steps: BugLifecycleStep[], riseSeconds?: number | null) {
   if (!steps?.length) return [];
-  const closedIndex = steps.findIndex((step) =>
-    CLOSED.has((step.status || "").toLowerCase())
+  // Keep full reopen cycles (fixed → pending → fixed); only zero duration on
+  // the current closed step so the bar stays readable.
+  const lifecycle = steps.map((step) =>
+    step.is_current && CLOSED.has((step.status || "").toLowerCase())
+      ? { ...step, duration_seconds: 0 }
+      : step
   );
-  const lifecycle =
-    closedIndex === -1
-      ? steps
-      : steps.slice(0, closedIndex + 1).map((step, index, arr) =>
-          index === arr.length - 1 && CLOSED.has((step.status || "").toLowerCase())
-            ? { ...step, duration_seconds: 0 }
-            : step
-        );
 
   const summed = lifecycle.reduce(
     (sum, step) => sum + Math.max(0, step.duration_seconds || 0),
@@ -240,6 +236,21 @@ function CycleShareBar({
   );
 }
 
+function eventLabelForStep(step: BugLifecycleStep): string | null {
+  const label = String(step.event_label || "").toLowerCase();
+  if (label === "reopened") return "Reopened";
+  if (label === "fixed") return "Fixed";
+  if (label === "raised") return "Raised";
+  const from = String(step.from_status || "").toLowerCase();
+  const to = String(step.status || "").toLowerCase();
+  if (CLOSED.has(from) && (to === "pending" || to === "in_progress")) {
+    return "Reopened";
+  }
+  if (to === "fixed" && from) return "Fixed";
+  if (!from) return "Raised";
+  return null;
+}
+
 function StatusTimeline({
   steps,
   riseSeconds,
@@ -270,24 +281,44 @@ function StatusTimeline({
         const isClosedCurrent =
           !!step.is_current && CLOSED.has((step.status || "").toLowerCase());
         const share = isClosedCurrent ? null : shareByIndex.get(index);
+        const eventLabel = eventLabelForStep(step);
+        const isReopen = eventLabel === "Reopened";
 
         return (
           <li key={`${step.status}-${step.entered_at}-${index}`} className="relative pb-4 last:pb-0">
             <span
               className={cn(
                 "absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background",
-                step.is_current ? "bg-primary" : "bg-muted-foreground/50"
+                isReopen
+                  ? "bg-orange-500"
+                  : step.is_current
+                    ? "bg-primary"
+                    : "bg-muted-foreground/50"
               )}
             />
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={step.status} />
               {step.from_status ? (
-                <span className="text-[11px] text-muted-foreground">
-                  from {formatStatusLabel(step.from_status)}
-                </span>
-              ) : (
-                <span className="text-[11px] text-muted-foreground">raised</span>
-              )}
+                <>
+                  <StatusBadge status={step.from_status} />
+                  <span className="text-[11px] text-muted-foreground">→</span>
+                </>
+              ) : null}
+              <StatusBadge status={step.status} />
+              {eventLabel ? (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "h-5 rounded-full px-2 text-[10px] font-semibold",
+                    isReopen
+                      ? "border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-200"
+                      : eventLabel === "Fixed"
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                        : "border-border/60"
+                  )}
+                >
+                  {eventLabel}
+                </Badge>
+              ) : null}
               {step.is_current ? (
                 <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px]">
                   Current
@@ -302,6 +333,11 @@ function StatusTimeline({
                 </Badge>
               ) : null}
             </div>
+            {step.reason === "tester_verification_failed" ? (
+              <p className="mt-1 text-[11px] text-orange-700 dark:text-orange-300">
+                Tester marked the fix as still broken
+              </p>
+            ) : null}
             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <CalendarClock className="h-3 w-3" />
@@ -435,7 +471,7 @@ export function BugLifecycleCard({ bugId, className }: BugLifecycleCardProps) {
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
-          Time spent in each status, cycle mix, and who moved the bug
+          Full history: raised → fixed → reopened → fixed again, with time in each status
         </p>
       </CardHeader>
       <CardContent className="relative space-y-5">

@@ -46,18 +46,19 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-auto p-0 max-w-[calc(100vw-2rem)] sm:max-w-[350px] overflow-hidden z-[200]" 
+        className="w-auto p-0 max-w-[min(100vw-1.5rem,300px)] overflow-hidden z-[200] rounded-2xl"
         align="start" 
         side="bottom" 
         alignOffset={0}
         sideOffset={4}
-        collisionPadding={8}
+        collisionPadding={12}
         onOpenAutoFocus={(e) => e.preventDefault()}
         onWheel={(e) => e.stopPropagation()}
       >
         <Calendar
           mode="single"
           selected={selectedDate}
+          defaultMonth={selectedDate}
           onSelect={(d) => {
             if (!d) return;
             const iso = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
@@ -69,12 +70,12 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
           disabled={disabled}
           initialFocus
         />
-        <div className="flex items-center justify-between gap-2 border-t border-border/60 px-3 py-2">
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 px-2.5 py-1.5">
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs text-blue-600 dark:text-blue-400"
+            className="h-7 px-2 text-xs text-blue-600 dark:text-blue-400"
             onClick={() => {
               onChange('');
               setOpen(false);
@@ -86,7 +87,7 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs text-blue-600 dark:text-blue-400"
+            className="h-7 px-2 text-xs text-blue-600 dark:text-blue-400"
             onClick={() => {
               const t = new Date();
               const iso = new Date(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()))

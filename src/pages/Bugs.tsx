@@ -4,7 +4,6 @@ import {
 } from "@/components/bugs/BugCard";
 import {
   BugTypeFilterSelect,
-  bugMatchesTypeFilter,
 } from "@/components/bugs/BugTypeFilterSelect";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { Button } from "@/components/ui/button";
@@ -21,7 +20,6 @@ import { useAuth } from "@/context/AuthContext";
 import { bugService } from "@/services/bugService";
 import { Project, projectService } from "@/services/projectService";
 import { userService } from "@/services/userService";
-import { Bug } from "@/types";
 import {
   Bug as BugIcon,
   Filter,
@@ -41,20 +39,20 @@ import {
   listReturnState,
 } from "@/hooks/useUrlPagination";
 import { canReportBug } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { sortNamedUsersActiveFirst } from "@/lib/utils/userSort";
+
+const OPEN_BUG_STATUSES = "pending,in_progress";
 
 const Bugs = () => {
   const { currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const location = useLocation();
   const listFromState = listReturnState(location.pathname, location.search);
-  const [bugs, setBugs] = useState<Bug[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [skeletonLoading, setSkeletonLoading] = useState(true);
   
   // Use persisted filters hook
-  const [filters, setFilter, clearFilters] = usePersistedFilters("bugs", {
+  const [filters, setFilter, clearFilters] = usePersistedFilters("bugs_list_v2", {
     searchTerm: "",
     priorityFilter: "all",
     statusFilter: "all",
@@ -99,17 +97,15 @@ const Bugs = () => {
     setPageSize: setItemsPerPage,
     clampToTotalPages,
   } = useUrlPagination({ defaultPageSize: 10 });
-  const [totalBugs, setTotalBugs] = useState(0);
-  const [pendingBugsCount, setPendingBugsCount] = useState(0);
 
-  // Compute role-aware visible projects for the filter
-  const visibleProjects = useMemo(() => {
-    if (currentUser?.role === "admin") {
-      return projects;
-    }
-    const assignedProjectIds = new Set(bugs.map((b) => String(b.project_id)));
-    return projects.filter((p) => assignedProjectIds.has(String(p.id)));
-  }, [projects, bugs, currentUser?.role]);
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Project list is already membership-scoped by the API
+  const visibleProjects = useMemo(() => projects, [projects]);
 
   const { data: directoryUsers = [] } = useQuery({
     queryKey: ["users", "directory"],
@@ -117,20 +113,21 @@ const Bugs = () => {
     staleTime: 60_000,
   });
 
-  const uniqueRaisers = useMemo(() => {
-    const byId = new Map<string, string>();
-    bugs.forEach((bug) => {
-      const id = String(bug.reported_by || "").trim();
-      if (!id) return;
-      if (!byId.has(id)) {
-        byId.set(id, bug.reporter_name || bug.reported_by || "Unknown");
-      }
-    });
-    return sortNamedUsersActiveFirst(
-      Array.from(byId.entries()).map(([id, name]) => ({ id, name })),
-      directoryUsers
-    );
-  }, [bugs, directoryUsers]);
+  const uniqueRaisers = useMemo(
+    () =>
+      sortNamedUsersActiveFirst(
+        directoryUsers.map((u: { id: string | number; username?: string; name?: string }) => ({
+          id: String(u.id),
+          name: u.username || u.name || "Unknown",
+        })),
+        directoryUsers
+      ),
+    [directoryUsers]
+  );
+
+  // All Bugs: optional Raised-by filter.
+  // My Bugs: always current user (ignore Raised-by so your bugs are never hidden by it).
+  const isMyBugsTab = activeTab === "my-bugs";
 
   const hasActiveFilters =
     !!searchTerm ||
@@ -138,7 +135,15 @@ const Bugs = () => {
     statusFilter !== "all" ||
     projectFilter !== "all" ||
     bugTypeFilter !== "all" ||
-    raisedByFilter !== "all";
+    (!isMyBugsTab && raisedByFilter !== "all");
+
+  // Clear Raised-by when entering My Bugs so switching back to All Bugs
+  // does not keep a stale user filter that hides your own bugs.
+  useEffect(() => {
+    if (isMyBugsTab && raisedByFilter !== "all") {
+      setRaisedByFilter("all");
+    }
+  }, [isMyBugsTab, raisedByFilter, setRaisedByFilter]);
 
   // If current selected project becomes invisible (e.g., role change or data refresh), reset it
   useEffect(() => {
@@ -160,7 +165,6 @@ const Bugs = () => {
   }, [uniqueRaisers, raisedByFilter]);
 
   useEffect(() => {
-    fetchBugs();
     fetchProjects();
   }, []);
 
@@ -173,7 +177,7 @@ const Bugs = () => {
 
   useResetUrlPageOnChange(setCurrentPage, [
     activeTab,
-    searchTerm,
+    debouncedSearch,
     priorityFilter,
     statusFilter,
     projectFilter,
@@ -181,44 +185,91 @@ const Bugs = () => {
     raisedByFilter,
   ]);
 
-  const fetchBugs = async (page = 1, limit = itemsPerPage) => {
-    try {
-      setLoading(true);
-      setSkeletonLoading(true);
+  const listStatus =
+    statusFilter === "all" ? OPEN_BUG_STATUSES : statusFilter;
+
+  const reporterId = isMyBugsTab
+    ? currentUser?.id != null
+      ? String(currentUser.id)
+      : undefined
+    : raisedByFilter !== "all"
+      ? String(raisedByFilter)
+      : undefined;
+
+  const bugsQueryKey = [
+    "bugs",
+    "open-list",
+    currentPage,
+    itemsPerPage,
+    listStatus,
+    projectFilter,
+    reporterId ?? "all",
+    debouncedSearch,
+    priorityFilter,
+    bugTypeFilter,
+    activeTab,
+  ] as const;
+
+  const {
+    data: bugsData,
+    isLoading: loading,
+    error: bugsError,
+    refetch: refetchBugs,
+  } = useQuery({
+    queryKey: bugsQueryKey,
+    queryFn: async () => {
       setAccessError(null);
-
-      // Fetch ALL bugs if you want a true count
-      const data = await bugService.getBugs({
-        page: 1,
-        limit: 1000,
-      });
-      setBugs(data.bugs);
-      setTotalBugs(data.pagination.totalBugs);
-
-      // Calculate pending bugs from all fetched bugs
-      const pendingCount = data.bugs.filter(
-        (bug) => bug.status === "pending" // or include "in_progress"
-      ).length;
-      setPendingBugsCount(pendingCount);
-
-      setSkeletonLoading(false);
-    } catch (error: any) {
-      // // console.error("Error fetching bugs:", error);
-      if (error.message?.includes("access")) {
-        setAccessError("You don't have access to any projects");
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to load bugs. Please try again.",
-          variant: "destructive",
+      try {
+        return await bugService.getBugs({
+          page: currentPage,
+          limit: itemsPerPage,
+          status: listStatus,
+          projectId: projectFilter !== "all" ? projectFilter : undefined,
+          userId: reporterId,
+          search: debouncedSearch || undefined,
+          priority: priorityFilter !== "all" ? priorityFilter : undefined,
+          bugTypeId: bugTypeFilter !== "all" ? bugTypeFilter : undefined,
         });
+      } catch (error: any) {
+        if (error?.message?.includes("access")) {
+          setAccessError("You don't have access to any projects");
+        }
+        throw error;
       }
-      setBugs([]);
-      setSkeletonLoading(false);
-    } finally {
-      setLoading(false);
+    },
+    placeholderData: (prev) => prev,
+  });
+
+  useEffect(() => {
+    if (!bugsError) return;
+    const message =
+      bugsError instanceof Error ? bugsError.message : String(bugsError);
+    if (!message.includes("access")) {
+      toast({
+        title: "Error",
+        description: "Failed to load bugs. Please try again.",
+        variant: "destructive",
+      });
     }
-  };
+  }, [bugsError]);
+
+  const bugs = bugsData?.bugs ?? [];
+  const totalFiltered = bugsData?.pagination?.totalBugs ?? 0;
+  const pendingBugsCount =
+    bugsData?.pagination?.counts?.open ??
+    bugsData?.pagination?.pendingBugsCount ??
+    0;
+  const allBugsTabCount = bugsData?.pagination?.counts?.open ?? pendingBugsCount;
+  const myBugsTabCount = bugsData?.pagination?.counts?.myOpen ?? 0;
+  const skeletonLoading = loading && !bugsData;
+  const paginatedBugs = bugs;
+  const totalPages = Math.max(
+    1,
+    bugsData?.pagination?.totalPages ||
+      Math.ceil(totalFiltered / itemsPerPage) ||
+      1
+  );
+  useClampUrlPage(clampToTotalPages, totalPages);
 
   const fetchProjects = async () => {
     try {
@@ -241,82 +292,18 @@ const Bugs = () => {
     }
   };
 
-  const handleDelete = () => {
-    fetchBugs();
+  const refreshBugs = () => {
+    queryClient.invalidateQueries({ queryKey: ["bugs"] });
+    refetchBugs();
   };
 
-  // Filter bugs based on active tab for admin users
-  const getFilteredBugs = () => {
-    let filteredByTab = bugs;
-
-    if (currentUser?.role === "admin" || currentUser?.role === "tester") {
-      switch (activeTab) {
-        case "all-bugs":
-          filteredByTab = bugs;
-          break;
-        case "my-bugs":
-          filteredByTab = bugs.filter((bug) => {
-            // Convert both to strings for comparison to handle type mismatches
-            return String(bug.reported_by) === String(currentUser.id);
-          });
-          break;
-        default:
-          filteredByTab = bugs;
-      }
-    }
-
-    // Apply additional filters
-    return filteredByTab.filter((bug) => {
-      const matchesSearch =
-        bug.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bug.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesPriority =
-        priorityFilter === "all" || bug.priority === priorityFilter;
-      const matchesStatus =
-        statusFilter === "all" || bug.status === statusFilter;
-      const matchesProject =
-        projectFilter === "all" || bug.project_id === projectFilter;
-      const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
-      const matchesRaisedBy =
-        raisedByFilter === "all" ||
-        String(bug.reported_by) === String(raisedByFilter);
-      // Bugs page: only active work items (pending / in progress)
-      const isActiveBug =
-        bug.status === "pending" || bug.status === "in_progress";
-      return (
-        matchesSearch &&
-        matchesPriority &&
-        matchesStatus &&
-        matchesProject &&
-        matchesBugType &&
-        matchesRaisedBy &&
-        isActiveBug
-      );
-    });
-  };
-
-  const filteredBugs = getFilteredBugs();
-
-  const totalFiltered = filteredBugs.length;
-  const paginatedBugs = filteredBugs.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / itemsPerPage) || 1);
-  useClampUrlPage(clampToTotalPages, totalPages);
-
-  // Get tab-specific count
+  // Get tab-specific count from server facet totals
   const getTabCount = (tabType: string) => {
-    const validStatuses = ["pending", "in_progress"];
     switch (tabType) {
       case "all-bugs":
-        return bugs.filter((bug) => validStatuses.includes(bug.status)).length;
+        return allBugsTabCount;
       case "my-bugs":
-        return bugs.filter(
-          (bug) =>
-            bug.reported_by === currentUser?.id &&
-            validStatuses.includes(bug.status)
-        ).length;
+        return myBugsTabCount;
       default:
         return 0;
     }
@@ -348,7 +335,8 @@ const Bugs = () => {
     currentUser?.role === "admin" || currentUser?.role === "tester";
 
   const isDeveloper = currentUser?.role === "developer";
-  const noBugs = !loading && filteredBugs.length === 0;
+  const noBugs = !loading && totalFiltered === 0;
+  const filteredBugs = bugs;
 
   const filterTriggerClass =
     "w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-orange-500/40 focus:ring-offset-0 data-[state=open]:ring-2 data-[state=open]:ring-orange-500/40";
@@ -432,19 +420,28 @@ const Bugs = () => {
                 <User className="h-4 w-4 text-white" />
               </div>
               <div className="min-w-0 flex-1">
-                <Select value={raisedByFilter} onValueChange={setRaisedByFilter}>
-                  <SelectTrigger className={filterTriggerClass}>
-                    <SelectValue placeholder="Raised by" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[60]">
-                    <SelectItem value="all">All Raisers</SelectItem>
-                    {uniqueRaisers.map((raiser) => (
-                      <SelectItem key={raiser.id} value={raiser.id}>
-                        {raiser.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isMyBugsTab ? (
+                  <div
+                    className={`${filterTriggerClass} flex items-center px-3 text-sm font-medium text-foreground`}
+                    title="My Bugs always shows bugs you raised"
+                  >
+                    You ({currentUser?.username || "me"})
+                  </div>
+                ) : (
+                  <Select value={raisedByFilter} onValueChange={setRaisedByFilter}>
+                    <SelectTrigger className={filterTriggerClass}>
+                      <SelectValue placeholder="Raised by" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-[60]">
+                      <SelectItem value="all">All Raisers</SelectItem>
+                      {uniqueRaisers.map((raiser) => (
+                        <SelectItem key={raiser.id} value={raiser.id}>
+                          {raiser.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
           </div>
@@ -839,6 +836,16 @@ const Bugs = () => {
                         ? "You're not assigned to any bugs yet. When bugs are reported, they'll appear here."
                         : "Great job! You currently have no bugs assigned to you. Check back later or ask your project admin for new assignments."}
                     </p>
+                    {hasActiveFilters ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => clearFilters()}
+                        className="h-11 px-5 rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-medium"
+                      >
+                        Clear filters
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               ) : (
@@ -848,7 +855,7 @@ const Bugs = () => {
                   aria-label="Bug list"
                 >
                   {paginatedBugs.map((bug) => (
-                    <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
+                    <BugCard key={bug.id} bug={bug} onConverted={() => refreshBugs()} />
                   ))}
                 </div>
               )}
@@ -873,6 +880,16 @@ const Bugs = () => {
                       ? "You're not assigned to any bugs yet. When bugs are reported, they'll appear here."
                       : "Great job! You currently have no bugs assigned to you. Check back later or ask your project admin for new assignments."}
                   </p>
+                  {hasActiveFilters ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => clearFilters()}
+                      className="h-11 px-5 rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-medium"
+                    >
+                      Clear filters
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             )}
@@ -1138,7 +1155,7 @@ const Bugs = () => {
                   aria-label="Bug list"
                 >
                   {paginatedBugs.map((bug) => (
-                    <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
+                    <BugCard key={bug.id} bug={bug} onConverted={() => refreshBugs()} />
                   ))}
                 </div>
               )}

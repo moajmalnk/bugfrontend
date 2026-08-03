@@ -4,6 +4,64 @@ export interface FeedbackStatus {
   has_submitted: boolean;
   should_show: boolean;
   first_submission_at?: string;
+  dismissed_at?: string | null;
+}
+
+export const FEEDBACK_SUBMITTED_KEY = 'bugricer_feedback_submitted';
+export const FEEDBACK_DISMISSED_AT_KEY = 'bugricer_feedback_dismissed_at';
+export const FEEDBACK_SESSION_START_KEY = 'bugricer_feedback_session_started_at';
+export const FEEDBACK_ENGAGE_MS = 5 * 60 * 1000; // 5 minutes after login/use
+export const FEEDBACK_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000; // 1 week after Maybe Later
+
+export function getOrCreateFeedbackSessionStart(): number {
+  try {
+    const existing = sessionStorage.getItem(FEEDBACK_SESSION_START_KEY);
+    if (existing) {
+      const n = Number(existing);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const now = Date.now();
+    sessionStorage.setItem(FEEDBACK_SESSION_START_KEY, String(now));
+    return now;
+  } catch {
+    return Date.now();
+  }
+}
+
+export function clearFeedbackSessionStart(): void {
+  try {
+    sessionStorage.removeItem(FEEDBACK_SESSION_START_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function isFeedbackSnoozedLocally(): boolean {
+  try {
+    const raw = localStorage.getItem(FEEDBACK_DISMISSED_AT_KEY);
+    if (!raw) return false;
+    const at = Number(raw);
+    if (!Number.isFinite(at)) return false;
+    return Date.now() - at < FEEDBACK_SNOOZE_MS;
+  } catch {
+    return false;
+  }
+}
+
+export function markFeedbackDismissedLocally(): void {
+  try {
+    localStorage.setItem(FEEDBACK_DISMISSED_AT_KEY, String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+export function clearFeedbackDismissedLocally(): void {
+  try {
+    localStorage.removeItem(FEEDBACK_DISMISSED_AT_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 export interface FeedbackStats {
@@ -173,29 +231,42 @@ class FeedbackService {
   }
 
   /**
-   * Check feedback status with localStorage fallback
+   * Check feedback status with localStorage fallback.
+   * Never show after submit; hide for 1 week after Maybe Later.
    */
   async shouldShowFeedback(): Promise<boolean> {
-    // Check localStorage first for immediate response
-    const localFeedbackSubmitted = localStorage.getItem('bugricer_feedback_submitted');
+    const localFeedbackSubmitted = localStorage.getItem(FEEDBACK_SUBMITTED_KEY);
     if (localFeedbackSubmitted === 'true') {
       return false;
     }
 
+    if (isFeedbackSnoozedLocally()) {
+      return false;
+    }
+
     try {
-      // Check server status
       const status = await this.getFeedbackStatus();
-      
-      // Update localStorage based on server response
+
       if (status.has_submitted) {
-        localStorage.setItem('bugricer_feedback_submitted', 'true');
+        localStorage.setItem(FEEDBACK_SUBMITTED_KEY, 'true');
+        clearFeedbackDismissedLocally();
         return false;
       }
 
-      return status.should_show;
+      if (!status.should_show) {
+        // Server says snoozed or otherwise hidden — mirror dismiss locally if provided
+        if (status.dismissed_at) {
+          const dismissedMs = Date.parse(status.dismissed_at);
+          if (Number.isFinite(dismissedMs)) {
+            localStorage.setItem(FEEDBACK_DISMISSED_AT_KEY, String(dismissedMs));
+          }
+        }
+        return false;
+      }
+
+      return true;
     } catch (error) {
       console.error('Error checking feedback status:', error);
-      // If there's an error, don't show feedback to avoid spamming
       return false;
     }
   }
@@ -230,10 +301,18 @@ class FeedbackService {
   }
 
   /**
-   * Mark feedback as submitted in localStorage
+   * Mark feedback as submitted in localStorage (never ask again).
    */
   markFeedbackAsSubmitted(): void {
-    localStorage.setItem('bugricer_feedback_submitted', 'true');
+    localStorage.setItem(FEEDBACK_SUBMITTED_KEY, 'true');
+    clearFeedbackDismissedLocally();
+  }
+
+  /**
+   * Mark Maybe Later snooze locally (1 week).
+   */
+  markFeedbackDismissed(): void {
+    markFeedbackDismissedLocally();
   }
 }
 

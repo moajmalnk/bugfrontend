@@ -8,7 +8,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
   Drawer,
   DrawerContent,
@@ -16,6 +16,14 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -54,7 +62,7 @@ import { updateService, type Update } from "@/services/updateService";
 import { userService } from "@/services/userService";
 import { RecentDeadlineRemindersPanel } from "@/components/dashboard/RecentDeadlineRemindersPanel";
 import { Bug, User } from "@/types";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowRight,
@@ -283,10 +291,12 @@ function sortByPriorityThenDate(bugs: Bug[]): Bug[] {
 
 async function loadDashboardData() {
   const today = startOfDay(new Date());
+  const listLimit = 40;
 
   const [
     projects,
     users,
+    lifetimeStats,
     pendingResult,
     progressResult,
     fixedResult,
@@ -296,11 +306,12 @@ async function loadDashboardData() {
   ] = await Promise.all([
     projectService.getProjects(),
     userService.getUsers(),
-    bugService.getBugs({ page: 1, limit: 500, status: "pending" }),
-    bugService.getBugs({ page: 1, limit: 500, status: "in_progress" }),
-    bugService.getBugs({ page: 1, limit: 500, status: "fixed" }),
-    bugService.getBugs({ page: 1, limit: 300, status: "declined" }),
-    bugService.getBugs({ page: 1, limit: 300, status: "rejected" }),
+    bugService.getDashboardStats(),
+    bugService.getBugs({ page: 1, limit: listLimit, status: "pending" }),
+    bugService.getBugs({ page: 1, limit: listLimit, status: "in_progress" }),
+    bugService.getBugs({ page: 1, limit: listLimit, status: "fixed" }),
+    bugService.getBugs({ page: 1, limit: listLimit, status: "declined" }),
+    bugService.getBugs({ page: 1, limit: listLimit, status: "rejected" }),
     updateService.getUpdates().catch(() => [] as Awaited<ReturnType<typeof updateService.getUpdates>>),
   ]);
 
@@ -337,22 +348,16 @@ async function loadDashboardData() {
         new Date(b.updated_at || b.created_at).getTime() -
         new Date(a.updated_at || a.created_at).getTime()
     );
+
   const bugCounts: BugStatusCounts = {
-    pending: pendingResult.pagination?.totalBugs ?? pendingResult.bugs.length,
-    in_progress: progressResult.pagination?.totalBugs ?? progressResult.bugs.length,
-    fixed: fixedResult.pagination?.totalBugs ?? fixedResult.bugs.length,
-    declined: declinedResult.pagination?.totalBugs ?? declinedResult.bugs.length,
-    rejected: rejectedResult.pagination?.totalBugs ?? rejectedResult.bugs.length,
-    total: 0,
-    open: 0,
+    pending: lifetimeStats.pending,
+    in_progress: lifetimeStats.in_progress,
+    fixed: lifetimeStats.fixed,
+    declined: lifetimeStats.declined,
+    rejected: lifetimeStats.rejected,
+    open: lifetimeStats.open,
+    total: lifetimeStats.total,
   };
-  bugCounts.open = bugCounts.pending + bugCounts.in_progress;
-  bugCounts.total =
-    bugCounts.pending +
-    bugCounts.in_progress +
-    bugCounts.fixed +
-    bugCounts.declined +
-    bugCounts.rejected;
 
   const bugsByStatus: Record<BugStatusKey, Bug[]> = {
     pending: sortByPriorityThenDate(pendingResult.bugs || []),
@@ -369,63 +374,32 @@ async function loadDashboardData() {
     ...bugsByStatus.in_progress,
   ]);
 
-  const openPriority: PriorityCounts = { high: 0, medium: 0, low: 0 };
-  openBugs.forEach((b) => {
-    openPriority[b.priority] = (openPriority[b.priority] || 0) + 1;
-  });
-
-  const sampleOpen = openBugs.length || 1;
   const scaledPriority: PriorityCounts = {
-    high: Math.round((openPriority.high / sampleOpen) * bugCounts.open),
-    medium: Math.round((openPriority.medium / sampleOpen) * bugCounts.open),
-    low: Math.round((openPriority.low / sampleOpen) * bugCounts.open),
+    high: lifetimeStats.open_priority?.high ?? 0,
+    medium: lifetimeStats.open_priority?.medium ?? 0,
+    low: lifetimeStats.open_priority?.low ?? 0,
   };
 
   const trackableProjects = projects.filter(
     (p) => p.status === "active" || p.status === "release_ready"
   );
 
-  const perProject = await mapWithConcurrency(trackableProjects, 4, async (project) => {
-    try {
-      const { bugs: projectBugs } = await bugService.getBugs({
-        projectId: project.id,
-        page: 1,
-        limit: 1000,
-      });
-      const openBugs = projectBugs.filter(
-        (b) => b.status === "pending" || b.status === "in_progress"
-      );
-      const highBugs = openBugs.filter((b) => b.priority === "high").length;
-      const fixedBugs = projectBugs.filter((b) => b.status === "fixed").length;
-      const updatesCount = updatesByProject.get(String(project.id)) || 0;
-      const deadline = parseDateOnly(project.deadline_date);
-      const { bucket, daysUntil } = classifyDeadline(deadline, today);
-      return {
-        project,
-        openBugs: openBugs.length,
-        highBugs,
-        fixedBugs,
-        updatesCount,
-        totalBugs: projectBugs.length,
-        deadline,
-        bucket,
-        daysUntil,
-      } satisfies ProjectHealth;
-    } catch {
-      const deadline = parseDateOnly(project.deadline_date);
-      const { bucket, daysUntil } = classifyDeadline(deadline, today);
-      return {
-        project,
-        openBugs: 0,
-        highBugs: 0,
-        fixedBugs: 0,
-        updatesCount: updatesByProject.get(String(project.id)) || 0,
-        totalBugs: 0,
-        deadline,
-        bucket,
-        daysUntil,
-      } satisfies ProjectHealth;
-    }
+  // Prefer embedded bug_stats from projects list (SQL COUNT) — avoid N×1000 fetches
+  const perProject: ProjectHealth[] = trackableProjects.map((project) => {
+    const stats = project.bug_stats;
+    const deadline = parseDateOnly(project.deadline_date);
+    const { bucket, daysUntil } = classifyDeadline(deadline, today);
+    return {
+      project,
+      openBugs: stats?.open ?? 0,
+      highBugs: 0,
+      fixedBugs: stats?.fixed ?? 0,
+      updatesCount: updatesByProject.get(String(project.id)) || 0,
+      totalBugs: stats?.total ?? 0,
+      deadline,
+      bucket,
+      daysUntil,
+    };
   });
 
   const overdue = perProject
@@ -446,7 +420,6 @@ async function loadDashboardData() {
       return b.openBugs - a.openBugs;
     });
 
-  // Ongoing health board — release-ready projects have their own section
   const projectHealthRows = perProject
     .filter((h) => h.project.status !== "release_ready")
     .slice()
@@ -458,7 +431,7 @@ async function loadDashboardData() {
       return b.openBugs - a.openBugs;
     });
 
-  const highOpenFromProjects = perProject.reduce((sum, row) => sum + row.highBugs, 0);
+  const highOpenFromProjects = scaledPriority.high;
 
   const deadlineBuckets = {
     overdue: perProject.filter((h) => h.bucket === "overdue").length,
@@ -1225,7 +1198,16 @@ function workStatusBadgeClass(status: WorkRetentionRow["status"]): string {
   return "bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300";
 }
 
-type WorkPeriodPreset = "today" | "yesterday" | "week" | "month" | "year" | "custom";
+type WorkPeriodPreset =
+  | "today"
+  | "yesterday"
+  | "week"
+  | "last_week"
+  | "month"
+  | "last_month"
+  | "year"
+  | "last_year"
+  | "custom";
 
 const WORK_PERIOD_PRESETS: {
   value: WorkPeriodPreset;
@@ -1235,8 +1217,11 @@ const WORK_PERIOD_PRESETS: {
   { value: "today", label: "Today", icon: Clock },
   { value: "yesterday", label: "Yesterday", icon: CalendarDays },
   { value: "week", label: "This week", icon: CalendarDays },
+  { value: "last_week", label: "Last week", icon: CalendarDays },
   { value: "month", label: "This month", icon: Calendar },
+  { value: "last_month", label: "Last month", icon: Calendar },
   { value: "year", label: "This year", icon: BarChart3 },
+  { value: "last_year", label: "Last year", icon: BarChart3 },
   { value: "custom", label: "Custom", icon: CalendarClock },
 ];
 
@@ -1254,9 +1239,29 @@ function getWeekPeriod(todayYmd: string): { from: string; to: string } {
   return { from, to: todayYmd };
 }
 
+function getLastWeekPeriod(todayYmd: string): { from: string; to: string } {
+  const thisWeek = getWeekPeriod(todayYmd);
+  const from = shiftCalendarDate(thisWeek.from, -7);
+  const to = shiftCalendarDate(thisWeek.from, -1);
+  return { from, to };
+}
+
+function getLastMonthPeriod(todayYmd: string): { from: string; to: string } {
+  const d = new Date(`${todayYmd}T00:00:00`);
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return getCalendarMonthPeriod(monthKey);
+}
+
 function getYearPeriod(todayYmd: string): { from: string; to: string } {
   const year = todayYmd.slice(0, 4);
   return { from: `${year}-01-01`, to: todayYmd };
+}
+
+function getLastYearPeriod(todayYmd: string): { from: string; to: string } {
+  const year = String(Number(todayYmd.slice(0, 4)) - 1);
+  return { from: `${year}-01-01`, to: `${year}-12-31` };
 }
 
 function formatShortYmd(ymd: string): string {
@@ -1306,6 +1311,27 @@ function resolveWorkPeriod(
       hoursLabel: "Weekly hours",
     };
   }
+  if (preset === "last_week") {
+    const { from, to } = getLastWeekPeriod(today);
+    return {
+      from,
+      to,
+      title: "Last week",
+      rangeLabel: `${formatShortYmd(from)} – ${formatShortYmd(to)}`,
+      hoursLabel: "Weekly hours",
+    };
+  }
+  if (preset === "last_month") {
+    const { from, to } = getLastMonthPeriod(today);
+    const monthKey = from.slice(0, 7);
+    return {
+      from,
+      to,
+      title: "Last month",
+      rangeLabel: formatCalendarMonthRange(monthKey),
+      hoursLabel: "Monthly hours",
+    };
+  }
   if (preset === "year") {
     const { from, to } = getYearPeriod(today);
     return {
@@ -1313,6 +1339,16 @@ function resolveWorkPeriod(
       to,
       title: "This year",
       rangeLabel: `${from.slice(0, 4)} · YTD`,
+      hoursLabel: "Yearly hours",
+    };
+  }
+  if (preset === "last_year") {
+    const { from, to } = getLastYearPeriod(today);
+    return {
+      from,
+      to,
+      title: "Last year",
+      rangeLabel: from.slice(0, 4),
       hoursLabel: "Yearly hours",
     };
   }
@@ -1395,14 +1431,12 @@ function DashboardPeriodFilter({
   onCustomToChange: (value: string) => void;
   isFetching?: boolean;
 }) {
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const activePreset =
-    WORK_PERIOD_PRESETS.find((p) => p.value === preset) ?? WORK_PERIOD_PRESETS[3];
+    WORK_PERIOD_PRESETS.find((p) => p.value === preset) ?? WORK_PERIOD_PRESETS[4];
   const ActivePresetIcon = activePreset.icon;
 
   const selectPreset = (value: WorkPeriodPreset) => {
     onPresetChange(value);
-    setFilterSheetOpen(false);
     if (value === "custom" && !customFrom) {
       const today = toLocalCalendarDateString(new Date());
       onCustomFromChange(shiftCalendarDate(today, -6));
@@ -1411,170 +1445,72 @@ function DashboardPeriodFilter({
   };
 
   return (
-    <>
-      <div className="relative">
-        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-50/40 via-transparent to-violet-50/30 dark:from-indigo-950/15 dark:via-transparent dark:to-violet-950/10 pointer-events-none" />
-        <div className="relative rounded-2xl border border-gray-200/60 dark:border-gray-700/60 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm p-2 space-y-2">
-          <div className="p-1 lg:hidden">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12 w-full justify-between rounded-2xl border-gray-200/70 bg-white/70 dark:border-gray-700/70 dark:bg-gray-800/70"
-              onClick={() => setFilterSheetOpen(true)}
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold min-w-0">
-                <ActivePresetIcon className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" />
-                <span className="truncate">{activePreset.label}</span>
-                <span className="truncate text-xs font-medium text-muted-foreground">
-                  · {period.rangeLabel}
-                </span>
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-0">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-12 px-4 sm:px-5 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 font-semibold shadow-sm hover:shadow-md transition-all duration-300 rounded-xl min-w-0 max-w-full"
+          >
+            <ActivePresetIcon className="mr-2 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-300" />
+            <span className="truncate">{activePreset.label}</span>
+            <span className="mx-1.5 hidden sm:inline text-muted-foreground font-normal">·</span>
+            <span className="truncate text-xs sm:text-sm font-medium text-muted-foreground max-w-[10rem] sm:max-w-[14rem]">
+              {period.rangeLabel}
+            </span>
+            {isFetching ? (
+              <span className="ml-1.5 text-[10px] font-medium text-muted-foreground shrink-0">
+                …
               </span>
-              <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-            </Button>
-          </div>
-
-          <div className="hidden lg:grid grid-cols-12 gap-1.5 p-1">
-            {WORK_PERIOD_PRESETS.map((item) => {
-              const Icon = item.icon;
-              const isActive = preset === item.value;
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => selectPreset(item.value)}
-                  className={cn(
-                    "col-span-2 flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-3 text-sm font-semibold transition-all duration-200",
-                    isActive
-                      ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-lg border border-gray-200 dark:border-gray-700"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/70 dark:hover:bg-gray-800/60"
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0 opacity-80" />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {preset === "custom" ? (
-            <div className="grid grid-cols-12 gap-2 px-1 pb-1">
-              <div className="col-span-12 sm:col-span-6 lg:col-span-3 space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-0.5">
-                  From
-                </p>
-                <DatePicker
-                  value={customFrom}
-                  onChange={onCustomFromChange}
-                  placeholder="Start date"
-                  disableFuture
-                />
-              </div>
-              <div className="col-span-12 sm:col-span-6 lg:col-span-3 space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-0.5">
-                  To
-                </p>
-                <DatePicker
-                  value={customTo}
-                  onChange={onCustomToChange}
-                  placeholder="End date"
-                  disableFuture
-                />
-              </div>
-              <div className="col-span-12 lg:col-span-6 flex items-end">
-                <p className="text-sm text-muted-foreground pb-2">
-                  Showing{" "}
-                  <span className="font-semibold text-foreground">
-                    {period.rangeLabel}
-                  </span>
-                  {isFetching ? " · updating…" : null}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="hidden lg:flex px-2 pb-1">
-              <p className="text-xs text-muted-foreground">
-                Period ·{" "}
-                <span className="font-semibold text-foreground">
-                  {period.rangeLabel}
-                </span>
-                {isFetching ? " · updating…" : null}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <Drawer open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
-        <DrawerContent className="rounded-t-3xl border-gray-200/70 bg-white/95 backdrop-blur-sm dark:border-gray-800/70 dark:bg-gray-900/95 lg:hidden">
-          <DrawerHeader className="pb-2 text-left">
-            <DrawerTitle className="text-2xl font-bold text-gray-900 dark:text-white">
-              Period filter
-            </DrawerTitle>
-            <DrawerDescription>
-              Today, yesterday, week, month, year, or a custom range
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="max-h-[65vh] space-y-3 overflow-y-auto hide-scrollbar px-4 pb-6">
-            {WORK_PERIOD_PRESETS.map((item) => {
-              const isActive = preset === item.value;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => selectPreset(item.value)}
-                  className={cn(
-                    "flex min-h-16 w-full items-center justify-between rounded-3xl px-4 py-4 transition-colors",
-                    isActive
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-100/80 text-gray-900 dark:bg-gray-800/80 dark:text-gray-100"
-                  )}
-                >
-                  <span className="flex items-center gap-3 min-w-0">
-                    <span
-                      className={cn(
-                        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                        isActive ? "bg-indigo-500/80" : "bg-gray-200 dark:bg-gray-700"
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className="text-lg font-semibold truncate">{item.label}</span>
-                  </span>
-                  {isActive ? <Check className="h-5 w-5 shrink-0" /> : null}
-                </button>
-              );
-            })}
-            {preset === "custom" ? (
-              <div className="grid grid-cols-1 gap-3 pt-2">
-                <div className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    From
-                  </p>
-                  <DatePicker
-                    value={customFrom}
-                    onChange={onCustomFromChange}
-                    placeholder="Start date"
-                    disableFuture
-                  />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    To
-                  </p>
-                  <DatePicker
-                    value={customTo}
-                    onChange={onCustomToChange}
-                    placeholder="End date"
-                    disableFuture
-                  />
-                </div>
-              </div>
             ) : null}
-          </div>
-        </DrawerContent>
-      </Drawer>
-    </>
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-70" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="z-[80] w-[min(100vw-2rem,18rem)] rounded-2xl p-1.5"
+        >
+          <DropdownMenuLabel className="px-2.5 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+            Period filter
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {WORK_PERIOD_PRESETS.map((item) => {
+            const Icon = item.icon;
+            const isActive = preset === item.value;
+            return (
+              <DropdownMenuItem
+                key={item.value}
+                onSelect={() => selectPreset(item.value)}
+                className={cn(
+                  "rounded-xl gap-2 cursor-pointer",
+                  isActive && "bg-indigo-50 text-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-100"
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="flex-1 font-medium">{item.label}</span>
+                {isActive ? <Check className="h-4 w-4 shrink-0" /> : null}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {preset === "custom" ? (
+        <DateRangePicker
+          from={customFrom}
+          to={customTo}
+          onChange={(nextFrom, nextTo) => {
+            onCustomFromChange(nextFrom);
+            onCustomToChange(nextTo);
+          }}
+          placeholder="From – To"
+          disableFuture
+          className="sm:min-w-[16rem] sm:max-w-[20rem]"
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -2078,6 +2014,7 @@ export default function AdminDashboard() {
   const { currentUser } = useAuth();
   const role = getEffectiveRole(currentUser || {});
   const isAdmin = role === "admin";
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseDashboardTab(searchParams.get("tab"));
   const [dashTabSheetOpen, setDashTabSheetOpen] = useState(false);
@@ -2119,7 +2056,19 @@ export default function AdminDashboard() {
     refetchOnWindowFocus: false,
   });
 
-  /** Bugs/updates scoped to the shared period filter; live metrics stay on `data`. */
+  const {
+    data: periodBugStats,
+    isFetching: periodStatsFetching,
+  } = useQuery({
+    queryKey: ["admin-ops-dashboard-bug-stats", period.from, period.to],
+    queryFn: () =>
+      bugService.getDashboardStats({ from: period.from, to: period.to }),
+    enabled: isAdmin && Boolean(period.from && period.to),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
+
+  /** Bugs/updates scoped to the shared period filter; KPIs use server COUNTs. */
   const view = useMemo(() => {
     if (!data) return null;
     const { from, to } = period;
@@ -2136,24 +2085,28 @@ export default function AdminDashboard() {
       ...bugsByStatus.pending,
       ...bugsByStatus.in_progress,
     ]);
-    const bugCounts: BugStatusCounts = {
-      pending: bugsByStatus.pending.length,
-      in_progress: bugsByStatus.in_progress.length,
-      fixed: bugsByStatus.fixed.length,
-      declined: bugsByStatus.declined.length,
-      rejected: bugsByStatus.rejected.length,
-      total: 0,
-      open: 0,
-    };
-    bugCounts.open = bugCounts.pending + bugCounts.in_progress;
-    bugCounts.total =
-      bugCounts.open + bugCounts.fixed + bugCounts.declined + bugCounts.rejected;
 
-    const scaledPriority: PriorityCounts = { high: 0, medium: 0, low: 0 };
-    openBugs.forEach((b) => {
-      scaledPriority[b.priority] = (scaledPriority[b.priority] || 0) + 1;
-    });
-    const highOpenFromProjects = openBugs.filter((b) => b.priority === "high").length;
+    const stats = periodBugStats;
+    const bugCounts: BugStatusCounts = stats
+      ? {
+          pending: stats.pending,
+          in_progress: stats.in_progress,
+          fixed: stats.fixed,
+          declined: stats.declined,
+          rejected: stats.rejected,
+          open: stats.open,
+          total: stats.total,
+        }
+      : data.bugCounts;
+
+    const scaledPriority: PriorityCounts = stats?.open_priority
+      ? {
+          high: stats.open_priority.high,
+          medium: stats.open_priority.medium,
+          low: stats.open_priority.low,
+        }
+      : data.scaledPriority;
+    const highOpenFromProjects = scaledPriority.high;
 
     const updates = data.updates.filter((u) => updateTouchesPeriod(u, from, to));
     const updateStatusCounts = {
@@ -2188,7 +2141,7 @@ export default function AdminDashboard() {
       updateTypeCounts,
       updatesTotal: updates.length,
     };
-  }, [data, period]);
+  }, [data, period, periodBugStats]);
 
   const statusPieData = useMemo(() => {
     if (!view) return [];
@@ -2464,17 +2417,17 @@ export default function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="lg"
-                  onClick={() => refetch()}
-                  className="h-12 px-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
-                >
-                  <RefreshCw className="mr-2 h-5 w-5" />
-                  Refresh
-                </Button>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0 min-w-0">
+                <DashboardPeriodFilter
+                  preset={periodPreset}
+                  customFrom={customFrom}
+                  customTo={customTo}
+                  period={period}
+                  onPresetChange={setPeriodPreset}
+                  onCustomFromChange={setCustomFrom}
+                  onCustomToChange={setCustomTo}
+                  isFetching={periodStatsFetching}
+                />
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
                   <div className="p-1.5 bg-blue-500 rounded-lg">
                     <BarChart3 className="h-5 w-5 text-white" />
@@ -2634,16 +2587,6 @@ export default function AdminDashboard() {
                   </div>
                 </DrawerContent>
               </Drawer>
-
-              <DashboardPeriodFilter
-                preset={periodPreset}
-                customFrom={customFrom}
-                customTo={customTo}
-                period={period}
-                onPresetChange={setPeriodPreset}
-                onCustomFromChange={setCustomFrom}
-                onCustomToChange={setCustomTo}
-              />
 
               <TabsContent value="overview" className="space-y-6 sm:space-y-8 mt-0">
                 <BugPipelineCard bugCounts={view.bugCounts} role={role} />

@@ -39,6 +39,9 @@ import {
   getProjectStatusLabel,
   parseProjectPlatforms,
   PROJECT_PLATFORM_OPTIONS,
+  sortProjectsByWorkload,
+  formatProjectDate,
+  computeProjectDurationDays,
 } from "@/lib/utils/projectUtils";
 import { Project, projectService } from "@/services/projectService";
 import { userService } from "@/services/userService";
@@ -51,6 +54,7 @@ import { motion } from "framer-motion";
 import {
   AlertCircle,
   Bug,
+  Calendar,
   Clock,
   Code,
   FolderKanban,
@@ -85,6 +89,26 @@ function formatProjectPlatformsLabel(value?: string | null): string | null {
       .map((opt) => opt.label)
       .join(", ") || null
   );
+}
+
+/** Compact date for project cards; empty string when unset. */
+function formatCardMilestone(value?: string | null): string {
+  if (!value) return "";
+  const formatted = formatProjectDate(value);
+  return formatted === "Not set" ? "" : formatted;
+}
+
+function isDeadlineOverdue(
+  deadline?: string | null,
+  status?: string | null
+): boolean {
+  if (!deadline) return false;
+  if (status === "completed" || status === "archived") return false;
+  const d = new Date(deadline.includes("T") ? deadline : `${deadline}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d.getTime() < today.getTime();
 }
 
 // Enhanced Professional Project Card Skeleton with animations
@@ -205,6 +229,15 @@ const Projects = () => {
     Record<string, number>
   >({});
   const [projectFixedBugsCount, setProjectFixedBugsCount] = useState<
+    Record<string, number>
+  >({});
+  const [projectUpdatesCount, setProjectUpdatesCount] = useState<
+    Record<string, number>
+  >({});
+  const [projectUpdatesApprovedCount, setProjectUpdatesApprovedCount] = useState<
+    Record<string, number>
+  >({});
+  const [projectUpdatesDoneCount, setProjectUpdatesDoneCount] = useState<
     Record<string, number>
   >({});
   const [projectMemberCounts, setProjectMemberCounts] = useState<
@@ -446,12 +479,27 @@ const Projects = () => {
       const totalCounts: Record<string, number> = {};
       const openCounts: Record<string, number> = {};
       const fixedCounts: Record<string, number> = {};
+      const updatesCounts: Record<string, number> = {};
+      const updatesApprovedCounts: Record<string, number> = {};
+      const updatesDoneCounts: Record<string, number> = {};
       const memberCounts: Record<string, ProjectMemberCounts> = {};
 
       Object.entries(stats.bugs || {}).forEach(([projectId, bugStats]) => {
         totalCounts[projectId] = bugStats.total;
         openCounts[projectId] = bugStats.open;
         fixedCounts[projectId] = bugStats.fixed;
+      });
+
+      data.forEach((project) => {
+        const u = project.update_stats;
+        updatesCounts[project.id] = u?.total ?? 0;
+        updatesApprovedCounts[project.id] = u?.approved ?? 0;
+        updatesDoneCounts[project.id] = u?.completed ?? 0;
+        if (totalCounts[project.id] === undefined && project.bug_stats) {
+          totalCounts[project.id] = project.bug_stats.total;
+          openCounts[project.id] = project.bug_stats.open;
+          fixedCounts[project.id] = project.bug_stats.fixed;
+        }
       });
 
       Object.entries(stats.members || {}).forEach(([projectId, memberStats]) => {
@@ -468,6 +516,9 @@ const Projects = () => {
         fixed: fixedCounts,
         members: memberCounts,
       });
+      setProjectUpdatesCount(updatesCounts);
+      setProjectUpdatesApprovedCount(updatesApprovedCounts);
+      setProjectUpdatesDoneCount(updatesDoneCounts);
     } catch (error) {
       toast({
         title: "Error",
@@ -800,11 +851,11 @@ const Projects = () => {
     project.client?.corporate_name || project.client_name || null;
 
   const totalFiltered = filteredProjects.length;
-  // Sort projects by highest count of open bugs before pagination
-  const sortedProjects = [...filteredProjects].sort((a, b) => {
-    const openA = projectOpenBugsCount[a.id] ?? 0;
-    const openB = projectOpenBugsCount[b.id] ?? 0;
-    return openB - openA;
+  // Workload order: Ongoing → open bugs ↓ → approved updates ↓ → total updates ↓ → name
+  const sortedProjects = sortProjectsByWorkload(filteredProjects, {
+    openBugs: projectOpenBugsCount,
+    updatesActive: projectUpdatesApprovedCount,
+    updatesTotal: projectUpdatesCount,
   });
   const paginatedProjects = sortedProjects.slice(
     (currentPage - 1) * itemsPerPage,
@@ -1372,40 +1423,189 @@ const Projects = () => {
                 </CardHeader>
                 <CardContent className="relative flex-1 flex flex-col justify-end py-2 px-4 sm:px-5">
                   <div className="flex flex-col gap-3">
-                    {/* Enhanced Bug Stats */}
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-2">
-                      <div className="flex flex-col items-center justify-center min-h-[5.25rem] p-2 sm:p-3 rounded-lg bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 transition-colors duration-200 text-center">
-                        <span className="text-xs sm:text-sm text-muted-foreground">
-                          Total
-                        </span>
-                        <span className="font-semibold text-lg sm:text-xl">
-                          {renderStatCount(projectBugsCount[project.id])}
-                        </span>
-                        <span className="text-[10px] sm:text-xs text-muted-foreground">
-                          Bugs
-                        </span>
+                    {/* Key dates & deadlines (most wanted milestones) */}
+                    {(() => {
+                      const startLabel = formatCardMilestone(project.start_date);
+                      const deadlineLabel = formatCardMilestone(
+                        project.deadline_date
+                      );
+                      const publishLabel = formatCardMilestone(
+                        project.expected_publish_date
+                      );
+                      const testingLabel = formatCardMilestone(
+                        project.testing_end_date || project.testing_start_date
+                      );
+                      const hasAny =
+                        startLabel ||
+                        deadlineLabel ||
+                        publishLabel ||
+                        testingLabel;
+                      if (!hasAny) return null;
+
+                      const overdue = isDeadlineOverdue(
+                        project.deadline_date,
+                        project.status
+                      );
+                      const durationDays = computeProjectDurationDays(project);
+
+                      return (
+                        <div className="rounded-xl border border-border/60 bg-muted/25 dark:bg-muted/15 px-2.5 py-2.5 space-y-2">
+                          <div className="flex items-center justify-between gap-2 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 text-white shrink-0">
+                                <Calendar className="h-3.5 w-3.5" />
+                              </span>
+                              <span className="text-xs font-semibold text-foreground truncate">
+                                Timeline
+                              </span>
+                            </div>
+                            {durationDays > 0 ? (
+                              <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0 tabular-nums">
+                                {durationDays}d
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
+                            <div className="rounded-xl border border-border/50 bg-background/70 dark:bg-background/40 px-2 py-1.5 min-w-0">
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 shrink-0" />
+                                Start
+                              </div>
+                              <p className="mt-0.5 text-[11px] sm:text-xs font-semibold text-foreground truncate">
+                                {startLabel || "—"}
+                              </p>
+                            </div>
+                            <div
+                              className={`rounded-xl border px-2 py-1.5 min-w-0 ${
+                                overdue
+                                  ? "border-red-300/70 bg-red-50/80 dark:border-red-800/50 dark:bg-red-950/30"
+                                  : "border-border/50 bg-background/70 dark:bg-background/40"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <span
+                                  className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                                    overdue
+                                      ? "bg-red-500"
+                                      : "bg-gradient-to-br from-red-500 to-orange-600"
+                                  }`}
+                                />
+                                Deadline
+                              </div>
+                              <p
+                                className={`mt-0.5 text-[11px] sm:text-xs font-semibold truncate ${
+                                  overdue
+                                    ? "text-red-700 dark:text-red-300"
+                                    : "text-foreground"
+                                }`}
+                              >
+                                {deadlineLabel || "—"}
+                              </p>
+                            </div>
+                            <div className="rounded-xl border border-border/50 bg-background/70 dark:bg-background/40 px-2 py-1.5 min-w-0">
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 shrink-0" />
+                                Publish
+                              </div>
+                              <p className="mt-0.5 text-[11px] sm:text-xs font-semibold text-foreground truncate">
+                                {publishLabel || "—"}
+                              </p>
+                            </div>
+                            <div className="rounded-xl border border-border/50 bg-background/70 dark:bg-background/40 px-2 py-1.5 min-w-0">
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-br from-lime-500 to-green-600 shrink-0" />
+                                Testing
+                              </div>
+                              <p className="mt-0.5 text-[11px] sm:text-xs font-semibold text-foreground truncate">
+                                {testingLabel || "—"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Bugs row, then Updates row */}
+                    <div className="flex flex-col gap-2 mt-2">
+                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        <div className="flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-100/80 dark:hover:bg-blue-900/30 transition-colors duration-200 text-center">
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Total
+                          </span>
+                          <span className="font-semibold text-lg sm:text-xl">
+                            {renderStatCount(projectBugsCount[project.id])}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Bugs
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-yellow-50/70 dark:bg-yellow-900/20 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/30 transition-colors duration-200 text-center">
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Open
+                          </span>
+                          <span className="font-semibold text-lg sm:text-xl text-yellow-600 dark:text-yellow-400">
+                            {renderStatCount(projectOpenBugsCount[project.id])}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Bugs
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-green-50/70 dark:bg-green-900/20 hover:bg-green-100/80 dark:hover:bg-green-900/30 transition-colors duration-200 text-center">
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Fixed
+                          </span>
+                          <span className="font-semibold text-lg sm:text-xl text-green-600 dark:text-green-400">
+                            {renderStatCount(projectFixedBugsCount[project.id])}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Bugs
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-center justify-center min-h-[5.25rem] p-2 sm:p-3 rounded-lg bg-yellow-50/70 dark:bg-yellow-900/20 hover:bg-yellow-100/80 dark:hover:bg-yellow-900/30 transition-colors duration-200 text-center">
-                        <span className="text-xs sm:text-sm text-muted-foreground">
-                          Open
-                        </span>
-                        <span className="font-semibold text-lg sm:text-xl text-yellow-600 dark:text-yellow-400">
-                          {renderStatCount(projectOpenBugsCount[project.id])}
-                        </span>
-                        <span className="text-[10px] sm:text-xs text-muted-foreground">
-                          Bugs
-                        </span>
-                      </div>
-                      <div className="flex flex-col items-center justify-center min-h-[5.25rem] p-2 sm:p-3 rounded-lg bg-green-50/70 dark:bg-green-900/20 hover:bg-green-100/80 dark:hover:bg-green-900/30 transition-colors duration-200 text-center">
-                        <span className="text-xs sm:text-sm text-muted-foreground">
-                          Fixed
-                        </span>
-                        <span className="font-semibold text-lg sm:text-xl text-green-600 dark:text-green-400">
-                          {renderStatCount(projectFixedBugsCount[project.id])}
-                        </span>
-                        <span className="text-[10px] sm:text-xs text-muted-foreground">
-                          Bugs
-                        </span>
+
+                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        <div className="flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-violet-50/70 dark:bg-violet-900/20 hover:bg-violet-100/80 dark:hover:bg-violet-900/30 transition-colors duration-200 text-center">
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Total
+                          </span>
+                          <span className="font-semibold text-lg sm:text-xl text-violet-600 dark:text-violet-400">
+                            {renderStatCount(
+                              projectUpdatesCount[project.id] ??
+                                project.update_stats?.total
+                            )}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Updates
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-sky-50/70 dark:bg-sky-900/20 hover:bg-sky-100/80 dark:hover:bg-sky-900/30 transition-colors duration-200 text-center">
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Approved
+                          </span>
+                          <span className="font-semibold text-lg sm:text-xl text-sky-600 dark:text-sky-400">
+                            {renderStatCount(
+                              projectUpdatesApprovedCount[project.id] ??
+                                project.update_stats?.approved
+                            )}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Updates
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center min-h-[5rem] p-2 sm:p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-900/20 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/30 transition-colors duration-200 text-center">
+                          <span className="text-xs sm:text-sm text-muted-foreground">
+                            Done
+                          </span>
+                          <span className="font-semibold text-lg sm:text-xl text-emerald-600 dark:text-emerald-400">
+                            {renderStatCount(
+                              projectUpdatesDoneCount[project.id] ??
+                                project.update_stats?.completed
+                            )}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
+                            Updates
+                          </span>
+                        </div>
                       </div>
                     </div>
 

@@ -25,14 +25,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import {
   ProjectPickerListItemContent,
@@ -43,50 +35,45 @@ import {
   sortProjectsForPicker,
   type Project,
 } from "@/lib/utils/projectUtils";
-import { bugService } from "@/services/bugService";
+import { updateService, type Update } from "@/services/updateService";
 import { projectService } from "@/services/projectService";
-import { Bug } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRightLeft,
+  Bug,
   FolderInput,
   Loader2,
-  Megaphone,
   ShieldAlert,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
-type ConvertMode = "move" | "to_update";
-type UpdateType = "feature" | "updation" | "maintenance";
+type ConvertMode = "move" | "to_bug";
 
-/** Sentinel so Radix Select stays controlled (never switches from undefined → string). */
-const SELECT_UNSET = "__unset__";
-
-type ConvertBugDialogProps = {
-  bug: Pick<Bug, "id" | "title" | "project_id" | "project_name" | "status" | "priority">;
+type ConvertUpdateDialogProps = {
+  update: Pick<
+    Update,
+    "id" | "title" | "project_id" | "project_name" | "status" | "type" | "update_priority"
+  >;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConverted?: (updated: Bug) => void;
-  onConvertedToUpdate?: (updateId: string, projectId: string) => void;
+  onConverted?: (updated: Update) => void;
+  onConvertedToBug?: (bugId: string, projectId: string) => void;
 };
 
-export function ConvertBugDialog({
-  bug,
+export function ConvertUpdateDialog({
+  update,
   open,
   onOpenChange,
   onConverted,
-  onConvertedToUpdate,
-}: ConvertBugDialogProps) {
+  onConvertedToBug,
+}: ConvertUpdateDialogProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [mode, setMode] = useState<ConvertMode>("move");
   const [targetProjectId, setTargetProjectId] = useState("");
-  const [updateType, setUpdateType] = useState<UpdateType | typeof SELECT_UNSET>(
-    SELECT_UNSET
-  );
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -95,7 +82,7 @@ export function ConvertBugDialog({
     isLoading: projectsLoading,
     isError: projectsError,
   } = useQuery({
-    queryKey: ["projects", "convert-bug"],
+    queryKey: ["projects", "convert-update"],
     queryFn: () => projectService.getProjects(),
     enabled: open,
     staleTime: 60_000,
@@ -105,10 +92,10 @@ export function ConvertBugDialog({
     () =>
       sortProjectsForPicker(
         (projects as Project[]).filter(
-          (p) => String(p.id) !== String(bug.project_id)
+          (p) => String(p.id) !== String(update.project_id)
         )
       ),
-    [projects, bug.project_id]
+    [projects, update.project_id]
   );
 
   const typeProjects = useMemo(
@@ -127,7 +114,6 @@ export function ConvertBugDialog({
     if (!open) {
       setMode("move");
       setTargetProjectId("");
-      setUpdateType(SELECT_UNSET);
       setSubmitting(false);
       setConfirmOpen(false);
     }
@@ -138,17 +124,11 @@ export function ConvertBugDialog({
     if (mode === "move") {
       setTargetProjectId("");
     } else {
-      setTargetProjectId(String(bug.project_id || ""));
+      setTargetProjectId(String(update.project_id || ""));
     }
-  }, [mode, open, bug.project_id]);
+  }, [mode, open, update.project_id]);
 
-  const canSubmit =
-    mode === "move"
-      ? !!targetProjectId && !submitting && !projectsLoading
-      : updateType !== SELECT_UNSET &&
-        !!targetProjectId &&
-        !submitting &&
-        !projectsLoading;
+  const canSubmit = !!targetProjectId && !submitting && !projectsLoading;
 
   const extractError = (err: unknown) => {
     if (err && typeof err === "object" && "response" in err) {
@@ -164,42 +144,43 @@ export function ConvertBugDialog({
     setSubmitting(true);
     try {
       if (mode === "move") {
-        const updated = await bugService.convertBug(bug.id, targetProjectId);
+        const updated = await updateService.convertProject(
+          update.id,
+          targetProjectId
+        );
         toast({
-          title: "Bug moved",
-          description: `Moved to “${updated.project_name || selected?.name || "selected project"}”. Attachments and history stayed with the bug.`,
+          title: "Update moved",
+          description: `Moved to “${updated.project_name || selected?.name || "selected project"}”. Attachments stayed with the update.`,
         });
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["bugs"] }),
-          queryClient.invalidateQueries({ queryKey: ["bug", bug.id] }),
-          queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] }),
+          queryClient.invalidateQueries({ queryKey: ["updates"] }),
+          queryClient.invalidateQueries({ queryKey: ["update", update.id] }),
           queryClient.invalidateQueries({ queryKey: ["projects"] }),
         ]);
         onConverted?.(updated);
         onOpenChange(false);
       } else {
-        const result = await bugService.convertToUpdate(bug.id, {
-          type: updateType as UpdateType,
+        const result = await updateService.convertToBug(update.id, {
           project_id: targetProjectId,
         });
         toast({
-          title: "Converted to update",
-          description: `New update created in “${result.update?.project_name || selected?.name || "project"}”. Original bug archived as declined.`,
+          title: "Converted to bug",
+          description: `New bug created in “${result.bug?.project_name || selected?.name || "project"}”. Original update archived as declined.`,
         });
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["bugs"] }),
-          queryClient.invalidateQueries({ queryKey: ["bug", bug.id] }),
           queryClient.invalidateQueries({ queryKey: ["updates"] }),
+          queryClient.invalidateQueries({ queryKey: ["update", update.id] }),
+          queryClient.invalidateQueries({ queryKey: ["bugs"] }),
           queryClient.invalidateQueries({ queryKey: ["projects"] }),
         ]);
-        const updateId = result.update_id || result.update?.id;
-        const projectId = result.update?.project_id || targetProjectId;
+        const bugId = result.bug_id || result.bug?.id;
+        const projectId = result.bug?.project_id || targetProjectId;
         onOpenChange(false);
-        if (onConvertedToUpdate) {
-          onConvertedToUpdate(updateId, projectId);
+        if (onConvertedToBug) {
+          onConvertedToBug(bugId, projectId);
         } else {
           const role = currentUser?.role || "admin";
-          navigate(`/${role}/updates/${updateId}`);
+          navigate(`/${role}/bugs/${bugId}`);
         }
       }
     } catch (err: unknown) {
@@ -215,7 +196,7 @@ export function ConvertBugDialog({
   };
 
   const handlePrimaryClick = () => {
-    if (mode === "to_update") {
+    if (mode === "to_bug") {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
@@ -231,14 +212,14 @@ export function ConvertBugDialog({
         <DialogContent className="sm:max-w-xl max-h-[min(92vh,760px)] flex flex-col gap-4 overflow-hidden rounded-2xl">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-sm">
                 <ArrowRightLeft className="h-4 w-4" />
               </span>
-              Convert bug
+              Convert update
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed pt-1">
-              Choose whether to move this bug between projects, or turn it into
-              a project Update (with attachment copy and audit trail).
+              Choose whether to move this update between projects, or turn it
+              into a Bug (with attachment copy and audit trail).
             </DialogDescription>
           </DialogHeader>
 
@@ -250,35 +231,35 @@ export function ConvertBugDialog({
               className={cn(
                 "rounded-2xl border px-3 py-3 text-left transition-all",
                 mode === "move"
-                  ? "border-sky-500/60 bg-sky-50/80 dark:bg-sky-950/40 shadow-sm"
-                  : "border-border/60 bg-muted/20 hover:bg-muted/40"
-              )}
-            >
-              <div className="flex items-center gap-2 font-semibold text-sm">
-                <FolderInput className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                Move to project
-              </div>
-              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                Keep the same bug record. Change project only. History stays.
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("to_update")}
-              disabled={submitting}
-              className={cn(
-                "rounded-2xl border px-3 py-3 text-left transition-all",
-                mode === "to_update"
                   ? "border-violet-500/60 bg-violet-50/80 dark:bg-violet-950/40 shadow-sm"
                   : "border-border/60 bg-muted/20 hover:bg-muted/40"
               )}
             >
               <div className="flex items-center gap-2 font-semibold text-sm">
-                <Megaphone className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                Convert to Update
+                <FolderInput className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                Move to project
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                Create a new update, copy attachments, archive this bug.
+                Keep the same update record. Change project only. History stays.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("to_bug")}
+              disabled={submitting}
+              className={cn(
+                "rounded-2xl border px-3 py-3 text-left transition-all",
+                mode === "to_bug"
+                  ? "border-orange-500/60 bg-orange-50/80 dark:bg-orange-950/40 shadow-sm"
+                  : "border-border/60 bg-muted/20 hover:bg-muted/40"
+              )}
+            >
+              <div className="flex items-center gap-2 font-semibold text-sm">
+                <Bug className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                Convert to Bug
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                Create a new bug, copy attachments, archive this update.
               </p>
             </button>
           </div>
@@ -286,63 +267,44 @@ export function ConvertBugDialog({
           <div className="min-h-0 flex-1 space-y-4 overflow-hidden flex flex-col">
             <div className="shrink-0 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Bug
+                Update
               </p>
               <p className="mt-1 text-sm font-semibold text-foreground line-clamp-2">
-                {bug.title || "Untitled Bug"}
+                {update.title || "Untitled Update"}
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
                 Current project:{" "}
                 <span className="font-medium text-foreground">
-                  {bug.project_name || "Unknown"}
+                  {update.project_name || "Unknown"}
                 </span>
-                {bug.priority ? (
+                {update.type ? (
                   <>
                     {" · "}
-                    Priority:{" "}
+                    Type:{" "}
                     <span className="font-medium text-foreground capitalize">
-                      {bug.priority}
+                      {update.type}
                     </span>
                   </>
                 ) : null}
               </p>
             </div>
 
-            {mode === "to_update" && (
-              <>
-                <div className="shrink-0 rounded-xl border border-amber-200/70 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2.5 flex gap-2">
-                  <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-900 dark:text-amber-100/90 leading-relaxed">
-                    Creates a <strong>pending</strong> update. Title, description
-                    (plus expected/actual), and priority map across. Source bug
-                    becomes <strong>declined</strong> with a conversion note.
-                    You will open the new update after success.
-                  </p>
-                </div>
-                <div className="shrink-0 space-y-2">
-                  <Label className="text-sm font-semibold">Update type</Label>
-                  <Select
-                    value={updateType}
-                    onValueChange={(v) => setUpdateType(v as UpdateType)}
-                    disabled={submitting}
-                  >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue placeholder="Select type…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="feature">Feature</SelectItem>
-                      <SelectItem value="updation">Updation</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
+            {mode === "to_bug" && (
+              <div className="shrink-0 rounded-xl border border-amber-200/70 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2.5 flex gap-2">
+                <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-900 dark:text-amber-100/90 leading-relaxed">
+                  Creates a <strong>pending</strong> bug. Description is prefixed
+                  with conversion context. Priority maps from update priority
+                  (or medium). Source update becomes <strong>declined</strong>.
+                  You will open the new bug after success.
+                </p>
+              </div>
             )}
 
             <div className="min-h-0 flex-1 flex flex-col space-y-2 overflow-hidden">
               <label className="shrink-0 text-sm font-semibold text-foreground flex items-center gap-2">
-                <FolderInput className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                {mode === "move" ? "Destination project" : "Project for new update"}
+                <FolderInput className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                {mode === "move" ? "Destination project" : "Project for new bug"}
               </label>
 
               <div className="min-h-0 flex-1 rounded-xl border border-border/70 bg-background overflow-hidden">
@@ -398,7 +360,7 @@ export function ConvertBugDialog({
                               }}
                               className={cn(
                                 "items-start gap-2 py-2.5 cursor-pointer",
-                                isSelected && "bg-sky-50 dark:bg-sky-950/40"
+                                isSelected && "bg-violet-50 dark:bg-violet-950/40"
                               )}
                             >
                               <ProjectPickerListItemContent
@@ -441,9 +403,9 @@ export function ConvertBugDialog({
               disabled={!canSubmit}
               className={cn(
                 "rounded-xl text-white",
-                mode === "to_update"
-                  ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700"
-                  : "bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700"
+                mode === "to_bug"
+                  ? "bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+                  : "bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700"
               )}
             >
               {submitting ? (
@@ -451,15 +413,15 @@ export function ConvertBugDialog({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Converting…
                 </>
-              ) : mode === "to_update" ? (
+              ) : mode === "to_bug" ? (
                 <>
-                  <Megaphone className="mr-2 h-4 w-4" />
-                  Convert to Update
+                  <Bug className="mr-2 h-4 w-4" />
+                  Convert to Bug
                 </>
               ) : (
                 <>
                   <ArrowRightLeft className="mr-2 h-4 w-4" />
-                  Move bug
+                  Move update
                 </>
               )}
             </Button>
@@ -470,15 +432,14 @@ export function ConvertBugDialog({
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent className="max-w-[400px] rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Convert bug to update?</AlertDialogTitle>
+            <AlertDialogTitle>Convert update to bug?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <span className="block">
-                A new <strong>{updateType !== SELECT_UNSET ? updateType : "update"}</strong>{" "}
-                will be created in{" "}
+                A new pending bug will be created in{" "}
                 <strong>{selected?.name || "the selected project"}</strong>.
               </span>
               <span className="block">
-                Attachments are copied. This bug will be marked{" "}
+                Attachments are copied. This update will be marked{" "}
                 <strong>declined</strong> and kept for history.
               </span>
             </AlertDialogDescription>

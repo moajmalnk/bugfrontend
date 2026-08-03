@@ -96,11 +96,19 @@ export function serializeAppPublisherMeta(meta: AppPublisherMeta): string | unde
   return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : undefined;
 }
 
-/** Drive / cloud folder URLs keyed by project category. */
-export type CategoryAssetLinks = Partial<Record<ProjectCategory, string>>;
+/** Drive / cloud URLs keyed by category (`WEB`) or slot (`APP:app_files`, `WEB:config:web_env`). */
+export type CategoryAssetLinks = Record<string, string>;
 
 export function emptyCategoryAssetLinks(): CategoryAssetLinks {
   return {};
+}
+
+export function assetSlotLinkKey(
+  category: ProjectCategory,
+  folder: string,
+  slotKey?: string
+): string {
+  return slotKey ? `${category}:${folder}:${slotKey}` : `${category}:${folder}`;
 }
 
 export function parseCategoryAssetLinks(value?: string | null): CategoryAssetLinks {
@@ -108,9 +116,9 @@ export function parseCategoryAssetLinks(value?: string | null): CategoryAssetLin
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     const out: CategoryAssetLinks = {};
-    (['WEB', 'PWA', 'APP', 'SEO', 'CREATIVE'] as ProjectCategory[]).forEach((cat) => {
-      const v = String(parsed[cat] || '').trim();
-      if (v) out[cat] = v;
+    Object.entries(parsed).forEach(([key, raw]) => {
+      const v = String(raw || '').trim();
+      if (key && v) out[key] = v;
     });
     return out;
   } catch {
@@ -120,9 +128,9 @@ export function parseCategoryAssetLinks(value?: string | null): CategoryAssetLin
 
 export function serializeCategoryAssetLinks(links: CategoryAssetLinks): string | undefined {
   const cleaned: CategoryAssetLinks = {};
-  (Object.keys(links) as ProjectCategory[]).forEach((key) => {
-    const v = String(links[key] || '').trim();
-    if (v) cleaned[key] = v;
+  Object.entries(links).forEach(([key, raw]) => {
+    const v = String(raw || '').trim();
+    if (key && v) cleaned[key] = v;
   });
   return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : undefined;
 }
@@ -160,7 +168,22 @@ export function isReadmeFileName(name: string): boolean {
   return n === 'readme' || n === 'readme.md' || n === 'readme.txt' || n.startsWith('readme.');
 }
 
-/** WEB category requires .env, .json, README files — or a Drive/cloud folder link. */
+function webSlotSatisfied(
+  slot: 'web_env' | 'web_json' | 'web_readme',
+  names: string[],
+  assetLinks?: CategoryAssetLinks
+): boolean {
+  const folder = slot === 'web_readme' ? 'docs' : 'config';
+  const key = assetSlotLinkKey('WEB', folder, slot);
+  if (hasValidAssetLink(assetLinks?.[key]) || hasValidAssetLink(assetLinks?.WEB)) {
+    return true;
+  }
+  if (slot === 'web_env') return names.some(isEnvFileName);
+  if (slot === 'web_json') return names.some(isJsonFileName);
+  return names.some(isReadmeFileName);
+}
+
+/** WEB category requires .env, .json, README — each via file upload or Drive link. */
 export function validateWebCategoryFiles(
   pending: Array<{ name: string; category?: string }>,
   existing: Array<{ file_name: string; category?: string | null }>,
@@ -179,14 +202,14 @@ export function validateWebCategoryFiles(
     ...webPending.map((f) => f.name),
     ...webExisting.map((f) => f.file_name),
   ];
-  if (!names.some(isEnvFileName)) {
-    return 'WEB projects require a .env file or a Drive folder link.';
+  if (!webSlotSatisfied('web_env', names, assetLinks)) {
+    return 'WEB projects require a .env file or Drive link.';
   }
-  if (!names.some(isJsonFileName)) {
-    return 'WEB projects require at least one .json file or a Drive folder link.';
+  if (!webSlotSatisfied('web_json', names, assetLinks)) {
+    return 'WEB projects require a .json file or Drive link.';
   }
-  if (!names.some(isReadmeFileName)) {
-    return 'WEB projects require a README file or a Drive folder link.';
+  if (!webSlotSatisfied('web_readme', names, assetLinks)) {
+    return 'WEB projects require a README file or Drive link.';
   }
   return null;
 }
@@ -230,6 +253,8 @@ export interface ProjectBugStatsLite {
 export interface ProjectUpdateStatsLite {
   total: number;
   open: number;
+  /** Status = approved (in progress / ready for work). */
+  approved?: number;
   completed: number;
 }
 
@@ -581,36 +606,97 @@ export function projectPickerStatusRank(status?: ProjectStatus | string | null):
 }
 
 /**
+ * Workload sort for project lists and pickers:
+ * Ongoing first, then open bugs ↓, active updates ↓, total updates ↓, name.
+ * Optional live count maps override embedded stats (Projects page cards).
+ */
+export type ProjectWorkloadSortCounts = {
+  openBugs?: Record<string, number>;
+  /** Prefer Approved (card metric); falls back to update_stats.open / approved */
+  updatesActive?: Record<string, number>;
+  updatesTotal?: Record<string, number>;
+};
+
+type WorkloadSortableProject = {
+  id?: string;
+  name: string;
+  status?: ProjectStatus | string | null;
+  bug_stats?: ProjectBugStatsLite | null;
+  update_stats?: ProjectUpdateStatsLite | null;
+};
+
+function projectWorkloadActiveUpdates(project: WorkloadSortableProject): number {
+  const stats = project.update_stats;
+  if (typeof stats?.approved === "number") return stats.approved;
+  return stats?.open ?? 0;
+}
+
+export function compareProjectsByWorkload(
+  a: WorkloadSortableProject,
+  b: WorkloadSortableProject,
+  counts?: ProjectWorkloadSortCounts
+): number {
+  const statusDiff =
+    projectPickerStatusRank(a.status) - projectPickerStatusRank(b.status);
+  if (statusDiff !== 0) return statusDiff;
+
+  const aId = a.id != null ? String(a.id) : "";
+  const bId = b.id != null ? String(b.id) : "";
+
+  const aBugs =
+    (aId && counts?.openBugs?.[aId] !== undefined
+      ? counts.openBugs[aId]
+      : a.bug_stats?.open) ?? 0;
+  const bBugs =
+    (bId && counts?.openBugs?.[bId] !== undefined
+      ? counts.openBugs[bId]
+      : b.bug_stats?.open) ?? 0;
+  if (bBugs !== aBugs) return bBugs - aBugs;
+
+  const aUpdatesActive =
+    (aId && counts?.updatesActive?.[aId] !== undefined
+      ? counts.updatesActive[aId]
+      : projectWorkloadActiveUpdates(a)) ?? 0;
+  const bUpdatesActive =
+    (bId && counts?.updatesActive?.[bId] !== undefined
+      ? counts.updatesActive[bId]
+      : projectWorkloadActiveUpdates(b)) ?? 0;
+  if (bUpdatesActive !== aUpdatesActive) return bUpdatesActive - aUpdatesActive;
+
+  const aUpdatesTotal =
+    (aId && counts?.updatesTotal?.[aId] !== undefined
+      ? counts.updatesTotal[aId]
+      : a.update_stats?.total) ?? 0;
+  const bUpdatesTotal =
+    (bId && counts?.updatesTotal?.[bId] !== undefined
+      ? counts.updatesTotal[bId]
+      : b.update_stats?.total) ?? 0;
+  if (bUpdatesTotal !== aUpdatesTotal) return bUpdatesTotal - aUpdatesTotal;
+
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+export function sortProjectsByWorkload<T extends WorkloadSortableProject>(
+  projects: T[],
+  counts?: ProjectWorkloadSortCounts
+): T[] {
+  return [...projects].sort((a, b) => compareProjectsByWorkload(a, b, counts));
+}
+
+/**
  * Sort projects for bug/update pickers:
- * Ongoing first, then by open bugs ↓, open updates ↓, total updates ↓, name.
+ * Ongoing first, then by open bugs ↓, open/approved updates ↓, total updates ↓, name.
  */
 export function sortProjectsForPicker<
   T extends {
+    id?: string;
     name: string;
     status?: ProjectStatus | string | null;
     bug_stats?: ProjectBugStatsLite | null;
     update_stats?: ProjectUpdateStatsLite | null;
   },
 >(projects: T[]): T[] {
-  return projects.slice().sort((a, b) => {
-    const statusDiff =
-      projectPickerStatusRank(a.status) - projectPickerStatusRank(b.status);
-    if (statusDiff !== 0) return statusDiff;
-
-    const aBugs = a.bug_stats?.open ?? 0;
-    const bBugs = b.bug_stats?.open ?? 0;
-    if (bBugs !== aBugs) return bBugs - aBugs;
-
-    const aUpdatesOpen = a.update_stats?.open ?? 0;
-    const bUpdatesOpen = b.update_stats?.open ?? 0;
-    if (bUpdatesOpen !== aUpdatesOpen) return bUpdatesOpen - aUpdatesOpen;
-
-    const aUpdatesTotal = a.update_stats?.total ?? 0;
-    const bUpdatesTotal = b.update_stats?.total ?? 0;
-    if (bUpdatesTotal !== aUpdatesTotal) return bUpdatesTotal - aUpdatesTotal;
-
-    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-  });
+  return sortProjectsByWorkload(projects);
 }
 
 

@@ -30,7 +30,7 @@ import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService } from "@/services/bugService";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRightLeft,
   Briefcase,
@@ -41,12 +41,13 @@ import {
   Eye,
   File,
   FileImage,
+  History,
   User,
   Video,
   Volume2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface BugContentCardsProps {
   bug: Bug;
@@ -54,6 +55,7 @@ interface BugContentCardsProps {
 }
 
 export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
+  const queryClient = useQueryClient();
   const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
   const [voiceNoteDurations, setVoiceNoteDurations] = useState<{
     [key: string]: number;
@@ -69,6 +71,15 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     staleTime: 30_000,
   });
   const conversionHistory = lifecycle?.conversion_history || [];
+  const statusHistory = useMemo(
+    () => lifecycle?.status_timeline || [],
+    [lifecycle?.status_timeline]
+  );
+
+  const handleBugUpdated = (updated: Bug) => {
+    onBugUpdated?.(updated);
+    void queryClient.invalidateQueries({ queryKey: ["bugLifecycle", bug.id] });
+  };
 
   const [screenshotViewerOpen, setScreenshotViewerOpen] = useState(false);
   const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState(0);
@@ -415,7 +426,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
               )}
             </div>
 
-            <TesterVerificationPanel bug={bug} onUpdated={onBugUpdated} />
+            <TesterVerificationPanel bug={bug} onUpdated={handleBugUpdated} />
           </CardContent>
         </Card>
       )}
@@ -503,7 +514,7 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
           </CardHeader>
           <CardContent className="relative">
             <div className="space-y-3">
-              {voiceNotes.map((attachment, index) => {
+              {voiceNotes.map((attachment) => {
                 const audioUrl = buildAudioUrl(attachment.file_path);
                 const duration =
                   (typeof attachment.duration === "number" &&
@@ -521,9 +532,6 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                     key={attachment.id}
                     className="rounded-xl border border-purple-100 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-900/20 p-3"
                   >
-                    <div className="mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                      Voice Note {index + 1}
-                    </div>
                     <WhatsAppVoiceMessage
                       id={voiceId}
                       audioSource={audioUrl}
@@ -795,6 +803,119 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
               )}
             </div>
           </div>
+
+          {statusHistory.length > 0 && (
+            <div className="mt-5 rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">
+                  Status history
+                </span>
+                <Badge
+                  variant="outline"
+                  className="ml-auto h-5 rounded-full px-2 text-[10px]"
+                >
+                  {statusHistory.length}
+                </Badge>
+              </div>
+              <ol className="relative ml-1.5 flex flex-col gap-3 border-l border-border/70 pl-4">
+                {statusHistory.map((step, index) => {
+                  const label = String(step.event_label || "").toLowerCase();
+                  const from = String(step.from_status || "").toLowerCase();
+                  const to = String(step.status || "").toLowerCase();
+                  const closed = new Set(["fixed", "declined", "rejected"]);
+                  const eventLabel =
+                    label === "reopened" ||
+                    (closed.has(from) && (to === "pending" || to === "in_progress"))
+                      ? "Reopened"
+                      : label === "fixed" || (to === "fixed" && !!from)
+                        ? "Fixed"
+                        : label === "raised" || !from
+                          ? "Raised"
+                          : null;
+                  const isReopen = eventLabel === "Reopened";
+
+                  return (
+                    <li
+                      key={`${step.status}-${step.entered_at || index}-${index}`}
+                      className="relative min-w-0"
+                    >
+                      <span
+                        className={cn(
+                          "absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background",
+                          isReopen
+                            ? "bg-orange-500"
+                            : step.is_current
+                              ? "bg-primary"
+                              : eventLabel === "Fixed"
+                                ? "bg-emerald-500"
+                                : "bg-muted-foreground/50"
+                        )}
+                      />
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        {step.from_status ? (
+                          <>
+                            <Badge
+                              variant="outline"
+                              className="h-5 rounded-full px-2 text-[10px] capitalize"
+                            >
+                              {String(step.from_status).replace(/_/g, " ")}
+                            </Badge>
+                            <span className="text-[11px] text-muted-foreground">→</span>
+                          </>
+                        ) : null}
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-5 rounded-full px-2 text-[10px] font-semibold capitalize",
+                            to === "fixed"
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                              : isReopen || to === "pending" || to === "in_progress"
+                                ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+                                : ""
+                          )}
+                        >
+                          {String(step.status || "unknown").replace(/_/g, " ")}
+                        </Badge>
+                        {eventLabel ? (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "h-5 rounded-full px-2 text-[10px] font-semibold",
+                              isReopen
+                                ? "border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-200"
+                                : eventLabel === "Fixed"
+                                  ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                                  : "border-border/60"
+                            )}
+                          >
+                            {eventLabel}
+                          </Badge>
+                        ) : null}
+                        {step.is_current ? (
+                          <Badge
+                            variant="secondary"
+                            className="h-5 rounded-full px-2 text-[10px]"
+                          >
+                            Current
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {step.entered_at
+                          ? formatLocalDate(step.entered_at, "datetime")
+                          : "—"}
+                        {step.actor_name ? ` · ${step.actor_name}` : ""}
+                        {step.reason === "tester_verification_failed"
+                          ? " · Still broken — reopened"
+                          : ""}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
 
           {bug.status === "fixed" && (
             <div className="mt-5 rounded-xl border border-sky-200/60 dark:border-sky-800/40 bg-sky-50/40 dark:bg-sky-950/20 p-4 space-y-3">

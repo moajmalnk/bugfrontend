@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Download, Volume2, Bot } from "lucide-react";
+import { Play, Pause, Download, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { probeAudioDuration } from "@/components/voice/probeAudioDuration";
@@ -18,7 +18,7 @@ export interface WhatsAppVoiceMessageProps {
   isActive?: boolean;
 }
 
-const SPEED_STEPS: Array<1 | 1.5 | 2> = [1, 1.5, 2];
+const SPEED_STEPS: Array<0.75 | 1 | 1.5 | 2> = [0.75, 1, 1.5, 2];
 /** Noticeable higher / brighter pitch when robot mode is on */
 const ROBOT_PITCH = 1.55;
 
@@ -64,8 +64,7 @@ export function WhatsAppVoiceMessage({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [speedIndex, setSpeedIndex] = useState(0);
-  const [robotMode, setRobotMode] = useState(false);
+  const [speedIndex, setSpeedIndex] = useState(1); // default 1x (steps: 0.75, 1, 1.5, 2)
   const [mediaDuration, setMediaDuration] = useState(
     Number.isFinite(duration) && duration > 0 ? duration : 0
   );
@@ -75,8 +74,9 @@ export function WhatsAppVoiceMessage({
   const derivedUrlRef = useRef<string | null>(null);
   const playIntentRef = useRef(false);
   const playRequestIdRef = useRef(0);
-  const robotModeRef = useRef(false);
-  const speedIndexRef = useRef(0);
+  /** Always-on robot voice — no human playback toggle */
+  const robotModeRef = useRef(true);
+  const speedIndexRef = useRef(1);
   const robotGraphRef = useRef<RobotGraph | null>(null);
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
@@ -89,10 +89,6 @@ export function WhatsAppVoiceMessage({
     onPlayRef.current = onPlay;
     onPauseRef.current = onPause;
   }, [onPlay, onPause]);
-
-  useEffect(() => {
-    robotModeRef.current = robotMode;
-  }, [robotMode]);
 
   useEffect(() => {
     speedIndexRef.current = speedIndex;
@@ -336,8 +332,7 @@ export function WhatsAppVoiceMessage({
 
   useEffect(() => {
     if (audioRef.current) applyRate(audioRef.current);
-    syncRobotMix(robotMode);
-  }, [speedIndex, robotMode]);
+  }, [speedIndex]);
 
   // Mutual exclusion only — do not re-trigger play if already starting
   useEffect(() => {
@@ -366,11 +361,9 @@ export function WhatsAppVoiceMessage({
       onPlayRef.current?.(id);
       applyRate(audio);
 
-      // If robot already on, ensure graph is live before/while playing
-      if (robotModeRef.current) {
-        const graph = await ensureRobotGraph(audio);
-        if (graph) syncRobotMix(true);
-      }
+      // Always apply robot voice on play
+      const graph = await ensureRobotGraph(audio);
+      if (graph) syncRobotMix(true);
 
       try {
         await audio.play();
@@ -398,27 +391,6 @@ export function WhatsAppVoiceMessage({
 
   const cycleSpeed = () => {
     setSpeedIndex((prev) => (prev + 1) % SPEED_STEPS.length);
-  };
-
-  const toggleRobotMode = async () => {
-    const next = !robotMode;
-    setRobotMode(next);
-    robotModeRef.current = next;
-
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    applyRate(audio);
-
-    if (next) {
-      const graph = await ensureRobotGraph(audio);
-      if (graph) {
-        if (graph.ctx.state === "suspended") await graph.ctx.resume();
-        syncRobotMix(true);
-      }
-    } else {
-      syncRobotMix(false);
-    }
   };
 
   const effectiveDuration =
@@ -644,47 +616,21 @@ export function WhatsAppVoiceMessage({
         </div>
 
         <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => void toggleRobotMode()}
-              disabled={!audioUrl}
-              className={cn(
-                "h-7 rounded-full border border-white/30 bg-white/10 px-2 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20",
-                accent === "received" &&
-                  "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
-                robotMode &&
-                  (accent === "sent"
-                    ? "bg-white/30 ring-1 ring-white/60"
-                    : "bg-violet-500/20 text-violet-600 dark:text-violet-300 ring-1 ring-violet-400/50"),
-                !audioUrl && "opacity-60"
-              )}
-              aria-label={
-                robotMode ? "Disable robot voice" : "Enable robot voice"
-              }
-              aria-pressed={robotMode}
-              title={robotMode ? "Robot voice on" : "Robot voice"}
-            >
-              <Bot className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={cycleSpeed}
-              disabled={!audioUrl}
-              className={cn(
-                "h-7 rounded-full border border-white/30 bg-white/10 px-3 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20",
-                accent === "received" &&
-                  "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
-                !audioUrl && "opacity-60"
-              )}
-            >
-              {SPEED_STEPS[speedIndex].toFixed(1).replace(".0", "")}x
-            </Button>
-          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={cycleSpeed}
+            disabled={!audioUrl}
+            className={cn(
+              "h-7 rounded-full border border-white/30 bg-white/10 px-3 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20",
+              accent === "received" &&
+                "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
+              !audioUrl && "opacity-60"
+            )}
+          >
+            {`${SPEED_STEPS[speedIndex]}`.replace(/\.0$/, "")}x
+          </Button>
           <div className="flex items-center gap-1">
             {onDownload && (
               <Button

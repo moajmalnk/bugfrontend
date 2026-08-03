@@ -57,9 +57,10 @@ export const BugHeader = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const canConvert =
-    currentUser?.role === "admin" ||
-    currentUser?.role === "developer" ||
-    currentUser?.role === "tester";
+    (currentUser?.role === "admin" ||
+      currentUser?.role === "developer" ||
+      currentUser?.role === "tester") &&
+    bug.status !== "declined";
 
   const searchParams = new URLSearchParams(location.search);
   const fromParam = searchParams.get("from");
@@ -508,6 +509,9 @@ export const BugHeader = ({
                 replace: true,
               });
             }
+          }}
+          onConvertedToUpdate={(updateId) => {
+            navigate(`/${role}/updates/${updateId}`, { replace: true });
           }}
         />
       )}
