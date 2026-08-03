@@ -12,7 +12,11 @@
     </script>
     <meta charset="UTF-8" />
     <style>
-      /* Critical boot shell — paints before JS; mirrors default Home hero */
+      /* Critical first paint — avoid white flash; boot shell paints before JS/CSS */
+      html, body { margin: 0; min-height: 100%; }
+      html.dark, html.dark body { background: #0f172a; color: #e2e8f0; }
+      html:not(.dark), html:not(.dark) body { background: #f8fafc; color: #0f172a; }
+      html.allow-body-scroll body { overflow: auto; }
       #app-boot {
         min-height: 100vh;
         margin: 0;
@@ -61,8 +65,15 @@
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
     <link rel="shortcut icon" href="/favicon.ico">
     
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" />
+    <!-- PWA Manifest — deferred so it leaves the critical request chain -->
+    <script>
+      window.addEventListener('load', function () {
+        var l = document.createElement('link');
+        l.rel = 'manifest';
+        l.href = '/manifest.json';
+        document.head.appendChild(l);
+      });
+    </script>
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#2563eb" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a" />
     <meta name="theme-color" content="#2563eb" />

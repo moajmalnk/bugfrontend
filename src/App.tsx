@@ -40,6 +40,43 @@ const LazyPWAEngagementPrompt = lazy(() =>
   }))
 );
 
+/** Why: PWA/Firebase messaging chunk is unused on guest landing — load only after auth + idle. */
+function DeferredPWAEngagementPrompt() {
+  const { currentUser } = useAuth();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setReady(false);
+      return;
+    }
+    let cancelled = false;
+    const enable = () => {
+      if (!cancelled) setReady(true);
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(enable, { timeout: 3500 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback(id);
+      };
+    }
+    const t = window.setTimeout(enable, 2000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [currentUser]);
+
+  if (!currentUser || !ready) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <LazyPWAEngagementPrompt />
+    </Suspense>
+  );
+}
+
 // Initialize the query client outside of the component with optimized defaults
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -363,9 +400,7 @@ function AppContent() {
           onAccept={handleUpdateAccept}
           onDismiss={handleUpdateDismiss}
         />
-        <Suspense fallback={null}>
-          <LazyPWAEngagementPrompt />
-        </Suspense>
+        <DeferredPWAEngagementPrompt />
         <TimezoneDebug />
         {networkError && <NetworkError />}
         <PerformanceMonitor enabled={import.meta.env.DEV} />

@@ -130,7 +130,11 @@
 
   body {
     @apply bg-background text-foreground;
-    overflow: hidden; /* Prevent body scrolling */
+    overflow: hidden; /* App shell scrolls inside main; public pages use html.allow-body-scroll */
+  }
+
+  html.allow-body-scroll body {
+    overflow: auto;
   }
 }
 

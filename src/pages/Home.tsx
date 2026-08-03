@@ -39,11 +39,9 @@ const Home = () => {
   };
 
   useEffect(() => {
-    // Enable body scrolling for this page
-    document.body.style.overflow = 'auto';
+    document.documentElement.classList.add('allow-body-scroll');
     return () => {
-      // Restore overflow hidden when leaving the page
-      document.body.style.overflow = 'hidden';
+      document.documentElement.classList.remove('allow-body-scroll');
     };
   }, []);
 

@@ -18,10 +18,27 @@ function patchPwaManifestFile(manifestPath: string, origin: string) {
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-function vendorManualChunks(_id: string): string | undefined {
-  // Why: forced vendor splits (charts/pdf/ui) caused circular TDZ crashes
-  // ("Cannot access 'X' before initialization"). Let Rollup auto-split.
-  return undefined;
+function deferCssPlugin() {
+  return {
+    name: "defer-css",
+    // Why: full Tailwind CSS is render-blocking (~320ms on Slow 4G). Critical
+    // boot styles are already inlined in index.html; load the rest async.
+    transformIndexHtml(html: string) {
+      return html.replace(
+        /<link([^>]*\s)rel="stylesheet"([^>]*)>/g,
+        (_match, pre: string, post: string) => {
+          const href = `${pre}rel="stylesheet"${post}`.match(
+            /href="([^"]+\.css)"/
+          )?.[1];
+          if (!href) return _match;
+          return [
+            `<link rel="preload" href="${href}" as="style" onload="this.onload=null;this.rel='stylesheet'">`,
+            `<noscript><link rel="stylesheet" href="${href}"></noscript>`,
+          ].join("");
+        }
+      );
+    },
+  };
 }
 
 export default defineConfig(({ mode }) => {
@@ -77,6 +94,7 @@ export default defineConfig(({ mode }) => {
       },
       ...(isProd
         ? [
+            deferCssPlugin(),
             viteCompression({
               algorithm: "gzip",
               ext: ".gz",
@@ -135,7 +153,7 @@ export default defineConfig(({ mode }) => {
             }
           : {
               output: {
-                manualChunks: vendorManualChunks,
+                manualChunks: undefined,
                 chunkFileNames: "assets/[name]-[hash].js",
                 entryFileNames: "assets/[name]-[hash].js",
                 assetFileNames: (assetInfo) => {

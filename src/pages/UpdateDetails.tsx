@@ -27,13 +27,13 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Check, X, Trash2, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Play, Timer, Loader2, Code2, ChevronLeft, Edit2, Share2, CheckSquare } from "lucide-react";
 import { CopyTextButton } from "@/components/ui/CopyTextButton";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { getReturnPathFromState } from "@/hooks/useUrlPagination";
+import { getReturnPathFromState, useMergeSearchParam } from "@/hooks/useUrlPagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { WhatsAppShareButton } from "@/components/bugs/WhatsAppShareButton";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
 import { format } from "date-fns";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { buildAudioUrl } from "@/lib/mediaUrls";
 import { UpdateDetailsCard } from "@/components/updates/UpdateDetailsCard";
 import { UpdateLifecycleCard } from "@/components/updates/UpdateLifecycleCard";
@@ -172,10 +172,13 @@ const UpdateDetails = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
+  const mergeSearchParam = useMergeSearchParam();
 
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
-  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(
+    () => searchParams.get("action") === "complete"
+  );
   const [completeForm, setCompleteForm] = useState({
     tested: "" as "" | "yes" | "no",
     devHours: "",
@@ -189,6 +192,7 @@ const UpdateDetails = () => {
   const [updateListLoading, setUpdateListLoading] = useState(true);
   const [isDeletingUpdate, setIsDeletingUpdate] = useState(false);
   const [activeVoiceNoteId, setActiveVoiceNoteId] = useState<string | null>(null);
+  const completeNavPushedRef = useRef(false);
 
   // Undo delete hook
   const undoDelete = useUndoDelete({
@@ -264,16 +268,20 @@ const UpdateDetails = () => {
     const roleOf = (p: ProjectMemberOption) =>
       String(p.user_role || p.member_role || p.role || "").toLowerCase();
 
+    const isAdmin = (p: ProjectMemberOption) => {
+      const r = roleOf(p);
+      return r === "admin" || r.includes("admin");
+    };
     const testers = people.filter((p) => {
       const r = roleOf(p);
-      return r === "tester" || r.includes("tester");
+      return r === "tester" || r.includes("tester") || isAdmin(p);
     });
     const developers = people.filter((p) => {
       const r = roleOf(p);
-      return r === "developer" || r.includes("developer");
+      return r === "developer" || r.includes("developer") || isAdmin(p);
     });
 
-    // If project membership roles don't separate cleanly, fall back to full list
+    // Prefer role-filtered lists (testers/devs + admins); fall back to full roster
     return {
       testerOptions: testers.length > 0 ? testers : people,
       developerOptions: developers.length > 0 ? developers : people,
@@ -319,6 +327,10 @@ const UpdateDetails = () => {
       setShowApproveDialog(false);
       setShowDeclineDialog(false);
       setShowCompleteDialog(false);
+      completeNavPushedRef.current = false;
+      if (searchParams.get("action") === "complete") {
+        mergeSearchParam("action", null, { replace: true });
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -340,6 +352,75 @@ const UpdateDetails = () => {
       updateService.markAsCompleted(updateId!, payload),
     ...mutationOptions,
   });
+
+  const roleForComplete = String(currentUser?.role || "").toLowerCase();
+  const canOpenCompleteFromUrl =
+    !!update &&
+    update.status === "approved" &&
+    (roleForComplete === "admin" ||
+      roleForComplete === "developer" ||
+      roleForComplete === "tester");
+
+  const isCompleteFormDirty =
+    completeForm.tested !== "" ||
+    Boolean(completeForm.testedBy.trim()) ||
+    Boolean(completeForm.developedBy.trim()) ||
+    Boolean(completeForm.devHours.trim()) ||
+    Boolean(completeForm.devStarted) ||
+    Boolean(completeForm.devEnded) ||
+    Boolean(completeForm.notes.trim());
+
+  const openCompleteDialog = useCallback(() => {
+    if (searchParams.get("action") !== "complete") {
+      mergeSearchParam("action", "complete");
+      completeNavPushedRef.current = true;
+    }
+    setShowCompleteDialog(true);
+  }, [mergeSearchParam, searchParams]);
+
+  const closeCompleteDialog = useCallback(
+    (options?: { force?: boolean }) => {
+      if (
+        !options?.force &&
+        isCompleteFormDirty &&
+        !window.confirm("You have unsaved changes. Discard them?")
+      ) {
+        return;
+      }
+      setShowCompleteDialog(false);
+      if (searchParams.get("action") === "complete") {
+        if (completeNavPushedRef.current) {
+          completeNavPushedRef.current = false;
+          navigate(-1);
+        } else {
+          mergeSearchParam("action", null, { replace: true });
+        }
+      }
+    },
+    [isCompleteFormDirty, mergeSearchParam, navigate, searchParams]
+  );
+
+  // Keep dialog synced with ?action=complete (deep links + browser Back)
+  useEffect(() => {
+    const wantsComplete = searchParams.get("action") === "complete";
+    if (!wantsComplete) {
+      if (showCompleteDialog) setShowCompleteDialog(false);
+      return;
+    }
+    if (!update) return;
+    if (!canOpenCompleteFromUrl) {
+      mergeSearchParam("action", null, { replace: true });
+      setShowCompleteDialog(false);
+      return;
+    }
+    if (!showCompleteDialog) setShowCompleteDialog(true);
+  }, [
+    searchParams,
+    update,
+    canOpenCompleteFromUrl,
+    showCompleteDialog,
+    mergeSearchParam,
+  ]);
 
   useEffect(() => {
     if (showCompleteDialog) {
@@ -489,7 +570,9 @@ const UpdateDetails = () => {
   const canPerformActions = currentUser?.role === "admin" || (currentUser?.role === "developer" && update?.created_by === currentUser?.username) || (currentUser?.role === "tester" && update?.created_by === currentUser?.username)
 
   const canMarkAsCompleted =
-    (currentUser?.role === "developer" || currentUser?.role === "tester") &&
+    (currentUser?.role === "admin" ||
+      currentUser?.role === "developer" ||
+      currentUser?.role === "tester") &&
     update?.status === "approved";
 
   const canSeePlanningFields =
@@ -653,7 +736,7 @@ const UpdateDetails = () => {
                     title="Mark as completed"
                     aria-label="Mark as completed"
                     className="h-9 w-9 p-0 shrink-0"
-                    onClick={() => setShowCompleteDialog(true)}
+                    onClick={openCompleteDialog}
                   >
                     <CheckSquare className="h-4 w-4" />
                   </Button>
@@ -836,12 +919,14 @@ const UpdateDetails = () => {
               </Card>
             )}
 
-            {update?.status === "approved" && currentUser?.role === "admin" && (
+            {update?.status === "approved" &&
+              currentUser?.role === "admin" &&
+              !canMarkAsCompleted && (
               <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950">
                 <CardHeader>
                   <CardTitle className="text-emerald-900 dark:text-emerald-100">Update Approved</CardTitle>
                   <CardDescription className="text-emerald-800 dark:text-emerald-300">
-                    You approved this update. A developer or tester on the project team will mark it
+                    You approved this update. An admin, developer, or tester on the project team can mark it
                     completed with testing notes.
                     {formatStatusDateTime(update.approved_at) && (
                       <span className="block mt-2 text-sm font-medium">
@@ -871,7 +956,7 @@ const UpdateDetails = () => {
                 </CardHeader>
                 <CardContent className="flex gap-4">
                   <Button 
-                    onClick={() => setShowCompleteDialog(true)} 
+                    onClick={openCompleteDialog} 
                     className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm hover:shadow-md"
                   >
                     <CheckCircle2 className="mr-2 h-4 w-4" />Mark as Completed
@@ -960,7 +1045,13 @@ const UpdateDetails = () => {
       {/* Confirmation Dialogs */}
       <ConfirmationDialog open={showApproveDialog} onOpenChange={setShowApproveDialog} onConfirm={() => approveMutation.mutate()} title="Approve Update" description="Are you sure you want to approve this update?" confirmText="Approve" isLoading={approveMutation.isPending} />
       <ConfirmationDialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog} onConfirm={() => declineMutation.mutate()} title="Decline Update" description="Are you sure you want to decline this update? This cannot be undone." confirmText="Decline" isLoading={declineMutation.isPending} variant="destructive" />
-      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+      <Dialog
+        open={showCompleteDialog}
+        onOpenChange={(open) => {
+          if (open) openCompleteDialog();
+          else closeCompleteDialog();
+        }}
+      >
         <DialogContent
           showCloseButton={false}
           className="flex max-h-[min(92vh,720px)] w-[calc(100vw-1rem)] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:w-full"
@@ -971,7 +1062,7 @@ const UpdateDetails = () => {
               type="button"
               variant="ghost"
               size="icon"
-              onClick={() => setShowCompleteDialog(false)}
+              onClick={() => closeCompleteDialog()}
               className="absolute right-3 top-3 z-10 h-9 w-9 rounded-full border border-white/30 bg-white/15 text-white hover:bg-white/25 hover:text-white"
               aria-label="Close completion dialog"
             >
@@ -1059,7 +1150,7 @@ const UpdateDetails = () => {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Testers assigned to this project.
+                      Testers and admins assigned to this project.
                     </p>
                   </div>
                 )}
@@ -1109,9 +1200,9 @@ const UpdateDetails = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Developers assigned to this project.
-                  </p>
+                    <p className="text-xs text-muted-foreground">
+                      Developers and admins assigned to this project.
+                    </p>
                 </div>
 
                 <div className="space-y-2">
@@ -1187,7 +1278,7 @@ const UpdateDetails = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setShowCompleteDialog(false)}
+              onClick={() => closeCompleteDialog()}
               disabled={completeMutation.isPending}
               className="w-full sm:w-auto"
             >

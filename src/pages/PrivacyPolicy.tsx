@@ -7,9 +7,9 @@ const LAST_UPDATED = 'July 2026';
 
 const PrivacyPolicy = () => {
   useEffect(() => {
-    document.body.style.overflow = 'auto';
+    document.documentElement.classList.add('allow-body-scroll');
     return () => {
-      document.body.style.overflow = 'hidden';
+      document.documentElement.classList.remove('allow-body-scroll');
     };
   }, []);
 
