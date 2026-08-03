@@ -187,6 +187,11 @@ type SelectContentProps = React.ComponentPropsWithoutRef<
   searchable?: boolean
   searchPlaceholder?: string
   emptyMessage?: string
+  /**
+   * Called when the menu mounts (Select has no Radix onOpenAutoFocus).
+   * Prefer preventDefault-style focus handling via the searchable input.
+   */
+  onOpenAutoFocus?: (event: Event) => void
 }
 
 const SelectContent = React.forwardRef<
@@ -213,6 +218,9 @@ const SelectContent = React.forwardRef<
     const inputRef = React.useRef<HTMLInputElement>(null)
     const searchRef = React.useRef(search)
     searchRef.current = search
+    // Keep optional open-focus callback without putting it on a DOM node
+    const onOpenAutoFocusRef = React.useRef(onOpenAutoFocus)
+    onOpenAutoFocusRef.current = onOpenAutoFocus
 
     const focusSearch = React.useCallback(() => {
       const el = inputRef.current
@@ -235,6 +243,12 @@ const SelectContent = React.forwardRef<
     }, [focusSearch])
 
     React.useEffect(() => {
+      // Radix Select.Content does not support onOpenAutoFocus (Dialog/Popover only).
+      // Mimic open-focus here so the prop never lands on a DOM div.
+      const synthetic = new Event("openAutoFocus", { cancelable: true })
+      onOpenAutoFocusRef.current?.(synthetic)
+      if (synthetic.defaultPrevented) return
+
       if (!searchable) return
       setSearch("")
       const id = window.setTimeout(() => scheduleFocusSearch(), 0)
@@ -280,16 +294,7 @@ const SelectContent = React.forwardRef<
           )}
           position={position}
           {...props}
-          onOpenAutoFocus={(event) => {
-            if (searchable) {
-              event.preventDefault()
-              scheduleFocusSearch()
-            }
-            onOpenAutoFocus?.(event)
-          }}
-          onCloseAutoFocus={(event) => {
-            onCloseAutoFocus?.(event)
-          }}
+          onCloseAutoFocus={onCloseAutoFocus}
           onKeyDownCapture={
             searchable
               ? (event) => {

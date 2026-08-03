@@ -20,6 +20,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { bugService } from "@/services/bugService";
 import { Project, projectService } from "@/services/projectService";
+import { userService } from "@/services/userService";
 import { Bug } from "@/types";
 import {
   Bug as BugIcon,
@@ -40,6 +41,8 @@ import {
   listReturnState,
 } from "@/hooks/useUrlPagination";
 import { canReportBug } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { sortNamedUsersActiveFirst } from "@/lib/utils/userSort";
 
 const Bugs = () => {
   const { currentUser } = useAuth();
@@ -108,6 +111,12 @@ const Bugs = () => {
     return projects.filter((p) => assignedProjectIds.has(String(p.id)));
   }, [projects, bugs, currentUser?.role]);
 
+  const { data: directoryUsers = [] } = useQuery({
+    queryKey: ["users", "directory"],
+    queryFn: () => userService.getUsers(),
+    staleTime: 60_000,
+  });
+
   const uniqueRaisers = useMemo(() => {
     const byId = new Map<string, string>();
     bugs.forEach((bug) => {
@@ -117,10 +126,11 @@ const Bugs = () => {
         byId.set(id, bug.reporter_name || bug.reported_by || "Unknown");
       }
     });
-    return Array.from(byId.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [bugs]);
+    return sortNamedUsersActiveFirst(
+      Array.from(byId.entries()).map(([id, name]) => ({ id, name })),
+      directoryUsers
+    );
+  }, [bugs, directoryUsers]);
 
   const hasActiveFilters =
     !!searchTerm ||

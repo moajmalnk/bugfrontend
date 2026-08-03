@@ -1,4 +1,5 @@
 import { ENV } from '@/lib/env';
+import { sortUsersActiveFirst } from '@/lib/utils/userSort';
 import { User, UserRole } from '@/types';
 import axios from 'axios';
 
@@ -289,15 +290,17 @@ class UserService {
     if (!response.success) {
       throw new Error(response.message);
     }
-    return response.data.map((user: any) => ({
-      ...user,
-      avatar: this.generateAvatar(user.name, user.role), // <-- use name
-      account_active:
-        user.account_active !== undefined && user.account_active !== null
-          ? Number(user.account_active)
-          : undefined,
-      joining_date: user.joining_date ?? null,
-    }));
+    return sortUsersActiveFirst(
+      response.data.map((user: any) => ({
+        ...user,
+        avatar: this.generateAvatar(user.name, user.role), // <-- use name
+        account_active:
+          user.account_active !== undefined && user.account_active !== null
+            ? Number(user.account_active)
+            : undefined,
+        joining_date: user.joining_date ?? null,
+      }))
+    );
   }
 
   async getAllTesterEmails(): Promise<string[]> {

@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { buildDocumentPreviewPagePath } from '@/lib/attachmentUtils';
 import { cn, getEffectiveRole } from '@/lib/utils';
+import { sortUsersActiveFirst } from '@/lib/utils/userSort';
 import { ProjectCategoryAssets, cnCategoryChip } from '@/components/projects/ProjectCategoryAssets';
 import {
   computeProjectDurationDays,
@@ -274,7 +275,9 @@ function MultiUserSelect({
     ? users.filter((u) => roleFilter.includes(u.role))
     : users;
 
-  const availableUsers = filtered.filter((u) => !selectedIds.includes(u.id));
+  const availableUsers = sortUsersActiveFirst(
+    filtered.filter((u) => !selectedIds.includes(u.id))
+  );
 
   const toggleUser = (userId: string) => {
     if (selectedIds.includes(userId)) {

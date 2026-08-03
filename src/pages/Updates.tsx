@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { projectService } from "@/services/projectService";
 import { updateService } from "@/services/updateService";
+import { userService } from "@/services/userService";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Bell, Lock, Plus, Search, User, FolderOpen, Filter, RotateCcw, Layers, CircleDot } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -42,6 +43,7 @@ import {
 } from "@/hooks/useUrlPagination";
 import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
+import { sortUsernamesActiveFirst } from "@/lib/utils/userSort";
 
 /** Stable defaults — avoid new object identity every render (breaks clearFilters memo). */
 const UPDATES_FILTER_DEFAULTS = {
@@ -224,6 +226,13 @@ const Updates = () => {
     enabled: !!currentUser,
   });
 
+  // Used to order creator filter: active accounts / online first
+  const { data: directoryUsers = [] } = useQuery({
+    queryKey: ["users", "directory"],
+    queryFn: () => userService.getUsers(),
+    staleTime: 60_000,
+  });
+
   const isLoading = skeletonLoading || projectsLoading;
 
   // Filter updates based on active tab
@@ -344,9 +353,9 @@ const Updates = () => {
     const creators = updates
       .map((update) => update.created_by || update.created_by_name)
       .filter(Boolean)
-      .filter((creator, index, arr) => arr.indexOf(creator) === index);
-    return creators.sort();
-  }, [updates]);
+      .filter((creator, index, arr) => arr.indexOf(creator) === index) as string[];
+    return sortUsernamesActiveFirst(creators, directoryUsers);
+  }, [updates, directoryUsers]);
 
   const visibleProjects = useMemo(() => {
     const projectMap = new Map<string, { id: string; name: string }>();

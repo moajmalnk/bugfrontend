@@ -58,6 +58,11 @@ const parseCheckInToMinutes = (value?: string | null): number | null => {
 };
 
 const compareEarlyCheckInFirst = (a: User, b: User): number => {
+  // Active accounts first, then deactivated
+  const aAccount = a.account_active === 0 ? 1 : 0;
+  const bAccount = b.account_active === 0 ? 1 : 0;
+  if (aAccount !== bAccount) return aAccount - bAccount;
+
   const aMinutes = parseCheckInToMinutes(a.check_in_time);
   const bMinutes = parseCheckInToMinutes(b.check_in_time);
   const aHas = a.checked_in_today && aMinutes !== null;

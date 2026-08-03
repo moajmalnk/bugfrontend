@@ -23,7 +23,6 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { getEffectiveRole } from "@/lib/utils";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
-import { downloadBugReportPdf } from "@/lib/utils/bugPdfReport";
 import { commonBugsService } from "@/services/commonBugsService";
 import { projectService, type Project } from "@/services/projectService";
 import { CommonBug } from "@/types";
@@ -255,6 +254,7 @@ const CommonBugs = () => {
         })
         .map(({ bug }) => bug);
 
+      const { downloadBugReportPdf } = await import("@/lib/utils/bugPdfReport");
       await downloadBugReportPdf({
         reportTitle: "Common Bugs Report",
         subtitle: "Already raised and duplicate bugs in projects",

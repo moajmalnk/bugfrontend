@@ -22,8 +22,6 @@ import { useAuth } from "@/context/AuthContext";
 import { bugStore, userStore } from "@/lib/store";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { Bug, User } from "@/types";
-import { jsPDF } from "jspdf";
-import { default as autoTable } from "jspdf-autotable";
 import { FileIcon, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -114,8 +112,10 @@ export default function Reports() {
     loadData();
   }, [toast]);
 
-  const exportToPdf = (data: any[], title: string) => {
+  const exportToPdf = async (data: any[], title: string) => {
     try {
+      const { jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
       const doc = new jsPDF();
 
       // Add title

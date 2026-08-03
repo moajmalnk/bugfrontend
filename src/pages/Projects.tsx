@@ -41,9 +41,12 @@ import {
   PROJECT_PLATFORM_OPTIONS,
 } from "@/lib/utils/projectUtils";
 import { Project, projectService } from "@/services/projectService";
+import { userService } from "@/services/userService";
 import { whatsappService } from "@/services/whatsappService";
 import { clientService } from "@/services/clientService";
 import { Client } from "@/types";
+import { useQuery } from "@tanstack/react-query";
+import { sortNamedUsersActiveFirst } from "@/lib/utils/userSort";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -363,6 +366,12 @@ const Projects = () => {
     ]
   );
 
+  const { data: directoryUsers = [] } = useQuery({
+    queryKey: ["users", "directory"],
+    queryFn: () => userService.getUsers(),
+    staleTime: 60_000,
+  });
+
   const developerOptions = useMemo(() => {
     const byId = new Map<string, string>();
     projects.forEach((project) => {
@@ -373,10 +382,11 @@ const Projects = () => {
         }
       });
     });
-    return Array.from(byId.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [projects]);
+    return sortNamedUsersActiveFirst(
+      Array.from(byId.entries()).map(([id, name]) => ({ id, name })),
+      directoryUsers
+    );
+  }, [projects, directoryUsers]);
 
   const testerOptions = useMemo(() => {
     const byId = new Map<string, string>();
@@ -388,10 +398,11 @@ const Projects = () => {
         }
       });
     });
-    return Array.from(byId.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [projects]);
+    return sortNamedUsersActiveFirst(
+      Array.from(byId.entries()).map(([id, name]) => ({ id, name })),
+      directoryUsers
+    );
+  }, [projects, directoryUsers]);
 
   useEffect(() => {
     // Fetch projects when component mounts

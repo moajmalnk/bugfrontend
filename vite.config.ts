@@ -18,22 +18,9 @@ function patchPwaManifestFile(manifestPath: string, origin: string) {
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-function vendorManualChunks(id: string): string | undefined {
-  if (!id.includes("node_modules")) return undefined;
-  // Why: do NOT force recharts/d3 or pdf libs into shared chunks — circular
-  // imports cause "Cannot access 'X' before initialization" at runtime.
-  if (id.includes("firebase")) return "firebase";
-  if (id.includes("framer-motion") || id.includes("@radix-ui")) {
-    return "ui-vendor";
-  }
-  if (
-    id.includes("/react/") ||
-    id.includes("/react-dom/") ||
-    id.includes("react-router") ||
-    id.includes("scheduler")
-  ) {
-    return "react-vendor";
-  }
+function vendorManualChunks(_id: string): string | undefined {
+  // Why: forced vendor splits (charts/pdf/ui) caused circular TDZ crashes
+  // ("Cannot access 'X' before initialization"). Let Rollup auto-split.
   return undefined;
 }
 
@@ -175,9 +162,6 @@ export default defineConfig(({ mode }) => {
       cssCodeSplit: true,
       modulePreload: {
         polyfill: true,
-        // Why: keep heavy vendor chunks out of cold-load preload so first paint stays lean
-        resolveDependencies: (_filename, deps) =>
-          deps.filter((dep) => !dep.includes("firebase-")),
       },
       assetsInlineLimit: 4096,
       assetsDir: "assets",

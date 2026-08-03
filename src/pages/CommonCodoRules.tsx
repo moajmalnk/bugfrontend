@@ -25,7 +25,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { downloadCodoRulesPdf } from '@/lib/utils/codoRulesPdfReport';
 import { cn, getEffectiveRole } from '@/lib/utils';
 import {
   Collapsible,
@@ -308,6 +307,7 @@ export default function CommonCodoRules() {
   const handleDownloadPdf = async () => {
     try {
       setIsDownloadingReport(true);
+      const { downloadCodoRulesPdf } = await import('@/lib/utils/codoRulesPdfReport');
       await downloadCodoRulesPdf({
         reportTitle: 'Common CODO Rules',
         subtitle: 'Shared production standards for developers, QA, and projects',
