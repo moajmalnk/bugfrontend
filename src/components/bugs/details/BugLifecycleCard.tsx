@@ -5,13 +5,18 @@ import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService, type BugConversionEvent, type BugLifecycleStep } from "@/services/bugService";
 import { useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowRightLeft,
+  Bug,
   CalendarClock,
   CheckCircle2,
   Clock3,
+  Flag,
   Hourglass,
   Percent,
+  RotateCcw,
   Timer,
   UserRound,
   Wrench,
@@ -25,6 +30,100 @@ type BugLifecycleCardProps = {
 type RatioTone = "success" | "warning" | "urgent" | "default";
 
 const CLOSED = new Set(["fixed", "declined", "rejected"]);
+
+type StepVisual = {
+  key: string;
+  label: string;
+  Icon: LucideIcon;
+  accent: string;
+  soft: string;
+  ring: string;
+  glow: string;
+  path: string;
+};
+
+const STEP_VISUALS: Record<string, StepVisual> = {
+  raised: {
+    key: "raised",
+    label: "Raised",
+    Icon: Flag,
+    accent: "text-sky-600 dark:text-sky-300",
+    soft: "bg-sky-500/15 text-sky-700 dark:text-sky-200",
+    ring: "ring-sky-400/50",
+    glow: "shadow-sky-500/30",
+    path: "bg-sky-500",
+  },
+  fixed: {
+    key: "fixed",
+    label: "Fixed",
+    Icon: CheckCircle2,
+    accent: "text-emerald-600 dark:text-emerald-300",
+    soft: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200",
+    ring: "ring-emerald-400/50",
+    glow: "shadow-emerald-500/30",
+    path: "bg-emerald-500",
+  },
+  reopened: {
+    key: "reopened",
+    label: "Reopened",
+    Icon: RotateCcw,
+    accent: "text-orange-600 dark:text-orange-300",
+    soft: "bg-orange-500/15 text-orange-800 dark:text-orange-200",
+    ring: "ring-orange-400/50",
+    glow: "shadow-orange-500/30",
+    path: "bg-orange-500",
+  },
+  in_progress: {
+    key: "in_progress",
+    label: "In progress",
+    Icon: Wrench,
+    accent: "text-violet-600 dark:text-violet-300",
+    soft: "bg-violet-500/15 text-violet-800 dark:text-violet-200",
+    ring: "ring-violet-400/50",
+    glow: "shadow-violet-500/30",
+    path: "bg-violet-500",
+  },
+  declined: {
+    key: "declined",
+    label: "Declined",
+    Icon: Bug,
+    accent: "text-rose-600 dark:text-rose-300",
+    soft: "bg-rose-500/15 text-rose-800 dark:text-rose-200",
+    ring: "ring-rose-400/50",
+    glow: "shadow-rose-500/30",
+    path: "bg-rose-500",
+  },
+  rejected: {
+    key: "rejected",
+    label: "Rejected",
+    Icon: Bug,
+    accent: "text-rose-600 dark:text-rose-300",
+    soft: "bg-rose-500/15 text-rose-800 dark:text-rose-200",
+    ring: "ring-rose-400/50",
+    glow: "shadow-rose-500/30",
+    path: "bg-rose-500",
+  },
+  pending: {
+    key: "pending",
+    label: "Pending",
+    Icon: Hourglass,
+    accent: "text-amber-600 dark:text-amber-300",
+    soft: "bg-amber-500/15 text-amber-900 dark:text-amber-200",
+    ring: "ring-amber-400/50",
+    glow: "shadow-amber-500/30",
+    path: "bg-amber-500",
+  },
+  default: {
+    key: "default",
+    label: "Status",
+    Icon: Timer,
+    accent: "text-muted-foreground",
+    soft: "bg-muted text-foreground",
+    ring: "ring-border",
+    glow: "shadow-black/10",
+    path: "bg-muted-foreground",
+  },
+};
 
 const toneStyles: Record<RatioTone, string> = {
   success:
@@ -251,6 +350,162 @@ function eventLabelForStep(step: BugLifecycleStep): string | null {
   return null;
 }
 
+function visualForStep(step: BugLifecycleStep): StepVisual {
+  const eventLabel = eventLabelForStep(step)?.toLowerCase();
+  if (eventLabel === "reopened") return STEP_VISUALS.reopened;
+  if (eventLabel === "fixed") return STEP_VISUALS.fixed;
+  if (eventLabel === "raised") return STEP_VISUALS.raised;
+  const status = String(step.status || "").toLowerCase();
+  return STEP_VISUALS[status] || STEP_VISUALS.default;
+}
+
+function stepHeadline(step: BugLifecycleStep, eventLabel: string | null): string {
+  if (eventLabel === "Reopened") return "Bug reopened";
+  if (eventLabel === "Fixed") return "Marked fixed";
+  if (eventLabel === "Raised") return "Bug raised";
+  if (step.from_status) {
+    return `${formatStatusLabel(step.from_status)} → ${formatStatusLabel(step.status)}`;
+  }
+  return formatStatusLabel(step.status);
+}
+
+function JourneyStepCard({
+  step,
+  index,
+  share,
+  align,
+}: {
+  step: BugLifecycleStep;
+  index: number;
+  share: number | null | undefined;
+  align: "left" | "right" | "stack";
+}) {
+  const eventLabel = eventLabelForStep(step);
+  const visual = visualForStep(step);
+  const Icon = visual.Icon;
+  const stepNo = String(index + 1).padStart(2, "0");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: align === "left" ? -14 : align === "right" ? 14 : 0, y: align === "stack" ? 10 : 0 }}
+      whileInView={{ opacity: 1, x: 0, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.35, delay: Math.min(index * 0.05, 0.3) }}
+      className={cn(
+        "w-full rounded-2xl border border-border/60 bg-background/90 p-3.5 shadow-sm backdrop-blur-sm",
+        "dark:bg-gray-950/70",
+        step.is_current && "ring-2 ring-primary/30"
+      )}
+    >
+      <div className="flex items-start gap-2.5 min-w-0">
+        <span
+          className={cn(
+            "mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+            visual.soft
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={cn("text-[11px] font-bold tracking-[0.14em] uppercase", visual.accent)}>
+              Step {stepNo}
+            </span>
+            {eventLabel ? (
+              <Badge
+                variant="outline"
+                className={cn("h-5 rounded-full px-2 text-[10px] font-semibold border-0", visual.soft)}
+              >
+                {eventLabel}
+              </Badge>
+            ) : null}
+            {step.is_current ? (
+              <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px]">
+                Current
+              </Badge>
+            ) : null}
+          </div>
+          <p className="text-sm font-semibold text-foreground leading-snug">
+            {stepHeadline(step, eventLabel)}
+          </p>
+          {step.from_status ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatusBadge status={step.from_status} />
+              <span className="text-[11px] text-muted-foreground">→</span>
+              <StatusBadge status={step.status} />
+            </div>
+          ) : (
+            <StatusBadge status={step.status} />
+          )}
+          {step.reason === "tester_verification_failed" ? (
+            <p className="text-[11px] text-orange-700 dark:text-orange-300">
+              Tester marked the fix as still broken
+            </p>
+          ) : null}
+          <div className="flex flex-col gap-1 pt-0.5 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 min-w-0">
+              <CalendarClock className="h-3 w-3 shrink-0" />
+              <span className="truncate">{formatDateTime(step.entered_at)}</span>
+            </span>
+            {step.duration_label ? (
+              <span className="inline-flex items-center gap-1.5 tabular-nums">
+                <Hourglass className="h-3 w-3 shrink-0" />
+                {step.duration_label}
+                {step.is_current ? " so far" : " in this status"}
+                {share !== null && share !== undefined ? ` · ${formatPercent(share, 0)} of cycle` : ""}
+              </span>
+            ) : share !== null && share !== undefined ? (
+              <span className="inline-flex items-center gap-1.5 tabular-nums">
+                <Percent className="h-3 w-3 shrink-0" />
+                {formatPercent(share, 0)} of cycle
+              </span>
+            ) : null}
+            {step.actor_name ? (
+              <span className="inline-flex items-center gap-1.5 min-w-0">
+                <UserRound className="h-3 w-3 shrink-0" />
+                <span className="truncate font-medium text-foreground/80">{step.actor_name}</span>
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function JourneyNode({
+  visual,
+  isCurrent,
+  isReopen,
+}: {
+  visual: StepVisual;
+  isCurrent?: boolean;
+  isReopen?: boolean;
+}) {
+  const Icon = visual.Icon;
+  return (
+    <div className="relative z-[1] flex h-10 w-10 items-center justify-center">
+      <span
+        className={cn(
+          "absolute inset-0 rounded-full bg-foreground shadow-lg",
+          visual.glow,
+          isCurrent && "ring-4",
+          isCurrent && visual.ring
+        )}
+      />
+      <span
+        className={cn(
+          "relative inline-flex h-6 w-6 items-center justify-center rounded-full text-white",
+          visual.path,
+          isReopen && "animate-pulse"
+        )}
+      >
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+    </div>
+  );
+}
+
 function StatusTimeline({
   steps,
   riseSeconds,
@@ -259,7 +514,11 @@ function StatusTimeline({
   riseSeconds?: number | null;
 }) {
   if (!steps?.length) {
-    return <p className="text-xs text-muted-foreground">No status history recorded yet.</p>;
+    return (
+      <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
+        No status history recorded yet.
+      </div>
+    );
   }
 
   const shares = getLifecycleShares(steps, riseSeconds);
@@ -276,91 +535,67 @@ function StatusTimeline({
   );
 
   return (
-    <ol className="relative ml-2 space-y-0 border-l border-border/70 pl-4">
-      {steps.map((step, index) => {
-        const isClosedCurrent =
-          !!step.is_current && CLOSED.has((step.status || "").toLowerCase());
-        const share = isClosedCurrent ? null : shareByIndex.get(index);
-        const eventLabel = eventLabelForStep(step);
-        const isReopen = eventLabel === "Reopened";
+    <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-muted/20 via-background/40 to-muted/10 p-4 sm:p-5">
+      {/* Vertical glowing path rail (desktop center / mobile left) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-9 top-6 bottom-6 w-4 -translate-x-1/2 rounded-full bg-muted-foreground/15 blur-[1px] md:left-1/2"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-9 top-8 bottom-8 w-2.5 -translate-x-1/2 rounded-full bg-gradient-to-b from-sky-400/45 via-amber-400/35 to-emerald-400/45 dark:from-sky-500/35 dark:via-amber-500/30 dark:to-emerald-500/35 shadow-[0_0_24px_rgba(148,163,184,0.22)] md:left-1/2"
+      />
 
-        return (
-          <li key={`${step.status}-${step.entered_at}-${index}`} className="relative pb-4 last:pb-0">
-            <span
-              className={cn(
-                "absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background",
-                isReopen
-                  ? "bg-orange-500"
-                  : step.is_current
-                    ? "bg-primary"
-                    : "bg-muted-foreground/50"
-              )}
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              {step.from_status ? (
-                <>
-                  <StatusBadge status={step.from_status} />
-                  <span className="text-[11px] text-muted-foreground">→</span>
-                </>
-              ) : null}
-              <StatusBadge status={step.status} />
-              {eventLabel ? (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "h-5 rounded-full px-2 text-[10px] font-semibold",
-                    isReopen
-                      ? "border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-200"
-                      : eventLabel === "Fixed"
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
-                        : "border-border/60"
-                  )}
-                >
-                  {eventLabel}
-                </Badge>
-              ) : null}
-              {step.is_current ? (
-                <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px]">
-                  Current
-                </Badge>
-              ) : null}
-              {share !== null && share !== undefined ? (
-                <Badge
-                  variant="outline"
-                  className="h-5 rounded-full px-2 text-[10px] tabular-nums border-border/60"
-                >
-                  {formatPercent(share, 0)} of cycle
-                </Badge>
-              ) : null}
-            </div>
-            {step.reason === "tester_verification_failed" ? (
-              <p className="mt-1 text-[11px] text-orange-700 dark:text-orange-300">
-                Tester marked the fix as still broken
-              </p>
-            ) : null}
-            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <CalendarClock className="h-3 w-3" />
-                {formatDateTime(step.entered_at)}
-              </span>
-              {step.duration_label ? (
-                <span className="inline-flex items-center gap-1 tabular-nums">
-                  <Hourglass className="h-3 w-3" />
-                  {step.duration_label}
-                  {step.is_current ? " so far" : " in this status"}
-                </span>
-              ) : null}
-              {step.actor_name ? (
-                <span className="inline-flex items-center gap-1">
-                  <UserRound className="h-3 w-3" />
-                  {step.actor_name}
-                </span>
-              ) : null}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+      <ol className="relative flex flex-col gap-6 md:gap-8">
+        {steps.map((step, index) => {
+          const isClosedCurrent =
+            !!step.is_current && CLOSED.has((step.status || "").toLowerCase());
+          const share = isClosedCurrent ? null : shareByIndex.get(index);
+          const eventLabel = eventLabelForStep(step);
+          const visual = visualForStep(step);
+          const onLeft = index % 2 === 0;
+
+          return (
+            <li
+              key={`${step.status}-${step.entered_at}-${index}`}
+              className="relative grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] md:items-center gap-3 md:gap-4"
+            >
+              {/* Left column (desktop) */}
+              <div className={cn("hidden md:block min-w-0", onLeft ? "order-1" : "order-1")}>
+                {onLeft ? (
+                  <JourneyStepCard step={step} index={index} share={share} align="left" />
+                ) : (
+                  <div className="h-full" />
+                )}
+              </div>
+
+              {/* Center node */}
+              <div className="absolute left-9 top-3 -translate-x-1/2 md:static md:order-2 md:translate-x-0 md:flex md:justify-center">
+                <JourneyNode
+                  visual={visual}
+                  isCurrent={!!step.is_current}
+                  isReopen={eventLabel === "Reopened"}
+                />
+              </div>
+
+              {/* Right column (desktop) */}
+              <div className={cn("hidden md:block min-w-0", onLeft ? "order-3" : "order-3")}>
+                {!onLeft ? (
+                  <JourneyStepCard step={step} index={index} share={share} align="right" />
+                ) : (
+                  <div className="h-full" />
+                )}
+              </div>
+
+              {/* Mobile / narrow: single stacked card */}
+              <div className="md:hidden min-w-0 pl-12">
+                <JourneyStepCard step={step} index={index} share={share} align="stack" />
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -604,6 +839,27 @@ export function BugLifecycleCard({ bugId, className }: BugLifecycleCardProps) {
             </div>
 
             <div>
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Status journey
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Follow raised → fixed → reopened → fixed again along the path
+                  </p>
+                </div>
+                <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px] tabular-nums">
+                  {(data.status_timeline || []).length} step
+                  {(data.status_timeline || []).length === 1 ? "" : "s"}
+                </Badge>
+              </div>
+              <StatusTimeline
+                steps={data.status_timeline || []}
+                riseSeconds={data.rise_duration_seconds}
+              />
+            </div>
+
+            <div>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   Conversion history
@@ -614,16 +870,6 @@ export function BugLifecycleCard({ bugId, className }: BugLifecycleCardProps) {
                 </Badge>
               </div>
               <ConversionHistory events={data.conversion_history || []} />
-            </div>
-
-            <div>
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Status timeline
-              </p>
-              <StatusTimeline
-                steps={data.status_timeline || []}
-                riseSeconds={data.rise_duration_seconds}
-              />
             </div>
           </>
         ) : null}

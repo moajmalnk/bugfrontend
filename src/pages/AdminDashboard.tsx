@@ -1445,26 +1445,33 @@ function DashboardPeriodFilter({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-0">
+    <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 min-w-0 w-full">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
             variant="outline"
             size="lg"
-            className="h-12 px-4 sm:px-5 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 font-semibold shadow-sm hover:shadow-md transition-all duration-300 rounded-xl min-w-0 max-w-full"
+            className="h-12 w-full sm:w-auto px-4 sm:px-5 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 font-semibold shadow-sm hover:shadow-md transition-all duration-300 rounded-xl min-w-0 max-w-full justify-between sm:justify-center"
           >
-            <ActivePresetIcon className="mr-2 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-300" />
-            <span className="truncate">{activePreset.label}</span>
-            <span className="mx-1.5 hidden sm:inline text-muted-foreground font-normal">·</span>
-            <span className="truncate text-xs sm:text-sm font-medium text-muted-foreground max-w-[10rem] sm:max-w-[14rem]">
-              {period.rangeLabel}
+            <span className="inline-flex items-center gap-2 min-w-0">
+              <ActivePresetIcon className="h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-300" />
+              <span className="truncate">{activePreset.label}</span>
+              {/* Custom range lives in DateRangePicker — avoid duplicating / truncating it here */}
+              {preset !== "custom" ? (
+                <>
+                  <span className="text-muted-foreground font-normal shrink-0">·</span>
+                  <span className="truncate text-xs sm:text-sm font-medium text-muted-foreground max-w-[9rem] md:max-w-[14rem]">
+                    {period.rangeLabel}
+                  </span>
+                </>
+              ) : null}
+              {isFetching ? (
+                <span className="text-[10px] font-medium text-muted-foreground shrink-0">
+                  …
+                </span>
+              ) : null}
             </span>
-            {isFetching ? (
-              <span className="ml-1.5 text-[10px] font-medium text-muted-foreground shrink-0">
-                …
-              </span>
-            ) : null}
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-70" />
           </Button>
         </DropdownMenuTrigger>
@@ -1507,7 +1514,7 @@ function DashboardPeriodFilter({
           }}
           placeholder="From – To"
           disableFuture
-          className="sm:min-w-[16rem] sm:max-w-[20rem]"
+          className="w-full sm:flex-1 sm:min-w-[14rem] sm:max-w-[22rem]"
         />
       ) : null}
     </div>
@@ -2396,28 +2403,28 @@ export default function AdminDashboard() {
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
         {/* Professional Header — matches Bugs / Fixes */}
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-6">
-              <div className="space-y-3 min-w-0 flex-1">
-                <div className="flex items-center gap-3">
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 lg:p-8">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-5 min-w-0">
+              <div className="space-y-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shrink-0">
                     <LayoutDashboard className="h-6 w-6 text-white" />
                   </div>
                   <div className="min-w-0">
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
                       Ops Dashboard
                     </h1>
                     <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full mt-2" />
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl break-words">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl break-words">
                   Projects, updates, deadlines, bugs & team analytics
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0 min-w-0">
+              <div className="min-w-0 w-full lg:w-auto shrink-0">
                 <DashboardPeriodFilter
                   preset={periodPreset}
                   customFrom={customFrom}
@@ -2428,19 +2435,6 @@ export default function AdminDashboard() {
                   onCustomToChange={setCustomTo}
                   isFetching={periodStatsFetching}
                 />
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
-                  <div className="p-1.5 bg-blue-500 rounded-lg">
-                    <BarChart3 className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 tabular-nums">
-                      {view?.bugCounts.open ?? data?.bugCounts.open ?? "—"}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-wider font-semibold text-blue-600/70 dark:text-blue-300/70">
-                      Open bugs
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -2448,11 +2442,11 @@ export default function AdminDashboard() {
 
         {isLoading ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-12 gap-3 sm:gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 p-4 space-y-3"
+                  className="col-span-6 sm:col-span-4 xl:col-span-2 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 p-4 space-y-3"
                 >
                   <Skeleton className="h-8 w-8 rounded-lg" />
                   <Skeleton className="h-3 w-20" />
@@ -2477,19 +2471,19 @@ export default function AdminDashboard() {
         ) : (
           <>
             {/* KPI cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-12 gap-3 sm:gap-4">
               {kpiCards.map((card) => (
                 <button
                   key={card.title}
                   type="button"
                   onClick={() => setActiveTab(card.tab)}
                   className={cn(
-                    "group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 text-left w-full",
+                    "col-span-6 sm:col-span-4 xl:col-span-2 group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 text-left w-full min-w-0",
                     card.chip
                   )}
                 >
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 truncate">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 leading-snug line-clamp-2 min-w-0">
                       {card.title}
                     </span>
                     <div className={cn("p-2 rounded-xl bg-gradient-to-br text-white shadow-md shrink-0", card.gradient)}>
@@ -2499,7 +2493,7 @@ export default function AdminDashboard() {
                   <p className={cn("text-2xl sm:text-3xl font-bold tabular-nums tracking-tight", card.valueClass)}>
                     {typeof card.value === "number" ? card.value.toLocaleString() : card.value}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1.5 truncate font-medium">{card.hint}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 line-clamp-1 font-medium">{card.hint}</p>
                 </button>
               ))}
             </div>
@@ -2615,7 +2609,7 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 sm:gap-6">
+                <div className="flex flex-col gap-5 sm:gap-6">
                   <div className="space-y-4">
                     <SectionTitle
                       icon={AlertTriangle}
@@ -2852,7 +2846,7 @@ export default function AdminDashboard() {
                   </ChartCard>
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 sm:gap-6">
+                <div className="flex flex-col gap-5 sm:gap-6">
                   <div className="space-y-4">
                     <SectionTitle
                       icon={AlertTriangle}
