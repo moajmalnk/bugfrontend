@@ -30,6 +30,12 @@ type RobotGraph = {
   modulatorGain: GainNode;
 };
 
+const isAbortError = (error: unknown) => {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: string }).name;
+  return name === "AbortError" || name === "NotAllowedError";
+};
+
 export function WhatsAppVoiceMessage({
   id,
   audioSource,
@@ -61,8 +67,17 @@ export function WhatsAppVoiceMessage({
   const robotGraphRef = useRef<RobotGraph | null>(null);
   const robotModeRef = useRef(false);
   const speedIndexRef = useRef(0);
-  const [sourceLoading, setSourceLoading] = useState(false);
+  const playIntentRef = useRef(false);
+  const playRequestIdRef = useRef(0);
+  const onPlayRef = useRef(onPlay);
+  const onPauseRef = useRef(onPause);
+  const [sourceLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onPlayRef.current = onPlay;
+    onPauseRef.current = onPause;
+  }, [onPlay, onPause]);
 
   useEffect(() => {
     robotModeRef.current = robotMode;
@@ -162,10 +177,11 @@ export function WhatsAppVoiceMessage({
 
   /**
    * Why: MediaRecorder WebM often reports Infinity duration until seeked.
-   * Seek near the end once so the player can show total length before play.
+   * Only probe while idle so seeking cannot interrupt an in-flight play().
    */
   const probeInfiniteDuration = (audio: HTMLAudioElement) => {
     if (probingDurationRef.current) return;
+    if (playIntentRef.current || !audio.paused) return;
     if (storedDurationRef.current > 0) return;
     if (Number.isFinite(audio.duration) && audio.duration > 0) return;
 
@@ -174,6 +190,7 @@ export function WhatsAppVoiceMessage({
 
     const finish = (value: number) => {
       probingDurationRef.current = false;
+      if (playIntentRef.current || !audio.paused) return;
       try {
         audio.currentTime = previousTime;
       } catch {
@@ -204,10 +221,7 @@ export function WhatsAppVoiceMessage({
       setMediaDuration(audio.duration);
       return;
     }
-    if (
-      !Number.isFinite(audio.duration) ||
-      audio.duration === Infinity
-    ) {
+    if (!Number.isFinite(audio.duration) || audio.duration === Infinity) {
       probeInfiniteDuration(audio);
     }
   };
@@ -215,7 +229,9 @@ export function WhatsAppVoiceMessage({
   useEffect(() => {
     if (!audioUrl) return;
 
-    // Tear down previous robot graph when the audio element is replaced
+    playIntentRef.current = false;
+    playRequestIdRef.current += 1;
+
     if (robotGraphRef.current) {
       try {
         robotGraphRef.current.modulator.stop();
@@ -227,7 +243,8 @@ export function WhatsAppVoiceMessage({
     }
 
     const audio = new Audio(audioUrl);
-    audio.preload = "auto";
+    audio.preload = "metadata";
+    // Needed for Web Audio robot graph on cross-origin audio.php URLs
     audio.crossOrigin = "anonymous";
     audioRef.current = audio;
     applyPlaybackRate(audio);
@@ -236,9 +253,10 @@ export function WhatsAppVoiceMessage({
       setCurrentTime(audio.currentTime);
     };
     const handleEnded = () => {
+      playIntentRef.current = false;
       setIsPlaying(false);
       setCurrentTime(0);
-      onPause?.(id);
+      onPauseRef.current?.(id);
     };
     const handleLoaded = () => {
       setIsLoading(false);
@@ -248,8 +266,11 @@ export function WhatsAppVoiceMessage({
       acceptMediaDuration(audio);
     };
     const handleError = () => {
+      // Ignore teardown / aborted loads while switching sources
+      if (!audioRef.current || audioRef.current !== audio) return;
       setLoadError("Unable to play voice note");
       setIsPlaying(false);
+      playIntentRef.current = false;
     };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
@@ -259,13 +280,17 @@ export function WhatsAppVoiceMessage({
     audio.addEventListener("error", handleError);
 
     return () => {
+      playIntentRef.current = false;
+      playRequestIdRef.current += 1;
       audio.pause();
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("loadedmetadata", handleLoaded);
       audio.removeEventListener("durationchange", handleDurationChange);
       audio.removeEventListener("error", handleError);
-      audioRef.current = null;
+      if (audioRef.current === audio) {
+        audioRef.current = null;
+      }
       if (robotGraphRef.current) {
         try {
           robotGraphRef.current.modulator.stop();
@@ -276,8 +301,9 @@ export function WhatsAppVoiceMessage({
         robotGraphRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- recreate only when URL/id changes
-  }, [audioUrl, id, onPause]);
+    // Stable: do not depend on onPause identity (parent inline lambdas)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioUrl, id]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -287,15 +313,22 @@ export function WhatsAppVoiceMessage({
   }, [speedIndex, robotMode]);
 
   useEffect(() => {
-    if (autoPlay && isActive) {
-      void togglePlayback(true);
-    } else if (!isActive && isPlaying) {
+    if (!autoPlay) return;
+
+    if (isActive) {
+      // Parent marked this note active — start only if we are not already intending to play
+      if (!playIntentRef.current) {
+        void togglePlayback(true);
+      }
+    } else if (playIntentRef.current || isPlaying) {
       void togglePlayback(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlay, isActive]);
 
-  const ensureRobotGraph = async (audio: HTMLAudioElement): Promise<RobotGraph | null> => {
+  const ensureRobotGraph = async (
+    audio: HTMLAudioElement
+  ): Promise<RobotGraph | null> => {
     if (robotGraphRef.current) {
       if (robotGraphRef.current.ctx.state === "suspended") {
         await robotGraphRef.current.ctx.resume();
@@ -329,15 +362,12 @@ export function WhatsAppVoiceMessage({
 
       modulator.type = "sine";
       modulator.frequency.value = 35;
-      // Base tremolo depth; AudioParam offset is 1 so gain oscillates around 1
       tremolo.gain.value = 1;
       modulatorGain.gain.value = 0;
 
-      // Dry path (normal voice)
       source.connect(dryGain);
       dryGain.connect(ctx.destination);
 
-      // Wet robot path: EQ → tremolo → wet mix
       source.connect(bandpass);
       bandpass.connect(highShelf);
       highShelf.connect(tremolo);
@@ -412,6 +442,11 @@ export function WhatsAppVoiceMessage({
 
       audio.addEventListener("loadedmetadata", handleLoaded);
       audio.addEventListener("error", handleError);
+      try {
+        audio.load();
+      } catch {
+        /* already loading */
+      }
     });
   };
 
@@ -421,33 +456,70 @@ export function WhatsAppVoiceMessage({
     }
 
     const shouldPlay = play ?? !isPlaying;
+    const audio = audioRef.current;
 
     if (shouldPlay) {
+      if (playIntentRef.current && !audio.paused) {
+        return;
+      }
+
+      const requestId = ++playRequestIdRef.current;
+      playIntentRef.current = true;
+
       try {
         setIsLoading(true);
-        await ensureAudioReady(audioRef.current);
-        acceptMediaDuration(audioRef.current);
+        setLoadError(null);
+        await ensureAudioReady(audio);
+        if (requestId !== playRequestIdRef.current || !playIntentRef.current) {
+          return;
+        }
+
+        if (
+          Number.isFinite(audio.duration) &&
+          audio.duration > 0 &&
+          storedDurationRef.current <= 0
+        ) {
+          setMediaDuration(audio.duration);
+        }
 
         if (robotModeRef.current) {
-          const graph = await ensureRobotGraph(audioRef.current);
+          const graph = await ensureRobotGraph(audio);
           if (graph) syncRobotRouting(true);
         }
 
-        applyPlaybackRate(audioRef.current);
-        await audioRef.current.play();
+        if (requestId !== playRequestIdRef.current || !playIntentRef.current) {
+          return;
+        }
+
+        applyPlaybackRate(audio);
+        await audio.play();
+
+        if (requestId !== playRequestIdRef.current || !playIntentRef.current) {
+          audio.pause();
+          return;
+        }
+
         setIsPlaying(true);
-        onPlay?.(id);
+        onPlayRef.current?.(id);
       } catch (error) {
+        // AbortError = play interrupted by pause/teardown — not a hard failure
+        if (isAbortError(error) || !playIntentRef.current) {
+          setIsPlaying(false);
+          return;
+        }
         console.error("Failed to play voice note", error);
         setLoadError("Unable to play voice note");
         setIsPlaying(false);
+        playIntentRef.current = false;
       } finally {
         setIsLoading(false);
       }
     } else {
-      audioRef.current.pause();
+      playIntentRef.current = false;
+      playRequestIdRef.current += 1;
+      audio.pause();
       setIsPlaying(false);
-      onPause?.(id);
+      onPauseRef.current?.(id);
     }
   };
 
@@ -497,11 +569,12 @@ export function WhatsAppVoiceMessage({
     effectiveDuration > 0
       ? Math.min(1, (currentTime || 0) / effectiveDuration)
       : isPlaying
-      ? 0.1
-      : 0;
+        ? 0.1
+        : 0;
 
   const bars = useMemo(() => {
-    const source = waveform && waveform.length > 0 ? waveform : placeholderWaveform();
+    const source =
+      waveform && waveform.length > 0 ? waveform : placeholderWaveform();
     const activeCount = Math.floor(source.length * progress);
     return source.map((value, index) => {
       const height = Math.max(12, value * 36);
@@ -516,8 +589,8 @@ export function WhatsAppVoiceMessage({
                 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
                 : "bg-emerald-400/40"
               : isBarActive
-              ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.25)]"
-              : "bg-white/40"
+                ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.25)]"
+                : "bg-white/40"
           )}
           style={{ height: `${height}px` }}
         />
@@ -527,7 +600,6 @@ export function WhatsAppVoiceMessage({
 
   const showError = Boolean(loadError);
   const isBusy = isLoading || sourceLoading;
-  const controlsDisabled = sourceLoading || !audioUrl || showError;
 
   return (
     <div
@@ -553,13 +625,18 @@ export function WhatsAppVoiceMessage({
           type="button"
           size="icon"
           variant="ghost"
-          onClick={() => void togglePlayback()}
-          disabled={controlsDisabled}
+          onClick={() => {
+            // Allow retry after a soft failure
+            if (loadError) setLoadError(null);
+            void togglePlayback();
+          }}
+          disabled={sourceLoading || !audioUrl}
           className={cn(
             "h-10 w-10 rounded-full border border-white/20 bg-white/10 text-current backdrop-blur transition hover:bg-white/20",
-            accent === "received" && "border-transparent bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20",
+            accent === "received" &&
+              "border-transparent bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20",
             isPlaying && "ring-2 ring-white/40 dark:ring-emerald-400/60",
-            controlsDisabled && "opacity-60"
+            (sourceLoading || !audioUrl) && "opacity-60"
           )}
           aria-label={isPlaying ? "Pause voice note" : "Play voice note"}
         >
@@ -593,7 +670,7 @@ export function WhatsAppVoiceMessage({
               size="sm"
               variant="ghost"
               onClick={() => void toggleRobotMode()}
-              disabled={controlsDisabled}
+              disabled={!audioUrl}
               className={cn(
                 "h-7 rounded-full border border-white/30 bg-white/10 px-2 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20",
                 accent === "received" &&
@@ -602,9 +679,11 @@ export function WhatsAppVoiceMessage({
                   (accent === "sent"
                     ? "bg-white/30 ring-1 ring-white/60"
                     : "bg-violet-500/20 text-violet-600 dark:text-violet-300 ring-1 ring-violet-400/50"),
-                controlsDisabled && "opacity-60"
+                !audioUrl && "opacity-60"
               )}
-              aria-label={robotMode ? "Disable robot voice" : "Enable robot voice"}
+              aria-label={
+                robotMode ? "Disable robot voice" : "Enable robot voice"
+              }
               aria-pressed={robotMode}
               title={robotMode ? "Robot voice on" : "Robot voice"}
             >
@@ -615,11 +694,12 @@ export function WhatsAppVoiceMessage({
               size="sm"
               variant="ghost"
               onClick={cycleSpeed}
-              disabled={controlsDisabled}
+              disabled={!audioUrl}
               className={cn(
                 "h-7 rounded-full border border-white/30 bg-white/10 px-3 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20",
-                accent === "received" && "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
-                controlsDisabled && "opacity-60"
+                accent === "received" &&
+                  "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
+                !audioUrl && "opacity-60"
               )}
             >
               {SPEED_STEPS[speedIndex].toFixed(1).replace(".0", "")}x
@@ -665,7 +745,6 @@ export function WhatsAppVoiceMessage({
 
 const formatTime = (seconds: number) => {
   if (!Number.isFinite(seconds) || seconds <= 0) return "00:00";
-  // Any positive duration below 1s should still display as 1 second.
   const normalizedSeconds = seconds < 1 ? 1 : Math.floor(seconds);
   const mins = Math.floor(normalizedSeconds / 60);
   const secs = normalizedSeconds % 60;
