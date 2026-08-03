@@ -4286,7 +4286,9 @@ const ProjectDetails = () => {
     const tabs = [
       { value: "overview", label: "Overview", icon: Code },
       { value: "analytics", label: "Analytics", icon: BarChart3 },
-      ...(currentUser?.role === "admin" || currentUser?.role === "developer"
+      ...(currentUser?.role === "admin" ||
+      currentUser?.role === "developer" ||
+      currentUser?.role === "tester"
         ? [{ value: "bugs", label: "Bugs", icon: Bug }]
         : []),
       ...(currentUser?.role === "tester" || currentUser?.role === "admin"
@@ -5293,7 +5295,9 @@ const ProjectDetails = () => {
                     </h3>
                   </div>
                   <div className="flex flex-col gap-2 min-w-0">
-                    {(currentUser?.role === "admin" || currentUser?.role === "developer") && (
+                    {(currentUser?.role === "admin" ||
+                      currentUser?.role === "developer" ||
+                      currentUser?.role === "tester") && (
                       <Button
                         variant="outline"
                         className="h-11 w-full min-w-0 justify-start gap-3 border-blue-200/80 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/30"
