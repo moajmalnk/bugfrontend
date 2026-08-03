@@ -207,8 +207,14 @@ export const AccessibilityProvider: React.FC<AccessibilityProviderProps> = ({ ch
   };
 
   const skipToContent = () => {
-    const mainContent = document.querySelector('main') || document.querySelector('[role="main"]');
+    const mainContent =
+      document.getElementById('main-content') ||
+      document.querySelector('main') ||
+      document.querySelector('[role="main"]');
     if (mainContent) {
+      if (!mainContent.hasAttribute('tabindex')) {
+        mainContent.setAttribute('tabindex', '-1');
+      }
       mainContent.focus();
       mainContent.scrollIntoView({ behavior: 'smooth' });
     }
@@ -246,7 +252,6 @@ export const SkipToContent: React.FC = () => {
     <button
       onClick={skipToContent}
       className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:shadow-lg"
-      tabIndex={1}
     >
       Skip to main content
     </button>

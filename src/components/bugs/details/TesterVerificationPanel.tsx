@@ -146,6 +146,58 @@ export function formatRetestSummary(bug: Pick<Bug, "tester_retested" | "tester_i
   };
 }
 
+/** Stable keys for list filters — mirrors formatRetestSummary buckets. */
+export type VerificationFilterKey =
+  | "retest_pending"
+  | "not_retested"
+  | "verified_fixed"
+  | "still_broken"
+  | "retested";
+
+export const VERIFICATION_FILTER_OPTIONS: {
+  value: VerificationFilterKey;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    value: "retest_pending",
+    label: "Retest pending",
+    hint: "Awaiting tester verification",
+  },
+  {
+    value: "not_retested",
+    label: "Not retested",
+    hint: "Tester marked as not retested",
+  },
+  {
+    value: "verified_fixed",
+    label: "Verified fixed",
+    hint: "Retest confirmed the fix",
+  },
+  {
+    value: "still_broken",
+    label: "Still broken",
+    hint: "Retest found the issue still present",
+  },
+  {
+    value: "retested",
+    label: "Retested",
+    hint: "Retested without a clear pass/fail outcome",
+  },
+];
+
+export function getVerificationFilterKey(
+  bug: Pick<Bug, "tester_retested" | "tester_issue_fixed">
+): VerificationFilterKey {
+  const retested = triState(bug.tester_retested);
+  const issueFixed = triState(bug.tester_issue_fixed);
+  if (retested === "unset") return "retest_pending";
+  if (retested === "no") return "not_retested";
+  if (issueFixed === "yes") return "verified_fixed";
+  if (issueFixed === "no") return "still_broken";
+  return "retested";
+}
+
 interface FileWithPreview extends File {
   preview?: string;
 }
@@ -294,13 +346,16 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
 
       screenshots.forEach((file) => formData.append("screenshots[]", file));
       files.forEach((file) => formData.append("files[]", file));
-      voiceNotes.forEach((vn) => {
+      voiceNotes.forEach((vn, index) => {
         const ext = vn.blob.type.includes("webm")
           ? "webm"
           : vn.blob.type.includes("mp4")
             ? "mp4"
             : "wav";
         formData.append("voice_notes[]", vn.blob, `${vn.name}.${ext}`);
+        if (Number.isFinite(vn.duration) && vn.duration > 0) {
+          formData.append(`voice_note_duration_${index}`, String(vn.duration));
+        }
       });
       if (attachmentsToDelete.length > 0) {
         formData.append("attachments_to_delete", JSON.stringify(attachmentsToDelete));
@@ -370,6 +425,13 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
               key={att.id}
               id={att.id}
               audioSource={buildAudioUrl(att.file_path)}
+              duration={
+                typeof att.duration === "number" &&
+                Number.isFinite(att.duration) &&
+                att.duration > 0
+                  ? att.duration
+                  : 0
+              }
               isActive={activeVoiceId === att.id}
               onPlay={setActiveVoiceId}
               onPause={(id) => {
@@ -765,6 +827,13 @@ export function TesterVerificationPanel({ bug, onUpdated }: TesterVerificationPa
                             <WhatsAppVoiceMessage
                               id={messageId}
                               audioSource={buildAudioUrl(att.file_path)}
+                              duration={
+                                typeof att.duration === "number" &&
+                                Number.isFinite(att.duration) &&
+                                att.duration > 0
+                                  ? att.duration
+                                  : 0
+                              }
                               accent="received"
                               autoPlay
                               isActive={activeVoiceId === messageId}

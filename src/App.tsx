@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { PrivacyOverlay } from "@/components/PrivacyOverlay";
 import AppProviders, { CoreProviders, RouterProviders } from "@/components/providers/AppProviders";
@@ -10,7 +10,6 @@ import { initShadowMode } from "@/lib/shadowMode";
 import { QueryClient } from "@tanstack/react-query";
 import { BrowserRouter as Router } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
-import { PWAEngagementPrompt } from "@/components/pwa/PWAEngagementPrompt";
 import ContextMenu from "./components/ContextMenu";
 import { ErrorBoundaryProvider } from "@/components/ErrorBoundaryManager";
 import { useApiErrorHandler } from "@/hooks/useApiErrorHandler";
@@ -20,7 +19,6 @@ import { ChunkErrorHandler } from "@/components/ChunkErrorHandler";
 import { useAuth } from "@/context/AuthContext";
 import { LoadingErrorModal } from "@/components/ui/LoadingErrorModal";
 import { useLoadingErrorModal } from "@/hooks/useLoadingErrorModal";
-import "@/utils/testLoadingError"; // Import for development testing
 import { BugProvider } from "@/context/BugContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -32,14 +30,15 @@ import { PerformanceMonitor } from "@/components/performance/PerformanceMonitor"
 import { BundleAnalyzer } from "@/components/performance/BundleAnalyzer";
 import { AccessibilityProvider, SkipToContent } from "@/components/accessibility/AccessibilityProvider";
 import { ModernErrorBoundary } from "@/components/error/ModernErrorBoundary";
-import { SEOHead } from "@/components/seo/SEOHead";
-import { GoogleOAuthProvider } from '@react-oauth/google';
-import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
-// Import troubleshooting tool (makes it available globally in console)
-import '@/utils/googleOAuthTroubleshoot';
-import { setupGoogleOAuthErrorHandler } from '@/utils/googleOAuthErrorHandler';
+import { RouteSEO } from "@/components/seo/RouteSEO";
 import { ProfessionalRefreshButton } from '@/components/ui/ProfessionalRefreshButton';
 import { RefreshKeyboardShortcuts } from '@/components/ui/RefreshKeyboardShortcuts';
+
+const LazyPWAEngagementPrompt = lazy(() =>
+  import("@/components/pwa/PWAEngagementPrompt").then((m) => ({
+    default: m.PWAEngagementPrompt,
+  }))
+);
 
 // Initialize the query client outside of the component with optimized defaults
 const queryClient = new QueryClient({
@@ -189,9 +188,6 @@ function AppContent() {
     // Initialize development utilities
     initDevUtils();
     
-    // Set up Google OAuth error handler
-    const oauthCleanup = setupGoogleOAuthErrorHandler();
-    
     // Initialize service worker
     initializeServiceWorker().catch(error => {
       // //.error('[App] Service worker initialization failed:', error);
@@ -227,7 +223,6 @@ function AppContent() {
     return () => {
       cleanup();
       cleanupShadow();
-      oauthCleanup();
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
@@ -351,7 +346,7 @@ function AppContent() {
 
   return (
     <>
-      <SEOHead />
+      <RouteSEO />
       <SkipToContent />
       <OfflineBanner show={isOffline} />
       <div style={{ paddingTop: isOffline ? '3rem' : '0' }}>
@@ -368,7 +363,9 @@ function AppContent() {
           onAccept={handleUpdateAccept}
           onDismiss={handleUpdateDismiss}
         />
-        <PWAEngagementPrompt />
+        <Suspense fallback={null}>
+          <LazyPWAEngagementPrompt />
+        </Suspense>
         <TimezoneDebug />
         {networkError && <NetworkError />}
         <PerformanceMonitor enabled={import.meta.env.DEV} />
@@ -460,7 +457,6 @@ function App() {
   return (
     <ChunkErrorHandler>
       <HelmetProvider>
-        <GoogleOAuthProvider clientId={GOOGLE_OAUTH_CONFIG.clientId}>
           <Router
             future={{
               v7_startTransition: true,
@@ -489,7 +485,6 @@ function App() {
             </AccessibilityProvider>
           </ThemeProvider>
         </Router>
-        </GoogleOAuthProvider>
       </HelmetProvider>
     </ChunkErrorHandler>
   );

@@ -15,6 +15,8 @@ interface SEOHeadProps {
   tags?: string[];
   noindex?: boolean;
   canonical?: string;
+  /** When false, use title as-is (already includes brand). Default true. */
+  titleTemplate?: boolean;
 }
 
 const defaultSEO = {
@@ -26,6 +28,13 @@ const defaultSEO = {
   type: 'website' as const,
   author: 'CODO AI Innovations',
 };
+
+function resolveTitle(title: string | undefined, useTemplate: boolean): string {
+  if (!title) return defaultSEO.title;
+  if (!useTemplate) return title;
+  if (/bugricer/i.test(title)) return title;
+  return `${title} | BugRicer`;
+}
 
 export const SEOHead: React.FC<SEOHeadProps> = ({
   title,
@@ -41,9 +50,10 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   tags,
   noindex = false,
   canonical,
+  titleTemplate = true,
 }) => {
   const seo = {
-    title: title ? `${title} | BugRicer` : defaultSEO.title,
+    title: resolveTitle(title, titleTemplate),
     description: description || defaultSEO.description,
     keywords: keywords || defaultSEO.keywords,
     image: image || defaultSEO.image,
@@ -60,20 +70,23 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
 
   return (
     <Helmet>
-      {/* Primary Meta Tags */}
       <title>{seo.title}</title>
       <meta name="title" content={seo.title} />
       <meta name="description" content={seo.description} />
       <meta name="keywords" content={seo.keywords} />
       <meta name="author" content={seo.author} />
-      
-      {/* Robots */}
-      <meta name="robots" content={seo.noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'} />
-      
-      {/* Canonical URL */}
+
+      <meta
+        name="robots"
+        content={
+          seo.noindex
+            ? 'noindex, nofollow'
+            : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
+        }
+      />
+
       <link rel="canonical" href={seo.canonical} />
-      
-      {/* Open Graph / Facebook */}
+
       <meta property="og:type" content={seo.type} />
       <meta property="og:url" content={seo.url} />
       <meta property="og:title" content={seo.title} />
@@ -84,21 +97,23 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       <meta property="og:image:alt" content={seo.title} />
       <meta property="og:site_name" content="BugRicer" />
       <meta property="og:locale" content="en_US" />
-      
-      {/* Article specific meta tags */}
+
       {seo.type === 'article' && (
         <>
-          {seo.publishedTime && <meta property="article:published_time" content={seo.publishedTime} />}
-          {seo.modifiedTime && <meta property="article:modified_time" content={seo.modifiedTime} />}
+          {seo.publishedTime && (
+            <meta property="article:published_time" content={seo.publishedTime} />
+          )}
+          {seo.modifiedTime && (
+            <meta property="article:modified_time" content={seo.modifiedTime} />
+          )}
           {seo.author && <meta property="article:author" content={seo.author} />}
           {seo.section && <meta property="article:section" content={seo.section} />}
-          {seo.tags && seo.tags.map((tag, index) => (
-            <meta key={index} property="article:tag" content={tag} />
+          {seo.tags?.map((tag) => (
+            <meta key={tag} property="article:tag" content={tag} />
           ))}
         </>
       )}
-      
-      {/* Twitter */}
+
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:url" content={seo.url} />
       <meta name="twitter:title" content={seo.title} />
@@ -107,34 +122,32 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       <meta name="twitter:image:alt" content={seo.title} />
       <meta name="twitter:site" content="@codoacademy" />
       <meta name="twitter:creator" content="@codoacademy" />
-      
-      {/* Additional Meta Tags */}
+
       <meta name="application-name" content="BugRicer" />
       <meta name="apple-mobile-web-app-title" content="BugRicer" />
-      
-      {/* Structured Data */}
+
       <script type="application/ld+json">
         {JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": seo.type === 'article' ? 'Article' : 'WebPage',
-          "headline": seo.title,
-          "description": seo.description,
-          "image": seo.image,
-          "url": seo.url,
-          "author": {
-            "@type": "Organization",
-            "name": seo.author,
+          '@context': 'https://schema.org',
+          '@type': seo.type === 'article' ? 'Article' : 'WebPage',
+          headline: seo.title,
+          description: seo.description,
+          image: seo.image,
+          url: seo.url,
+          author: {
+            '@type': 'Organization',
+            name: seo.author,
           },
-          "publisher": {
-            "@type": "Organization",
-            "name": "CODO AI Innovations",
-            "url": "https://codoacademy.com",
+          publisher: {
+            '@type': 'Organization',
+            name: 'CODO AI Innovations',
+            url: 'https://codoacademy.com',
           },
           ...(seo.type === 'article' && {
-            "datePublished": seo.publishedTime,
-            "dateModified": seo.modifiedTime,
-            "articleSection": seo.section,
-            "keywords": seo.tags?.join(', '),
+            datePublished: seo.publishedTime,
+            dateModified: seo.modifiedTime,
+            articleSection: seo.section,
+            keywords: seo.tags?.join(', '),
           }),
         })}
       </script>
@@ -142,7 +155,6 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   );
 };
 
-// Hook for easy SEO management
 export const useSEO = (props: SEOHeadProps) => {
   return <SEOHead {...props} />;
 };

@@ -16,6 +16,7 @@ interface WhatsAppShareButtonProps {
   variant?: 'default' | 'outline' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   showLabel?: boolean;
+  className?: string;
 }
 
 export function WhatsAppShareButton({ 
@@ -23,7 +24,8 @@ export function WhatsAppShareButton({
   type, 
   variant = 'outline', 
   size = 'sm',
-  showLabel = true 
+  showLabel = true,
+  className,
 }: WhatsAppShareButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -81,7 +83,13 @@ export function WhatsAppShareButton({
         <Button
           variant={variant}
           size={size}
-          className="gap-2 h-9 px-3 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 dark:hover:border-green-700 text-gray-700 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+          title="Share via WhatsApp"
+          aria-label="Share via WhatsApp"
+          className={
+            showLabel
+              ? `gap-2 h-9 px-3 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 dark:hover:border-green-700 text-gray-700 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-300 transition-colors ${className ?? ""}`
+              : `h-9 w-9 p-0 shrink-0 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 dark:hover:border-green-700 text-gray-700 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-300 transition-colors ${className ?? ""}`
+          }
         >
           {getIcon()}
           {showLabel && getButtonText()}

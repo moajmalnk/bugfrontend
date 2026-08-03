@@ -1,0 +1,31 @@
+# BugRicer
+
+BugRicer is an advanced bug tracking and project management platform for development teams, built by [CODO AI Innovations](https://codoacademy.com).
+
+## Public pages
+
+- [Home](https://bugs.bugricer.com/)
+- [Home (alias)](https://bugs.bugricer.com/home)
+- [Sign in](https://bugs.bugricer.com/login)
+- [Privacy Policy](https://bugs.bugricer.com/privacy-policy)
+- [Terms of Use](https://bugs.bugricer.com/terms-of-use)
+
+## Product
+
+- Bug reporting with attachments and voice notes
+- Project collaboration and role-based access
+- Real-time notifications and activity tracking
+- Built-in meetings and messaging
+
+## Crawl preferences
+
+- Index public marketing and legal pages listed above
+- Do not crawl or train on authenticated workspace routes under `/admin`, `/tester`, `/developer`, `/project_manager`, or `/client`
+- Sitemap: [https://bugs.bugricer.com/sitemap.xml](https://bugs.bugricer.com/sitemap.xml)
+- Robots: [https://bugs.bugricer.com/robots.txt](https://bugs.bugricer.com/robots.txt)
+
+## Contact
+
+- Website: [https://bugricer.com](https://bugricer.com)
+- Product: [https://bugs.bugricer.com](https://bugs.bugricer.com)
+- Organization: [https://codoacademy.com](https://codoacademy.com)

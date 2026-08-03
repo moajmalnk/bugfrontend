@@ -11,6 +11,8 @@ import {
   formValuesToPayload,
   projectService,
   projectToFormValues,
+  validateWebCategoryFiles,
+  type TaggedProjectFile,
 } from '@/services/projectService';
 import { userService } from '@/services/userService';
 import { clientService } from '@/services/clientService';
@@ -18,10 +20,6 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, FolderKanban, Pencil } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-
-interface FileWithPreview extends File {
-  preview?: string;
-}
 
 const EditProject = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -36,7 +34,7 @@ const EditProject = () => {
     created_at: '',
     updated_at: '',
   }));
-  const [attachmentFiles, setAttachmentFiles] = useState<FileWithPreview[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<TaggedProjectFile[]>([]);
   const [selectedBugDocIds, setSelectedBugDocIds] = useState<number[]>([]);
   const [selectedBugSheetIds, setSelectedBugSheetIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -179,8 +177,39 @@ const EditProject = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
+
+    if (!(values.project_categories || []).length) {
+      toast({
+        title: 'Categories required',
+        description: 'Select at least one project category.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const allAttachments = [
+      ...(project.attachments || []),
+      ...attachments.filter((a) => !(project.attachments || []).some((p) => p.id === a.id)),
+    ];
+
+    if ((values.project_categories || []).includes('WEB')) {
+      const webError = validateWebCategoryFiles(
+        attachmentFiles,
+        allAttachments,
+        values.category_asset_links
+      );
+      if (webError) {
+        toast({
+          title: 'WEB files required',
+          description: webError,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
 
     try {
       const payload = formValuesToPayload(values);

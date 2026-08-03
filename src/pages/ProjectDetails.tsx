@@ -103,6 +103,7 @@ import {
   Copy,
   ExternalLink,
   FileText,
+  ClipboardCheck,
   Filter,
   ListChecks,
   Lock,
@@ -115,12 +116,17 @@ import {
   ShieldCheck,
   TestTube,
   User,
+  UserCheck,
   Users,
   X,
 } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
+import {
+  getVerificationFilterKey,
+  VERIFICATION_FILTER_OPTIONS,
+} from "@/components/bugs/details/TesterVerificationPanel";
 
 // Skeleton components for loading state
 const ProjectHeaderSkeleton = () => (
@@ -663,18 +669,21 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
     statusFilter: initialStatus || "all",
     projectFilter: "all",
     bugTypeFilter: "all",
+    raisedByFilter: "all",
   });
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const statusFilter = filters.statusFilter || initialStatus || "all";
   const projectFilter = filters.projectFilter || "all";
   const bugTypeFilter = filters.bugTypeFilter || "all";
+  const raisedByFilter = filters.raisedByFilter || "all";
   
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
   const setStatusFilter = (value: string) => setFilter("statusFilter", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const setBugTypeFilter = (value: string) => setFilter("bugTypeFilter", value);
+  const setRaisedByFilter = (value: string) => setFilter("raisedByFilter", value);
   const [activeTab, setActiveTab] = useState(initialTab || "all-bugs");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -718,7 +727,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
   // Keep pagination in range when filters / page size change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, priorityFilter, statusFilter, bugTypeFilter, activeTab, itemsPerPage]);
+  }, [searchTerm, priorityFilter, statusFilter, bugTypeFilter, raisedByFilter, activeTab, itemsPerPage]);
   
   // Fetch bugs data
   useEffect(() => {
@@ -787,6 +796,9 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
       const matchesProject =
         projectFilter === "all" || bug.project_id === projectFilter;
       const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
+      const matchesRaisedBy =
+        raisedByFilter === "all" ||
+        String(bug.reported_by) === String(raisedByFilter);
       // Bugs tab: only active work items (pending / in progress)
       const isActiveBug =
         bug.status === "pending" || bug.status === "in_progress";
@@ -796,6 +808,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
         matchesStatus &&
         matchesProject &&
         matchesBugType &&
+        matchesRaisedBy &&
         isActiveBug
       );
     });
@@ -808,6 +821,28 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
     currentPage * itemsPerPage
   );
   const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+
+  const uniqueRaisers = useMemo(() => {
+    const byId = new Map<string, string>();
+    bugs.forEach((bug) => {
+      const id = String(bug.reported_by || "").trim();
+      if (!id) return;
+      if (!byId.has(id)) {
+        byId.set(id, bug.reporter_name || bug.reported_by || "Unknown");
+      }
+    });
+    return Array.from(byId.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [bugs]);
+
+  const hasActiveFilters =
+    !!searchTerm ||
+    priorityFilter !== "all" ||
+    statusFilter !== "all" ||
+    projectFilter !== "all" ||
+    bugTypeFilter !== "all" ||
+    raisedByFilter !== "all";
   
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
@@ -953,69 +988,85 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
           <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
             {/* Search and Filter */}
             {!skeletonLoading && !loading && (
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
-                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="p-1.5 bg-orange-500 rounded-lg">
+              <div className="relative w-full min-w-0">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl pointer-events-none" />
+                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
+                  <div className="space-y-3 sm:space-y-4 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
                         <Search className="h-4 w-4 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                        Search & Filter
+                      </h3>
                     </div>
-                    
-                    <div className="flex flex-col md:flex-row gap-4">
-                      {/* Search Bar */}
-                      <div className="flex-1 relative group">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
-                        <input
-                          type="text"
-                          placeholder="Search bugs by title, description, or bug ID..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                        />
-                      </div>
 
-                      {/* Filter Controls */}
-                      <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                        {/* Status Filter */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
-                            <BugIcon className="h-4 w-4 text-white" />
-                          </div>
-                          <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                              <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent position="popper" className="z-[60]">
-                              <SelectItem value="all">All Status</SelectItem>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="in_progress">In Progress</SelectItem>
-                            </SelectContent>
-                          </Select>
+                    <div className="relative group w-full min-w-0">
+                      <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search by title, description, or ID…"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                          <BugIcon className="h-4 w-4 text-white" />
                         </div>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                          <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="in_progress">In Progress</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                        <BugTypeFilterSelect
-                          value={bugTypeFilter}
-                          onValueChange={setBugTypeFilter}
-                        />
+                      <BugTypeFilterSelect
+                        value={bugTypeFilter}
+                        onValueChange={setBugTypeFilter}
+                        className="min-w-0"
+                      />
 
-                        {/* Clear Filters Button */}
-                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              clearFilters();
-                            }}
-                            className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                          >
-                            Clear
-                          </Button>
-                        )}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
+                          <User className="h-4 w-4 text-white" />
+                        </div>
+                        <Select value={raisedByFilter} onValueChange={setRaisedByFilter}>
+                          <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Raised by" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All Raisers</SelectItem>
+                            {uniqueRaisers.map((raiser) => (
+                              <SelectItem key={raiser.id} value={raiser.id}>
+                                {raiser.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
+
+                    {hasActiveFilters ? (
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => clearFilters()}
+                          className="h-10 sm:h-11 w-full sm:w-auto px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                        >
+                          Clear filters
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -1023,7 +1074,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
 
             {/* Professional Responsive Pagination Controls - Show when there are bugs */}
             {!skeletonLoading && !loading && filteredBugs.length > 0 && totalPages > 1 && (
-              <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+              <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                 {/* Top Row - Results Info and Items Per Page */}
                 <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
                   <div className="flex items-center gap-2">
@@ -1356,72 +1407,88 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
           </TabsContent>
         </Tabs>
       ) : (
-        <div className="space-y-6 sm:space-y-8">
+        <div className="space-y-6 sm:space-y-8 min-w-0">
           {/* Search & Filter for Developers */}
           {!skeletonLoading && !loading && (
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
-              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="p-1.5 bg-orange-500 rounded-lg">
+            <div className="relative w-full min-w-0">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl pointer-events-none" />
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
+                <div className="space-y-3 sm:space-y-4 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
                       <Search className="h-4 w-4 text-white" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                      Search & Filter
+                    </h3>
                   </div>
 
-                  <div className="flex flex-col md:flex-row gap-4">
-                    {/* Search Bar */}
-                    <div className="flex-1 relative group">
-                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
-                      <input
-                        type="text"
-                        placeholder="Search bugs by title, description, or bug ID..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                      />
-                    </div>
+                  <div className="relative group w-full min-w-0">
+                    <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search by title, description, or ID…"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                    />
+                  </div>
 
-                    {/* Filter Controls */}
-                    <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                      {/* Status Filter */}
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
-                          <BugIcon className="h-4 w-4 text-white" />
-                        </div>
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                          <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" className="z-[60]">
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                          </SelectContent>
-                        </Select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                        <BugIcon className="h-4 w-4 text-white" />
                       </div>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                      <BugTypeFilterSelect
-                        value={bugTypeFilter}
-                        onValueChange={setBugTypeFilter}
-                      />
+                    <BugTypeFilterSelect
+                      value={bugTypeFilter}
+                      onValueChange={setBugTypeFilter}
+                      className="min-w-0"
+                    />
 
-                      {/* Clear Filters Button */}
-                      {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            clearFilters();
-                          }}
-                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                        >
-                          Clear
-                        </Button>
-                      )}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
+                        <User className="h-4 w-4 text-white" />
+                      </div>
+                      <Select value={raisedByFilter} onValueChange={setRaisedByFilter}>
+                        <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectValue placeholder="Raised by" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All Raisers</SelectItem>
+                          {uniqueRaisers.map((raiser) => (
+                            <SelectItem key={raiser.id} value={raiser.id}>
+                              {raiser.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
+
+                  {hasActiveFilters ? (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => clearFilters()}
+                        className="h-10 sm:h-11 w-full sm:w-auto px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                      >
+                        Clear filters
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -1432,7 +1499,7 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
             !loading &&
             filteredBugs.length > 0 &&
             totalPages > 1 && (
-              <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+              <div className="flex flex-col gap-4 sm:gap-5 mb-6 w-full min-w-0 overflow-x-hidden bg-gradient-to-r from-background via-background to-muted/10 rounded-xl shadow-sm border border-border/50 backdrop-blur-sm hover:shadow-md transition-all duration-300">
                 {/* Top Row - Results Info and Items Per Page */}
                 <div className="flex flex-col sm:flex-row md:flex-row sm:items-center md:items-center justify-between gap-3 sm:gap-4 md:gap-4 p-4 sm:p-5">
                   <div className="flex items-center gap-2">
@@ -1788,18 +1855,24 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
     statusFilter: initialStatus || "all",
     projectFilter: "all",
     bugTypeFilter: "all",
+    fixedByFilter: "all",
+    verificationFilter: "all",
   });
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const statusFilter = filters.statusFilter || initialStatus || "all";
   const projectFilter = filters.projectFilter || "all";
   const bugTypeFilter = filters.bugTypeFilter || "all";
+  const fixedByFilter = filters.fixedByFilter || "all";
+  const verificationFilter = filters.verificationFilter || "all";
   
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
   const setStatusFilter = (value: string) => setFilter("statusFilter", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const setBugTypeFilter = (value: string) => setFilter("bugTypeFilter", value);
+  const setFixedByFilter = (value: string) => setFilter("fixedByFilter", value);
+  const setVerificationFilter = (value: string) => setFilter("verificationFilter", value);
   const [activeTab, setActiveTab] = useState(initialTab || "all-fixes");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -1827,6 +1900,19 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
     if (targetTab !== activeTab) setActiveTab(targetTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchTerm,
+    priorityFilter,
+    statusFilter,
+    bugTypeFilter,
+    fixedByFilter,
+    verificationFilter,
+    activeTab,
+    itemsPerPage,
+  ]);
   
   // Fetch bugs data
   useEffect(() => {
@@ -1896,6 +1982,12 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
       const matchesProject =
         projectFilter === "all" || bug.project_id === projectFilter;
       const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
+      const fixerId = String(bug.fixed_by || bug.updated_by || "").trim();
+      const matchesFixedBy =
+        fixedByFilter === "all" || fixerId === String(fixedByFilter);
+      const matchesVerification =
+        verificationFilter === "all" ||
+        getVerificationFilterKey(bug) === verificationFilter;
       // Fixes: fixed + rejected (rejected counts as closed on our side)
       const isResolved =
         bug.status === "fixed" || bug.status === "rejected";
@@ -1905,6 +1997,8 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
         matchesStatus &&
         matchesProject &&
         matchesBugType &&
+        matchesFixedBy &&
+        matchesVerification &&
         isResolved
       );
     });
@@ -1917,6 +2011,32 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
     currentPage * itemsPerPage
   );
   const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+
+  const uniqueFixers = useMemo(() => {
+    const byId = new Map<string, string>();
+    bugs.forEach((bug) => {
+      const id = String(bug.fixed_by || bug.updated_by || "").trim();
+      if (!id) return;
+      if (!byId.has(id)) {
+        byId.set(
+          id,
+          bug.fixed_by_name || bug.updated_by_name || "Unknown"
+        );
+      }
+    });
+    return Array.from(byId.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [bugs]);
+
+  const hasActiveFilters =
+    !!searchTerm ||
+    priorityFilter !== "all" ||
+    statusFilter !== "all" ||
+    projectFilter !== "all" ||
+    bugTypeFilter !== "all" ||
+    fixedByFilter !== "all" ||
+    verificationFilter !== "all";
   
   // Get tab-specific count
   const getTabCount = (tabType: string) => {
@@ -2062,69 +2182,113 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
           <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
             {/* Search and Filter */}
             {!skeletonLoading && !loading && (
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-green-50/30 dark:from-gray-800/30 dark:to-green-900/30 rounded-2xl"></div>
-                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="p-1.5 bg-green-500 rounded-lg">
+              <div className="relative w-full min-w-0">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-green-50/30 dark:from-gray-800/30 dark:to-green-900/30 rounded-2xl pointer-events-none" />
+                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
+                  <div className="space-y-3 sm:space-y-4 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-green-500 rounded-lg shrink-0">
                         <Search className="h-4 w-4 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                        Search & Filter
+                      </h3>
                     </div>
-                    
-                    <div className="flex flex-col md:flex-row gap-4">
-                      {/* Search Bar */}
-                      <div className="flex-1 relative group">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-green-500 transition-colors" />
-                        <input
-                          type="text"
-                          placeholder="Search fixes by title, description, or bug ID..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                        />
-                      </div>
 
-                      {/* Filter Controls */}
-                      <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                        {/* Status Filter */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
-                            <CheckCircle2 className="h-4 w-4 text-white" />
-                          </div>
-                          <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                              <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent position="popper" className="z-[60]">
-                              <SelectItem value="all">All Status</SelectItem>
-                              <SelectItem value="fixed">Fixed</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
-                            </SelectContent>
-                          </Select>
+                    <div className="relative group w-full min-w-0">
+                      <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-green-500 transition-colors pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search by title, description, or ID…"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                          <CheckCircle2 className="h-4 w-4 text-white" />
                         </div>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                          <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="fixed">Fixed</SelectItem>
+                            <SelectItem value="rejected">Rejected</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                        <BugTypeFilterSelect
-                          value={bugTypeFilter}
-                          onValueChange={setBugTypeFilter}
-                        />
-
-                        {/* Clear Filters Button */}
-                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              clearFilters();
-                            }}
-                            className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-sky-500 rounded-lg shrink-0">
+                          <ClipboardCheck className="h-4 w-4 text-white" />
+                        </div>
+                        <Select value={verificationFilter} onValueChange={setVerificationFilter}>
+                          <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Verification" />
+                          </SelectTrigger>
+                          <SelectContent
+                            position="popper"
+                            className="z-[60] w-[var(--radix-select-trigger-width)] min-w-[16rem] max-w-[min(100vw-2rem,22rem)]"
+                            searchPlaceholder="Search verification..."
                           >
-                            Clear
-                          </Button>
-                        )}
+                            <SelectItem value="all">All verification</SelectItem>
+                            {VERIFICATION_FILTER_OPTIONS.map((opt) => (
+                              <SelectItem
+                                key={opt.value}
+                                value={opt.value}
+                                textValue={`${opt.label} ${opt.hint}`}
+                                description={opt.hint}
+                              >
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <BugTypeFilterSelect
+                        value={bugTypeFilter}
+                        onValueChange={setBugTypeFilter}
+                        className="min-w-0"
+                      />
+
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
+                          <UserCheck className="h-4 w-4 text-white" />
+                        </div>
+                        <Select value={fixedByFilter} onValueChange={setFixedByFilter}>
+                          <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Fixed by" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search fixers...">
+                            <SelectItem value="all">All Fixers</SelectItem>
+                            {uniqueFixers.map((fixer) => (
+                              <SelectItem key={fixer.id} value={fixer.id}>
+                                {fixer.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
+
+                    {hasActiveFilters ? (
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => clearFilters()}
+                          className="h-10 sm:h-11 w-full sm:w-auto px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                        >
+                          Clear filters
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -2468,39 +2632,37 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
         <div className="space-y-6 sm:space-y-8">
           {/* Search & Filter for Developers */}
           {!skeletonLoading && !loading && (
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-green-50/30 dark:from-gray-800/30 dark:to-green-900/30 rounded-2xl"></div>
-              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="p-1.5 bg-green-500 rounded-lg">
-                      <Search className="h-4 w-4 text-white" />
+              <div className="relative w-full min-w-0">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-green-50/30 dark:from-gray-800/30 dark:to-green-900/30 rounded-2xl pointer-events-none" />
+                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
+                  <div className="space-y-3 sm:space-y-4 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-green-500 rounded-lg shrink-0">
+                        <Search className="h-4 w-4 text-white" />
+                      </div>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                        Search & Filter
+                      </h3>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-                  </div>
 
-                  <div className="flex flex-col md:flex-row gap-4">
-                    {/* Search Bar */}
-                    <div className="flex-1 relative group">
-                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                    <div className="relative group w-full min-w-0">
+                      <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-green-500 transition-colors pointer-events-none" />
                       <input
                         type="text"
-                        placeholder="Search fixes by title, description, or bug ID..."
+                        placeholder="Search by title, description, or ID…"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                        className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
                       />
                     </div>
 
-                    {/* Filter Controls */}
-                    <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                      {/* Status Filter */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
                           <CheckCircle2 className="h-4 w-4 text-white" />
                         </div>
                         <Select value={statusFilter} onValueChange={setStatusFilter}>
-                          <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                          <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
                             <SelectValue placeholder="Status" />
                           </SelectTrigger>
                           <SelectContent position="popper" className="z-[60]">
@@ -2511,31 +2673,76 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
                         </Select>
                       </div>
 
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-sky-500 rounded-lg shrink-0">
+                          <ClipboardCheck className="h-4 w-4 text-white" />
+                        </div>
+                        <Select value={verificationFilter} onValueChange={setVerificationFilter}>
+                          <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Verification" />
+                          </SelectTrigger>
+                          <SelectContent
+                            position="popper"
+                            className="z-[60] w-[var(--radix-select-trigger-width)] min-w-[16rem] max-w-[min(100vw-2rem,22rem)]"
+                            searchPlaceholder="Search verification..."
+                          >
+                            <SelectItem value="all">All verification</SelectItem>
+                            {VERIFICATION_FILTER_OPTIONS.map((opt) => (
+                              <SelectItem
+                                key={opt.value}
+                                value={opt.value}
+                                textValue={`${opt.label} ${opt.hint}`}
+                                description={opt.hint}
+                              >
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
                       <BugTypeFilterSelect
                         value={bugTypeFilter}
                         onValueChange={setBugTypeFilter}
-                        accent="emerald"
+                        className="min-w-0"
                       />
 
-                      {/* Clear Filters Button */}
-                      {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
+                          <UserCheck className="h-4 w-4 text-white" />
+                        </div>
+                        <Select value={fixedByFilter} onValueChange={setFixedByFilter}>
+                          <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                            <SelectValue placeholder="Fixed by" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]" searchPlaceholder="Search fixers...">
+                            <SelectItem value="all">All Fixers</SelectItem>
+                            {uniqueFixers.map((fixer) => (
+                              <SelectItem key={fixer.id} value={fixer.id}>
+                                {fixer.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {hasActiveFilters ? (
+                      <div className="flex justify-end">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            clearFilters();
-                          }}
-                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                          onClick={() => clearFilters()}
+                          className="h-10 sm:h-11 w-full sm:w-auto px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                         >
-                          Clear
+                          Clear filters
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Professional Responsive Pagination for Developers - Show when there are fixes and multiple pages */}
           {!skeletonLoading &&

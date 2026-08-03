@@ -324,21 +324,14 @@ export const BugHeader = ({
           {backText}
         </button>
 
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
-          <div className="space-y-1 min-w-0">
-            <div className="flex items-start gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words min-w-0 flex-1">
-                <MalayalamTextToggle
-                  text={bug.title}
-                  className="text-xl sm:text-2xl font-bold tracking-tight break-words"
-                />
-              </h1>
-              <CopyTextButton
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1 min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words">
+              <MalayalamTextToggle
                 text={bug.title}
-                label="title"
-                className="mt-1 shrink-0"
+                className="text-xl sm:text-2xl font-bold tracking-tight break-words"
               />
-            </div>
+            </h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
               Project Name: {bug.project_name}
             </p>
@@ -351,14 +344,26 @@ export const BugHeader = ({
             </p>
           </div>
 
-          {/* Actions: allow wrapping on small screens, no horizontal scrollbar */}
-          <div className="w-full sm:w-auto">
-            <div className="flex flex-row flex-wrap items-center gap-2">
+          {/* Unified action toolbar — equal-size controls, clean wrap on all viewports */}
+          <div
+            role="toolbar"
+            aria-label="Bug actions"
+            className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:max-w-md lg:justify-end"
+          >
+            <CopyTextButton
+              text={bug.title}
+              label="title"
+              size="md"
+              className="h-9 w-9 shrink-0"
+            />
+
             {canEditBug && (
               <Button
                 variant="outline"
                 size="sm"
-                className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap"
+                title="Edit bug"
+                aria-label="Edit bug"
+                className="h-9 w-9 p-0 shrink-0"
                 onClick={() => {
                   const editUrl = `/${role}/bugs/${bug.id}/edit`;
                   const redirectUrl = isFromProject
@@ -369,7 +374,7 @@ export const BugHeader = ({
                   navigate(redirectUrl);
                 }}
               >
-                <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Edit2 className="h-4 w-4" />
               </Button>
             )}
 
@@ -378,26 +383,26 @@ export const BugHeader = ({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap border-sky-200 text-sky-700 hover:bg-sky-50 hover:border-sky-300 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-900/20"
+                className="h-9 w-9 p-0 shrink-0 border-sky-200 text-sky-700 hover:bg-sky-50 hover:border-sky-300 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-900/20"
                 onClick={() => setConvertOpen(true)}
                 title="Convert to another project"
+                aria-label="Convert to another project"
               >
-                <ArrowRightLeft className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">Convert</span>
+                <ArrowRightLeft className="h-4 w-4" />
               </Button>
             )}
 
-            {/* General Share Button */}
             <Button
               variant="outline"
               size="sm"
               onClick={handleShare}
-              className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap"
+              title="Share"
+              aria-label="Share"
+              className="h-9 w-9 p-0 shrink-0"
             >
-              <Share2 className="w-3 h-3 sm:w-4 sm:h-4" />
+              <Share2 className="h-4 w-4" />
             </Button>
 
-            {/* WhatsApp Share Button */}
             <WhatsAppShareButton
               data={{
                 bugTitle: bug.title,
@@ -416,30 +421,19 @@ export const BugHeader = ({
               showLabel={false}
             />
 
-            {canDelete && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDeleteClick}
-                disabled={isDeleting}
-                className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 whitespace-nowrap"
-              >
-                <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-              </Button>
-            )}
-
-              {(currentUser?.role === "admin" || currentUser?.role === "developer") &&
+            {(currentUser?.role === "admin" || currentUser?.role === "developer") &&
               bug.status !== "fixed" && (
                 <Button
                   variant="default"
                   size="sm"
-                  className="shrink-0 h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap"
+                  title="Mark as fixed"
+                  aria-label="Mark as fixed"
+                  className="h-9 w-9 p-0 shrink-0"
                   onMouseEnter={prefetchFixBugPage}
                   onFocus={prefetchFixBugPage}
                   onPointerDown={prefetchFixBugPage}
                   onClick={() => {
                     prefetchFixBugPage();
-                    // Preserve the from parameter when navigating to fix page
                     const fixUrl = `/${role}/bugs/${bug.id}/fix`;
                     const redirectUrl = isFromProject
                       ? `${fixUrl}?from=project`
@@ -454,10 +448,23 @@ export const BugHeader = ({
                     }
                   }}
                 >
-                  <CheckSquare className="mr-0 h-4 w-4" />
+                  <CheckSquare className="h-4 w-4" />
                 </Button>
               )}
-            </div>
+
+            {canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteClick}
+                disabled={isDeleting}
+                title="Delete bug"
+                aria-label="Delete bug"
+                className="h-9 w-9 p-0 shrink-0 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 

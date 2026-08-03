@@ -55,7 +55,7 @@ export function CopyTextButton({
 
   const sizeClass =
     size === "md"
-      ? "h-8 w-8"
+      ? "h-9 w-9"
       : "h-7 w-7";
 
   return (

@@ -35,8 +35,13 @@ import { ENV } from "@/lib/env";
 import { CompliancePipelineStage, getPipelineStageLabel } from "@/lib/codo/complianceRules";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { canReportBug } from "@/lib/utils";
-import { getProjectStatusLabel } from "@/lib/utils/projectUtils";
+import {
+  getProjectStatusLabel,
+  parseProjectPlatforms,
+  PROJECT_PLATFORM_OPTIONS,
+} from "@/lib/utils/projectUtils";
 import { Project, projectService } from "@/services/projectService";
+import { whatsappService } from "@/services/whatsappService";
 import { clientService } from "@/services/clientService";
 import { Client } from "@/types";
 import { motion } from "framer-motion";
@@ -46,7 +51,10 @@ import {
   Clock,
   Code,
   FolderKanban,
+  Loader2,
   Lock,
+  Copy,
+  Check,
   Shield,
   ShieldCheck,
   TestTube,
@@ -65,6 +73,16 @@ import {
   useResetUrlPageOnChange,
   listReturnState,
 } from "@/hooks/useUrlPagination";
+
+function formatProjectPlatformsLabel(value?: string | null): string | null {
+  const platforms = parseProjectPlatforms(value);
+  if (platforms.length === 0) return null;
+  return (
+    PROJECT_PLATFORM_OPTIONS.filter((opt) => platforms.includes(opt.value))
+      .map((opt) => opt.label)
+      .join(", ") || null
+  );
+}
 
 // Enhanced Professional Project Card Skeleton with animations
 const ProjectCardSkeleton = ({ index = 0 }: { index?: number }) => (
@@ -203,6 +221,8 @@ const Projects = () => {
   } = useUrlPagination({ defaultPageSize: 12 });
   const listFromState = listReturnState(location.pathname, location.search);
   const [projectToUndo, setProjectToUndo] = useState<Project | null>(null);
+  const [copyingProjectId, setCopyingProjectId] = useState<string | null>(null);
+  const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
 
   const userProjectMemberships = useMemo(() => {
     if (!currentUser || projects.length === 0) {
@@ -221,6 +241,126 @@ const Projects = () => {
     (projectId: string) =>
       currentUser?.role === "admin" || Boolean(userProjectMemberships[projectId]),
     [currentUser?.role, userProjectMemberships]
+  );
+
+  const handleCopyProject = useCallback(
+    async (project: Project) => {
+      if (copyingProjectId) return;
+      setCopyingProjectId(project.id);
+
+      try {
+        const developers = (project.members_detail || [])
+          .filter((m) => String(m.role || "").toLowerCase() === "developer")
+          .map((m) => m.username || m.email || "Developer");
+        const testers = (project.members_detail || [])
+          .filter((m) => String(m.role || "").toLowerCase() === "tester")
+          .map((m) => m.username || m.email || "Tester");
+
+        let totalBugs = projectBugsCount[project.id] ?? project.bug_stats?.total ?? 0;
+        let openBugs = projectOpenBugsCount[project.id] ?? project.bug_stats?.open ?? 0;
+        let fixedBugs =
+          projectFixedBugsCount[project.id] ?? project.bug_stats?.fixed ?? 0;
+        let updatesCount: number | null = project.update_stats?.total ?? null;
+        let avgRise: string | null = null;
+        let avgFix: string | null = null;
+
+        try {
+          const analytics = await projectService.getProjectAnalytics(project.id);
+          totalBugs = analytics.summary?.bugs ?? analytics.project.counts.bugs ?? totalBugs;
+          openBugs = analytics.summary?.open ?? analytics.project.counts.open ?? openBugs;
+          fixedBugs =
+            analytics.summary?.fixes ?? analytics.project.counts.fixes ?? fixedBugs;
+          updatesCount =
+            analytics.summary?.updates ?? analytics.project.counts.updates ?? updatesCount;
+          avgRise = analytics.summary?.avg_rise_duration_label || null;
+          avgFix = analytics.summary?.avg_fix_duration_label || null;
+        } catch {
+          // Card stats are enough if analytics endpoint is unavailable
+        }
+
+        const memberStats = projectMemberCounts[project.id];
+        const platforms = formatProjectPlatformsLabel(project.platforms);
+
+        const briefing = whatsappService.formatProjectShareMessage({
+          projectId: project.id,
+          projectName: project.name,
+          statusLabel: getProjectStatusLabel(project.status),
+          description: project.description,
+          clientName:
+            project.client?.corporate_name || project.client_name || null,
+          technologyStack: project.technology_stack,
+          platforms,
+          frontendDomain: project.frontend_domain,
+          backendDomain: project.backend_domain,
+          vercelDomain: project.vercel_domain,
+          appUrlIos: project.app_url_ios,
+          appUrlAndroid: project.app_url_android,
+          testflightUrl: project.testflight_url,
+          githubFrontend: project.github_frontend,
+          githubBackend: project.github_backend,
+          createdAtLabel: formatLocalDate(project.created_at, "date"),
+          sharedBy: currentUser?.username || null,
+          sharedByRole: currentUser?.role || null,
+          totalBugs,
+          openBugs,
+          fixedBugs,
+          updatesCount,
+          avgRiseDurationLabel: avgRise,
+          avgFixDurationLabel: avgFix,
+          developers,
+          testers,
+          developerCount: memberStats?.developers ?? developers.length,
+          testerCount: memberStats?.testers ?? testers.length,
+          complianceStage: project.compliance
+            ? getPipelineStageLabel(
+                project.compliance.pipeline_stage as CompliancePipelineStage
+              )
+            : null,
+        });
+
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(briefing);
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = briefing;
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        }
+
+        setCopiedProjectId(project.id);
+        window.setTimeout(() => {
+          setCopiedProjectId((current) =>
+            current === project.id ? null : current
+          );
+        }, 2000);
+
+        toast({
+          title: "Briefing copied",
+          description: "Project details are on your clipboard — paste anywhere.",
+        });
+      } catch (error) {
+        console.error("Failed to copy project briefing:", error);
+        toast({
+          title: "Copy failed",
+          description: "Could not copy the project briefing. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setCopyingProjectId(null);
+      }
+    },
+    [
+      copyingProjectId,
+      projectBugsCount,
+      projectOpenBugsCount,
+      projectFixedBugsCount,
+      projectMemberCounts,
+      currentUser,
+    ]
   );
 
   const developerOptions = useMemo(() => {
@@ -1352,9 +1492,7 @@ const Projects = () => {
                       asChild
                       variant="outline"
                       className={`h-11 w-full min-w-0 px-2 rounded-xl border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/40 text-slate-700 dark:text-slate-200 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ${
-                        currentUser?.role === "developer" || currentUser?.role === "tester"
-                          ? "col-span-2"
-                          : ""
+                        currentUser?.role === "developer" ? "col-span-2" : ""
                       }`}
                     >
                       <Link
@@ -1370,10 +1508,32 @@ const Projects = () => {
                       </Link>
                     </Button>
                     )}
+                    {(currentUser?.role === "admin" || currentUser?.role === "tester") &&
+                      canUseProjectActions && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 w-full min-w-0 px-2 rounded-xl border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                        title="Copy project briefing to clipboard"
+                        disabled={copyingProjectId === project.id}
+                        onClick={() => void handleCopyProject(project)}
+                      >
+                        {copyingProjectId === project.id ? (
+                          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                        ) : copiedProjectId === project.id ? (
+                          <Check className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <Copy className="h-4 w-4 shrink-0" />
+                        )}
+                        <span className="truncate text-xs sm:text-sm ml-1.5">
+                          {copiedProjectId === project.id ? "Copied" : "Copy"}
+                        </span>
+                      </Button>
+                    )}
                     {currentUser?.role === "admin" && (
                       <Button
                         variant="destructive"
-                        className="w-full h-11 shadow-sm hover:shadow-md transition-all duration-200"
+                        className="w-full h-11 shadow-sm hover:shadow-md transition-all duration-200 col-span-2"
                         title="You can only delete projects that have no team members or bugs"
                         onClick={() => {
                           setProjectToDelete(project.id);

@@ -138,61 +138,68 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Extract duration from audio files
+  // Prefer stored duration; probe metadata only for legacy rows without duration
   useEffect(() => {
-    const extractDurations = async () => {
-      const durations: { [key: string]: number } = {};
+    if (!bug.attachments) return;
 
-      if (bug.attachments) {
-        for (const attachment of bug.attachments) {
-          if (
-            attachment.file_type?.startsWith("audio/") ||
-            attachment.file_name?.match(/\.(wav|mp3|m4a|ogg|webm)$/i)
-          ) {
-            try {
-              // Use audio.php endpoint for proper CORS and content-type handling
-              const audioUrl = buildAudioUrl(attachment.file_path);
+    const seed: { [key: string]: number } = {};
+    for (const attachment of bug.attachments) {
+      const isAudio =
+        attachment.file_type?.startsWith("audio/") ||
+        !!attachment.file_name?.match(/\.(wav|mp3|m4a|ogg|webm)$/i);
+      if (!isAudio) continue;
 
-              const audio = new Audio();
-
-              audio.addEventListener("loadedmetadata", () => {
-                durations[attachment.id] = audio.duration;
-                setVoiceNoteDurations((prev) => ({
-                  ...prev,
-                  [attachment.id]: audio.duration,
-                }));
-              });
-
-              audio.addEventListener("error", (e) => {
-                console.warn(
-                  "⚠️ Could not load audio duration for:",
-                  attachment.file_name,
-                  e
-                );
-                durations[attachment.id] = 0;
-                setVoiceNoteDurations((prev) => ({
-                  ...prev,
-                  [attachment.id]: 0,
-                }));
-              });
-
-              // Set source and trigger load
-              audio.src = audioUrl;
-              audio.load();
-            } catch (error) {
-              console.warn("Error loading audio duration:", error);
-              durations[attachment.id] = 0;
-              setVoiceNoteDurations((prev) => ({
-                ...prev,
-                [attachment.id]: 0,
-              }));
-            }
-          }
-        }
+      const stored = attachment.duration;
+      if (typeof stored === "number" && Number.isFinite(stored) && stored > 0) {
+        seed[attachment.id] = stored;
       }
-    };
+    }
+    if (Object.keys(seed).length > 0) {
+      setVoiceNoteDurations((prev) => ({ ...prev, ...seed }));
+    }
 
-    extractDurations();
+    for (const attachment of bug.attachments) {
+      const isAudio =
+        attachment.file_type?.startsWith("audio/") ||
+        !!attachment.file_name?.match(/\.(wav|mp3|m4a|ogg|webm)$/i);
+      if (!isAudio) continue;
+
+      const stored = attachment.duration;
+      if (typeof stored === "number" && Number.isFinite(stored) && stored > 0) {
+        continue;
+      }
+
+      try {
+        const audioUrl = buildAudioUrl(attachment.file_path);
+        const audio = new Audio();
+
+        const applyIfFinite = () => {
+          if (Number.isFinite(audio.duration) && audio.duration > 0) {
+            setVoiceNoteDurations((prev) => ({
+              ...prev,
+              [attachment.id]: audio.duration,
+            }));
+          }
+        };
+
+        audio.addEventListener("loadedmetadata", applyIfFinite);
+        audio.addEventListener("durationchange", applyIfFinite);
+        audio.addEventListener("error", () => {
+          setVoiceNoteDurations((prev) => ({
+            ...prev,
+            [attachment.id]: prev[attachment.id] ?? 0,
+          }));
+        });
+
+        audio.src = audioUrl;
+        audio.load();
+      } catch {
+        setVoiceNoteDurations((prev) => ({
+          ...prev,
+          [attachment.id]: prev[attachment.id] ?? 0,
+        }));
+      }
+    }
   }, [bug.attachments]);
 
   const downloadAttachment = (attachment: {
@@ -514,7 +521,16 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
             <div className="space-y-3">
               {voiceNotes.map((attachment, index) => {
                 const audioUrl = buildAudioUrl(attachment.file_path);
-                const duration = voiceNoteDurations[attachment.id] || 0;
+                const duration =
+                  (typeof attachment.duration === "number" &&
+                  Number.isFinite(attachment.duration) &&
+                  attachment.duration > 0
+                    ? attachment.duration
+                    : null) ??
+                  (Number.isFinite(voiceNoteDurations[attachment.id]) &&
+                  voiceNoteDurations[attachment.id] > 0
+                    ? voiceNoteDurations[attachment.id]
+                    : 0);
                 const voiceId = `bug-voice-${attachment.id}`;
                 return (
                   <div

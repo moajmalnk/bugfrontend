@@ -110,6 +110,7 @@ interface Attachment {
   uploaded_by: string;
   full_url?: string;
   isPlaying?: boolean;
+  duration?: number | null;
 }
 
 const formSchema = z.object({
@@ -518,7 +519,7 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
       });
 
       // Add voice notes
-      voiceNotes.forEach((voiceNote) => {
+      voiceNotes.forEach((voiceNote, index) => {
         const fileExtension = voiceNote.blob.type.includes("webm")
           ? "webm"
           : voiceNote.blob.type.includes("mp4")
@@ -529,6 +530,12 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
           voiceNote.blob,
           `${voiceNote.name}.${fileExtension}`
         );
+        if (Number.isFinite(voiceNote.duration) && voiceNote.duration > 0) {
+          formData.append(
+            `voice_note_duration_${index}`,
+            String(voiceNote.duration)
+          );
+        }
       });
 
       // Add attachments to delete
@@ -1345,6 +1352,13 @@ const EditBugForm = ({ bug, onCancel, onSuccess }: EditBugFormProps) => {
                                   <WhatsAppVoiceMessage
                                     id={messageId}
                                     audioSource={audioSource}
+                                    duration={
+                                      typeof attachment.duration === "number" &&
+                                      Number.isFinite(attachment.duration) &&
+                                      attachment.duration > 0
+                                        ? attachment.duration
+                                        : 0
+                                    }
                                     accent="received"
                                     autoPlay
                                     isActive={activeVoiceId === messageId}

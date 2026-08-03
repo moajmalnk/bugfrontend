@@ -302,7 +302,12 @@ const NewBug = () => {
         // Append Blob directly (FormData.append accepts Blob as second parameter)
         // Cast to any to allow filename parameter (supported by browsers)
         (formData.append as any)(`voice_notes[]`, voiceNote.blob, fileName);
-        console.log(`Added voice note ${index + 1}: ${fileName}, Size: ${voiceNote.blob.size}, Type: ${voiceNote.blob.type}`);
+        if (Number.isFinite(voiceNote.duration) && voiceNote.duration > 0) {
+          formData.append(
+            `voice_note_duration_${index}`,
+            String(voiceNote.duration)
+          );
+        }
       });
 
       const response = await apiClient.post('/bugs/create.php', formData, {

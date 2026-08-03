@@ -99,8 +99,11 @@ apiClient.interceptors.response.use(
 
     const status = error.response?.status;
     const errData = error.response?.data as { error_code?: string } | undefined;
-    if (status === 403 && errData?.error_code === 'ACCOUNT_REVOKED') {
-      window.dispatchEvent(new CustomEvent('auth:revoked'));
+    if (
+      (status === 403 && errData?.error_code === "ACCOUNT_REVOKED") ||
+      (status === 401 && errData?.error_code === "SESSION_REVOKED")
+    ) {
+      window.dispatchEvent(new CustomEvent("auth:revoked"));
     }
     
     return Promise.reject(error);

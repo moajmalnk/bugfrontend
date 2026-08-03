@@ -26,16 +26,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { buildDocumentPreviewPagePath } from '@/lib/attachmentUtils';
 import { cn, getEffectiveRole } from '@/lib/utils';
+import { ProjectCategoryAssets, cnCategoryChip } from '@/components/projects/ProjectCategoryAssets';
 import {
   computeProjectDurationDays,
   formatProjectDate,
   getProjectStatusLabel,
+  PROJECT_CATEGORY_OPTIONS,
   PROJECT_PLATFORM_OPTIONS,
   Project,
   ProjectAttachment,
+  ProjectCategory,
   ProjectComplianceSummaryLite,
   ProjectFormValues,
   type ProjectPlatform,
+  type TaggedProjectFile,
 } from '@/lib/utils/projectUtils';
 import { User } from '@/types';
 import type { Client } from '@/types';
@@ -63,10 +67,6 @@ import {
 import { ChangeEvent, FormEvent, ReactNode, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-interface FileWithPreview extends File {
-  preview?: string;
-}
-
 interface ProjectFormProps {
   mode: 'create' | 'edit';
   values: ProjectFormValues;
@@ -79,8 +79,8 @@ interface ProjectFormProps {
   existingAttachments?: ProjectAttachment[];
   projectMeta?: Pick<Project, 'created_at' | 'created_by' | 'status' | 'start_date' | 'deadline_date'>;
   createdByName?: string;
-  attachmentFiles: FileWithPreview[];
-  onAttachmentFilesChange: (files: FileWithPreview[]) => void;
+  attachmentFiles: TaggedProjectFile[];
+  onAttachmentFilesChange: (files: TaggedProjectFile[]) => void;
   availableBugDocs?: Array<{
     id: number;
     title: string;
@@ -433,14 +433,30 @@ export function ProjectForm({
   };
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    const files = Array.from(e.target.files || []).map((file) => {
+      const tagged = file as TaggedProjectFile;
+      tagged.category = 'GENERAL';
+      return tagged;
+    });
     onAttachmentFilesChange([...attachmentFiles, ...files]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const removeNewFile = (index: number) => {
-    onAttachmentFilesChange(attachmentFiles.filter((_, i) => i !== index));
+  const toggleProjectCategory = (cat: ProjectCategory) => {
+    const current = values.project_categories || [];
+    const next = current.includes(cat)
+      ? current.filter((c) => c !== cat)
+      : [...current, cat];
+    onChange({ ...values, project_categories: next });
   };
+
+  const generalPendingFiles = attachmentFiles.filter((f) => f.category === 'GENERAL' || !f.category);
+  const typedExistingAttachments = (existingAttachments || []).filter(
+    (a) => a.category && a.category !== 'GENERAL'
+  );
+  const generalExistingAttachments = (existingAttachments || []).filter(
+    (a) => !a.category || a.category === 'GENERAL'
+  );
 
   const toggleExistingDoc = (docId: number) => {
     if (!onSelectedBugDocIdsChange) return;
@@ -586,6 +602,37 @@ export function ProjectForm({
                       {values.description.length}/{DESCRIPTION_MAX}
                     </span>
                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <FieldLabel
+                    dotClass="from-cyan-500 to-sky-600"
+                    hint="Select at least one delivery category"
+                  >
+                    Project Categories
+                  </FieldLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {PROJECT_CATEGORY_OPTIONS.map((opt) => {
+                      const selected = (values.project_categories || []).includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => toggleProjectCategory(opt.value)}
+                          title={opt.hint}
+                          className={cnCategoryChip(selected)}
+                        >
+                          {selected ? <Check className="h-4 w-4" /> : null}
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(values.project_categories || []).length === 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      Choose at least one category (WEB, PWA, APP, SEO, or CREATIVE).
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1151,25 +1198,42 @@ export function ProjectForm({
                 </SectionBlock>
               )}
 
+              {(values.project_categories || []).length > 0 && (
+                <SectionBlock
+                  title="Category assets"
+                  description="Type-specific metadata and file uploads for selected categories"
+                  icon={Layers}
+                  iconClass="bg-gradient-to-br from-cyan-500 to-blue-600"
+                >
+                  <ProjectCategoryAssets
+                    categories={values.project_categories || []}
+                    appMeta={values.app_publisher_meta || {}}
+                    onAppMetaChange={(meta) => setField('app_publisher_meta', meta)}
+                    assetLinks={values.category_asset_links || {}}
+                    onAssetLinksChange={(links) => setField('category_asset_links', links)}
+                    pendingFiles={attachmentFiles}
+                    onPendingFilesChange={onAttachmentFilesChange}
+                    existingAttachments={typedExistingAttachments}
+                  />
+                </SectionBlock>
+              )}
+
               <div className="space-y-4">
                 <FieldLabel
                   dotClass="from-indigo-500 to-purple-600"
-                  hint="Docs, screenshots, .env / config files, and other project assets"
+                  hint="Extra docs not tied to a category slot"
                 >
-                  Attachments (.env & docs)
+                  General attachments
                 </FieldLabel>
                 <div className="rounded-xl border border-indigo-200/60 dark:border-indigo-800/50 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/15 dark:to-purple-950/10 p-4 sm:p-5 space-y-4">
                   <p className="text-xs text-muted-foreground">
-                    Upload documentation, design files, and environment files such as{' '}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env</code>,{' '}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env.example</code>, or
-                    other config exports. Treat secrets carefully — prefer sanitized examples when
-                    possible.
+                    Optional miscellaneous files. Category-specific uploads (WEB .env, APP builds, etc.)
+                    belong in the sections above.
                   </p>
-                  {existingAttachments.length > 0 && (
+                  {generalExistingAttachments.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Existing attachments</p>
-                      {existingAttachments.map((att) => (
+                      {generalExistingAttachments.map((att) => (
                         <button
                           key={att.id}
                           type="button"
@@ -1207,12 +1271,12 @@ export function ProjectForm({
                     onClick={() => fileInputRef.current?.click()}
                     className="h-12 w-full sm:w-auto rounded-xl border-dashed border-2 hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20"
                   >
-                    <Paperclip className="mr-2 h-4 w-4" /> Choose .env, docs & files
+                    <Paperclip className="mr-2 h-4 w-4" /> Choose files
                   </Button>
 
-                  {attachmentFiles.length > 0 && (
+                  {generalPendingFiles.length > 0 && (
                     <div className="space-y-2">
-                      {attachmentFiles.map((file, index) => (
+                      {generalPendingFiles.map((file, index) => (
                         <div
                           key={`${file.name}-${index}`}
                           className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
@@ -1221,7 +1285,14 @@ export function ProjectForm({
                             <File className="h-4 w-4 shrink-0 text-indigo-500" />
                             {file.name}
                           </span>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => removeNewFile(index)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              onAttachmentFilesChange(attachmentFiles.filter((f) => f !== file))
+                            }
+                          >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
@@ -1252,7 +1323,12 @@ export function ProjectForm({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !values.name.trim() || !values.description.trim()}
+                  disabled={
+                    isSubmitting ||
+                    !values.name.trim() ||
+                    !values.description.trim() ||
+                    !(values.project_categories || []).length
+                  }
                   className="h-12 px-8 bg-gradient-to-r from-blue-600 to-emerald-700 hover:from-blue-700 hover:to-emerald-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   {isSubmitting ? (

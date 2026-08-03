@@ -78,7 +78,9 @@ function getNotificationCategory(notification: Notification): string {
   if (entityType === 'update' || type === 'update_created' || type === 'new_update') {
     return 'update';
   }
-  if (entityType === 'project' || type.includes('project')) return 'project';
+  if (entityType === 'project' || type === 'project_deadline_reminder' || type.includes('project')) {
+    return 'project';
+  }
   if (entityType === 'meet' || type === 'meet_created' || type === 'meeting_reminder') {
     return 'meet';
   }
@@ -313,6 +315,8 @@ export default function Notifications() {
       case 'meet_created':
       case 'meeting_reminder':
         return '📅';
+      case 'project_deadline_reminder':
+        return '⏰';
       case 'doc_created':
         return '📄';
       case 'project_created':
@@ -343,6 +347,7 @@ export default function Notifications() {
       case 'task_completed':
       case 'meet_created':
       case 'meeting_reminder':
+      case 'project_deadline_reminder':
       case 'doc_created':
       case 'project_created':
         return 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400';

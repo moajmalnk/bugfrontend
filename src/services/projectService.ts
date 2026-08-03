@@ -10,18 +10,9 @@ import {
   UpdateProjectData,
 } from '@/lib/utils/projectUtils';
 
-export type {
-  CreateProjectData,
-  Project,
-  ProjectAttachment,
-  ProjectFormValues,
-  ProjectMemberDetail,
-  ProjectMemberInput,
-  ProjectStatus,
-  UpdateProjectData,
-} from '@/lib/utils/projectUtils';
-
 export {
+  emptyAppPublisherMeta,
+  emptyCategoryAssetLinks,
   emptyProjectFormValues,
   formValuesToPayload,
   projectToFormValues,
@@ -29,7 +20,28 @@ export {
   computeProjectDurationDays,
   formatProjectDate,
   parseProjectPlatforms,
+  parseProjectCategories,
+  parseCategoryAssetLinks,
   PROJECT_PLATFORM_OPTIONS,
+  PROJECT_CATEGORY_OPTIONS,
+  serializeProjectCategories,
+  serializeCategoryAssetLinks,
+  validateWebCategoryFiles,
+} from '@/lib/utils/projectUtils';
+
+export type {
+  AppPublisherMeta,
+  CategoryAssetLinks,
+  CreateProjectData,
+  Project,
+  ProjectAttachment,
+  ProjectCategory,
+  ProjectFormValues,
+  ProjectMemberDetail,
+  ProjectMemberInput,
+  ProjectStatus,
+  TaggedProjectFile,
+  UpdateProjectData,
 } from '@/lib/utils/projectUtils';
 
 export type ProjectBugStats = {
@@ -262,12 +274,31 @@ class ProjectService {
     return [];
   }
 
-  async uploadAttachments(projectId: string, files: File[]): Promise<ProjectAttachment[]> {
+  async uploadAttachments(
+    projectId: string,
+    files: Array<
+      File & {
+        category?: string;
+        folder?: string;
+        relativePath?: string;
+        webkitRelativePath?: string;
+      }
+    >
+  ): Promise<ProjectAttachment[]> {
     if (files.length === 0) return [];
 
     const formData = new FormData();
     formData.append('project_id', projectId);
-    files.forEach((file) => formData.append('files[]', file));
+    files.forEach((file, index) => {
+      formData.append('files[]', file);
+      if (file.category) formData.append(`categories[${index}]`, file.category);
+      if (file.folder) formData.append(`folders[${index}]`, file.folder);
+      const rel =
+        file.relativePath ||
+        (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+        '';
+      if (rel) formData.append(`relative_paths[${index}]`, rel);
+    });
 
     const response = await apiClient.post<{ success: boolean; data: ProjectAttachment[] }>(
       '/projects/upload_attachment.php',

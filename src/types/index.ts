@@ -56,6 +56,8 @@ export type Bug = {
     created_at?: string;
     /** report | verification */
     upload_context?: string | null;
+    /** Voice note length in whole seconds */
+    duration?: number | null;
   }>;
   fixed_by?: string | null;
   fixed_by_name?: string | null;

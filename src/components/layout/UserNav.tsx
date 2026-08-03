@@ -1,5 +1,6 @@
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
+import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,19 +8,22 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { UserIcon, LogOut, Settings, User as UserAvatar, Shield, Mail } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { cn } from '@/lib/utils';
-import { VerifiedBlueTick, isFullFledgedUser } from '@/components/ui/VerifiedBlueTick';
+} from "@/components/ui/dropdown-menu";
+import { UserIcon, LogOut, Settings, User as UserAvatar, Shield, Mail } from "lucide-react";
+import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
+import { useState } from "react";
 
 export function UserNav() {
-  const { currentUser, logout } = useAuth();
+  const { currentUser } = useAuth();
   const role = currentUser?.role;
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   const defaultAvatar = "/logo.png";
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button 
@@ -121,7 +125,10 @@ export function UserNav() {
         
         {/* Logout */}
         <DropdownMenuItem 
-          onClick={logout}
+          onSelect={(e) => {
+            e.preventDefault();
+            setLogoutOpen(true);
+          }}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors duration-200 focus:bg-destructive/10 focus:text-destructive"
         >
           <LogOut className="h-4 w-4" />
@@ -129,5 +136,7 @@ export function UserNav() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <LogoutConfirmDialog open={logoutOpen} onOpenChange={setLogoutOpen} />
+    </>
   );
 }

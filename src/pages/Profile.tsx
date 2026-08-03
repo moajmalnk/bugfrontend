@@ -1,3 +1,4 @@
+import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -149,7 +150,7 @@ const RecentActivitySkeleton = () => (
 );
 
 export default function Profile() {
-  const { currentUser, logout, isLoading, updateCurrentUser } = useAuth();
+  const { currentUser, isLoading, updateCurrentUser } = useAuth();
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
   const [activitySearch, setActivitySearch] = useState("");
@@ -297,15 +298,9 @@ export default function Profile() {
   // Remove the problematic useEffect that was causing infinite requests
   // The user data is already available from AuthContext and doesn't need to be refetched
 
-  const handleLogout = useCallback(async () => {
-    setShowConfirm(false);
-    try {
-      await logout();
-      navigate("/login");
-    } catch (error) {
-      // console.error("Logout failed:", error);
-    }
-  }, [logout, navigate]);
+  const handleLogoutOpen = useCallback((open: boolean) => {
+    setShowConfirm(open);
+  }, []);
 
   const handleUserUpdate = (updatedUser) => {
     // // console.log("Updated user data received in handleUserUpdate:", updatedUser);
@@ -529,36 +524,7 @@ export default function Profile() {
         </div>
 
         {/* Logout Confirmation Modal */}
-      {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 transition-colors p-3 sm:p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-4 sm:p-6 w-[95vw] max-w-md mx-auto animate-fadeIn">
-            <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-gray-100 flex items-center gap-2">
-              <LogOut className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
-              Confirm Logout
-            </h2>
-            <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 dark:text-gray-300">
-              Are you sure you want to log out? You will need to sign in again
-              to access your account.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => setShowConfirm(false)}
-                className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleLogout}
-                className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base"
-              >
-                Yes, Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+        <LogoutConfirmDialog open={showConfirm} onOpenChange={handleLogoutOpen} />
 
         {/* Password Reset Confirmation Modal */}
         {showPasswordResetConfirm && (

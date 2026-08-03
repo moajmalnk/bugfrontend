@@ -3,6 +3,8 @@ export type ClientAccountStatus = 'active' | 'inactive';
 export type ProjectMemberRole = 'manager' | 'developer' | 'tester';
 /** Comma-separated in DB; use helpers below. */
 export type ProjectPlatform = 'web' | 'ios' | 'android';
+/** Delivery categories — multi-select, separate from device platforms. */
+export type ProjectCategory = 'WEB' | 'PWA' | 'APP' | 'SEO' | 'CREATIVE';
 
 import type { ClientSummary } from '@/types';
 
@@ -11,6 +13,42 @@ export const PROJECT_PLATFORM_OPTIONS: { value: ProjectPlatform; label: string }
   { value: 'ios', label: 'iOS App' },
   { value: 'android', label: 'Android App' },
 ];
+
+export const PROJECT_CATEGORY_OPTIONS: {
+  value: ProjectCategory;
+  label: string;
+  hint: string;
+}[] = [
+  { value: 'WEB', label: 'WEB', hint: 'Websites & web apps' },
+  { value: 'PWA', label: 'PWA', hint: 'Progressive web apps' },
+  { value: 'APP', label: 'APP', hint: 'Mobile / store apps' },
+  { value: 'SEO', label: 'SEO', hint: 'Search & content' },
+  { value: 'CREATIVE', label: 'CREATIVE', hint: 'Brand & design assets' },
+];
+
+export interface AppPublisherMeta {
+  account?: string;
+  company_name?: string;
+  mail_id?: string;
+  contact_number?: string;
+  duns_number?: string;
+  account_id?: string;
+  play_store_transaction_id?: string;
+  app_published_name?: string;
+  app_package_id?: string;
+}
+
+export const emptyAppPublisherMeta = (): AppPublisherMeta => ({
+  account: '',
+  company_name: '',
+  mail_id: '',
+  contact_number: '',
+  duns_number: '',
+  account_id: '',
+  play_store_transaction_id: '',
+  app_published_name: '',
+  app_package_id: '',
+});
 
 export function parseProjectPlatforms(value?: string | null): ProjectPlatform[] {
   if (!value?.trim()) return [];
@@ -23,6 +61,134 @@ export function parseProjectPlatforms(value?: string | null): ProjectPlatform[] 
 
 export function serializeProjectPlatforms(platforms: ProjectPlatform[]): string {
   return platforms.join(',');
+}
+
+export function parseProjectCategories(value?: string | null): ProjectCategory[] {
+  if (!value?.trim()) return [];
+  const allowed = new Set<ProjectCategory>(['WEB', 'PWA', 'APP', 'SEO', 'CREATIVE']);
+  return value
+    .split(',')
+    .map((s) => s.trim().toUpperCase())
+    .filter((s): s is ProjectCategory => allowed.has(s as ProjectCategory));
+}
+
+export function serializeProjectCategories(categories: ProjectCategory[]): string {
+  return categories.join(',');
+}
+
+export function parseAppPublisherMeta(value?: string | null): AppPublisherMeta {
+  const empty = emptyAppPublisherMeta();
+  if (!value?.trim()) return empty;
+  try {
+    const parsed = JSON.parse(value) as AppPublisherMeta;
+    return { ...empty, ...parsed };
+  } catch {
+    return empty;
+  }
+}
+
+export function serializeAppPublisherMeta(meta: AppPublisherMeta): string | undefined {
+  const cleaned: AppPublisherMeta = {};
+  (Object.keys(meta) as (keyof AppPublisherMeta)[]).forEach((key) => {
+    const v = String(meta[key] || '').trim();
+    if (v) cleaned[key] = v;
+  });
+  return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : undefined;
+}
+
+/** Drive / cloud folder URLs keyed by project category. */
+export type CategoryAssetLinks = Partial<Record<ProjectCategory, string>>;
+
+export function emptyCategoryAssetLinks(): CategoryAssetLinks {
+  return {};
+}
+
+export function parseCategoryAssetLinks(value?: string | null): CategoryAssetLinks {
+  if (!value?.trim()) return {};
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const out: CategoryAssetLinks = {};
+    (['WEB', 'PWA', 'APP', 'SEO', 'CREATIVE'] as ProjectCategory[]).forEach((cat) => {
+      const v = String(parsed[cat] || '').trim();
+      if (v) out[cat] = v;
+    });
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function serializeCategoryAssetLinks(links: CategoryAssetLinks): string | undefined {
+  const cleaned: CategoryAssetLinks = {};
+  (Object.keys(links) as ProjectCategory[]).forEach((key) => {
+    const v = String(links[key] || '').trim();
+    if (v) cleaned[key] = v;
+  });
+  return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : undefined;
+}
+
+export function hasValidAssetLink(url?: string | null): boolean {
+  const v = String(url || '').trim();
+  if (!v) return false;
+  try {
+    const u = new URL(v);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/** Pending upload with category/folder tags for type-specific assets. */
+export type TaggedProjectFile = File & {
+  preview?: string;
+  category?: ProjectCategory | 'GENERAL';
+  folder?: string;
+  slotKey?: string;
+};
+
+export function isEnvFileName(name: string): boolean {
+  const n = name.toLowerCase();
+  return n === '.env' || n.startsWith('.env.') || n.endsWith('.env');
+}
+
+export function isJsonFileName(name: string): boolean {
+  return name.toLowerCase().endsWith('.json');
+}
+
+export function isReadmeFileName(name: string): boolean {
+  const n = name.toLowerCase();
+  return n === 'readme' || n === 'readme.md' || n === 'readme.txt' || n.startsWith('readme.');
+}
+
+/** WEB category requires .env, .json, README files — or a Drive/cloud folder link. */
+export function validateWebCategoryFiles(
+  pending: Array<{ name: string; category?: string }>,
+  existing: Array<{ file_name: string; category?: string | null }>,
+  assetLinks?: CategoryAssetLinks
+): string | null {
+  if (hasValidAssetLink(assetLinks?.WEB)) {
+    return null;
+  }
+  const webPending = pending.filter(
+    (f) => !f.category || f.category === 'WEB' || f.category === 'GENERAL'
+  );
+  const webExisting = existing.filter(
+    (f) => !f.category || f.category === 'WEB' || f.category === 'GENERAL'
+  );
+  const names = [
+    ...webPending.map((f) => f.name),
+    ...webExisting.map((f) => f.file_name),
+  ];
+  if (!names.some(isEnvFileName)) {
+    return 'WEB projects require a .env file or a Drive folder link.';
+  }
+  if (!names.some(isJsonFileName)) {
+    return 'WEB projects require at least one .json file or a Drive folder link.';
+  }
+  if (!names.some(isReadmeFileName)) {
+    return 'WEB projects require a README file or a Drive folder link.';
+  }
+  return null;
 }
 
 export interface ProjectComplianceSummaryLite {
@@ -49,6 +215,8 @@ export interface ProjectAttachment {
   file_name: string;
   file_path: string;
   file_type?: string;
+  category?: string | null;
+  folder?: string | null;
   uploaded_by?: string;
   created_at?: string;
 }
@@ -94,6 +262,12 @@ export interface Project {
   vercel_domain?: string | null;
   /** Comma-separated: web,ios,android */
   platforms?: string | null;
+  /** Comma-separated: WEB,PWA,APP,SEO,CREATIVE */
+  project_categories?: string | null;
+  /** JSON string of AppPublisherMeta */
+  app_publisher_meta?: string | null;
+  /** JSON map of category → Drive/cloud folder URL */
+  category_asset_links?: string | null;
   app_url_ios?: string | null;
   app_url_android?: string | null;
   testflight_url?: string | null;
@@ -173,6 +347,9 @@ export interface CreateProjectData {
   backend_domain?: string;
   vercel_domain?: string;
   platforms?: string;
+  project_categories?: string;
+  app_publisher_meta?: string;
+  category_asset_links?: string;
   app_url_ios?: string;
   app_url_android?: string;
   testflight_url?: string;
@@ -208,6 +385,9 @@ export interface ProjectFormValues {
   backend_domain: string;
   vercel_domain: string;
   platforms: ProjectPlatform[];
+  project_categories: ProjectCategory[];
+  app_publisher_meta: AppPublisherMeta;
+  category_asset_links: CategoryAssetLinks;
   app_url_ios: string;
   app_url_android: string;
   testflight_url: string;
@@ -243,6 +423,9 @@ export const emptyProjectFormValues = (): ProjectFormValues => ({
   backend_domain: '',
   vercel_domain: '',
   platforms: [],
+  project_categories: [],
+  app_publisher_meta: emptyAppPublisherMeta(),
+  category_asset_links: emptyCategoryAssetLinks(),
   app_url_ios: '',
   app_url_android: '',
   testflight_url: '',
@@ -280,6 +463,9 @@ export function projectToFormValues(project: Project): ProjectFormValues {
     backend_domain: project.backend_domain || '',
     vercel_domain: project.vercel_domain || '',
     platforms: parseProjectPlatforms(project.platforms),
+    project_categories: parseProjectCategories(project.project_categories),
+    app_publisher_meta: parseAppPublisherMeta(project.app_publisher_meta),
+    category_asset_links: parseCategoryAssetLinks(project.category_asset_links),
     app_url_ios: project.app_url_ios || '',
     app_url_android: project.app_url_android || '',
     testflight_url: project.testflight_url || '',
@@ -328,6 +514,9 @@ export function formValuesToPayload(values: ProjectFormValues): CreateProjectDat
     backend_domain: values.backend_domain.trim() || undefined,
     vercel_domain: values.vercel_domain.trim() || undefined,
     platforms: serializeProjectPlatforms(values.platforms) || undefined,
+    project_categories: serializeProjectCategories(values.project_categories) || undefined,
+    app_publisher_meta: serializeAppPublisherMeta(values.app_publisher_meta),
+    category_asset_links: serializeCategoryAssetLinks(values.category_asset_links),
     app_url_ios: values.app_url_ios.trim() || undefined,
     app_url_android: values.app_url_android.trim() || undefined,
     testflight_url: values.testflight_url.trim() || undefined,

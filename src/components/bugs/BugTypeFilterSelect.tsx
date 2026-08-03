@@ -51,28 +51,30 @@ export function BugTypeFilterSelect({
   });
 
   return (
-    <div className={cn("flex items-center gap-2 min-w-0", className)}>
+    <div className={cn("flex items-center gap-2 min-w-0 w-full", className)}>
       <div className={cn("p-1.5 rounded-lg shrink-0", ACCENT[accent])}>
         <Tags className="h-4 w-4 text-white" />
       </div>
-      <Select value={value || "all"} onValueChange={onValueChange}>
-        <SelectTrigger
-          className={cn(
-            "w-full sm:w-[150px] md:w-[170px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300",
-            triggerClassName
-          )}
-        >
-          <SelectValue placeholder={isLoading ? "Loading…" : "Bug type"} />
-        </SelectTrigger>
-        <SelectContent position="popper" className="z-[60]">
-          <SelectItem value="all">All Types</SelectItem>
-          {types.map((type: BugType) => (
-            <SelectItem key={type.id} value={type.id}>
-              {type.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="min-w-0 flex-1">
+        <Select value={value || "all"} onValueChange={onValueChange}>
+          <SelectTrigger
+            className={cn(
+              "w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-0 data-[state=open]:ring-2 data-[state=open]:ring-blue-500/40",
+              triggerClassName
+            )}
+          >
+            <SelectValue placeholder={isLoading ? "Loading…" : "Bug type"} />
+          </SelectTrigger>
+          <SelectContent position="popper" className="z-[60]">
+            <SelectItem value="all">All Types</SelectItem>
+            {types.map((type: BugType) => (
+              <SelectItem key={type.id} value={type.id}>
+                {type.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 } from '@/lib/utils/projectUtils';
 import { useAuth } from '@/context/AuthContext';
 import {
+  BellRing,
   Building2,
   Calendar,
   ExternalLink,
@@ -28,6 +29,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { ProjectWorkActivityOverview } from '@/components/projects/ProjectWorkActivityOverview';
+import { ProjectDeadlineReminders } from '@/components/projects/ProjectDeadlineReminders';
 
 interface ProjectInfoOverviewProps {
   project: Project;
@@ -394,6 +396,12 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
           </div>
         </SectionShell>
       </div>
+
+      {role === 'admin' && (
+        <SectionShell title="Deadline reminders" icon={BellRing} accent="amber">
+          <ProjectDeadlineReminders projectId={project.id} isAdmin />
+        </SectionShell>
+      )}
 
       <SectionShell title="Reference Sites / Themes" icon={ExternalLink} accent="slate">
         {renderDescription(project.reference_sites_or_themes)}

@@ -16,6 +16,7 @@ import { AddUserDialog } from "@/components/users/AddUserDialog";
 import { ActiveTodayWorkSummary } from "@/components/users/ActiveTodayWorkSummary";
 import { UserAnalytics } from "@/components/users/UserAnalytics";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
+import { UsersTopLeaderboards } from "@/components/users/UsersTopLeaderboards";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
@@ -25,7 +26,7 @@ import { getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
 import { BarChart3, Bug, Code2, Shield, UserCheck, UserRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   useUrlPagination,
@@ -566,6 +567,26 @@ const Users = () => {
     setSearchParams,
   ]);
 
+  const leaderboardUsers = useMemo(() => {
+    const pool = (() => {
+      switch (activeTab) {
+        case "active":
+          return users.filter((u) => u.checked_in_today);
+        case "admins":
+          return users.filter((u) => u.role === "admin");
+        case "developers":
+          return users.filter((u) => u.role === "developer");
+        case "testers":
+          return users.filter((u) => u.role === "tester");
+        case "others":
+          return users.filter((u) => u.role_id && ![1, 2, 3].includes(u.role_id));
+        default:
+          return users;
+      }
+    })();
+    return pool.filter((u) => u.account_active !== 0);
+  }, [users, activeTab]);
+
   const totalFiltered = filteredUsers.length;
   const totalPages =
     totalFiltered > 0 ? Math.max(1, Math.ceil(totalFiltered / itemsPerPage)) : 1;
@@ -735,6 +756,14 @@ const Users = () => {
   function renderUsersContent() {
     return (
       <>
+        {!isLoading && leaderboardUsers.length > 0 ? (
+          <UsersTopLeaderboards
+            users={leaderboardUsers}
+            rolePath={effectiveRole}
+            listFromState={listFromState}
+          />
+        ) : null}
+
         {/* Professional Search and Filter Controls */}
         {!isLoading && (
         <div className="relative">

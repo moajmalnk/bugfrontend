@@ -27,6 +27,43 @@ interface WhatsAppContact {
   phone: string;
 }
 
+export interface ProjectWhatsAppShareData {
+  projectId: string;
+  projectName: string;
+  statusLabel?: string | null;
+  description?: string | null;
+  clientName?: string | null;
+  technologyStack?: string | null;
+  platforms?: string | null;
+  frontendDomain?: string | null;
+  backendDomain?: string | null;
+  vercelDomain?: string | null;
+  appUrlIos?: string | null;
+  appUrlAndroid?: string | null;
+  testflightUrl?: string | null;
+  githubFrontend?: string | null;
+  githubBackend?: string | null;
+  createdAtLabel?: string | null;
+  sharedBy?: string | null;
+  sharedByRole?: string | null;
+  /** Bug / work analytics */
+  totalBugs?: number | null;
+  openBugs?: number | null;
+  fixedBugs?: number | null;
+  updatesCount?: number | null;
+  avgRiseDurationLabel?: string | null;
+  avgFixDurationLabel?: string | null;
+  /** Team */
+  developers?: string[];
+  testers?: string[];
+  developerCount?: number | null;
+  testerCount?: number | null;
+  /** Compliance */
+  complianceStage?: string | null;
+  /** Extra note for developers receiving the message */
+  developerNote?: string | null;
+}
+
 class WhatsAppService {
   // Base URL for WhatsApp deep links
   private readonly WA_BASE_URL = 'https://wa.me';
@@ -37,6 +74,108 @@ class WhatsAppService {
     // For sharing, we want role-neutral URLs that work for all users
     // The route handler will redirect to the appropriate role-based URL
     return `${window.location.origin}${path}`;
+  }
+
+  private line(label: string, value?: string | number | null): string {
+    if (value === null || value === undefined) return "";
+    const text = String(value).trim();
+    if (!text) return "";
+    return `${label} ${text}\n`;
+  }
+
+  private formatList(items?: string[], empty = "None listed"): string {
+    const cleaned = (items || []).map((n) => n.trim()).filter(Boolean);
+    if (cleaned.length === 0) return empty;
+    return cleaned.map((n) => `• ${n}`).join("\n");
+  }
+
+  /** Rich project briefing for WhatsApp (oriented to developers). */
+  formatProjectShareMessage(data: ProjectWhatsAppShareData): string {
+    const projectUrl = this.getRoleBasedUrl(`/projects/${data.projectId}`);
+    const total = Number(data.totalBugs ?? 0);
+    const open = Number(data.openBugs ?? 0);
+    const fixed = Number(data.fixedBugs ?? 0);
+    const fixRate =
+      total > 0 ? `${Math.round((fixed / total) * 100)}%` : "N/A";
+
+    let message = `📁 *Project Briefing — BugRicer*\n\n`;
+    message += `*${data.projectName}*\n`;
+    message += this.line("📌 *Status:*", data.statusLabel);
+    message += this.line("🗓️ *Created:*", data.createdAtLabel);
+    message += this.line("🏢 *Client:*", data.clientName);
+
+    if (data.description?.trim()) {
+      const desc =
+        data.description.length > 280
+          ? `${data.description.slice(0, 280)}…`
+          : data.description.trim();
+      message += `\n📝 *Overview*\n${desc}\n`;
+    }
+
+    message += `\n📊 *Analytics*\n`;
+    message += `• Total bugs: *${total}*\n`;
+    message += `• Open / in progress: *${open}*\n`;
+    message += `• Fixed: *${fixed}*\n`;
+    message += `• Fix rate: *${fixRate}*\n`;
+    if (data.updatesCount != null) {
+      message += `• Updates published: *${data.updatesCount}*\n`;
+    }
+    if (data.avgRiseDurationLabel) {
+      message += `• Avg. time to raise: ${data.avgRiseDurationLabel}\n`;
+    }
+    if (data.avgFixDurationLabel) {
+      message += `• Avg. time to fix: ${data.avgFixDurationLabel}\n`;
+    }
+
+    message += `\n👥 *Team*\n`;
+    message += `Developers (${data.developerCount ?? data.developers?.length ?? 0}):\n`;
+    message += `${this.formatList(data.developers)}\n`;
+    message += `Testers (${data.testerCount ?? data.testers?.length ?? 0}):\n`;
+    message += `${this.formatList(data.testers)}\n`;
+
+    const techBits = [
+      data.technologyStack ? `• Stack: ${data.technologyStack}` : "",
+      data.platforms ? `• Platforms: ${data.platforms}` : "",
+      data.frontendDomain ? `• Frontend: ${data.frontendDomain}` : "",
+      data.backendDomain ? `• Backend: ${data.backendDomain}` : "",
+      data.vercelDomain ? `• Vercel: ${data.vercelDomain}` : "",
+      data.appUrlIos ? `• iOS: ${data.appUrlIos}` : "",
+      data.appUrlAndroid ? `• Android: ${data.appUrlAndroid}` : "",
+      data.testflightUrl ? `• TestFlight: ${data.testflightUrl}` : "",
+      data.githubFrontend ? `• GitHub (FE): ${data.githubFrontend}` : "",
+      data.githubBackend ? `• GitHub (BE): ${data.githubBackend}` : "",
+    ].filter(Boolean);
+
+    if (techBits.length > 0) {
+      message += `\n🛠️ *Technical details*\n${techBits.join("\n")}\n`;
+    }
+
+    if (data.complianceStage) {
+      message += `\n✅ *Compliance:* ${data.complianceStage}\n`;
+    }
+
+    message += `\n👨‍💻 *Note for developers*\n`;
+    message +=
+      data.developerNote?.trim() ||
+      "Please review open bugs, prioritize high-severity items, and update fix notes after each resolution. Confirm retest readiness in BugRicer when done.";
+
+    if (data.sharedBy) {
+      message += `\n\n👤 Shared by: ${data.sharedBy}`;
+      if (data.sharedByRole) message += ` (${data.sharedByRole})`;
+    }
+
+    message += `\n\n🔗 *Open project:* ${projectUrl}`;
+    message += `\n\n_Sent from BugRicer_`;
+
+    return message;
+  }
+
+  shareProject(data: ProjectWhatsAppShareData, phoneNumber?: string): void {
+    const link = this.createWhatsAppLink(
+      this.formatProjectShareMessage(data),
+      phoneNumber
+    );
+    this.openWhatsApp(link);
   }
 
   // Save frequently used contacts

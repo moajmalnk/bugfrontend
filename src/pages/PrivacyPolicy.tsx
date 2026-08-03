@@ -14,7 +14,11 @@ const PrivacyPolicy = () => {
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 outline-none"
+    >
       <div className="container mx-auto px-4 py-8 max-w-4xl pb-12">
         <div className="mb-8">
           <div className="flex items-center gap-3">
@@ -176,7 +180,7 @@ const PrivacyPolicy = () => {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

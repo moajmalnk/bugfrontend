@@ -57,18 +57,21 @@ const Bugs = () => {
     statusFilter: "all",
     projectFilter: "all",
     bugTypeFilter: "all",
+    raisedByFilter: "all",
   });
   const searchTerm = filters.searchTerm || "";
   const priorityFilter = filters.priorityFilter || "all";
   const statusFilter = filters.statusFilter || "all";
   const projectFilter = filters.projectFilter || "all";
   const bugTypeFilter = filters.bugTypeFilter || "all";
+  const raisedByFilter = filters.raisedByFilter || "all";
   
   const setSearchTerm = (value: string) => setFilter("searchTerm", value);
   const setPriorityFilter = (value: string) => setFilter("priorityFilter", value);
   const setStatusFilter = (value: string) => setFilter("statusFilter", value);
   const setProjectFilter = (value: string) => setFilter("projectFilter", value);
   const setBugTypeFilter = (value: string) => setFilter("bugTypeFilter", value);
+  const setRaisedByFilter = (value: string) => setFilter("raisedByFilter", value);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -105,6 +108,28 @@ const Bugs = () => {
     return projects.filter((p) => assignedProjectIds.has(String(p.id)));
   }, [projects, bugs, currentUser?.role]);
 
+  const uniqueRaisers = useMemo(() => {
+    const byId = new Map<string, string>();
+    bugs.forEach((bug) => {
+      const id = String(bug.reported_by || "").trim();
+      if (!id) return;
+      if (!byId.has(id)) {
+        byId.set(id, bug.reporter_name || bug.reported_by || "Unknown");
+      }
+    });
+    return Array.from(byId.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [bugs]);
+
+  const hasActiveFilters =
+    !!searchTerm ||
+    priorityFilter !== "all" ||
+    statusFilter !== "all" ||
+    projectFilter !== "all" ||
+    bugTypeFilter !== "all" ||
+    raisedByFilter !== "all";
+
   // If current selected project becomes invisible (e.g., role change or data refresh), reset it
   useEffect(() => {
     if (
@@ -114,6 +139,15 @@ const Bugs = () => {
       setFilter("projectFilter", "all");
     }
   }, [visibleProjects, projectFilter, setFilter]);
+
+  useEffect(() => {
+    if (
+      raisedByFilter !== "all" &&
+      !uniqueRaisers.some((r) => String(r.id) === String(raisedByFilter))
+    ) {
+      setRaisedByFilter("all");
+    }
+  }, [uniqueRaisers, raisedByFilter]);
 
   useEffect(() => {
     fetchBugs();
@@ -134,6 +168,7 @@ const Bugs = () => {
     statusFilter,
     projectFilter,
     bugTypeFilter,
+    raisedByFilter,
   ]);
 
   const fetchBugs = async (page = 1, limit = itemsPerPage) => {
@@ -232,6 +267,9 @@ const Bugs = () => {
       const matchesProject =
         projectFilter === "all" || bug.project_id === projectFilter;
       const matchesBugType = bugMatchesTypeFilter(bug.bug_types, bugTypeFilter);
+      const matchesRaisedBy =
+        raisedByFilter === "all" ||
+        String(bug.reported_by) === String(raisedByFilter);
       // Bugs page: only active work items (pending / in progress)
       const isActiveBug =
         bug.status === "pending" || bug.status === "in_progress";
@@ -241,6 +279,7 @@ const Bugs = () => {
         matchesStatus &&
         matchesProject &&
         matchesBugType &&
+        matchesRaisedBy &&
         isActiveBug
       );
     });
@@ -301,32 +340,148 @@ const Bugs = () => {
   const isDeveloper = currentUser?.role === "developer";
   const noBugs = !loading && filteredBugs.length === 0;
 
+  const filterTriggerClass =
+    "w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-orange-500/40 focus:ring-offset-0 data-[state=open]:ring-2 data-[state=open]:ring-orange-500/40";
+
+  const filterFieldClass = "flex items-center gap-2 min-w-0 w-full";
+
+  const searchFilterBar = !skeletonLoading && !loading ? (
+    <div className="relative w-full min-w-0">
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl pointer-events-none" />
+      <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
+        <div className="space-y-3 sm:space-y-4 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+              <Search className="h-4 w-4 text-white" />
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+              Search & Filter
+            </h3>
+          </div>
+
+          <div className="relative group w-full min-w-0">
+            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by title, description, or ID…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 min-w-0">
+            <div className={filterFieldClass}>
+              <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                <BugIcon className="h-4 w-4 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className={filterTriggerClass}>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[60]">
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className={filterFieldClass}>
+              <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
+                <FolderOpen className="h-4 w-4 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                  <SelectTrigger className={filterTriggerClass}>
+                    <SelectValue placeholder="Project" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[60]">
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {visibleProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <BugTypeFilterSelect
+              value={bugTypeFilter}
+              onValueChange={setBugTypeFilter}
+              className={filterFieldClass}
+              triggerClassName={filterTriggerClass}
+            />
+
+            <div className={filterFieldClass}>
+              <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
+                <User className="h-4 w-4 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <Select value={raisedByFilter} onValueChange={setRaisedByFilter}>
+                  <SelectTrigger className={filterTriggerClass}>
+                    <SelectValue placeholder="Raised by" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[60]">
+                    <SelectItem value="all">All Raisers</SelectItem>
+                    {uniqueRaisers.map((raiser) => (
+                      <SelectItem key={raiser.id} value={raiser.id}>
+                        {raiser.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {hasActiveFilters ? (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => clearFilters()}
+                className="h-10 sm:h-11 w-full sm:w-auto px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+              >
+                Clear filters
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8 overflow-x-hidden">
+      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
         {/* Professional Header */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-transparent to-red-50/50 dark:from-orange-950/20 dark:via-transparent dark:to-red-950/20"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-6 min-w-0">
               <div className="space-y-3 min-w-0 flex-1">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
-                    <BugIcon className="h-6 w-6 text-white" />
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg shrink-0">
+                    <BugIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
                       Bugs
                     </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-orange-500 to-red-600 rounded-full mt-2"></div>
+                    <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-orange-500 to-red-600 rounded-full mt-2"></div>
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl min-w-0 break-words">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl min-w-0 break-words">
                   Track pending bugs across your projects
                 </p>
               </div>
               
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0 w-full lg:w-auto">
                 {canReportBug(currentUser?.role) && (
                   <Link
                     to={
@@ -410,98 +565,8 @@ const Bugs = () => {
               </div>
             </div>
 
-            <TabsContent value={activeTab} className="space-y-6 sm:space-y-8">
-              {/* Always show search and filters when tabs are visible */}
-              {!skeletonLoading && !loading && (
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
-                  <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="p-1.5 bg-orange-500 rounded-lg">
-                          <Search className="h-4 w-4 text-white" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-                      </div>
-                      
-                      <div className="flex flex-col md:flex-row gap-4">
-                        {/* Search Bar */}
-                        <div className="flex-1 relative group">
-                          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
-                          <input
-                            type="text"
-                            placeholder="Search bugs by title, description, or bug ID..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                          />
-                        </div>
-
-                        {/* Filter Controls */}
-                        <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                        
-
-                          {/* Status Filter */}
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
-                              <BugIcon className="h-4 w-4 text-white" />
-                            </div>
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                              <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                                <SelectValue placeholder="Status" />
-                              </SelectTrigger>
-                              <SelectContent position="popper" className="z-[60]">
-                                <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="in_progress">In Progress</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {/* Project Filter */}
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                              <FolderOpen className="h-4 w-4 text-white" />
-                            </div>
-                            <Select value={projectFilter} onValueChange={setProjectFilter}>
-                              <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                                <SelectValue placeholder="Project" />
-                              </SelectTrigger>
-                              <SelectContent position="popper" className="z-[60]">
-                                <SelectItem value="all">All Projects</SelectItem>
-                                {visibleProjects.map((project) => (
-                                  <SelectItem key={project.id} value={project.id}>
-                                    {project.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <BugTypeFilterSelect
-                            value={bugTypeFilter}
-                            onValueChange={setBugTypeFilter}
-                          />
-
-                          {/* Clear Filters Button */}
-                          {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                clearFilters();
-                              }}
-                              className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                            >
-                              Clear
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <TabsContent value={activeTab} className="space-y-6 sm:space-y-8 min-w-0">
+              {searchFilterBar}
 
               {/* Professional Responsive Pagination Controls - Show when there are bugs */}
               {!skeletonLoading && !loading && filteredBugs.length > 0 && totalPages > 1 && (
@@ -527,8 +592,8 @@ const Bugs = () => {
                       </span>
                     </div>
                     <div className="flex items-center justify-center sm:justify-end gap-3">
-                      <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
-                        Items per page:
+                      <span className="text-xs sm:text-sm text-muted-foreground font-medium shrink-0">
+                        Per page
                       </span>
                       <ItemsPerPageSelect
                         id="items-per-page"
@@ -563,7 +628,7 @@ const Bugs = () => {
                           setCurrentPage((p) => Math.max(1, p - 1))
                         }
                         disabled={currentPage === 1}
-                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        className="h-9 sm:h-10 px-3 sm:px-4 min-w-[44px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md sm:hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                       >
                         <svg
                           className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
@@ -682,7 +747,7 @@ const Bugs = () => {
                           setCurrentPage((p) => Math.min(totalPages, p + 1))
                         }
                         disabled={currentPage === totalPages}
-                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        className="h-9 sm:h-10 px-3 sm:px-4 min-w-[44px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md sm:hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                       >
                         <span className="hidden sm:inline">Next</span>
                         <span className="sm:hidden text-lg">›</span>
@@ -732,8 +797,8 @@ const Bugs = () => {
                     </span>
                   </div>
                   <div className="flex items-center justify-center sm:justify-end gap-3">
-                    <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
-                      Items per page:
+                    <span className="text-xs sm:text-sm text-muted-foreground font-medium shrink-0">
+                      Per page
                     </span>
                     <ItemsPerPageSelect
                       id="items-per-page-simple"
@@ -758,7 +823,7 @@ const Bugs = () => {
                     </div>
                     <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Found</h3>
                     <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                      {searchTerm || projectFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all" || bugTypeFilter !== "all"
+                      {hasActiveFilters
                         ? "No bugs match your search criteria. Try adjusting your filters."
                         : currentUser?.role === "tester"
                         ? "You're not assigned to any bugs yet. When bugs are reported, they'll appear here."
@@ -780,96 +845,8 @@ const Bugs = () => {
             </TabsContent>
           </Tabs>
         ) : (
-          <div className="space-y-6 sm:space-y-8">
-            {/* Unified Search & Filter design for Developers (same as Admins/Testers) - always show */}
-            {!skeletonLoading && !loading && (
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-orange-50/30 dark:from-gray-800/30 dark:to-orange-900/30 rounded-2xl"></div>
-                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="p-1.5 bg-orange-500 rounded-lg">
-                        <Search className="h-4 w-4 text-white" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter</h3>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row gap-4">
-                      {/* Search Bar */}
-                      <div className="flex-1 relative group">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
-                        <input
-                          type="text"
-                          placeholder="Search bugs by title, description, or bug ID..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                        />
-                      </div>
-
-                      {/* Filter Controls (Status + Project to match Admin/Tester) */}
-                      <div className="flex flex-col sm:flex-row lg:flex-row gap-3">
-                        {/* Status Filter */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
-                            <BugIcon className="h-4 w-4 text-white" />
-                          </div>
-                          <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                              <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent position="popper" className="z-[60]">
-                              <SelectItem value="all">All Status</SelectItem>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="in_progress">In Progress</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Project Filter */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 bg-purple-500 rounded-lg shrink-0">
-                            <FolderOpen className="h-4 w-4 text-white" />
-                          </div>
-                          <Select value={projectFilter} onValueChange={setProjectFilter}>
-                            <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                              <SelectValue placeholder="Project" />
-                            </SelectTrigger>
-                            <SelectContent position="popper" className="z-[60]">
-                              <SelectItem value="all">All Projects</SelectItem>
-                              {visibleProjects.map((project) => (
-                                <SelectItem key={project.id} value={project.id}>
-                                  {project.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <BugTypeFilterSelect
-                          value={bugTypeFilter}
-                          onValueChange={setBugTypeFilter}
-                        />
-
-                        {/* Clear Filters Button */}
-                        {(searchTerm || priorityFilter !== "all" || statusFilter !== "all" || projectFilter !== "all" || bugTypeFilter !== "all") && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              clearFilters();
-                            }}
-                            className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-                          >
-                            Clear
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="space-y-6 sm:space-y-8 min-w-0">
+            {searchFilterBar}
             {/* Enhanced Professional Header for Developers */}
             {(isDeveloper || currentUser?.role === "tester" || currentUser?.role === "admin") && noBugs && (
               <div className="relative overflow-hidden">
@@ -880,7 +857,7 @@ const Bugs = () => {
                   </div>
                   <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3">No Bugs Found</h3>
                   <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                    {searchTerm || projectFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all" || bugTypeFilter !== "all"
+                    {hasActiveFilters
                       ? "No bugs match your search criteria. Try adjusting your filters."
                       : currentUser?.role === "tester"
                       ? "You're not assigned to any bugs yet. When bugs are reported, they'll appear here."
@@ -916,8 +893,8 @@ const Bugs = () => {
                       </span>
                     </div>
                     <div className="flex items-center justify-center sm:justify-end gap-3">
-                      <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
-                        Items per page:
+                      <span className="text-xs sm:text-sm text-muted-foreground font-medium shrink-0">
+                        Per page
                       </span>
                       <ItemsPerPageSelect
                         id="items-per-page-dev"
@@ -952,7 +929,7 @@ const Bugs = () => {
                           setCurrentPage((p) => Math.max(1, p - 1))
                         }
                         disabled={currentPage === 1}
-                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        className="h-9 sm:h-10 px-3 sm:px-4 min-w-[44px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md sm:hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                       >
                         <svg
                           className="w-4 h-4 mr-2 hidden sm:inline transition-transform duration-200 group-hover:-translate-x-0.5"
@@ -1071,7 +1048,7 @@ const Bugs = () => {
                           setCurrentPage((p) => Math.min(totalPages, p + 1))
                         }
                         disabled={currentPage === totalPages}
-                        className="h-10 px-4 min-w-[90px] font-medium transition-all duration-200 hover:shadow-md hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
+                        className="h-9 sm:h-10 px-3 sm:px-4 min-w-[44px] sm:min-w-[90px] font-medium transition-all duration-200 hover:shadow-md sm:hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 border-border/60 hover:border-primary/50 hover:bg-primary/5"
                       >
                         <span className="hidden sm:inline">Next</span>
                         <span className="sm:hidden text-lg">›</span>
@@ -1124,8 +1101,8 @@ const Bugs = () => {
                     </span>
                   </div>
                   <div className="flex items-center justify-center sm:justify-end gap-3">
-                    <span className="text-sm text-muted-foreground font-medium whitespace-nowrap">
-                      Items per page:
+                    <span className="text-xs sm:text-sm text-muted-foreground font-medium shrink-0">
+                      Per page
                     </span>
                     <ItemsPerPageSelect
                       id="items-per-page-dev-simple"

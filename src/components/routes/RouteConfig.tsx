@@ -1,23 +1,26 @@
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { GoogleOAuthGate } from "@/components/auth/GoogleOAuthGate";
 import { PageSkeleton } from "@/components/layout/MainLayoutSkeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
-import Login from "@/pages/Login";
 import Home from "@/pages/Home";
-import ResetPassword from "@/pages/ResetPassword";
-import NotFound from "@/pages/NotFound";
-import PrivacyPolicy from "@/pages/PrivacyPolicy";
-import TermsOfUse from "@/pages/TermsOfUse";
 import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useParams, useLocation } from "react-router-dom";
-import MeetLobby from "@/pages/MeetLobby";
-import MeetRoom from "@/pages/MeetRoom";
 import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
 import { getEffectiveRole } from "@/lib/utils";
 
 // Shared page skeleton (mirrors real page geometry — header, toolbar, stats, cards)
 const SkeletonFallback = () => <PageSkeleton />;
+
+const MeetLobby = lazy(() => import("@/pages/MeetLobby"));
+const MeetRoom = lazy(() => import("@/pages/MeetRoom"));
+// Why: keep / cold-load lean — Login alone is a large unused chunk on the landing page
+const Login = lazy(() => import("@/pages/Login"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
+const TermsOfUse = lazy(() => import("@/pages/TermsOfUse"));
 
 // New layout for role-based routes
 const ProtectedRoleLayout = () => (
@@ -254,10 +257,40 @@ const RouteConfig = () => {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/home" element={<Home />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-      <Route path="/terms-of-use" element={<TermsOfUse />} />
+      <Route
+        path="/login"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <GoogleOAuthGate>
+              <Login />
+            </GoogleOAuthGate>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <ResetPassword />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/privacy-policy"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <PrivacyPolicy />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/terms-of-use"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <TermsOfUse />
+          </Suspense>
+        }
+      />
 
       {/* Google Docs OAuth callback routes */}
       <Route
@@ -391,7 +424,14 @@ const RouteConfig = () => {
         </Route>
       )}
 
-      <Route path="*" element={<NotFound />} />
+      <Route
+        path="*"
+        element={
+          <Suspense fallback={<SkeletonFallback />}>
+            <NotFound />
+          </Suspense>
+        }
+      />
     </Routes>
   );
 };

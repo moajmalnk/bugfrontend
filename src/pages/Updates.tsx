@@ -28,8 +28,8 @@ import { useAuth } from "@/context/AuthContext";
 import { projectService } from "@/services/projectService";
 import { updateService } from "@/services/updateService";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Bell, Lock, Plus, Search, User, FolderOpen } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Bell, Lock, Plus, Search, User, FolderOpen, Filter, RotateCcw, Layers, CircleDot } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import { ListPagination } from "@/components/pagination/ListPagination";
@@ -42,6 +42,16 @@ import {
 } from "@/hooks/useUrlPagination";
 import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
+
+/** Stable defaults — avoid new object identity every render (breaks clearFilters memo). */
+const UPDATES_FILTER_DEFAULTS = {
+  searchTerm: "",
+  projectFilter: "all",
+  createdByFilter: "all",
+  statusFilter: "all",
+  priorityFilter: "all",
+  typeFilter: "all",
+};
 
 // Table row skeleton component for loading state
 const TableRowSkeleton = () => (
@@ -125,23 +135,66 @@ const Updates = () => {
     clampToTotalPages,
   } = useUrlPagination({ defaultPageSize: 10 });
 
-  const [filters, setFilter, clearFilters] = usePersistedFilters("updates", {
-    searchTerm: "",
-    projectFilter: "all",
-    createdByFilter: "all",
-  });
+  const [filters, setFilter, clearFilters] = usePersistedFilters(
+    "updates",
+    UPDATES_FILTER_DEFAULTS
+  );
   const searchTerm = filters.searchTerm || "";
   const projectFilter = filters.projectFilter || "all";
   const createdByFilter = filters.createdByFilter || "all";
+  const statusFilter = filters.statusFilter || "all";
+  const priorityFilter = filters.priorityFilter || "all";
+  const typeFilter = filters.typeFilter || "all";
 
-  const setSearchTerm = (value: string) => setFilter("searchTerm", value);
-  const setProjectFilter = (value: string) => setFilter("projectFilter", value);
-  const setCreatedByFilter = (value: string) => setFilter("createdByFilter", value);
+  // Draft for the input only — avoids remount/focus loss and URL churn on every keystroke
+  const [searchDraft, setSearchDraft] = useState(searchTerm);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (searchDraft !== searchTerm) {
+        setFilter("searchTerm", searchDraft);
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchDraft, searchTerm, setFilter]);
+
+  const setProjectFilter = useCallback(
+    (value: string) => setFilter("projectFilter", value),
+    [setFilter]
+  );
+  const setCreatedByFilter = useCallback(
+    (value: string) => setFilter("createdByFilter", value),
+    [setFilter]
+  );
+  const setStatusFilter = useCallback(
+    (value: string) => setFilter("statusFilter", value),
+    [setFilter]
+  );
+  const setPriorityFilter = useCallback(
+    (value: string) => setFilter("priorityFilter", value),
+    [setFilter]
+  );
+  const setTypeFilter = useCallback(
+    (value: string) => setFilter("typeFilter", value),
+    [setFilter]
+  );
+
+  const handleClearFilters = useCallback(() => {
+    setSearchDraft("");
+    clearFilters();
+  }, [clearFilters]);
 
   const hasActiveFilters =
-    Boolean(searchTerm.trim()) ||
+    Boolean(searchDraft.trim()) ||
     projectFilter !== "all" ||
-    createdByFilter !== "all";
+    createdByFilter !== "all" ||
+    statusFilter !== "all" ||
+    priorityFilter !== "all" ||
+    typeFilter !== "all";
+
+  const filterFieldClass = "flex items-center gap-2 min-w-0 w-full";
+  const filterTriggerClass =
+    "h-11 w-full min-w-0 rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm";
 
   // Fetch updates from backend
   const {
@@ -153,11 +206,15 @@ const Updates = () => {
     queryFn: () => updateService.getUpdates(),
   });
 
+  // Reset page on committed search (debounced), not every draft keystroke
   useResetUrlPageOnChange(setCurrentPage, [
     activeTab,
     searchTerm,
     projectFilter,
     createdByFilter,
+    statusFilter,
+    priorityFilter,
+    typeFilter,
   ]);
 
   // Fetch projects to determine if user can create new update
@@ -191,7 +248,8 @@ const Updates = () => {
         filtered = updates;
     }
 
-    const q = searchTerm.trim().toLowerCase();
+    // Filter with draft so results update while typing without waiting for debounce
+    const q = searchDraft.trim().toLowerCase();
     return filtered.filter((update) => {
       const matchesSearch =
         !q ||
@@ -217,16 +275,40 @@ const Updates = () => {
       const matchesCreatedBy =
         createdByFilter === "all" || creatorName === createdByFilter;
 
-      return matchesSearch && matchesProject && matchesCreatedBy;
+      const matchesStatus =
+        statusFilter === "all" ||
+        String(update.status || "").toLowerCase() === statusFilter;
+
+      const updatePriority = String(update.update_priority || "")
+        .toLowerCase()
+        .trim();
+      const matchesPriority =
+        priorityFilter === "all" || updatePriority === priorityFilter;
+
+      const matchesType =
+        typeFilter === "all" ||
+        String(update.type || "").toLowerCase() === typeFilter;
+
+      return (
+        matchesSearch &&
+        matchesProject &&
+        matchesCreatedBy &&
+        matchesStatus &&
+        matchesPriority &&
+        matchesType
+      );
     });
   }, [
     updates,
     activeTab,
     currentUser?.username,
     currentUser?.id,
-    searchTerm,
+    searchDraft,
     projectFilter,
     createdByFilter,
+    statusFilter,
+    priorityFilter,
+    typeFilter,
     projects,
   ]);
 
@@ -348,7 +430,7 @@ const Updates = () => {
                 : "There are no updates to display right now. Check back later or create a new one."}
           </p>
           {noMatches && (
-            <Button variant="outline" onClick={clearFilters}>
+            <Button variant="outline" onClick={handleClearFilters}>
               Clear filters
             </Button>
           )}
@@ -357,8 +439,10 @@ const Updates = () => {
     );
   };
 
-  // Updates Tabs Component
-  const UpdatesTabs = () => (
+  // IMPORTANT: This must be JSX, not a nested component.
+  // Declaring `const UpdatesTabs = () => (...)` remounts the tree on every
+  // keystroke and steals focus from the search input.
+  const updatesTabs = (
     <Tabs
       value={activeTab}
       onValueChange={(val) => {
@@ -419,33 +503,88 @@ const Updates = () => {
                 )}
               </div>
 
-              <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
-                <div className="flex-1 min-w-0 relative group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
-                  <input
-                    type="search"
-                    placeholder="Search by title, description, project, or creator..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-11 pr-4 py-2.5 h-11 border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm font-medium"
-                    autoComplete="off"
-                    aria-label="Search updates"
-                  />
+              <div className="relative group w-full min-w-0">
+                <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search by title, description, project, or creator..."
+                  value={searchDraft}
+                  onChange={(e) => setSearchDraft(e.target.value)}
+                  className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                  autoComplete="off"
+                  aria-label="Search updates"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 min-w-0">
+                <div className={filterFieldClass}>
+                  <div className="p-1.5 bg-blue-500 rounded-lg shrink-0" aria-hidden>
+                    <CircleDot className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className={filterTriggerClass}>
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[100]" searchPlaceholder="Search status...">
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="declined">Declined</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-                  <div className="flex items-center gap-2 min-w-0 sm:min-w-[200px]">
-                    <div className="p-1.5 bg-orange-500 rounded-lg shrink-0" aria-hidden>
-                      <FolderOpen className="h-4 w-4 text-white" />
-                    </div>
-                    <Select
-                      value={projectFilter}
-                      onValueChange={setProjectFilter}
-                    >
-                      <SelectTrigger className="w-full h-11 rounded-xl">
-                        <SelectValue placeholder="All Projects" />
+                <div className={filterFieldClass}>
+                  <div className="p-1.5 bg-orange-500 rounded-lg shrink-0" aria-hidden>
+                    <Filter className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                      <SelectTrigger className={filterTriggerClass}>
+                        <SelectValue placeholder="Priority" />
                       </SelectTrigger>
-                      <SelectContent position="popper" className="z-[100]">
+                      <SelectContent position="popper" className="z-[100]" searchPlaceholder="Search priorities...">
+                        <SelectItem value="all">All Priorities</SelectItem>
+                        <SelectItem value="high">High Priority</SelectItem>
+                        <SelectItem value="medium">Medium Priority</SelectItem>
+                        <SelectItem value="low">Low Priority</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className={filterFieldClass}>
+                  <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0" aria-hidden>
+                    <Layers className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                      <SelectTrigger className={filterTriggerClass}>
+                        <SelectValue placeholder="Type" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[100]" searchPlaceholder="Search types...">
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="feature">Feature</SelectItem>
+                        <SelectItem value="updation">Updation</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className={filterFieldClass}>
+                  <div className="p-1.5 bg-amber-500 rounded-lg shrink-0" aria-hidden>
+                    <FolderOpen className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Select value={projectFilter} onValueChange={setProjectFilter}>
+                      <SelectTrigger className={filterTriggerClass}>
+                        <SelectValue placeholder="Project" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-[100]" searchPlaceholder="Search projects...">
                         <SelectItem value="all">All Projects</SelectItem>
                         {visibleProjects.map((project) => (
                           <SelectItem key={project.id} value={project.id}>
@@ -455,19 +594,18 @@ const Updates = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
 
-                  <div className="flex items-center gap-2 min-w-0 sm:min-w-[200px]">
-                    <div className="p-1.5 bg-purple-500 rounded-lg shrink-0" aria-hidden>
-                      <User className="h-4 w-4 text-white" />
-                    </div>
-                    <Select
-                      value={createdByFilter}
-                      onValueChange={setCreatedByFilter}
-                    >
-                      <SelectTrigger className="w-full h-11 rounded-xl">
-                        <SelectValue placeholder="All Creators" />
+                <div className={filterFieldClass}>
+                  <div className="p-1.5 bg-purple-500 rounded-lg shrink-0" aria-hidden>
+                    <User className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+                      <SelectTrigger className={filterTriggerClass}>
+                        <SelectValue placeholder="Created by" />
                       </SelectTrigger>
-                      <SelectContent position="popper" className="z-[100]">
+                      <SelectContent position="popper" className="z-[100]" searchPlaceholder="Search creators...">
                         <SelectItem value="all">All Creators</SelectItem>
                         {uniqueCreators.map((creator) => (
                           <SelectItem key={creator} value={creator}>
@@ -477,17 +615,19 @@ const Updates = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
 
-                  {hasActiveFilters && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearFilters}
-                      className="h-11 px-4 rounded-xl"
-                    >
-                      Clear filters
-                    </Button>
-                  )}
+                <div className={filterFieldClass}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!hasActiveFilters}
+                    onClick={handleClearFilters}
+                    className="h-11 w-full min-w-0 rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all duration-300 font-medium disabled:opacity-50"
+                  >
+                    <RotateCcw className="h-4 w-4 shrink-0 mr-1.5" />
+                    <span className="truncate">Clear filters</span>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -795,7 +935,7 @@ const Updates = () => {
         )}
 
         {!isLoading ? (
-          <UpdatesTabs />
+          updatesTabs
         ) : (
           <div className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-green-50/30 to-emerald-50/50 dark:from-blue-950/20 dark:via-green-950/10 dark:to-emerald-950/20 rounded-2xl"></div>

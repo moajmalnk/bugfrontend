@@ -37,7 +37,8 @@ interface ApiResponse<T> {
   message?: string;
 }
 
-const DEFAULT_FIX_DESCRIPTION = "Fixed, Can U check Now";
+const DEFAULT_FIX_DESCRIPTION =
+  "The issue has been fixed. Please retest and confirm at your convenience.";
 const BUG_STALE_TIME = 5 * 60 * 1000;
 
 const FixBug = () => {

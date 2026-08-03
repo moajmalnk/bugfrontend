@@ -1010,7 +1010,11 @@ const Login = () => {
   `;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative outline-none"
+    >
       {/* Subtle background pattern */}
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.05)_1px,transparent_0)] dark:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)] [background-size:20px_20px] pointer-events-none z-0" />
       
@@ -1920,7 +1924,7 @@ const Login = () => {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 };
 

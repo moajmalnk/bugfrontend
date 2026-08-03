@@ -52,6 +52,7 @@ import { bugService } from "@/services/bugService";
 import { projectService } from "@/services/projectService";
 import { updateService, type Update } from "@/services/updateService";
 import { userService } from "@/services/userService";
+import { RecentDeadlineRemindersPanel } from "@/components/dashboard/RecentDeadlineRemindersPanel";
 import { Bug, User } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -2710,6 +2711,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                <RecentDeadlineRemindersPanel role={role} />
+
                 <div className="space-y-4">
                   <SectionTitle
                     icon={Rocket}
@@ -2934,6 +2937,8 @@ export default function AdminDashboard() {
                     />
                   </div>
                 </div>
+
+                <RecentDeadlineRemindersPanel role={role} />
 
                 <div className="space-y-4">
                   <SectionTitle

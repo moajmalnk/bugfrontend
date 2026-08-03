@@ -19,12 +19,14 @@ interface AuthContextType {
   isLoading: boolean;
   login: (identifier: string, password: string) => Promise<boolean>;
   loginWithToken: (user: User, token: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (scope?: LogoutScope) => Promise<void>;
   register: (data: RegisterData) => Promise<boolean>;
   updateCurrentUser: (user: User) => void;
   storeIntendedDestination: (path: string) => void;
   exitImpersonateMode: () => void;
 }
+
+export type LogoutScope = "this_device" | "all_devices";
 
 interface RegisterData {
   username: string;
@@ -69,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     toast({
       title: "Session ended",
       description:
-        "Your account is no longer active or was removed by an administrator.",
+        "Your account is no longer active, was signed out everywhere, or was removed by an administrator.",
       variant: "destructive",
     });
   }, [navigate]);
@@ -359,8 +361,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = async () => {
-    // End activity session tracking on logout
+  const logout = async (scope: LogoutScope = "this_device") => {
+    // End activity session tracking / optionally revoke all JWT sessions
     const token = sessionStorage.getItem("token") || localStorage.getItem("token");
     if (token && currentUser) {
       try {
@@ -370,7 +372,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ user_id: currentUser.id }),
+          body: JSON.stringify({
+            user_id: currentUser.id,
+            scope,
+          }),
         });
       } catch (error) {
         // Don't fail logout if session tracking fails
@@ -379,7 +384,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-    
+
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
     localStorage.removeItem("intendedDestination");

@@ -1,24 +1,64 @@
 # Robots.txt for BugRicer - Bug Tracking Platform
 # https://bugs.bugricer.com
 
-# Allow all search engines to crawl the site
 User-agent: *
 Allow: /
+Allow: /home
+Allow: /login
+Allow: /privacy-policy
+Allow: /terms-of-use
+Allow: /manifest.json
+Allow: /robots.txt
+Allow: /sitemap.xml
+Allow: /llms.txt
 
-# Specific directives for major search engines
+# Auth-gated app and sensitive paths
+Disallow: /api/
+Disallow: /admin/
+Disallow: /tester/
+Disallow: /developer/
+Disallow: /project_manager/
+Disallow: /client/
+Disallow: /meet
+Disallow: /reset-password
+Disallow: /docs-setup-success
+Disallow: /docs-setup-error
+Disallow: /private/
+Disallow: /uploads/
+Disallow: /node_modules/
+
+# Major search engines
 User-agent: Googlebot
 Allow: /
-Crawl-delay: 1
+Allow: /home
+Allow: /login
+Allow: /privacy-policy
+Allow: /terms-of-use
+Disallow: /api/
+Disallow: /admin/
+Disallow: /tester/
+Disallow: /developer/
+Disallow: /project_manager/
+Disallow: /client/
+Disallow: /meet
+Disallow: /reset-password
 
 User-agent: Bingbot
 Allow: /
-Crawl-delay: 1
+Allow: /home
+Allow: /login
+Allow: /privacy-policy
+Allow: /terms-of-use
+Disallow: /api/
+Disallow: /admin/
+Disallow: /tester/
+Disallow: /developer/
+Disallow: /project_manager/
+Disallow: /client/
+Disallow: /meet
+Disallow: /reset-password
 
-User-agent: Slurp
-Allow: /
-Crawl-delay: 1
-
-# Social media crawlers
+# Social media crawlers (OG previews on public pages)
 User-agent: Twitterbot
 Allow: /
 
@@ -31,24 +71,5 @@ Allow: /
 User-agent: WhatsApp
 Allow: /
 
-# Block access to sensitive areas
-Disallow: /api/
-Disallow: /admin/
-Disallow: /private/
-Disallow: /uploads/
-Disallow: /_next/
-Disallow: /node_modules/
-Disallow: /*.json$
-Disallow: /*.xml$
-Disallow: /*.txt$
-
-# Allow important files
-Allow: /manifest.json
-Allow: /robots.txt
-Allow: /sitemap.xml
-
-# Sitemap location
 Sitemap: https://bugs.bugricer.com/sitemap.xml
-
-# Host directive
 Host: bugs.bugricer.com

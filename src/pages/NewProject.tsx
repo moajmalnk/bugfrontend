@@ -8,6 +8,8 @@ import {
   emptyProjectFormValues,
   formValuesToPayload,
   projectService,
+  validateWebCategoryFiles,
+  type TaggedProjectFile,
 } from '@/services/projectService';
 import { userService } from '@/services/userService';
 import { clientService } from '@/services/clientService';
@@ -16,15 +18,11 @@ import { ArrowLeft, FolderKanban, Plus } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-interface FileWithPreview extends File {
-  preview?: string;
-}
-
 const NewProject = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [values, setValues] = useState(emptyProjectFormValues());
-  const [attachmentFiles, setAttachmentFiles] = useState<FileWithPreview[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<TaggedProjectFile[]>([]);
   const [selectedBugDocIds, setSelectedBugDocIds] = useState<number[]>([]);
   const [selectedBugSheetIds, setSelectedBugSheetIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,8 +68,34 @@ const NewProject = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
+
+    if (!(values.project_categories || []).length) {
+      toast({
+        title: 'Categories required',
+        description: 'Select at least one project category.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if ((values.project_categories || []).includes('WEB')) {
+      const webError = validateWebCategoryFiles(
+        attachmentFiles,
+        [],
+        values.category_asset_links
+      );
+      if (webError) {
+        toast({
+          title: 'WEB files required',
+          description: webError,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
 
     try {
       const payload = formValuesToPayload(values);
