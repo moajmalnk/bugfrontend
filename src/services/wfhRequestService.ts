@@ -12,6 +12,7 @@ export type WfhRequest = {
   user_note?: string | null;
   admin_note?: string | null;
   reviewed_by?: string | null;
+  reviewed_by_username?: string | null;
   reviewed_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -21,6 +22,15 @@ export type PendingWfhRequestsPayload = {
   today: string;
   pending: WfhRequest[];
   pending_count: number;
+};
+
+export type UserWfhRequestsPayload = {
+  today: string;
+  user_id: string;
+  requests: WfhRequest[];
+  rejected: WfhRequest[];
+  request_count: number;
+  rejected_count: number;
 };
 
 function authHeaders(): HeadersInit {
@@ -46,6 +56,22 @@ export async function listPendingWfhRequests(): Promise<PendingWfhRequestsPayloa
   const res = await fetch(`${API}?${params}`, { headers: authHeaders() });
   const data = await parseJson(res);
   return data.data as PendingWfhRequestsPayload;
+}
+
+export async function listUserWfhRequests(
+  userId: string,
+  status?: 'pending' | 'approved' | 'rejected' | 'all'
+): Promise<UserWfhRequestsPayload> {
+  const params = new URLSearchParams({
+    user_id: userId,
+    history: '1',
+  });
+  if (status && status !== 'all') {
+    params.set('status', status);
+  }
+  const res = await fetch(`${API}?${params}`, { headers: authHeaders() });
+  const data = await parseJson(res);
+  return data.data as UserWfhRequestsPayload;
 }
 
 export async function requestWfhForToday(payload?: {

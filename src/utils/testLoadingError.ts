@@ -24,7 +24,7 @@ export function setGlobalLoadingErrorModal(modal: LoadingErrorModalControls) {
  * Only works in development mode
  */
 export function triggerLoadingErrorModal() {
-  if (process.env.NODE_ENV === 'development' && globalLoadingErrorModal) {
+  if (import.meta.env.DEV && globalLoadingErrorModal) {
     globalLoadingErrorModal.showModal();
     console.log('Loading error modal triggered for testing');
   } else {
@@ -37,7 +37,7 @@ export function triggerLoadingErrorModal() {
  * Only works in development mode
  */
 export function simulateChunkLoadingError() {
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     // Simulate a chunk loading error
     const error = new Error('Loading chunk 123 failed');
     error.name = 'ChunkLoadError';
@@ -58,7 +58,7 @@ export function simulateChunkLoadingError() {
 }
 
 // Make functions available globally in development for easy testing
-if (process.env.NODE_ENV === 'development') {
+if (import.meta.env.DEV) {
   const testWindow = window as LoadingErrorTestWindow;
   testWindow.triggerLoadingErrorModal = triggerLoadingErrorModal;
   testWindow.simulateChunkLoadingError = simulateChunkLoadingError;

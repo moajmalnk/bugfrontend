@@ -115,7 +115,7 @@ class BugricerServiceWorkerManager implements ServiceWorkerManager {
     try {
       if (this.registration?.active) {
         const response = await this.sendMessage({ type: 'CLEAR_CACHE' });
-        return response.success;
+        return Boolean(response.success);
       }
 
       // Fallback: Clear caches directly
@@ -303,7 +303,7 @@ export const serviceWorkerManager = new BugricerServiceWorkerManager();
  */
 export async function initializeServiceWorker(): Promise<void> {
   // Only register in production or when explicitly enabled
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = import.meta.env.PROD;
   const forceEnable = localStorage.getItem('sw-force-enable') === 'true';
   
   if (!isProduction && !forceEnable) {
@@ -340,7 +340,7 @@ export async function initializeServiceWorker(): Promise<void> {
  * Development helper to clear all caches
  */
 export async function clearAllCaches(): Promise<void> {
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     await serviceWorkerManager.clearCache();
     // console.log('[SW Manager] Development cache cleared');
   }

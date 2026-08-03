@@ -13,7 +13,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2, LocateFixed } from 'lucide-react';
+import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2, LocateFixed, RefreshCw } from 'lucide-react';
 import { projectService, Project } from '@/services/projectService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -31,6 +31,8 @@ import {
   queryGeolocationPermission,
   resolveOfficeConfig,
   type CheckInPosition,
+  type GeolocationPermissionState,
+  type OfficeLocationErrorCode,
 } from '@/lib/officeLocation';
 import { ENV } from '@/lib/env';
 import {
@@ -48,6 +50,8 @@ import {
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T } | T;
 
 const DAILY_WORK_DRAFT_VERSION = 1;
+/** Why: Bump when project stat meaning changes (open bugs / approved updates). */
+const PROJECT_STATS_CACHE_VERSION = 2;
 
 function dailyWorkDraftStorageKey(userId: string | number, date: string) {
   return `bugRicer:dailyWorkDraft:v${DAILY_WORK_DRAFT_VERSION}:${userId}:${date}`;
@@ -272,6 +276,9 @@ export function DailyWorkFlowPanel({
   const [workMode, setWorkMode] = useState<WorkMode | null>(null);
   const [officeGeoStatus, setOfficeGeoStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [officeGeoMessage, setOfficeGeoMessage] = useState<string | null>(null);
+  const [officeGeoErrorCode, setOfficeGeoErrorCode] = useState<OfficeLocationErrorCode | null>(null);
+  const [officeGeoPermission, setOfficeGeoPermission] =
+    useState<GeolocationPermissionState>('unknown');
   const [officePosition, setOfficePosition] = useState<CheckInPosition | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
@@ -295,7 +302,10 @@ export function DailyWorkFlowPanel({
   const [wfhRequestNote, setWfhRequestNote] = useState('');
   const [wfhRequestSubmitting, setWfhRequestSubmitting] = useState(false);
   const projectsCacheRef = useRef<{ at: number; items: Project[] } | null>(null);
-  const projectStatsCacheRef = useRef<Record<string, { bugs: number; updates: number }>>({});
+  const projectStatsCacheRef = useRef<{
+    version: number;
+    entries: Record<string, { bugs: number; updates: number }>;
+  }>({ version: PROJECT_STATS_CACHE_VERSION, entries: {} });
   const didAutoOpenEditRef = useRef(false);
   const didAutoOpenFlowRef = useRef<string | null>(null);
 
@@ -321,6 +331,11 @@ export function DailyWorkFlowPanel({
   const canRequestWfh = Boolean(attendanceGate?.can_request_wfh);
   const wfhRequestPending = wfhRequestStatus === 'pending';
   const showRequestWfhAction = workModeLockedToOffice && !allowWfhToday;
+  /** Why: When Office geo fails, always offer an admin WFH request escape hatch. */
+  const showGeoAdminWfhRequest =
+    !allowWfhToday &&
+    wfhRequestStatus !== 'approved' &&
+    (canRequestWfh || showRequestWfhAction || !workModeLockedToOffice);
   const forgiveLateToday = Boolean(attendanceGate?.forgive_late_today);
   const lateCount = attendanceGate?.late_count ?? 0;
   const lateLimit = attendanceGate?.late_limit ?? 3;
@@ -351,33 +366,40 @@ export function DailyWorkFlowPanel({
   const clearOfficeGeoState = useCallback(() => {
     setOfficeGeoStatus('idle');
     setOfficeGeoMessage(null);
+    setOfficeGeoErrorCode(null);
+    setOfficeGeoPermission('unknown');
     setOfficePosition(null);
   }, []);
 
   const verifyOfficeLocation = useCallback(async () => {
     setOfficeGeoStatus('checking');
     setOfficePosition(null);
+    setOfficeGeoErrorCode(null);
 
     const permission = await queryGeolocationPermission();
+    setOfficeGeoPermission(permission);
     if (permission === 'denied') {
       setOfficeGeoMessage(
-        'Location is blocked for this site. Tap the lock icon in the address bar → Site settings → Location → Allow, then tap Allow location again.'
+        'Location is blocked for this site. Open the lock icon in the address bar → Site settings → Location → Allow, then try again.'
       );
     } else if (permission === 'prompt') {
-      setOfficeGeoMessage('Waiting for location access… Allow location when your browser asks.');
+      setOfficeGeoMessage('Waiting for location access… Choose Allow when your browser asks.');
     } else {
-      setOfficeGeoMessage('Getting your location…');
+      setOfficeGeoMessage('Checking your distance from the office…');
     }
 
     try {
       const pos = await getCheckInPosition(officeGeoConfig);
       setOfficePosition(pos);
       setOfficeGeoStatus('ok');
+      setOfficeGeoErrorCode(null);
+      setOfficeGeoPermission('granted');
       setOfficeGeoMessage(
-        `At ${officeGeoConfig.label} (~${Math.round(pos.distanceM)} m)`
+        `Verified near ${officeGeoConfig.label} (~${Math.round(pos.distanceM)} m)`
       );
       return pos;
     } catch (e) {
+      const code = e instanceof OfficeLocationError ? e.code : 'unavailable';
       const msg =
         e instanceof OfficeLocationError
           ? e.message
@@ -386,6 +408,12 @@ export function DailyWorkFlowPanel({
             : 'Could not verify office location.';
       setOfficePosition(null);
       setOfficeGeoStatus('error');
+      setOfficeGeoErrorCode(code);
+      if (code === 'denied') {
+        setOfficeGeoPermission('denied');
+      } else if (permission === 'granted' || code === 'out_of_range') {
+        setOfficeGeoPermission('granted');
+      }
       setOfficeGeoMessage(msg);
       throw e instanceof Error ? e : new Error(msg);
     }
@@ -399,6 +427,35 @@ export function DailyWorkFlowPanel({
       // status/message already set by verifyOfficeLocation
     }
   }, [verifyOfficeLocation]);
+
+  const officeLocationAction = useMemo(() => {
+    if (officeGeoErrorCode === 'out_of_range' || officeGeoPermission === 'granted') {
+      return {
+        label: 'Check location again',
+        icon: RefreshCw,
+        hint: null as string | null,
+      };
+    }
+    if (officeGeoErrorCode === 'denied' || officeGeoPermission === 'denied') {
+      return {
+        label: 'Enable location',
+        icon: LocateFixed,
+        hint: 'Location permission is off for this site. Enable it in the address-bar lock menu, then try again.',
+      };
+    }
+    if (officeGeoErrorCode === 'timeout' || officeGeoErrorCode === 'unavailable') {
+      return {
+        label: 'Try again',
+        icon: RefreshCw,
+        hint: null as string | null,
+      };
+    }
+    return {
+      label: 'Share location',
+      icon: LocateFixed,
+      hint: null as string | null,
+    };
+  }, [officeGeoErrorCode, officeGeoPermission]);
 
   const selectWorkMode = useCallback(
     async (mode: WorkMode) => {
@@ -419,9 +476,15 @@ export function DailyWorkFlowPanel({
   );
 
   const openWfhRequestDialog = useCallback(() => {
-    setWfhRequestNote(attendanceGate?.wfh_request?.user_note ?? '');
+    const existing = attendanceGate?.wfh_request?.user_note ?? '';
+    setWfhRequestNote(
+      existing ||
+        (officeGeoStatus === 'error'
+          ? 'Unable to check in at office location — requesting WFH for today.'
+          : '')
+    );
     setWfhRequestDialogOpen(true);
-  }, [attendanceGate?.wfh_request?.user_note]);
+  }, [attendanceGate?.wfh_request?.user_note, officeGeoStatus]);
 
   const closeWfhRequestDialog = useCallback(() => {
     if (wfhRequestSubmitting) return;
@@ -432,43 +495,74 @@ export function DailyWorkFlowPanel({
   const submitWfhRequest = useCallback(async () => {
     if (wfhRequestSubmitting) return;
     setWfhRequestSubmitting(true);
+
+    const note = wfhRequestNote.trim().slice(0, 255) || undefined;
+
+    // Why: Close immediately so "Sending…" never feels stuck while the API finishes.
+    setWfhRequestDialogOpen(false);
+    setWfhRequestNote('');
+    setAttendanceGate((prev) =>
+      prev
+        ? {
+            ...prev,
+            wfh_request_status: 'pending',
+            can_request_wfh: false,
+            wfh_request: {
+              ...(prev.wfh_request ?? {}),
+              status: 'pending',
+              user_note: note ?? prev.wfh_request?.user_note ?? null,
+              request_date: serverToday,
+            },
+          }
+        : prev
+    );
+    toast({
+      title: 'WFH request sent',
+      description: 'Waiting for admin approval.',
+    });
+
     try {
       const result = await requestWfhForToday({
         date: serverToday,
-        user_note: wfhRequestNote.trim().slice(0, 255) || undefined,
+        user_note: note,
       });
-      if (currentUser?.id) {
-        try {
-          const status = await getAttendanceStatus(String(currentUser.id), serverToday);
-          setAttendanceGate(status);
-        } catch {
-          // non-fatal; optimistic pending
-          setAttendanceGate((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  wfh_request_status: 'pending',
-                  can_request_wfh: false,
-                  wfh_request: result.request
-                    ? {
-                        id: result.request.id,
-                        status: result.request.status,
-                        user_note: result.request.user_note,
-                        request_date: result.request.request_date,
-                      }
-                    : prev.wfh_request,
-                }
-              : prev
-          );
-        }
-      }
-      setWfhRequestDialogOpen(false);
-      setWfhRequestNote('');
-      toast({
-        title: 'WFH request sent',
-        description: result.message || 'Waiting for admin approval.',
+      const policy = result.policy as Record<string, unknown> | undefined;
+      setAttendanceGate((prev) => {
+        if (!prev) return prev;
+        const fromPolicy =
+          policy && typeof policy === 'object'
+            ? {
+                wfh_request_status: String(policy.wfh_request_status ?? 'pending'),
+                can_request_wfh: Boolean(policy.can_request_wfh),
+                allow_wfh_today: Boolean(policy.allow_wfh_today ?? prev.allow_wfh_today),
+              }
+            : {
+                wfh_request_status: 'pending' as const,
+                can_request_wfh: false,
+              };
+        return {
+          ...prev,
+          ...fromPolicy,
+          wfh_request: result.request
+            ? {
+                id: result.request.id,
+                status: result.request.status,
+                user_note: result.request.user_note,
+                request_date: result.request.request_date,
+              }
+            : prev.wfh_request,
+        };
       });
     } catch (e) {
+      setAttendanceGate((prev) =>
+        prev
+          ? {
+              ...prev,
+              wfh_request_status: prev.wfh_request?.status === 'pending' ? 'none' : prev.wfh_request_status,
+              can_request_wfh: true,
+            }
+          : prev
+      );
       toast({
         title: 'Could not request WFH',
         description: e instanceof Error ? e.message : 'Please try again.',
@@ -477,12 +571,7 @@ export function DailyWorkFlowPanel({
     } finally {
       setWfhRequestSubmitting(false);
     }
-  }, [
-    wfhRequestSubmitting,
-    serverToday,
-    wfhRequestNote,
-    currentUser?.id,
-  ]);
+  }, [wfhRequestSubmitting, serverToday, wfhRequestNote]);
 
 
   useEffect(() => {
@@ -521,7 +610,7 @@ export function DailyWorkFlowPanel({
       ? projects.filter((project) => project.name.toLowerCase().includes(query))
       : [...projects];
 
-    // Active first, then highest bug count, then updates, then name.
+    // Active first, then most open bugs, then most approved updates, then name.
     const statusRank = (status?: string | null) => {
       const s = String(status || 'active').toLowerCase();
       if (s === 'active' || s === '') return 0;
@@ -530,7 +619,7 @@ export function DailyWorkFlowPanel({
       return 3;
     };
 
-    return list.sort((a, b) => {
+    return [...list].sort((a, b) => {
       const rankDiff = statusRank(a.status) - statusRank(b.status);
       if (rankDiff !== 0) return rankDiff;
 
@@ -601,28 +690,44 @@ export function DailyWorkFlowPanel({
     setLoadingProjectStats(true);
     try {
       const selectedSet = new Set(selectedProjects);
-      // UX optimization: compute stats for selected projects and first visible chunk only.
+      // Why: Sort needs open-bug / approved-update counts for the full list, not only the first chunk.
       const prioritized = projectList.filter((p) => selectedSet.has(p.id));
-      const remainder = projectList.filter((p) => !selectedSet.has(p.id)).slice(0, 8);
+      const remainder = projectList.filter((p) => !selectedSet.has(p.id));
       const targetProjects = [...prioritized, ...remainder];
 
+      if (projectStatsCacheRef.current.version !== PROJECT_STATS_CACHE_VERSION) {
+        projectStatsCacheRef.current = {
+          version: PROJECT_STATS_CACHE_VERSION,
+          entries: {},
+        };
+      }
+      const cacheEntries = projectStatsCacheRef.current.entries;
+
       const statResults = await mapWithConcurrency(targetProjects, 4, async (project) => {
-        if (projectStatsCacheRef.current[project.id]) {
+        if (cacheEntries[project.id]) {
           return {
             projectId: project.id,
-            bugs: projectStatsCacheRef.current[project.id].bugs,
-            updates: projectStatsCacheRef.current[project.id].updates,
+            bugs: cacheEntries[project.id].bugs,
+            updates: cacheEntries[project.id].updates,
           };
         }
         try {
           const [bugResponse, updates] = await Promise.all([
-            bugService.getBugs({ projectId: project.id, page: 1, limit: 1 }),
+            bugService.getBugs({
+              projectId: project.id,
+              page: 1,
+              limit: 1,
+              status: 'pending,in_progress',
+            }),
             updateService.getUpdatesByProject(project.id),
           ]);
+          const approvedUpdates = Array.isArray(updates)
+            ? updates.filter((u) => String(u.status || '').toLowerCase() === 'approved').length
+            : 0;
           return {
             projectId: project.id,
             bugs: Number(bugResponse?.pagination?.totalBugs ?? bugResponse?.bugs?.length ?? 0),
-            updates: Array.isArray(updates) ? updates.length : 0,
+            updates: approvedUpdates,
           };
         } catch {
           return {
@@ -637,7 +742,10 @@ export function DailyWorkFlowPanel({
       statResults.forEach((result) => {
         nextStats[result.projectId] = { bugs: result.bugs, updates: result.updates };
       });
-      projectStatsCacheRef.current = { ...projectStatsCacheRef.current, ...nextStats };
+      projectStatsCacheRef.current = {
+        version: PROJECT_STATS_CACHE_VERSION,
+        entries: { ...cacheEntries, ...nextStats },
+      };
       setProjectStats((prev) => ({ ...prev, ...nextStats }));
     } finally {
       setLoadingProjectStats(false);
@@ -1280,8 +1388,11 @@ export function DailyWorkFlowPanel({
         const cached = projectsCacheRef.current;
         if (cached && now - cached.at < 5 * 60 * 1000) {
           setProjects(cached.items);
-          if (Object.keys(projectStatsCacheRef.current).length > 0) {
-            setProjectStats(projectStatsCacheRef.current);
+          if (
+            projectStatsCacheRef.current.version === PROJECT_STATS_CACHE_VERSION &&
+            Object.keys(projectStatsCacheRef.current.entries).length > 0
+          ) {
+            setProjectStats(projectStatsCacheRef.current.entries);
           } else {
             // Non-blocking stats warmup
             void fetchProjectStats(cached.items);
@@ -2089,7 +2200,7 @@ export function DailyWorkFlowPanel({
         }
         closeCheckInDialog();
       }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 [&>button[data-radix-dialog-close]]:hidden">
+        <DialogContent className="flex max-h-[92vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden p-0 [&>button[data-radix-dialog-close]]:hidden">
           {/* Header with gradient background */}
           <div className="relative bg-gradient-to-br from-emerald-500 via-blue-600 to-indigo-600 p-6 text-white overflow-visible">
             <div className="absolute inset-0 bg-black/10"></div>
@@ -2265,36 +2376,61 @@ export function DailyWorkFlowPanel({
                         `Office check-in requires your location within ${officeGeoConfig.radiusM} m of ${officeGeoConfig.label}.`}
                     </p>
                     {officeGeoStatus === 'error' ? (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={isCheckingIn}
-                          onClick={() => void retryOfficeLocation()}
-                          className="h-9 rounded-xl border-rose-300/80 bg-background/90 px-3 text-xs font-semibold text-rose-900 hover:bg-rose-100 dark:border-rose-700/60 dark:text-rose-100 dark:hover:bg-rose-950/60"
-                        >
-                          <LocateFixed className="h-3.5 w-3.5 mr-1.5" />
-                          Allow location
-                        </Button>
-                        {canRequestWfh ? (
+                      <div className="space-y-2">
+                        {officeLocationAction.hint ? (
+                          <p className="text-[11px] opacity-80 leading-relaxed">
+                            {officeLocationAction.hint}
+                          </p>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            disabled={isCheckingIn || wfhRequestSubmitting}
-                            onClick={openWfhRequestDialog}
-                            className="h-9 rounded-xl border-emerald-300/80 bg-background/90 px-3 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700/60 dark:text-emerald-100 dark:hover:bg-emerald-950/60"
+                            disabled={isCheckingIn}
+                            onClick={() => void retryOfficeLocation()}
+                            className="h-9 rounded-xl border-rose-300/80 bg-background/90 px-3 text-xs font-semibold text-rose-900 hover:bg-rose-100 dark:border-rose-700/60 dark:text-rose-100 dark:hover:bg-rose-950/60"
                           >
-                            <Home className="h-3.5 w-3.5 mr-1.5" />
-                            Request WFH for today
+                            {officeLocationAction.icon === LocateFixed ? (
+                              <LocateFixed className="h-3.5 w-3.5 mr-1.5" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                            )}
+                            {officeLocationAction.label}
                           </Button>
-                        ) : null}
+                          {wfhRequestPending ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled
+                              className="h-9 rounded-xl border-amber-300/80 bg-background/90 px-3 text-xs font-semibold text-amber-900 dark:border-amber-700/60 dark:text-amber-100"
+                            >
+                              <Home className="h-3.5 w-3.5 mr-1.5" />
+                              WFH request pending
+                            </Button>
+                          ) : showGeoAdminWfhRequest ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isCheckingIn || wfhRequestSubmitting}
+                              onClick={openWfhRequestDialog}
+                              className="h-9 rounded-xl border-emerald-300/80 bg-background/90 px-3 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700/60 dark:text-emerald-100 dark:hover:bg-emerald-950/60"
+                            >
+                              <Home className="h-3.5 w-3.5 mr-1.5" />
+                              Request WFH for today
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
                     ) : null}
-                    {officeGeoStatus === 'checking' ? (
+                    {officeGeoStatus === 'checking' &&
+                    (officeGeoPermission === 'prompt' || officeGeoPermission === 'denied') ? (
                       <p className="text-[11px] opacity-80">
-                        Look for the browser location prompt and choose Allow.
+                        {officeGeoPermission === 'denied'
+                          ? 'Enable Location in the site settings menu, then try again.'
+                          : 'Look for the browser location prompt and choose Allow.'}
                       </p>
                     ) : null}
                   </div>
@@ -2384,10 +2520,10 @@ export function DailyWorkFlowPanel({
                             </label>
                             <div className="flex items-center gap-2">
                               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                                {loadingProjectStats ? '...' : (projectStats[project.id]?.bugs ?? 0)} bugs
+                                {loadingProjectStats ? '...' : (projectStats[project.id]?.bugs ?? 0)} open
                               </span>
                               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                                {loadingProjectStats ? '...' : (projectStats[project.id]?.updates ?? 0)} updates
+                                {loadingProjectStats ? '...' : (projectStats[project.id]?.updates ?? 0)} approved
                               </span>
                             </div>
                           </div>

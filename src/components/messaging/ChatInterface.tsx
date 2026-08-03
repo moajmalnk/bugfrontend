@@ -257,7 +257,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingStartedAtRef = useRef<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sidebarBumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -936,10 +936,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const handleMediaUploadSuccess = async (mediaData: SendChatMessagePayload) => {
     try {
-      const sentMessage = MessagingService.mergeMediaMessage(
-        await MessagingService.sendMessage(mediaData),
-        mediaData
-      );
+      const fromApi = await MessagingService.sendMessage(mediaData);
+      const sentMessage = MessagingService.mergeMediaMessage(fromApi, {
+        message_type: mediaData.message_type,
+        content: mediaData.content,
+        media_type: mediaData.media_type,
+        media_file_path: mediaData.media_file_path,
+        media_file_name: mediaData.media_file_name,
+        media_file_size: mediaData.media_file_size,
+        media_thumbnail: mediaData.media_thumbnail ?? undefined,
+      });
       shouldAutoScrollRef.current = true;
       setMessages((prev) => [...prev, sentMessage]);
       updateSidebarPreview(sentMessage);

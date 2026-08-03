@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ENV } from "@/lib/env";
+import type { MediaType, MessageType } from "@/types";
 import {
   FileText,
   Image as ImageIcon,
@@ -23,7 +24,16 @@ import React, { useRef, useState } from "react";
 
 interface MediaUploaderProps {
   groupId: string;
-  onUploadSuccess: (messageData: any) => void;
+  onUploadSuccess: (messageData: {
+    group_id: string;
+    message_type: MessageType;
+    content?: string;
+    media_type: MediaType;
+    media_file_path: string;
+    media_file_name: string;
+    media_file_size: number;
+    media_thumbnail?: string | null;
+  }) => void;
 }
 
 export const MediaUploader: React.FC<MediaUploaderProps> = ({
@@ -132,7 +142,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       }
 
       // Determine message type based on file type
-      let messageType = "document";
+      let messageType: MediaType = "document";
       if (selectedFile.type.startsWith("image/")) {
         messageType = "image";
       } else if (selectedFile.type.startsWith("video/")) {
@@ -144,7 +154,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       // Send message with media
       const messageData = {
         group_id: groupId,
-        message_type: messageType,
+        message_type: messageType as MessageType,
         content: caption || undefined,
         media_type: messageType,
         media_file_path: uploadResponse.data.file_url,

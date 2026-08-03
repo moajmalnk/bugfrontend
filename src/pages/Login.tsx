@@ -21,7 +21,6 @@ import {
   BugIcon, 
   Key, 
   Mail, 
-  User, 
   Eye, 
   EyeOff, 
   Loader2, 
@@ -32,6 +31,7 @@ import {
   Zap,
   Lock,
   FileText,
+  User,
   X
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -39,16 +39,15 @@ import { useNavigate } from "react-router-dom";
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { GOOGLE_OAUTH_CONFIG } from '@/config/google-oauth-config';
 import { GoogleSignInButton } from '@/components/GoogleSignInButton';
-import { clearGoogleOAuthCache, handleGoogleOAuthError } from '@/utils/googleOAuthUtils';
-import type { User } from "@/types";
-
+import { clearGoogleOAuthCache, handleGoogleOAuthError } from '@/utils/googleOAuthUtils'; 
+import { User as UserType } from "@/types";
 type LoginMethod = "username" | "email" | "otp" | "forgot" | "magic";
 
 type AuthApiResponse = {
   success: boolean;
   message?: string;
   token?: string;
-  user?: User;
+  user?: UserType;
 };
 
 const Login = () => {
@@ -89,7 +88,7 @@ const Login = () => {
 
   // OTP countdown timer
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (otpCountdown > 0) {
       interval = setInterval(() => {
         setOtpCountdown((prev) => {
@@ -101,7 +100,7 @@ const Login = () => {
         });
       }, 1000);
     }
-    return () => clearInterval(interval);
+    return () => interval && clearInterval(interval);
   }, [otpCountdown]);
 
   useEffect(() => {
@@ -281,7 +280,7 @@ const Login = () => {
     try {
       await assertDeviceClockMatchesServer('sign in');
       let success = false;
-      let user: User | null = null;
+      let user: UserType | null = null;
 
       switch (loginMethod) {
         case "username":

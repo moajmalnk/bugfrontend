@@ -6,8 +6,10 @@ import {
     ChatMessage,
     EmojiReaction,
     GroupSettings,
+    MediaType,
     MessageReaction,
     MessageResponse,
+    MessageType,
     PinnedMessage,
     TypingIndicator
 } from '@/types';
@@ -89,9 +91,9 @@ export class MessagingService {
   static mergeMediaMessage(
     fromApi: ChatMessage,
     payload: {
-      message_type?: ChatMessage['message_type'];
+      message_type?: MessageType;
       content?: string;
-      media_type?: ChatMessage['media_type'];
+      media_type?: MediaType;
       media_file_path?: string;
       media_file_name?: string;
       media_file_size?: number;
@@ -178,12 +180,12 @@ export class MessagingService {
   // Messages
   static async sendMessage(data: {
     group_id: string;
-    message_type: 'text' | 'voice' | 'reply' | 'image' | 'video' | 'document' | 'audio';
+    message_type: MessageType;
     content?: string;
     voice_file_path?: string;
     voice_duration?: number;
     reply_to_message_id?: string;
-    media_type?: string;
+    media_type?: MediaType;
     media_file_path?: string;
     media_file_name?: string;
     media_file_size?: number;

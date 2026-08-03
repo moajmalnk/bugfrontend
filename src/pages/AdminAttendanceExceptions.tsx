@@ -54,6 +54,7 @@ import {
 } from '@/services/attendanceExceptionService';
 import {
   listPendingWfhRequests,
+  listUserWfhRequests,
   reviewWfhRequest,
   type WfhRequest,
 } from '@/services/wfhRequestService';
@@ -84,6 +85,37 @@ function formatCheckIn(value?: string | null) {
     });
   } catch {
     return value;
+  }
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return null;
+  try {
+    return new Date(
+      value.includes('T') ? value : value.replace(' ', 'T')
+    ).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata',
+    });
+  } catch {
+    return value;
+  }
+}
+
+function wfhStatusBadgeClass(status: string): string {
+  switch (String(status).toLowerCase()) {
+    case 'pending':
+      return 'bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800';
+    case 'approved':
+      return 'bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800';
+    case 'rejected':
+      return 'bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-800';
+    default:
+      return 'bg-muted text-muted-foreground border-border';
   }
 }
 
@@ -163,6 +195,7 @@ export default function AdminAttendanceExceptions() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailExceptions, setDetailExceptions] = useState<AttendanceDayException[]>([]);
   const [detailLates, setDetailLates] = useState<LateDayRow[]>([]);
+  const [detailWfhRequests, setDetailWfhRequests] = useState<WfhRequest[]>([]);
 
   const [grantUserId, setGrantUserId] = useState('');
   const [exceptionDates, setExceptionDates] = useState<string[]>([todayYMD()]);
@@ -213,7 +246,10 @@ export default function AdminAttendanceExceptions() {
       if (!userId) return;
       if (!opts?.silent) setDetailLoading(true);
       try {
-        const payload = await listAttendanceExceptions(userId);
+        const [payload, wfhHistory] = await Promise.all([
+          listAttendanceExceptions(userId),
+          listUserWfhRequests(userId).catch(() => null),
+        ]);
         const username =
           users.find((u) => String(u.id) === userId)?.username ||
           data?.exceptions?.find((e) => String(e.user_id) === userId)?.username ||
@@ -232,6 +268,15 @@ export default function AdminAttendanceExceptions() {
             username: username ?? row.username,
           }))
         );
+        setDetailWfhRequests(
+          Array.isArray(wfhHistory?.requests)
+            ? wfhHistory.requests.map((row) => ({
+                ...row,
+                user_id: userId,
+                username: username ?? row.username,
+              }))
+            : []
+        );
         setSelectedKeys((prev) => {
           const alive = new Set(
             (payload.exceptions ?? []).map((r) => exceptionKey({ ...r, user_id: userId }))
@@ -244,6 +289,7 @@ export default function AdminAttendanceExceptions() {
         const fromAllLate = (data?.late_days ?? []).filter((r) => String(r.user_id) === userId);
         setDetailExceptions(fromAllExc);
         setDetailLates(fromAllLate);
+        setDetailWfhRequests([]);
         if (fromAllExc.length === 0 && fromAllLate.length === 0) {
           toast({
             title: 'Could not load user exceptions',
@@ -268,6 +314,7 @@ export default function AdminAttendanceExceptions() {
     } else {
       setDetailExceptions([]);
       setDetailLates([]);
+      setDetailWfhRequests([]);
       setSelectedKeys([]);
     }
   }, [detailUserId]); // eslint-disable-line react-hooks/exhaustive-deps -- reload when entering a user
@@ -1050,6 +1097,105 @@ export default function AdminAttendanceExceptions() {
 
                     <div className="col-span-12 space-y-3">
                       <p className="text-sm font-semibold">
+                        WFH requests
+                        <span className="text-muted-foreground font-normal ml-2 tabular-nums">
+                          {detailWfhRequests.length}
+                        </span>
+                        {detailWfhRequests.some((r) => r.status === 'rejected') ? (
+                          <span className="text-rose-600 dark:text-rose-400 font-normal ml-2 text-xs">
+                            · {detailWfhRequests.filter((r) => r.status === 'rejected').length} rejected
+                          </span>
+                        ) : null}
+                      </p>
+                      {detailWfhRequests.length === 0 ? (
+                        <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border/60 px-4 py-8 text-center">
+                          No WFH requests for this user yet.
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          {detailWfhRequests.map((row) => {
+                            const status = String(row.status || 'pending').toLowerCase();
+                            const reviewedAt = formatDateTime(row.reviewed_at);
+                            return (
+                              <div
+                                key={`${row.user_id}-${row.request_date}-${row.id ?? status}`}
+                                className={cn(
+                                  'rounded-xl border px-4 py-3 space-y-2',
+                                  status === 'rejected'
+                                    ? 'border-rose-300/70 dark:border-rose-800/60 bg-rose-50/40 dark:bg-rose-950/20'
+                                    : status === 'approved'
+                                      ? 'border-emerald-300/70 dark:border-emerald-800/60 bg-emerald-50/30 dark:bg-emerald-950/20'
+                                      : 'border-amber-300/70 dark:border-amber-800/60 bg-amber-50/30 dark:bg-amber-950/20'
+                                )}
+                              >
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium">{formatDay(row.request_date)}</p>
+                                    {row.user_note ? (
+                                      <p className="text-xs text-muted-foreground mt-1 break-words">
+                                        Note: {row.user_note}
+                                      </p>
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground mt-1">No user note</p>
+                                    )}
+                                  </div>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn('rounded-xl capitalize shrink-0', wfhStatusBadgeClass(status))}
+                                  >
+                                    {status}
+                                  </Badge>
+                                </div>
+                                {status === 'rejected' || status === 'approved' ? (
+                                  <div className="text-xs text-muted-foreground space-y-1">
+                                    {row.admin_note ? (
+                                      <p>
+                                        Admin note: <span className="text-foreground/90">{row.admin_note}</span>
+                                      </p>
+                                    ) : null}
+                                    <p>
+                                      {status === 'rejected' ? 'Rejected' : 'Approved'}
+                                      {row.reviewed_by_username
+                                        ? ` by ${row.reviewed_by_username}`
+                                        : ''}
+                                      {reviewedAt ? ` · ${reviewedAt}` : ''}
+                                    </p>
+                                  </div>
+                                ) : null}
+                                {status === 'pending' ? (
+                                  <div className="flex flex-wrap gap-2 pt-1">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className="rounded-xl"
+                                      disabled={saving || wfhReviewing}
+                                      onClick={() => setWfhReview({ request: row, action: 'approve' })}
+                                    >
+                                      <Check className="h-3.5 w-3.5 mr-1.5" />
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="rounded-xl"
+                                      disabled={saving || wfhReviewing}
+                                      onClick={() => setWfhReview({ request: row, action: 'reject' })}
+                                    >
+                                      <X className="h-3.5 w-3.5 mr-1.5" />
+                                      Reject
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="col-span-12 space-y-3">
+                      <p className="text-sm font-semibold">
                         Late check-ins
                         <span className="text-muted-foreground font-normal ml-2 tabular-nums">
                           {detailLates.length}
@@ -1098,7 +1244,7 @@ export default function AdminAttendanceExceptions() {
           ) : (
             <div className="col-span-12 lg:col-span-12">
               <p className="text-xs text-muted-foreground text-center sm:text-left">
-                Select a person to view every exception day and late check-in for them.
+                Select a person to view exceptions, WFH requests (including rejected), and late check-ins.
               </p>
             </div>
           )}

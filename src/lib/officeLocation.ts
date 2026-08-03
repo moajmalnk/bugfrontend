@@ -124,10 +124,14 @@ export function getCheckInPosition(config?: Partial<OfficeGeoConfig> | null): Pr
         const distanceM = haversineMeters(latitude, longitude, office.lat, office.lng);
 
         if (distanceM > office.radiusM) {
+          const distanceLabel =
+            distanceM >= 1000
+              ? `${(distanceM / 1000).toFixed(1)} km`
+              : `${Math.round(distanceM)} m`;
           reject(
             new OfficeLocationError(
               'out_of_range',
-              `You are about ${Math.round(distanceM)} m away. Move closer to ${office.label} (within ${office.radiusM} m) to check in as Office.`,
+              `You are about ${distanceLabel} from ${office.label}. Move within ${office.radiusM} m to check in as Office.`,
               distanceM
             )
           );

@@ -2,6 +2,7 @@
  * Writes committed agent export files from the builtin CODO catalog.
  * Run from frontend/: npx tsx scripts/generate-codo-exports.ts
  */
+/// <reference types="node" />
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

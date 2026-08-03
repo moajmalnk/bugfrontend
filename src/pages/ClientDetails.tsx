@@ -488,7 +488,11 @@ const ClientDetails = () => {
                     {client.attachments?.map((att) => (
                       <Link
                         key={att.id}
-                        to={buildDocumentPreviewPagePath(att.file_path)}
+                        to={buildDocumentPreviewPagePath(role, {
+                          filePath: att.file_path,
+                          fileName: att.file_name,
+                          returnTo: `/${role}/clients/${client.id}`,
+                        })}
                         className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
                       >
                         <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">

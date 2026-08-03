@@ -157,7 +157,7 @@ export default function MeetRoom() {
   }, [participantNames, currentUser]);
   
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -169,11 +169,11 @@ export default function MeetRoom() {
   const animationFrameRef = useRef<number | null>(null);
   const recordingRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isPlayingRef = useRef(false);
   const playPromiseRef = useRef<Promise<void> | null>(null);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
-  const meetingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const meetingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const performanceMonitorRef = useRef<{ [key: string]: number }>({});
   const localStreamRef = useRef<MediaStream | null>(null);
   const recordingUrlRef = useRef<string>('');

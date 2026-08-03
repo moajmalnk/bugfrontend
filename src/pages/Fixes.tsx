@@ -299,6 +299,8 @@ const BugCard = ({ bug, projects }: { bug: BugType; projects: Project[] }) => {
             title: bug.title,
             project_id: bug.project_id,
             project_name: project?.name || bug.project_name,
+            status: bug.status,
+            priority: bug.priority,
           }}
           open={convertOpen}
           onOpenChange={setConvertOpen}
