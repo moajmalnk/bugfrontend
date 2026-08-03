@@ -400,17 +400,51 @@ export async function checkIn(
   submissionDate?: string,
   plannedProjects?: string[],
   plannedWork?: string,
-  plannedWorkStatus?: StatusOption
-): Promise<{ success: boolean; check_in_time: string; submission_date: string; message?: string }> {
+  plannedWorkStatus?: StatusOption,
+  workMode?: 'office' | 'wfh',
+  location?: { latitude: number; longitude: number; accuracy?: number | null } | null
+): Promise<{
+  success: boolean;
+  check_in_time: string;
+  submission_date: string;
+  message?: string;
+  work_mode?: 'office' | 'wfh';
+  is_late?: boolean;
+  is_sunday?: boolean;
+  late_count?: number;
+  late_limit?: number;
+  office_only?: boolean;
+  office_only_week_start?: string | null;
+  office_only_week_end?: string | null;
+  upcoming_office_only_week?: { week_start: string; week_end: string } | null;
+  warning?: string | null;
+  restriction_created?: boolean;
+  check_in_distance_m?: number | null;
+}> {
+  if (!workMode || (workMode !== 'office' && workMode !== 'wfh')) {
+    throw new Error('Please select Office or WFH before checking in.');
+  }
+
+  const body: Record<string, unknown> = {
+    submission_date: submissionDate || new Date().toISOString().split('T')[0],
+    planned_projects: plannedProjects || [],
+    planned_work: plannedWork || '',
+    planned_work_status: plannedWorkStatus || 'not_started',
+    work_mode: workMode,
+  };
+
+  if (workMode === 'office' && location) {
+    body.latitude = location.latitude;
+    body.longitude = location.longitude;
+    if (typeof location.accuracy === 'number') {
+      body.accuracy = location.accuracy;
+    }
+  }
+
   const res = await fetch(`${API}/tasks/check_in.php`, {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      submission_date: submissionDate || new Date().toISOString().split('T')[0],
-      planned_projects: plannedProjects || [],
-      planned_work: plannedWork || '',
-      planned_work_status: plannedWorkStatus || 'not_started'
-    }),
+    body: JSON.stringify(body),
   });
 
   // Get response text first to handle empty responses
@@ -436,12 +470,37 @@ export async function checkIn(
   const data = (responseData.data || responseData) as {
     check_in_time?: string;
     submission_date?: string;
+    work_mode?: 'office' | 'wfh';
+    is_late?: boolean;
+    is_sunday?: boolean;
+    late_count?: number;
+    late_limit?: number;
+    office_only?: boolean;
+    office_only_week_start?: string | null;
+    office_only_week_end?: string | null;
+    upcoming_office_only_week?: { week_start: string; week_end: string } | null;
+    warning?: string | null;
+    restriction_created?: boolean;
+    check_in_distance_m?: number | null;
   };
   return {
     success: Boolean(responseData.success),
     check_in_time: String(data.check_in_time || responseData.check_in_time || ''),
     submission_date: String(data.submission_date || responseData.submission_date || ''),
-    message: responseData.message
+    message: responseData.message,
+    work_mode: data.work_mode,
+    is_late: Boolean(data.is_late),
+    is_sunday: Boolean(data.is_sunday),
+    late_count: typeof data.late_count === 'number' ? data.late_count : undefined,
+    late_limit: typeof data.late_limit === 'number' ? data.late_limit : undefined,
+    office_only: Boolean(data.office_only),
+    office_only_week_start: data.office_only_week_start ?? null,
+    office_only_week_end: data.office_only_week_end ?? null,
+    upcoming_office_only_week: data.upcoming_office_only_week ?? null,
+    warning: data.warning ?? null,
+    restriction_created: Boolean(data.restriction_created),
+    check_in_distance_m:
+      typeof data.check_in_distance_m === 'number' ? data.check_in_distance_m : null,
   };
 }
 

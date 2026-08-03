@@ -6,6 +6,7 @@ import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { UserProjectsDialog } from "@/components/users/UserProjectsDialog";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
+import { UserAttendanceExceptions } from "@/components/users/UserAttendanceExceptions";
 import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
 import { Button } from "@/components/ui/button";
 import {
@@ -758,6 +759,16 @@ export default function UserDetails() {
                   />
                 </CardContent>
               </Card>
+              {effectiveRole === "admin" ? (
+                <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
+                  <CardContent className="p-5 sm:p-6 space-y-6">
+                    <UserAttendanceExceptions
+                      userId={user.id}
+                      username={user.username || undefined}
+                    />
+                  </CardContent>
+                </Card>
+              ) : null}
               <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
                 <CardContent className="p-5 sm:p-6 space-y-6">
                   <h3 className="text-lg font-semibold">Work Statistics</h3>

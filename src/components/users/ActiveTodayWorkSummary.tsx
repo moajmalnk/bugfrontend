@@ -1,4 +1,4 @@
-import { Coffee, Clock, LogIn, LogOut, type LucideIcon } from "lucide-react";
+import { Building2, Coffee, Clock, Home, LogIn, LogOut, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function formatWorkTime(value: string | null | undefined): string | null {
@@ -29,7 +29,7 @@ function SummaryPill({
   icon: LucideIcon;
   label: string;
   value: string;
-  accent: "emerald" | "cyan" | "blue" | "amber";
+  accent: "emerald" | "cyan" | "blue" | "amber" | "rose" | "indigo";
 }) {
   const accents = {
     emerald:
@@ -38,12 +38,15 @@ function SummaryPill({
     blue: "bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-200 [&_svg]:text-blue-600 dark:[&_svg]:text-blue-400",
     amber:
       "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200 [&_svg]:text-amber-600 dark:[&_svg]:text-amber-400",
+    rose: "bg-rose-50 text-rose-800 dark:bg-rose-950/30 dark:text-rose-200 [&_svg]:text-rose-600 dark:[&_svg]:text-rose-400",
+    indigo:
+      "bg-indigo-50 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-200 [&_svg]:text-indigo-600 dark:[&_svg]:text-indigo-400",
   };
 
   return (
     <div
       className={cn(
-        "inline-flex min-w-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs sm:text-sm",
+        "inline-flex min-w-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm",
         accents[accent]
       )}
     >
@@ -59,6 +62,8 @@ interface ActiveTodayWorkSummaryProps {
   breakMinutes?: number;
   hoursWorked?: number;
   checkoutTime?: string | null;
+  workMode?: "office" | "wfh" | null;
+  isLate?: boolean;
 }
 
 export function ActiveTodayWorkSummary({
@@ -66,6 +71,8 @@ export function ActiveTodayWorkSummary({
   breakMinutes = 0,
   hoursWorked = 0,
   checkoutTime,
+  workMode = null,
+  isLate = false,
 }: ActiveTodayWorkSummaryProps) {
   const checkInLabel = formatWorkTime(checkInTime);
   const checkoutLabel = formatWorkTime(checkoutTime);
@@ -74,7 +81,17 @@ export function ActiveTodayWorkSummary({
   return (
     <div className="flex w-full flex-wrap items-center gap-2">
       {checkInLabel ? (
-        <SummaryPill icon={LogIn} label="Check in" value={checkInLabel} accent="emerald" />
+        <SummaryPill
+          icon={LogIn}
+          label={isLate ? "Late in" : "Check in"}
+          value={checkInLabel}
+          accent={isLate ? "rose" : "emerald"}
+        />
+      ) : null}
+      {workMode === "office" ? (
+        <SummaryPill icon={Building2} label="Mode" value="Office" accent="indigo" />
+      ) : workMode === "wfh" ? (
+        <SummaryPill icon={Home} label="Mode" value="WFH" accent="cyan" />
       ) : null}
       <SummaryPill icon={Coffee} label="Break" value={formatBreakHours(breakMinutes)} accent="cyan" />
       <SummaryPill icon={Clock} label="Worked" value={workedLabel} accent="blue" />

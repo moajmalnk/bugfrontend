@@ -13,7 +13,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle } from 'lucide-react';
+import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2 } from 'lucide-react';
 import { projectService, Project } from '@/services/projectService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -25,10 +25,17 @@ import { updateService } from '@/services/updateService';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
 import { extractApiErrorMessage } from '@/lib/apiError';
 import { assertDeviceClockMatchesServer } from '@/lib/deviceClock';
+import {
+  getCheckInPosition,
+  OfficeLocationError,
+  resolveOfficeConfig,
+  type CheckInPosition,
+} from '@/lib/officeLocation';
 import { ENV } from '@/lib/env';
 import {
   getAttendanceStatus,
   type AttendanceStatus,
+  type WorkMode,
 } from '@/services/leaveService';
 import {
   calendarMonthKey,
@@ -235,6 +242,10 @@ export function DailyWorkFlowPanel({
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [plannedWork, setPlannedWork] = useState<string>('');
   const [plannedWorkStatus, setPlannedWorkStatus] = useState<StatusOption>('not_started');
+  const [workMode, setWorkMode] = useState<WorkMode | null>(null);
+  const [officeGeoStatus, setOfficeGeoStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
+  const [officeGeoMessage, setOfficeGeoMessage] = useState<string | null>(null);
+  const [officePosition, setOfficePosition] = useState<CheckInPosition | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingProjectStats, setLoadingProjectStats] = useState(false);
@@ -273,6 +284,86 @@ export function DailyWorkFlowPanel({
   const hasCheckedIn = !!form.check_in_time;
   const hasActiveWorkSession = hasCheckedIn && !todaySubmissionComplete && !isEditing;
   const attendanceBlocked = attendanceGate != null && attendanceGate.allowed === false;
+  const officeOnlyActive = Boolean(attendanceGate?.office_only);
+  const workModeLockedToOffice = attendanceGate?.work_mode_locked_to === 'office' || officeOnlyActive;
+  const allowWfhToday = Boolean(attendanceGate?.allow_wfh_today);
+  const forgiveLateToday = Boolean(attendanceGate?.forgive_late_today);
+  const lateCount = attendanceGate?.late_count ?? 0;
+  const lateLimit = attendanceGate?.late_limit ?? 3;
+  const isSundayHoliday = Boolean(attendanceGate?.is_sunday);
+  const upcomingOfficeWeek = attendanceGate?.upcoming_office_only_week ?? null;
+  const officeGeoConfig = useMemo(
+    () =>
+      resolveOfficeConfig({
+        lat: attendanceGate?.office_lat,
+        lng: attendanceGate?.office_lng,
+        radiusM: attendanceGate?.office_radius_m,
+        label: attendanceGate?.office_label,
+      }),
+    [
+      attendanceGate?.office_lat,
+      attendanceGate?.office_lng,
+      attendanceGate?.office_radius_m,
+      attendanceGate?.office_label,
+    ]
+  );
+  const officeGeoVerified = workMode === 'office' && officeGeoStatus === 'ok' && !!officePosition;
+  const canConfirmCheckIn =
+    !!workMode &&
+    (workMode === 'wfh' || officeGeoVerified) &&
+    (selectedProjects.length > 0 || !!plannedWork.trim()) &&
+    officeGeoStatus !== 'checking';
+
+  const clearOfficeGeoState = useCallback(() => {
+    setOfficeGeoStatus('idle');
+    setOfficeGeoMessage(null);
+    setOfficePosition(null);
+  }, []);
+
+  const verifyOfficeLocation = useCallback(async () => {
+    setOfficeGeoStatus('checking');
+    setOfficeGeoMessage('Verifying office location…');
+    setOfficePosition(null);
+    try {
+      const pos = await getCheckInPosition(officeGeoConfig);
+      setOfficePosition(pos);
+      setOfficeGeoStatus('ok');
+      setOfficeGeoMessage(
+        `At ${officeGeoConfig.label} (~${Math.round(pos.distanceM)} m)`
+      );
+      return pos;
+    } catch (e) {
+      const msg =
+        e instanceof OfficeLocationError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : 'Could not verify office location.';
+      setOfficePosition(null);
+      setOfficeGeoStatus('error');
+      setOfficeGeoMessage(msg);
+      throw e instanceof Error ? e : new Error(msg);
+    }
+  }, [officeGeoConfig]);
+
+  const selectWorkMode = useCallback(
+    async (mode: WorkMode) => {
+      if (mode === 'wfh') {
+        if (workModeLockedToOffice) return;
+        setWorkMode('wfh');
+        clearOfficeGeoState();
+        return;
+      }
+      setWorkMode('office');
+      try {
+        await verifyOfficeLocation();
+      } catch {
+        // status/message already set
+      }
+    },
+    [workModeLockedToOffice, clearOfficeGeoState, verifyOfficeLocation]
+  );
+
 
   useEffect(() => {
     if (!currentUser?.id) {
@@ -306,9 +397,34 @@ export function DailyWorkFlowPanel({
   const regularHours = useMemo(() => Math.min(Number(form.hours_today), 8), [form.hours_today]);
   const filteredProjects = useMemo(() => {
     const query = projectSearch.trim().toLowerCase();
-    if (!query) return projects;
-    return projects.filter((project) => project.name.toLowerCase().includes(query));
-  }, [projects, projectSearch]);
+    const list = query
+      ? projects.filter((project) => project.name.toLowerCase().includes(query))
+      : [...projects];
+
+    // Active first, then highest bug count, then updates, then name.
+    const statusRank = (status?: string | null) => {
+      const s = String(status || 'active').toLowerCase();
+      if (s === 'active' || s === '') return 0;
+      if (s === 'release_ready') return 1;
+      if (s === 'completed') return 2;
+      return 3;
+    };
+
+    return list.sort((a, b) => {
+      const rankDiff = statusRank(a.status) - statusRank(b.status);
+      if (rankDiff !== 0) return rankDiff;
+
+      const aBugs = projectStats[a.id]?.bugs ?? 0;
+      const bBugs = projectStats[b.id]?.bugs ?? 0;
+      if (bBugs !== aBugs) return bBugs - aBugs;
+
+      const aUpdates = projectStats[a.id]?.updates ?? 0;
+      const bUpdates = projectStats[b.id]?.updates ?? 0;
+      if (bUpdates !== aUpdates) return bUpdates - aUpdates;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [projects, projectSearch, projectStats]);
 
   const checkoutProjects = useMemo(() => {
     const byId = new Map(projects.map((p) => [p.id, p]));
@@ -700,6 +816,12 @@ export function DailyWorkFlowPanel({
       });
       return;
     }
+    clearOfficeGeoState();
+    if (workModeLockedToOffice) {
+      void selectWorkMode('office');
+    } else {
+      setWorkMode(null);
+    }
     syncFlowAction('checkin');
     setIsCheckInDialogOpen(true);
   }
@@ -707,6 +829,8 @@ export function DailyWorkFlowPanel({
   function closeCheckInDialog() {
     setIsCheckInDialogOpen(false);
     setProjectSearch('');
+    setWorkMode(null);
+    clearOfficeGeoState();
     clearWorkFlowUrl();
   }
 
@@ -765,9 +889,43 @@ export function DailyWorkFlowPanel({
 
   const handleCheckIn = useCallback(async () => {
     try {
+      if (!workMode) {
+        toast({
+          title: 'Select work location',
+          description: 'Choose Office or WFH before checking in.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (workModeLockedToOffice && workMode === 'wfh') {
+        toast({
+          title: 'Office only this week',
+          description: attendanceGate?.office_only_week_start
+            ? `WFH is blocked (${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end}).`
+            : 'WFH is not allowed during your Office-only week.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       setIsCheckingIn(true);
       await assertDeviceClockMatchesServer('check in');
-      
+
+      let locationPayload: { latitude: number; longitude: number; accuracy?: number | null } | null = null;
+      if (workMode === 'office') {
+        const pos = officePosition && officeGeoStatus === 'ok'
+          ? await getCheckInPosition(officeGeoConfig).catch(() => officePosition)
+          : await verifyOfficeLocation();
+        locationPayload = {
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          accuracy: pos.accuracy,
+        };
+        setOfficePosition(pos);
+        setOfficeGeoStatus('ok');
+        setOfficeGeoMessage(`At ${officeGeoConfig.label} (~${Math.round(pos.distanceM)} m)`);
+      }
+
       // Optimistic UI update - show success immediately for faster perceived performance
       const optimisticCheckInTime = new Date().toISOString();
       setForm((prev) => ({
@@ -778,14 +936,7 @@ export function DailyWorkFlowPanel({
       // Close dialog immediately for instant feedback
       setIsCheckInDialogOpen(false);
       syncFlowAction(null);
-      
-      // Show optimistic success toast
-      const optimisticTime = new Date(optimisticCheckInTime).toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Kolkata'
-      });
-      
+
       toast({
         title: 'Checking in...',
         description: 'Processing your check-in',
@@ -796,7 +947,9 @@ export function DailyWorkFlowPanel({
         serverToday,
         selectedProjects,
         plannedWork,
-        form.planned_work_status || 'not_started'
+        form.planned_work_status || 'not_started',
+        workMode,
+        locationPayload
       );
 
       // Update with actual server time
@@ -813,33 +966,65 @@ export function DailyWorkFlowPanel({
         timeZone: 'Asia/Kolkata'
       });
 
-      // Update toast with success
-      toast({
-        title: 'Checked in successfully',
-        description: `Check-in time: ${formattedTime}`,
-      });
-
-      if (isEmbedded) {
-        onSaved?.();
+      const modeLabel = result.work_mode === 'wfh' ? 'WFH' : 'Office';
+      const distanceNote =
+        typeof result.check_in_distance_m === 'number'
+          ? ` · ~${Math.round(result.check_in_distance_m)} m from office`
+          : '';
+      if (result.restriction_created || result.warning) {
+        toast({
+          title: result.restriction_created ? 'Office-only week scheduled' : 'Late check-in',
+          description: result.warning || `Checked in at ${formattedTime} (${modeLabel})`,
+          variant: result.restriction_created || result.is_late ? 'destructive' : 'default',
+        });
+      } else {
+        toast({
+          title: 'Checked in',
+          description: `${modeLabel} · ${formattedTime}${result.is_sunday ? ' · Sunday holiday' : ''}${distanceNote}`,
+        });
       }
 
-      // Keep selectedProjects and plannedWork for preview and submission
-      // Don't reset them - they should persist until daily work is saved
-    } catch (e: any) {
+      // Refresh attendance gate (late count / office-only)
+      if (currentUser?.id) {
+        try {
+          const status = await getAttendanceStatus(String(currentUser.id), result.submission_date || serverToday);
+          setAttendanceGate(status);
+        } catch {
+          // non-fatal
+        }
+      }
+
+      setWorkMode(null);
+      clearOfficeGeoState();
+      onSaved?.();
+    } catch (e) {
       // Revert optimistic update on error
       setForm((prev) => ({
         ...prev,
         check_in_time: undefined,
       }));
-      
-      // Reopen dialog on error
       setIsCheckInDialogOpen(true);
-      
       toast(attendanceErrorToast('Check-in blocked', e));
     } finally {
       setIsCheckingIn(false);
     }
-  }, [form.submission_date, selectedProjects, plannedWork, form.planned_work_status, isEmbedded, onSaved, syncFlowAction, serverToday]);
+  }, [
+    workMode,
+    workModeLockedToOffice,
+    attendanceGate,
+    officePosition,
+    officeGeoStatus,
+    officeGeoConfig,
+    verifyOfficeLocation,
+    clearOfficeGeoState,
+    serverToday,
+    selectedProjects,
+    plannedWork,
+    form.planned_work_status,
+    syncFlowAction,
+    currentUser?.id,
+    onSaved,
+  ]);
 
   function handleProjectToggle(projectId: string) {
     setSelectedProjects(prev =>
@@ -1542,6 +1727,12 @@ export function DailyWorkFlowPanel({
 
     if (flowAction === 'checkin') {
       didAutoOpenFlowRef.current = flowKey;
+      clearOfficeGeoState();
+      if (workModeLockedToOffice) {
+        void selectWorkMode('office');
+      } else {
+        setWorkMode(null);
+      }
       setIsCheckInDialogOpen(true);
       return;
     }
@@ -1552,7 +1743,7 @@ export function DailyWorkFlowPanel({
       setCheckoutWizardStep('form');
       setIsCheckoutWizardOpen(true);
     }
-  }, [flowAction, editId, isEditing]);
+  }, [flowAction, editId, isEditing, workModeLockedToOffice, clearOfficeGeoState, selectWorkMode]);
 
   async function startEdit(t: UserTask) {
     setEditingTaskId((t.id as number) ?? null);
@@ -1617,6 +1808,65 @@ export function DailyWorkFlowPanel({
                   .
                 </>
               ) : null}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {officeOnlyActive ? (
+        <div className="w-full rounded-xl border border-amber-300/80 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-950 dark:text-amber-100 flex items-start gap-2 mb-3">
+          <Building2 className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="font-semibold">Office only this week — WFH disabled</p>
+            <p className="text-xs mt-0.5 opacity-90">
+              {attendanceGate?.office_only_week_start && attendanceGate?.office_only_week_end
+                ? `${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end}. Check in from Office after 3 late arrivals.`
+                : 'Check in from Office only after 3 late arrivals.'}
+            </p>
+          </div>
+        </div>
+      ) : allowWfhToday ? (
+        <div className="w-full rounded-xl border border-emerald-300/80 dark:border-emerald-700/60 bg-emerald-50/90 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-950 dark:text-emerald-100 flex items-start gap-2 mb-3">
+          <Home className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="font-semibold">WFH allowed today (admin exception)</p>
+            <p className="text-xs mt-0.5 opacity-90">
+              You may check in as WFH today
+              {forgiveLateToday ? '. Late after 10:00 AM will not count as a strike.' : '.'}
+            </p>
+          </div>
+        </div>
+      ) : upcomingOfficeWeek ? (
+        <div className="w-full rounded-xl border border-orange-300/80 dark:border-orange-700/60 bg-orange-50/90 dark:bg-orange-950/40 px-4 py-3 text-sm text-orange-950 dark:text-orange-100 flex items-start gap-2 mb-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="font-semibold">Upcoming Office-only week</p>
+            <p className="text-xs mt-0.5 opacity-90">
+              {upcomingOfficeWeek.week_start} – {upcomingOfficeWeek.week_end}: WFH will not be allowed.
+            </p>
+          </div>
+        </div>
+      ) : lateCount > 0 && !hasCheckedIn ? (
+        <div className="w-full rounded-xl border border-sky-200/80 dark:border-sky-800/60 bg-sky-50/90 dark:bg-sky-950/40 px-4 py-3 text-sm text-sky-950 dark:text-sky-100 flex items-start gap-2 mb-3">
+          <Clock className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="font-semibold">
+              Late strikes: {lateCount}/{lateLimit}
+            </p>
+            <p className="text-xs mt-0.5 opacity-90">
+              Check in before 10:00 AM IST (Mon–Sat). After {lateLimit} late check-ins, next week is Office only.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {isSundayHoliday && !hasCheckedIn && !attendanceBlocked ? (
+        <div className="w-full rounded-xl border border-violet-200/80 dark:border-violet-800/60 bg-violet-50/90 dark:bg-violet-950/40 px-4 py-3 text-sm text-violet-950 dark:text-violet-100 flex items-start gap-2 mb-3">
+          <Calendar className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="font-semibold">Sunday holiday</p>
+            <p className="text-xs mt-0.5 opacity-90">
+              Check-in anytime is allowed. Hours stay 0 until you submit your work update — nothing is auto-added.
             </p>
           </div>
         </div>
@@ -1748,8 +1998,8 @@ export function DailyWorkFlowPanel({
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50 dark:bg-gray-900/50">
             {/* Date and Time - Elegant Cards */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-6 relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Date</span>
                   <span className="text-base font-bold text-gray-900 dark:text-white">
@@ -1763,7 +2013,7 @@ export function DailyWorkFlowPanel({
                 </div>
                 <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-bl-full"></div>
               </div>
-              <div className="relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+              <div className="col-span-6 relative overflow-hidden bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Time</span>
                   <span className="text-base font-bold text-gray-900 dark:text-white">
@@ -1776,6 +2026,99 @@ export function DailyWorkFlowPanel({
                 </div>
                 <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 rounded-bl-full"></div>
               </div>
+            </div>
+
+            {isSundayHoliday ? (
+              <p className="text-xs text-muted-foreground rounded-xl border border-border/60 bg-background/80 px-3 py-2">
+                Sunday holiday — check-in anytime. Hours are not auto-added.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground rounded-xl border border-border/60 bg-background/80 px-3 py-2">
+                Please check in before 10:00 AM IST. Late check-ins are allowed but count toward Office-only weeks.
+              </p>
+            )}
+
+            {/* Office / WFH */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                  <Building2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                Work location
+                <span className="text-rose-500">*</span>
+              </Label>
+              {workModeLockedToOffice ? (
+                <p className="text-xs text-amber-800 dark:text-amber-200">
+                  Office only this week
+                  {attendanceGate?.office_only_week_start
+                    ? ` (${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end})`
+                    : ''}
+                  . WFH is disabled.
+                </p>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                Office check-in requires your location within {officeGeoConfig.radiusM} m of {officeGeoConfig.label}.
+              </p>
+              <div className="grid grid-cols-12 gap-4">
+                <button
+                  type="button"
+                  onClick={() => void selectWorkMode('office')}
+                  disabled={officeGeoStatus === 'checking' || isCheckingIn}
+                  className={`col-span-6 sm:col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-60 ${
+                    workMode === 'office'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300'
+                  }`}
+                >
+                  <Building2 className="h-6 w-6" />
+                  <span className="text-sm font-semibold">Office</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void selectWorkMode('wfh')}
+                  disabled={workModeLockedToOffice || officeGeoStatus === 'checking' || isCheckingIn}
+                  className={`col-span-6 sm:col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    workMode === 'wfh'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-emerald-300'
+                  }`}
+                >
+                  <Home className="h-6 w-6" />
+                  <span className="text-sm font-semibold">WFH</span>
+                </button>
+              </div>
+              {workMode === 'office' ? (
+                <div
+                  className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${
+                    officeGeoStatus === 'ok'
+                      ? 'border-emerald-300/80 bg-emerald-50/90 text-emerald-900 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-100'
+                      : officeGeoStatus === 'error'
+                        ? 'border-rose-300/80 bg-rose-50/90 text-rose-900 dark:border-rose-700/60 dark:bg-rose-950/40 dark:text-rose-100'
+                        : 'border-border/60 bg-background/80 text-muted-foreground'
+                  }`}
+                >
+                  {officeGeoStatus === 'checking' ? (
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 mt-0.5 animate-spin" />
+                  ) : (
+                    <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">
+                      {officeGeoMessage ||
+                        `Office check-in requires your location within ${officeGeoConfig.radiusM} m of ${officeGeoConfig.label}.`}
+                    </p>
+                    {officeGeoStatus === 'error' ? (
+                      <button
+                        type="button"
+                        className="mt-1 underline font-semibold"
+                        onClick={() => void verifyOfficeLocation()}
+                      >
+                        Retry location
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {/* Project Selection - Enhanced */}
@@ -1905,7 +2248,7 @@ export function DailyWorkFlowPanel({
             <div className="w-full flex justify-center">
               <Button
                 onClick={handleCheckIn}
-                disabled={isCheckingIn || (selectedProjects.length === 0 && !plannedWork.trim())}
+                disabled={isCheckingIn || !canConfirmCheckIn}
                 className="w-full sm:w-auto min-w-[200px] px-8 py-6 bg-gradient-to-r from-emerald-600 via-blue-600 to-indigo-600 hover:from-emerald-700 hover:via-blue-700 hover:to-indigo-700 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
               >
                 {isCheckingIn ? (

@@ -31,6 +31,8 @@ export type LeaveRequest = {
   updated_at?: string | null;
 };
 
+export type WorkMode = 'office' | 'wfh';
+
 export type AttendanceStatus = {
   user_id: string;
   date: string;
@@ -47,6 +49,27 @@ export type AttendanceStatus = {
     start_date: string;
     end_date: string;
   } | null;
+  /** Check-in policy (10:00 AM IST / late strikes / Office-only week) */
+  checkin_cutoff?: string;
+  is_sunday?: boolean;
+  late_count?: number;
+  late_limit?: number;
+  office_only?: boolean;
+  office_only_week_start?: string | null;
+  office_only_week_end?: string | null;
+  upcoming_office_only_week?: { week_start: string; week_end: string } | null;
+  work_mode_locked_to?: WorkMode | null;
+  allow_wfh_today?: boolean;
+  forgive_late_today?: boolean;
+  day_exception?: {
+    allow_wfh?: boolean;
+    forgive_late?: boolean;
+    admin_note?: string | null;
+  } | null;
+  office_lat?: number;
+  office_lng?: number;
+  office_radius_m?: number;
+  office_label?: string;
 };
 
 function authHeaders(): HeadersInit {

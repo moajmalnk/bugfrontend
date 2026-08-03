@@ -347,6 +347,8 @@ export function ActiveUserActivityDialog({
             breakMinutes={work?.break_minutes ?? user?.today_break_minutes ?? 0}
             hoursWorked={work?.hours_today ?? user?.today_hours_worked ?? 0}
             checkoutTime={work?.checkout_time ?? user?.checkout_time}
+            workMode={user?.work_mode}
+            isLate={user?.is_late}
           />
         </DialogHeader>
 

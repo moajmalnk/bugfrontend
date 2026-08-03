@@ -275,6 +275,8 @@ const Users = () => {
           today_hours_worked: Number(user.today_hours_worked || 0),
           today_break_minutes: Number(user.today_break_minutes || 0),
           checkout_time: user.checkout_time || null,
+          work_mode: user.work_mode === 'office' || user.work_mode === 'wfh' ? user.work_mode : null,
+          is_late: Boolean(user.is_late),
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
             user.username || user.name || "?"
           )}&background=3b82f6&color=fff`,
@@ -751,6 +753,8 @@ const Users = () => {
           breakMinutes={user.today_break_minutes}
           hoursWorked={user.today_hours_worked}
           checkoutTime={user.checkout_time}
+          workMode={user.work_mode}
+          isLate={user.is_late}
         />
       );
     }

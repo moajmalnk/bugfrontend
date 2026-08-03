@@ -139,6 +139,10 @@ export interface User {
   today_hours_worked?: number;
   today_break_minutes?: number;
   checkout_time?: string | null;
+  /** Today's work location from check-in */
+  work_mode?: 'office' | 'wfh' | null;
+  /** True when today's check-in was after 10:00 AM IST */
+  is_late?: boolean;
   permissions?: string[]; // Effective permissions for the user
 }
 

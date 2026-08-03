@@ -46,12 +46,19 @@ function getUserDisplay(user: User) {
   const avatar =
     user.avatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff`;
-  return { name, avatar, checkInLabel: formatCheckInTime(user.check_in_time) };
+  const modeLabel = user.work_mode === "wfh" ? "WFH" : user.work_mode === "office" ? "Office" : null;
+  return {
+    name,
+    avatar,
+    checkInLabel: formatCheckInTime(user.check_in_time),
+    modeLabel,
+    isLate: Boolean(user.is_late),
+  };
 }
 
 /** Instagram-style circular story avatar — mobile only */
 function InstagramStoryAvatar({ user, onClick }: { user: User; onClick: () => void }) {
-  const { name, avatar, checkInLabel } = getUserDisplay(user);
+  const { name, avatar, checkInLabel, modeLabel, isLate } = getUserDisplay(user);
   const isLive = user.status === "active" || user.status === "idle";
 
   return (
@@ -80,7 +87,11 @@ function InstagramStoryAvatar({ user, onClick }: { user: User; onClick: () => vo
       <div className="w-full min-w-0 text-center">
         <p className="truncate text-[11px] font-medium leading-tight text-foreground">{name}</p>
         {checkInLabel ? (
-          <p className="truncate text-[10px] leading-tight text-muted-foreground">{checkInLabel}</p>
+          <p className={cn("truncate text-[10px] leading-tight", isLate ? "text-rose-500" : "text-muted-foreground")}>
+            {isLate ? "Late · " : ""}
+            {checkInLabel}
+            {modeLabel ? ` · ${modeLabel}` : ""}
+          </p>
         ) : null}
       </div>
     </button>
@@ -89,7 +100,7 @@ function InstagramStoryAvatar({ user, onClick }: { user: User; onClick: () => vo
 
 /** WhatsApp-style tall status card — tablet & desktop */
 function WhatsAppStatusCard({ user, onClick }: { user: User; onClick: () => void }) {
-  const { name, avatar, checkInLabel } = getUserDisplay(user);
+  const { name, avatar, checkInLabel, modeLabel, isLate } = getUserDisplay(user);
 
   return (
     <button
@@ -131,7 +142,13 @@ function WhatsAppStatusCard({ user, onClick }: { user: User; onClick: () => void
             {name}
           </p>
           {checkInLabel ? (
-            <p className="truncate text-[10px] text-muted-foreground">{checkInLabel}</p>
+            <p className={cn("truncate text-[10px]", isLate ? "text-rose-400" : "text-muted-foreground")}>
+              {isLate ? "Late · " : ""}
+              {checkInLabel}
+            </p>
+          ) : null}
+          {modeLabel ? (
+            <p className="truncate text-[10px] font-medium text-foreground/80">{modeLabel}</p>
           ) : null}
         </div>
       </div>

@@ -19,6 +19,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,9 +28,16 @@ import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
+  defaultOfficeLocationSettings,
+  getAppSettings,
+  updateOfficeLocationSettings,
+  type OfficeLocationSettings,
+} from "@/services/settingsService";
+import {
   Bell,
   Check,
   ChevronDown,
+  MapPin,
   Megaphone,
   Moon,
   Settings as SettingsIcon,
@@ -38,8 +46,9 @@ import {
   Tags,
   Users,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 const Settings = () => {
@@ -48,6 +57,17 @@ const Settings = () => {
   const { theme, toggleTheme } = useTheme();
   const [autoAssign, setAutoAssign] = useState(true);
   const [initialAutoAssign, setInitialAutoAssign] = useState(true);
+  const [officeLocation, setOfficeLocation] = useState<OfficeLocationSettings>(
+    defaultOfficeLocationSettings()
+  );
+  const [initialOfficeLocation, setInitialOfficeLocation] = useState<OfficeLocationSettings>(
+    defaultOfficeLocationSettings()
+  );
+  const [officeDefaults, setOfficeDefaults] = useState<OfficeLocationSettings>(
+    defaultOfficeLocationSettings()
+  );
+  const [loadingOfficeSettings, setLoadingOfficeSettings] = useState(true);
+  const [savingOfficeSettings, setSavingOfficeSettings] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab") || "general";
   const normalizeSettingsTab = (tab: string) => {
@@ -74,6 +94,47 @@ const Settings = () => {
     if (normalized !== activeTab) setActiveTab(normalized);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  const loadOfficeSettings = useCallback(async () => {
+    setLoadingOfficeSettings(true);
+    try {
+      const settings = await getAppSettings();
+      const next: OfficeLocationSettings = {
+        office_lat: settings.office_lat,
+        office_lng: settings.office_lng,
+        office_radius_m: settings.office_radius_m,
+        office_label: settings.office_label,
+      };
+      setOfficeLocation(next);
+      setInitialOfficeLocation(next);
+      if (settings.office_defaults) {
+        setOfficeDefaults(settings.office_defaults);
+      }
+    } catch (e) {
+      toast({
+        title: "Could not load office location",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingOfficeSettings(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadOfficeSettings();
+  }, [loadOfficeSettings]);
+
+  const officeDirty = useMemo(() => {
+    return (
+      officeLocation.office_lat !== initialOfficeLocation.office_lat ||
+      officeLocation.office_lng !== initialOfficeLocation.office_lng ||
+      officeLocation.office_radius_m !== initialOfficeLocation.office_radius_m ||
+      officeLocation.office_label !== initialOfficeLocation.office_label
+    );
+  }, [officeLocation, initialOfficeLocation]);
+
+  const generalDirty = autoAssign !== initialAutoAssign || officeDirty;
 
   // Check for SETTINGS_EDIT permission
   if (isLoading) {
@@ -106,12 +167,54 @@ const Settings = () => {
     );
   }
 
-  const handleSaveGeneral = () => {
-    setInitialAutoAssign(autoAssign);
-    toast({
-      title: "Settings saved",
-      description: "Your general settings have been updated.",
-    });
+  const handleSaveGeneral = async () => {
+    setSavingOfficeSettings(true);
+    try {
+      if (officeDirty) {
+        const lat = Number(officeLocation.office_lat);
+        const lng = Number(officeLocation.office_lng);
+        const radius = Number(officeLocation.office_radius_m);
+        const label = officeLocation.office_label.trim();
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          throw new Error("Enter valid latitude and longitude.");
+        }
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          throw new Error("Coordinates are out of range.");
+        }
+        if (!Number.isFinite(radius) || radius < 50 || radius > 5000) {
+          throw new Error("Radius must be between 50 m and 5000 m.");
+        }
+        if (!label) {
+          throw new Error("Office label is required.");
+        }
+
+        const saved = await updateOfficeLocationSettings({
+          office_lat: lat,
+          office_lng: lng,
+          office_radius_m: Math.round(radius),
+          office_label: label.slice(0, 120),
+        });
+        setOfficeLocation(saved);
+        setInitialOfficeLocation(saved);
+      }
+
+      setInitialAutoAssign(autoAssign);
+      toast({
+        title: "Settings saved",
+        description: officeDirty
+          ? "Office check-in location and general settings updated."
+          : "Your general settings have been updated.",
+      });
+    } catch (e) {
+      toast({
+        title: "Save failed",
+        description: e instanceof Error ? e.message : "Could not save settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingOfficeSettings(false);
+    }
   };
 
   const handleResetGeneral = () => {
@@ -119,9 +222,19 @@ const Settings = () => {
       toggleTheme();
     }
     setAutoAssign(true);
+    setInitialAutoAssign(true);
+    setOfficeLocation(initialOfficeLocation);
     toast({
-      title: "Defaults restored",
-      description: "Light mode and auto-assign have been reset to defaults.",
+      title: "Settings reset",
+      description: "Unsaved changes were discarded.",
+    });
+  };
+
+  const handleRestoreOfficeDefaults = () => {
+    setOfficeLocation({ ...officeDefaults });
+    toast({
+      title: "Office defaults loaded",
+      description: "Wired In Coworks defaults applied — click Save to persist.",
     });
   };
 
@@ -354,18 +467,160 @@ const Settings = () => {
                       </div>
                     </div>
 
+                    <div className="rounded-2xl border border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 p-4 sm:p-5 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-900/40 shrink-0">
+                            <MapPin className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+                          </div>
+                          <div className="space-y-1 min-w-0">
+                            <p className="text-base font-semibold text-gray-900 dark:text-white">
+                              Office check-in location
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Employees must be within this radius to check in as Office. WFH does not require GPS.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleRestoreOfficeDefaults}
+                          disabled={loadingOfficeSettings || savingOfficeSettings}
+                          className="h-10 rounded-xl shrink-0"
+                        >
+                          Load defaults
+                        </Button>
+                      </div>
+
+                      {loadingOfficeSettings ? (
+                        <div className="grid grid-cols-12 gap-4">
+                          <Skeleton className="col-span-12 h-10 rounded-xl" />
+                          <Skeleton className="col-span-12 md:col-span-6 h-10 rounded-xl" />
+                          <Skeleton className="col-span-12 md:col-span-6 h-10 rounded-xl" />
+                          <Skeleton className="col-span-12 md:col-span-6 h-10 rounded-xl" />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-12 gap-4">
+                          <div className="col-span-12 space-y-2">
+                            <Label htmlFor="officeLabel" className="text-sm font-medium">
+                              Office name
+                            </Label>
+                            <Input
+                              id="officeLabel"
+                              value={officeLocation.office_label}
+                              maxLength={120}
+                              onChange={(e) =>
+                                setOfficeLocation((prev) => ({
+                                  ...prev,
+                                  office_label: e.target.value.slice(0, 120),
+                                }))
+                              }
+                              placeholder="Wired In Coworks, Kottakkal"
+                              className="h-11 rounded-xl"
+                            />
+                          </div>
+                          <div className="col-span-12 md:col-span-6 space-y-2">
+                            <Label htmlFor="officeLat" className="text-sm font-medium">
+                              Latitude
+                            </Label>
+                            <Input
+                              id="officeLat"
+                              type="number"
+                              step="any"
+                              inputMode="decimal"
+                              value={officeLocation.office_lat}
+                              onChange={(e) =>
+                                setOfficeLocation((prev) => ({
+                                  ...prev,
+                                  office_lat: Number(e.target.value),
+                                }))
+                              }
+                              className="h-11 rounded-xl"
+                            />
+                          </div>
+                          <div className="col-span-12 md:col-span-6 space-y-2">
+                            <Label htmlFor="officeLng" className="text-sm font-medium">
+                              Longitude
+                            </Label>
+                            <Input
+                              id="officeLng"
+                              type="number"
+                              step="any"
+                              inputMode="decimal"
+                              value={officeLocation.office_lng}
+                              onChange={(e) =>
+                                setOfficeLocation((prev) => ({
+                                  ...prev,
+                                  office_lng: Number(e.target.value),
+                                }))
+                              }
+                              className="h-11 rounded-xl"
+                            />
+                          </div>
+                          <div className="col-span-12 md:col-span-6 space-y-2">
+                            <Label htmlFor="officeRadius" className="text-sm font-medium">
+                              Allowed radius (meters)
+                            </Label>
+                            <Input
+                              id="officeRadius"
+                              type="number"
+                              min={50}
+                              max={5000}
+                              step={10}
+                              inputMode="numeric"
+                              value={officeLocation.office_radius_m}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/[^\d]/g, "");
+                                const next = digits === "" ? 0 : Number(digits.slice(0, 4));
+                                setOfficeLocation((prev) => ({
+                                  ...prev,
+                                  office_radius_m: Math.min(5000, next),
+                                }));
+                              }}
+                              className="h-11 rounded-xl"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Recommended 200–500 m for indoor GPS drift. Range: 50–5000 m.
+                            </p>
+                          </div>
+                          <div className="col-span-12 md:col-span-6 flex items-end">
+                            <a
+                              href={`https://www.google.com/maps?q=${encodeURIComponent(
+                                `${officeLocation.office_lat},${officeLocation.office_lng}`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex h-11 items-center gap-2 rounded-xl border border-border px-4 text-sm font-medium text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/40"
+                            >
+                              <MapPin className="h-4 w-4" />
+                              Preview on Google Maps
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-gray-200/50 dark:border-gray-700/50">
                       <Button
-                        onClick={handleSaveGeneral}
-                        disabled={autoAssign === initialAutoAssign}
-                        className="h-12 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+                        onClick={() => void handleSaveGeneral()}
+                        disabled={!generalDirty || savingOfficeSettings || loadingOfficeSettings}
+                        className="h-12 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 rounded-xl"
                       >
-                        Save Settings
+                        {savingOfficeSettings ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Saving…
+                          </span>
+                        ) : (
+                          "Save Settings"
+                        )}
                       </Button>
                       <Button
                         variant="outline"
                         onClick={handleResetGeneral}
-                        className="h-12 px-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-semibold"
+                        disabled={savingOfficeSettings}
+                        className="h-12 px-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-semibold rounded-xl"
                       >
                         Reset
                       </Button>
