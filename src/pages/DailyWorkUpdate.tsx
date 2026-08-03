@@ -38,6 +38,7 @@ import {
   type AttendanceStatus,
   type WorkMode,
 } from '@/services/leaveService';
+import { requestWfhForToday } from '@/services/wfhRequestService';
 import {
   calendarMonthKey,
   computeMonthTotalsToDate,
@@ -290,6 +291,9 @@ export function DailyWorkFlowPanel({
   const [todaySubmissionComplete, setTodaySubmissionComplete] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState<Record<string, ProjectWorkUpdate>>({});
   const [attendanceGate, setAttendanceGate] = useState<AttendanceStatus | null>(null);
+  const [wfhRequestDialogOpen, setWfhRequestDialogOpen] = useState(false);
+  const [wfhRequestNote, setWfhRequestNote] = useState('');
+  const [wfhRequestSubmitting, setWfhRequestSubmitting] = useState(false);
   const projectsCacheRef = useRef<{ at: number; items: Project[] } | null>(null);
   const projectStatsCacheRef = useRef<Record<string, { bugs: number; updates: number }>>({});
   const didAutoOpenEditRef = useRef(false);
@@ -313,6 +317,10 @@ export function DailyWorkFlowPanel({
   const officeOnlyActive = Boolean(attendanceGate?.office_only);
   const workModeLockedToOffice = attendanceGate?.work_mode_locked_to === 'office' || officeOnlyActive;
   const allowWfhToday = Boolean(attendanceGate?.allow_wfh_today);
+  const wfhRequestStatus = String(attendanceGate?.wfh_request_status ?? 'none').toLowerCase();
+  const canRequestWfh = Boolean(attendanceGate?.can_request_wfh);
+  const wfhRequestPending = wfhRequestStatus === 'pending';
+  const showRequestWfhAction = workModeLockedToOffice && !allowWfhToday;
   const forgiveLateToday = Boolean(attendanceGate?.forgive_late_today);
   const lateCount = attendanceGate?.late_count ?? 0;
   const lateLimit = attendanceGate?.late_limit ?? 3;
@@ -395,7 +403,7 @@ export function DailyWorkFlowPanel({
   const selectWorkMode = useCallback(
     async (mode: WorkMode) => {
       if (mode === 'wfh') {
-        if (workModeLockedToOffice) return;
+        if (workModeLockedToOffice && !allowWfhToday) return;
         setWorkMode('wfh');
         clearOfficeGeoState();
         return;
@@ -407,8 +415,74 @@ export function DailyWorkFlowPanel({
         // status/message already set
       }
     },
-    [workModeLockedToOffice, clearOfficeGeoState, verifyOfficeLocation]
+    [workModeLockedToOffice, allowWfhToday, clearOfficeGeoState, verifyOfficeLocation]
   );
+
+  const openWfhRequestDialog = useCallback(() => {
+    setWfhRequestNote(attendanceGate?.wfh_request?.user_note ?? '');
+    setWfhRequestDialogOpen(true);
+  }, [attendanceGate?.wfh_request?.user_note]);
+
+  const closeWfhRequestDialog = useCallback(() => {
+    if (wfhRequestSubmitting) return;
+    setWfhRequestDialogOpen(false);
+    setWfhRequestNote('');
+  }, [wfhRequestSubmitting]);
+
+  const submitWfhRequest = useCallback(async () => {
+    if (wfhRequestSubmitting) return;
+    setWfhRequestSubmitting(true);
+    try {
+      const result = await requestWfhForToday({
+        date: serverToday,
+        user_note: wfhRequestNote.trim().slice(0, 255) || undefined,
+      });
+      if (currentUser?.id) {
+        try {
+          const status = await getAttendanceStatus(String(currentUser.id), serverToday);
+          setAttendanceGate(status);
+        } catch {
+          // non-fatal; optimistic pending
+          setAttendanceGate((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  wfh_request_status: 'pending',
+                  can_request_wfh: false,
+                  wfh_request: result.request
+                    ? {
+                        id: result.request.id,
+                        status: result.request.status,
+                        user_note: result.request.user_note,
+                        request_date: result.request.request_date,
+                      }
+                    : prev.wfh_request,
+                }
+              : prev
+          );
+        }
+      }
+      setWfhRequestDialogOpen(false);
+      setWfhRequestNote('');
+      toast({
+        title: 'WFH request sent',
+        description: result.message || 'Waiting for admin approval.',
+      });
+    } catch (e) {
+      toast({
+        title: 'Could not request WFH',
+        description: e instanceof Error ? e.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setWfhRequestSubmitting(false);
+    }
+  }, [
+    wfhRequestSubmitting,
+    serverToday,
+    wfhRequestNote,
+    currentUser?.id,
+  ]);
 
 
   useEffect(() => {
@@ -931,12 +1005,12 @@ export function DailyWorkFlowPanel({
         });
         return;
       }
-      if (workModeLockedToOffice && workMode === 'wfh') {
+      if (workModeLockedToOffice && !allowWfhToday && workMode === 'wfh') {
         toast({
           title: 'Office only this week',
           description: attendanceGate?.office_only_week_start
-            ? `WFH is blocked (${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end}).`
-            : 'WFH is not allowed during your Office-only week.',
+            ? `WFH is blocked (${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end}). Request WFH if you need an exception.`
+            : 'WFH is not allowed during your Office-only week. Request WFH if you need an exception.',
           variant: 'destructive',
         });
         return;
@@ -1045,6 +1119,7 @@ export function DailyWorkFlowPanel({
   }, [
     workMode,
     workModeLockedToOffice,
+    allowWfhToday,
     attendanceGate,
     officePosition,
     officeGeoStatus,
@@ -2105,7 +2180,11 @@ export function DailyWorkFlowPanel({
                   {attendanceGate?.office_only_week_start
                     ? ` (${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end})`
                     : ''}
-                  . WFH is disabled.
+                  {allowWfhToday
+                    ? '. WFH is allowed for you today.'
+                    : wfhRequestPending
+                      ? '. Your WFH request is pending admin approval.'
+                      : '. Use Request WFH for today if you need an exception.'}
                 </p>
               ) : null}
               <p className="text-xs text-muted-foreground">
@@ -2125,20 +2204,46 @@ export function DailyWorkFlowPanel({
                   <Building2 className="h-6 w-6" />
                   <span className="text-sm font-semibold">Office</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void selectWorkMode('wfh')}
-                  disabled={workModeLockedToOffice || officeGeoStatus === 'checking' || isCheckingIn}
-                  className={`col-span-6 sm:col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                    workMode === 'wfh'
-                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-emerald-300'
-                  }`}
-                >
-                  <Home className="h-6 w-6" />
-                  <span className="text-sm font-semibold">WFH</span>
-                </button>
+                {showRequestWfhAction ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (wfhRequestPending || !canRequestWfh) return;
+                      openWfhRequestDialog();
+                    }}
+                    disabled={wfhRequestPending || !canRequestWfh || isCheckingIn || wfhRequestSubmitting}
+                    className={`col-span-6 sm:col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      wfhRequestPending
+                        ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-emerald-300'
+                    }`}
+                  >
+                    <Home className="h-6 w-6" />
+                    <span className="text-sm font-semibold text-center leading-tight">
+                      {wfhRequestPending ? 'WFH pending' : 'Request WFH for today'}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void selectWorkMode('wfh')}
+                    disabled={officeGeoStatus === 'checking' || isCheckingIn}
+                    className={`col-span-6 sm:col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      workMode === 'wfh'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-emerald-300'
+                    }`}
+                  >
+                    <Home className="h-6 w-6" />
+                    <span className="text-sm font-semibold">WFH</span>
+                  </button>
+                )}
               </div>
+              {wfhRequestPending ? (
+                <p className="text-xs rounded-xl border border-amber-300/80 bg-amber-50/90 px-3 py-2 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100">
+                  WFH request pending — waiting for admin. You will be able to check in as WFH after approval.
+                </p>
+              ) : null}
               {workMode === 'office' ? (
                 <div
                   className={`flex items-start gap-3 rounded-xl border px-3 py-3 text-xs ${
@@ -2160,17 +2265,32 @@ export function DailyWorkFlowPanel({
                         `Office check-in requires your location within ${officeGeoConfig.radiusM} m of ${officeGeoConfig.label}.`}
                     </p>
                     {officeGeoStatus === 'error' ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={isCheckingIn}
-                        onClick={() => void retryOfficeLocation()}
-                        className="h-9 rounded-xl border-rose-300/80 bg-background/90 px-3 text-xs font-semibold text-rose-900 hover:bg-rose-100 dark:border-rose-700/60 dark:text-rose-100 dark:hover:bg-rose-950/60"
-                      >
-                        <LocateFixed className="h-3.5 w-3.5 mr-1.5" />
-                        Allow location
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isCheckingIn}
+                          onClick={() => void retryOfficeLocation()}
+                          className="h-9 rounded-xl border-rose-300/80 bg-background/90 px-3 text-xs font-semibold text-rose-900 hover:bg-rose-100 dark:border-rose-700/60 dark:text-rose-100 dark:hover:bg-rose-950/60"
+                        >
+                          <LocateFixed className="h-3.5 w-3.5 mr-1.5" />
+                          Allow location
+                        </Button>
+                        {canRequestWfh ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isCheckingIn || wfhRequestSubmitting}
+                            onClick={openWfhRequestDialog}
+                            className="h-9 rounded-xl border-emerald-300/80 bg-background/90 px-3 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700/60 dark:text-emerald-100 dark:hover:bg-emerald-950/60"
+                          >
+                            <Home className="h-3.5 w-3.5 mr-1.5" />
+                            Request WFH for today
+                          </Button>
+                        ) : null}
+                      </div>
                     ) : null}
                     {officeGeoStatus === 'checking' ? (
                       <p className="text-[11px] opacity-80">
@@ -2325,6 +2445,64 @@ export function DailyWorkFlowPanel({
                 )}
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={wfhRequestDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeWfhRequestDialog();
+            return;
+          }
+          setWfhRequestDialogOpen(true);
+        }}
+      >
+        <DialogContent className="max-w-[400px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Request WFH for today</DialogTitle>
+            <DialogDescription>
+              Admins will be notified. After approval you can check in as WFH.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="wfh-request-note">Note (optional)</Label>
+            <Textarea
+              id="wfh-request-note"
+              value={wfhRequestNote}
+              maxLength={255}
+              onChange={(e) => setWfhRequestNote(e.target.value.slice(0, 255))}
+              placeholder="Reason for WFH today…"
+              className="min-h-[96px] rounded-xl"
+              disabled={wfhRequestSubmitting}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              disabled={wfhRequestSubmitting}
+              onClick={closeWfhRequestDialog}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="rounded-xl"
+              disabled={wfhRequestSubmitting}
+              onClick={() => void submitWfhRequest()}
+            >
+              {wfhRequestSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                'Send request'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

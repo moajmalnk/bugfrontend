@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns';
 import {
   ArrowLeft,
   CalendarClock,
+  Check,
   ChevronRight,
   ExternalLink,
   Home,
@@ -12,6 +13,7 @@ import {
   Search,
   Trash2,
   UserRound,
+  X,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -50,6 +52,11 @@ import {
   type AttendanceExceptionsAllPayload,
   type LateDayRow,
 } from '@/services/attendanceExceptionService';
+import {
+  listPendingWfhRequests,
+  reviewWfhRequest,
+  type WfhRequest,
+} from '@/services/wfhRequestService';
 import { userService } from '@/services/userService';
 import type { User } from '@/types';
 
@@ -144,6 +151,12 @@ export default function AdminAttendanceExceptions() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState('');
+  const [pendingWfh, setPendingWfh] = useState<WfhRequest[]>([]);
+  const [wfhReview, setWfhReview] = useState<{
+    request: WfhRequest;
+    action: 'approve' | 'reject';
+  } | null>(null);
+  const [wfhReviewing, setWfhReviewing] = useState(false);
 
   /** Currently opened user detail (null = roster view). */
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
@@ -163,11 +176,13 @@ export default function AdminAttendanceExceptions() {
   const loadOverview = useCallback(async () => {
     setLoading(true);
     try {
-      const [payload, userList] = await Promise.all([
+      const [payload, userList, wfhPayload] = await Promise.all([
         listAllAttendanceExceptions(),
         userService.getUsers().catch(() => [] as User[]),
+        listPendingWfhRequests().catch(() => ({ pending: [] as WfhRequest[], pending_count: 0, today: todayYMD() })),
       ]);
       setData(payload);
+      setPendingWfh(Array.isArray(wfhPayload.pending) ? wfhPayload.pending : []);
       const staff = (userList || [])
         .filter((u) => {
           const r = String(u.role || '').toLowerCase();
@@ -187,6 +202,7 @@ export default function AdminAttendanceExceptions() {
         variant: 'destructive',
       });
       setData(null);
+      setPendingWfh([]);
     } finally {
       setLoading(false);
     }
@@ -497,6 +513,38 @@ export default function AdminAttendanceExceptions() {
     }
   }
 
+  async function handleConfirmWfhReview() {
+    if (!wfhReview || wfhReviewing) return;
+    setWfhReviewing(true);
+    try {
+      const result = await reviewWfhRequest({
+        user_id: wfhReview.request.user_id,
+        date: wfhReview.request.request_date,
+        action: wfhReview.action,
+      });
+      toast({
+        title: wfhReview.action === 'approve' ? 'WFH approved' : 'WFH rejected',
+        description:
+          result.message ||
+          `${wfhReview.request.username || 'User'} · ${formatDay(wfhReview.request.request_date)}`,
+      });
+      const reviewedUserId = wfhReview.request.user_id;
+      setWfhReview(null);
+      await loadOverview();
+      if (detailUserId === reviewedUserId) {
+        await loadUserDetail(reviewedUserId, { silent: true });
+      }
+    } catch (e) {
+      toast({
+        title: 'Review failed',
+        description: e instanceof Error ? e.message : 'Could not update WFH request.',
+        variant: 'destructive',
+      });
+    } finally {
+      setWfhReviewing(false);
+    }
+  }
+
   if (role !== 'admin') {
     return (
       <div className="p-6">
@@ -533,6 +581,78 @@ export default function AdminAttendanceExceptions() {
           </Badge>
         </div>
       </div>
+
+      {pendingWfh.length > 0 ? (
+        <div className="rounded-2xl border border-amber-300/70 bg-amber-50/80 dark:border-amber-700/50 dark:bg-amber-950/30 p-4 sm:p-5 space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm font-semibold flex items-center gap-2">
+              <Home className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+              Pending WFH requests
+            </p>
+            <Badge variant="outline" className="rounded-xl tabular-nums border-amber-400/80">
+              {pendingWfh.length}
+            </Badge>
+          </div>
+          <div className="flex flex-col gap-4">
+            {pendingWfh.map((req) => (
+              <div
+                key={`${req.user_id}-${req.request_date}-${req.id ?? ''}`}
+                className="rounded-xl border border-border/60 bg-background/90 p-3 sm:p-4"
+              >
+                <div className="grid grid-cols-12 gap-4 items-start">
+                  <div className="col-span-12 md:col-span-7 min-w-0 space-y-1">
+                    <p className="font-semibold truncate">
+                      {req.username || `User #${req.user_id}`}
+                      {req.role ? (
+                        <span className="ms-2 text-xs font-normal text-muted-foreground">{req.role}</span>
+                      ) : null}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{formatDay(req.request_date)}</p>
+                    {req.user_note ? (
+                      <p className="text-sm text-foreground/90 break-words">{req.user_note}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No note</p>
+                    )}
+                  </div>
+                  <div className="col-span-12 md:col-span-5 flex flex-wrap gap-2 md:justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="rounded-xl"
+                      disabled={saving || wfhReviewing}
+                      onClick={() => setWfhReview({ request: req, action: 'approve' })}
+                    >
+                      <Check className="h-3.5 w-3.5 mr-1.5" />
+                      Approve
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl"
+                      disabled={saving || wfhReviewing}
+                      onClick={() => setWfhReview({ request: req, action: 'reject' })}
+                    >
+                      <X className="h-3.5 w-3.5 mr-1.5" />
+                      Reject
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-xl"
+                      onClick={() => openUser(req.user_id)}
+                    >
+                      Open user
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-border/60 bg-card/60 p-4 sm:p-5 space-y-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1029,6 +1149,60 @@ export default function AdminAttendanceExceptions() {
                 `Remove ${removeCount}`
               ) : (
                 'Remove'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!wfhReview}
+        onOpenChange={(open) => {
+          if (!open && !wfhReviewing) setWfhReview(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {wfhReview?.action === 'approve' ? 'Approve WFH request?' : 'Reject WFH request?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {wfhReview
+                ? `${wfhReview.request.username || 'User'} · ${formatDay(
+                    wfhReview.request.request_date
+                  )}${
+                    wfhReview.action === 'approve'
+                      ? '. This grants Allow WFH for that day so they can check in as WFH.'
+                      : '. They will stay on Office-only until you grant an exception.'
+                  }`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={wfhReviewing}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(
+                'rounded-xl',
+                wfhReview?.action === 'reject' &&
+                  'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+              )}
+              disabled={wfhReviewing || !wfhReview}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmWfhReview();
+              }}
+            >
+              {wfhReviewing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : wfhReview?.action === 'approve' ? (
+                'Approve'
+              ) : (
+                'Reject'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

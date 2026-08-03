@@ -66,6 +66,16 @@ export type AttendanceStatus = {
     forgive_late?: boolean;
     admin_note?: string | null;
   } | null;
+  /** Same-day WFH approval gate (Office-only week) */
+  wfh_request_status?: 'none' | 'pending' | 'approved' | 'rejected' | string;
+  can_request_wfh?: boolean;
+  wfh_request?: {
+    id?: number;
+    status?: string;
+    user_note?: string | null;
+    admin_note?: string | null;
+    request_date?: string;
+  } | null;
   office_lat?: number;
   office_lng?: number;
   office_radius_m?: number;

@@ -501,9 +501,15 @@ class UserService {
         throw new Error('Authentication token not found');
       }
 
+      const frontendOrigin =
+        typeof window !== 'undefined' ? window.location.origin : undefined;
+
       const response = await axios.post<{ success: boolean; data: { url: string; expires_at: string; ttl_seconds: number }; message?: string }>(
         `${ENV.API_URL}/users/generate-dashboard-link.php`,
-        { userId },
+        {
+          userId,
+          ...(frontendOrigin ? { frontend_origin: frontendOrigin } : {}),
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -512,7 +518,17 @@ class UserService {
       );
 
       if (response.data.success) {
-        return response.data.data;
+        const data = response.data.data;
+        // Why: Keep impersonation on the same host the admin is using (local ↔ production).
+        if (frontendOrigin && data?.url) {
+          try {
+            const parsed = new URL(data.url);
+            data.url = `${frontendOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+          } catch {
+            // keep API url
+          }
+        }
+        return data;
       } else {
         throw new Error(response.data.message || 'Failed to generate dashboard link');
       }

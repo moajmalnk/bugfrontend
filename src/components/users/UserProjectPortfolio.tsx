@@ -39,7 +39,9 @@ import {
   Bug,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   ExternalLink,
   FolderKanban,
   FoldVertical,
@@ -1589,8 +1591,11 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  /** Why: Portfolio opens collapsed; expand is opt-in via accordion or Expand all. */
+  /** Why: Whole portfolio section starts open; header toggles stats + list together. */
+  const [sectionExpanded, setSectionExpanded] = useState(true);
+  /** Why: Project rows start fully expanded; list toggle is opt-in collapse. */
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>([]);
+  const [expandAllProjectsByDefault, setExpandAllProjectsByDefault] = useState(true);
   const [selectedProject, setSelectedProject] = useState<UserPortfolioProject | null>(null);
   const [projectSheetOpen, setProjectSheetOpen] = useState(false);
   const rolePath = getEffectiveRole(currentUser) || "admin";
@@ -1603,11 +1608,13 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
   };
 
   useEffect(() => {
+    setSectionExpanded(true);
     setExpandedProjectIds([]);
+    setExpandAllProjectsByDefault(true);
     setSearch("");
   }, [userId]);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["userProfilePortfolio", userId],
     queryFn: () => userService.getProfilePortfolio(userId),
     enabled: !!userId,
@@ -1642,15 +1649,26 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
     });
   }, [data?.projects, search]);
 
+  useEffect(() => {
+    if (!expandAllProjectsByDefault) return;
+    setExpandedProjectIds(filteredProjects.map((project) => project.id));
+  }, [filteredProjects, expandAllProjectsByDefault]);
+
   const allProjectsExpanded =
     filteredProjects.length > 0 &&
     filteredProjects.every((project) => expandedProjectIds.includes(project.id));
 
+  const toggleSectionExpanded = () => {
+    setSectionExpanded((open) => !open);
+  };
+
   const toggleExpandAllProjects = () => {
     if (allProjectsExpanded) {
+      setExpandAllProjectsByDefault(false);
       setExpandedProjectIds([]);
       return;
     }
+    setExpandAllProjectsByDefault(true);
     setExpandedProjectIds(filteredProjects.map((project) => project.id));
   };
 
@@ -1692,13 +1710,13 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
   return (
     <TooltipProvider delayDuration={200}>
     <Card className={cn("overflow-hidden border-border/60 shadow-sm", className)}>
-      <CardHeader className="p-4 sm:p-5 lg:p-6 pb-3 sm:pb-4">
+      <CardHeader className={cn("p-4 sm:p-5 lg:p-6", sectionExpanded ? "pb-3 sm:pb-4" : "pb-4 sm:pb-5")}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-slate-700 dark:bg-slate-600 rounded-lg">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1.5 bg-slate-700 dark:bg-slate-600 rounded-lg shrink-0">
               <FolderKanban className="h-4 w-4 text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-lg sm:text-xl">Project portfolio</CardTitle>
               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                 Assignments, ratios, status history, and time spent in each stage
@@ -1707,15 +1725,21 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
           </div>
           <button
             type="button"
-            onClick={() => void refetch()}
+            onClick={toggleSectionExpanded}
             className="inline-flex items-center gap-1.5 self-start sm:self-auto text-xs text-muted-foreground hover:text-foreground"
-            disabled={isFetching}
+            aria-expanded={sectionExpanded}
+            aria-label={sectionExpanded ? "Collapse project portfolio" : "Expand project portfolio"}
           >
-            <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-            Refresh
+            {sectionExpanded ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+            {sectionExpanded ? "Collapse" : "Expand"}
           </button>
         </div>
       </CardHeader>
+      {sectionExpanded ? (
       <CardContent className="min-w-0 space-y-4 p-4 pt-0 sm:p-5 lg:p-6">
         {isLoading ? (
           <PortfolioSkeleton />
@@ -1894,7 +1918,7 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
                   className="pl-9 h-10 rounded-xl"
                 />
               </div>
-              <div className="hidden lg:block col-span-12 lg:col-span-3 xl:col-span-2">
+              <div className="col-span-12 lg:col-span-3 xl:col-span-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -1964,6 +1988,7 @@ export function UserProjectPortfolio({ userId, className }: UserProjectPortfolio
           </>
         )}
       </CardContent>
+      ) : null}
     </Card>
     </TooltipProvider>
   );
