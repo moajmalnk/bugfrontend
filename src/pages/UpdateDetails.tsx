@@ -24,7 +24,7 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { updateService } from "@/services/updateService";
 import { apiClient } from "@/lib/axios";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Check, X, Trash2, Pencil, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Play, Timer, Loader2, Code2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, X, Trash2, AlertCircle, Lock, CheckCircle2, ImagePlus, Paperclip, File, Play, Timer, Loader2, Code2, ChevronLeft, Edit2, Share2, CheckSquare } from "lucide-react";
 import { CopyTextButton } from "@/components/ui/CopyTextButton";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
@@ -39,6 +39,8 @@ import { UpdateDetailsCard } from "@/components/updates/UpdateDetailsCard";
 import { UpdateLifecycleCard } from "@/components/updates/UpdateLifecycleCard";
 import { userService } from "@/services/userService";
 import { compareUsersActiveFirst } from "@/lib/utils/userSort";
+import { generateShareableUrl } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 type ProjectMemberOption = {
   id: string;
@@ -523,62 +525,172 @@ const UpdateDetails = () => {
       {/* Main content */}
       <section className="max-w-7xl mx-auto space-y-8 flex-1 w-full">
         <header className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20"></div>
-          <div className="relative p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-              <div className="min-w-0">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => navigate(updatesBackPath)} 
-                  className="mb-2 -ml-2 sm:-ml-4"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  {fromProject ? "Back to Project Updates" : "Back to Updates"}
-                </Button>
-                <div className="flex items-start gap-2">
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent break-words min-w-0 flex-1">
-                    {update.title}
-                  </h1>
-                  <CopyTextButton
-                    text={update.title || ""}
-                    label="title"
-                    className="mt-1.5 shrink-0"
-                  />
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 break-words">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-emerald-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-emerald-950/20" />
+          <div className="relative p-4 sm:p-6 space-y-3 sm:space-y-4">
+            <button
+              type="button"
+              onClick={() => navigate(updatesBackPath)}
+              className="inline-flex items-center text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronLeft className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              {fromProject ? "Back to Project Updates" : "Back to Updates"}
+            </button>
+
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-1 min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words">
+                  {update.title}
+                </h1>
+                {update.project_name ? (
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Project Name: {update.project_name}
+                  </p>
+                ) : null}
+                <p className="text-xs sm:text-sm text-muted-foreground break-words">
                   Update ID: <span className="font-mono break-all">{update.id}</span>
                 </p>
-                <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
               </div>
-              <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
-                {canPerformActions && (
-                  <>
-                    {(currentUser?.role === "admin" || update?.created_by === currentUser?.username) && (
-                      <Button asChild variant="outline" size="sm">
-                        <Link to={currentUser?.role ? `/${currentUser.role}/updates/${updateId}/edit` : `/updates/${updateId}/edit`}>
-                          <Pencil className="mr-2 h-4 w-4"/>Edit
-                        </Link>
-                      </Button>
-                    )}
-                    <WhatsAppShareButton
-                      data={{
-                        updateId: update.id,
-                        updateTitle: update.title,
-                        updateStatus: update.status,
-                        updateType: update.type,
-                        projectName: update.project_name,
-                        createdBy: update.created_by_name || update.created_by,
-                        description: update.description,
-                      }}
-                      type="update_details"
+
+              <div
+                role="toolbar"
+                aria-label="Update actions"
+                className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:max-w-md lg:justify-end"
+              >
+                <CopyTextButton
+                  text={update.title || ""}
+                  label="title"
+                  size="md"
+                  className="h-9 w-9 shrink-0"
+                />
+
+                {canPerformActions &&
+                  (currentUser?.role === "admin" ||
+                    update?.created_by === currentUser?.username) && (
+                    <Button
+                      variant="outline"
                       size="sm"
-                    />
-                    <Button variant="destructive" size="sm" onClick={handleDeleteUpdate}>
-                      <Trash2 className="mr-2 h-4 w-4"/>Delete
+                      title="Edit update"
+                      aria-label="Edit update"
+                      className="h-9 w-9 p-0 shrink-0"
+                      asChild
+                    >
+                      <Link
+                        to={
+                          currentUser?.role
+                            ? `/${currentUser.role}/updates/${updateId}/edit`
+                            : `/updates/${updateId}/edit`
+                        }
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Link>
                     </Button>
-                  </>
+                  )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title="Share"
+                  aria-label="Share"
+                  className="h-9 w-9 p-0 shrink-0"
+                  onClick={async () => {
+                    const url = generateShareableUrl("updates", update.id);
+                    try {
+                      if (navigator.share) {
+                        await navigator.share({
+                          title: update.title,
+                          text: update.title,
+                          url,
+                        });
+                      } else {
+                        await navigator.clipboard.writeText(url);
+                        toast({
+                          title: "Link copied",
+                          description: "Update link copied to clipboard.",
+                        });
+                      }
+                    } catch {
+                      try {
+                        await navigator.clipboard.writeText(url);
+                        toast({
+                          title: "Link copied",
+                          description: "Update link copied to clipboard.",
+                        });
+                      } catch {
+                        toast({
+                          title: "Share failed",
+                          description: "Could not share this update.",
+                          variant: "destructive",
+                        });
+                      }
+                    }
+                  }}
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+
+                {canPerformActions && (
+                  <WhatsAppShareButton
+                    data={{
+                      updateId: update.id,
+                      updateTitle: update.title,
+                      updateStatus: update.status,
+                      updateType: update.type,
+                      projectName: update.project_name,
+                      createdBy: update.created_by_name || update.created_by,
+                      description: update.description,
+                    }}
+                    type="update_details"
+                    variant="outline"
+                    size="sm"
+                    showLabel={false}
+                  />
+                )}
+
+                {canMarkAsCompleted && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    title="Mark as completed"
+                    aria-label="Mark as completed"
+                    className="h-9 w-9 p-0 shrink-0"
+                    onClick={() => setShowCompleteDialog(true)}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                  </Button>
+                )}
+
+                {canPerformActions && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    title="Delete update"
+                    aria-label="Delete update"
+                    onClick={handleDeleteUpdate}
+                    className="h-9 w-9 p-0 shrink-0 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary" className="text-xs">
+                ID: {String(update.id).substring(0, 8)}
+              </Badge>
+              {update.status ? (
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${getStatusBadgeStyle(update.status)}`}
+                >
+                  {String(update.status).replace(/_/g, " ").toUpperCase()}
+                </Badge>
+              ) : null}
+              {update.type ? (
+                <Badge variant="outline" className="text-xs capitalize">
+                  {update.type}
+                </Badge>
+              ) : null}
             </div>
           </div>
         </header>
