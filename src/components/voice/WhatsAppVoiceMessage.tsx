@@ -18,17 +18,8 @@ export interface WhatsAppVoiceMessageProps {
 }
 
 const SPEED_STEPS: Array<1 | 1.5 | 2> = [1, 1.5, 2];
-/** Mild pitch bump for a brighter / female-like robot voice */
-const ROBOT_PITCH = 1.2;
-
-type RobotGraph = {
-  ctx: AudioContext;
-  source: MediaElementAudioSourceNode;
-  dryGain: GainNode;
-  wetGain: GainNode;
-  modulator: OscillatorNode;
-  modulatorGain: GainNode;
-};
+/** Higher pitch for robot / brighter voice — no Web Audio delay */
+const ROBOT_PITCH = 1.25;
 
 const isAbortError = (error: unknown) => {
   if (!error || typeof error !== "object") return false;
@@ -54,25 +45,19 @@ export function WhatsAppVoiceMessage({
   const [currentTime, setCurrentTime] = useState(0);
   const [speedIndex, setSpeedIndex] = useState(0);
   const [robotMode, setRobotMode] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(
     Number.isFinite(duration) && duration > 0 ? duration : 0
   );
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const derivedUrlRef = useRef<string | null>(null);
-  const storedDurationRef = useRef(
-    Number.isFinite(duration) && duration > 0 ? duration : 0
-  );
-  const probingDurationRef = useRef(false);
-  const robotGraphRef = useRef<RobotGraph | null>(null);
-  const robotModeRef = useRef(false);
-  const speedIndexRef = useRef(0);
   const playIntentRef = useRef(false);
   const playRequestIdRef = useRef(0);
+  const robotModeRef = useRef(false);
+  const speedIndexRef = useRef(0);
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
-  const [sourceLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     onPlayRef.current = onPlay;
@@ -88,431 +73,162 @@ export function WhatsAppVoiceMessage({
   }, [speedIndex]);
 
   useEffect(() => {
+    if (typeof duration === "number" && Number.isFinite(duration) && duration > 0) {
+      setMediaDuration(duration);
+    }
+  }, [duration]);
+
+  // Resolve blob / string source once
+  useEffect(() => {
     let cancelled = false;
 
-    const cleanupDerivedUrl = () => {
+    const revoke = () => {
       if (derivedUrlRef.current) {
         URL.revokeObjectURL(derivedUrlRef.current);
         derivedUrlRef.current = null;
       }
     };
 
-    const resolveSource = async () => {
-      if (audioSource instanceof Blob) {
-        cleanupDerivedUrl();
-        setIsPlaying(false);
-        setCurrentTime(0);
-        setLoadError(null);
-        setAudioUrl(null);
-
-        const url = URL.createObjectURL(audioSource);
-        if (!cancelled) {
-          derivedUrlRef.current = url;
-          setAudioUrl(url);
-        } else {
-          URL.revokeObjectURL(url);
-        }
+    if (audioSource instanceof Blob) {
+      revoke();
+      const url = URL.createObjectURL(audioSource);
+      if (cancelled) {
+        URL.revokeObjectURL(url);
         return;
       }
+      derivedUrlRef.current = url;
+      setLoadError(null);
+      setAudioUrl(url);
+      setIsPlaying(false);
+      setCurrentTime(0);
+      return () => {
+        cancelled = true;
+        revoke();
+      };
+    }
 
-      if (typeof audioSource === "string") {
-        if (!audioSource.trim()) {
-          cleanupDerivedUrl();
-          setAudioUrl(null);
-          if (!cancelled) {
-            setLoadError("Unable to load voice note");
-          }
-          return;
-        }
+    if (typeof audioSource === "string" && audioSource.trim()) {
+      revoke();
+      setLoadError(null);
+      setAudioUrl(audioSource);
+      return () => {
+        cancelled = true;
+        revoke();
+      };
+    }
 
-        cleanupDerivedUrl();
-        setLoadError(null);
-
-        if (
-          audioSource.startsWith("blob:") ||
-          audioSource.startsWith("data:") ||
-          audioSource.startsWith("http://") ||
-          audioSource.startsWith("https://") ||
-          audioSource.startsWith("/")
-        ) {
-          if (!cancelled) {
-            setAudioUrl(audioSource);
-          }
-          return;
-        }
-
-        setAudioUrl(null);
-        if (!cancelled) {
-          setLoadError("Unsupported audio source");
-        }
-        return;
-      }
-
-      cleanupDerivedUrl();
-      setAudioUrl(null);
-      if (!cancelled) {
-        setLoadError("Unsupported audio source");
-      }
-    };
-
-    void resolveSource();
-
+    revoke();
+    setAudioUrl(null);
+    setLoadError("Unable to load voice note");
     return () => {
       cancelled = true;
-      cleanupDerivedUrl();
+      revoke();
     };
   }, [audioSource]);
 
-  useEffect(() => {
-    if (typeof duration === "number" && Number.isFinite(duration) && duration > 0) {
-      storedDurationRef.current = duration;
-      setMediaDuration(duration);
-    }
-  }, [duration]);
-
-  const applyPlaybackRate = (audio: HTMLAudioElement) => {
+  const applyRate = (audio: HTMLAudioElement) => {
     const base = SPEED_STEPS[speedIndexRef.current] ?? 1;
     audio.playbackRate = base * (robotModeRef.current ? ROBOT_PITCH : 1);
   };
 
-  /**
-   * Why: MediaRecorder WebM often reports Infinity duration until seeked.
-   * Only probe while idle so seeking cannot interrupt an in-flight play().
-   */
-  const probeInfiniteDuration = (audio: HTMLAudioElement) => {
-    if (probingDurationRef.current) return;
-    if (playIntentRef.current || !audio.paused) return;
-    if (storedDurationRef.current > 0) return;
-    if (Number.isFinite(audio.duration) && audio.duration > 0) return;
-
-    probingDurationRef.current = true;
-    const previousTime = audio.currentTime;
-
-    const finish = (value: number) => {
-      probingDurationRef.current = false;
-      if (playIntentRef.current || !audio.paused) return;
-      try {
-        audio.currentTime = previousTime;
-      } catch {
-        /* ignore seek restore failures */
-      }
-      if (Number.isFinite(value) && value > 0) {
-        setMediaDuration(value);
-      }
-    };
-
-    const onSeeked = () => {
-      audio.removeEventListener("seeked", onSeeked);
-      const probed = audio.currentTime;
-      finish(probed);
-    };
-
-    audio.addEventListener("seeked", onSeeked);
-    try {
-      audio.currentTime = 1e101;
-    } catch {
-      audio.removeEventListener("seeked", onSeeked);
-      probingDurationRef.current = false;
-    }
-  };
-
-  const acceptMediaDuration = (audio: HTMLAudioElement) => {
-    if (Number.isFinite(audio.duration) && audio.duration > 0) {
-      setMediaDuration(audio.duration);
-      return;
-    }
-    if (!Number.isFinite(audio.duration) || audio.duration === Infinity) {
-      probeInfiniteDuration(audio);
-    }
-  };
-
+  // Create audio element once URL is ready — metadata only, play on demand
   useEffect(() => {
     if (!audioUrl) return;
 
     playIntentRef.current = false;
     playRequestIdRef.current += 1;
 
-    if (robotGraphRef.current) {
-      try {
-        robotGraphRef.current.modulator.stop();
-        void robotGraphRef.current.ctx.close();
-      } catch {
-        /* ignore */
-      }
-      robotGraphRef.current = null;
-    }
-
     const audio = new Audio(audioUrl);
     audio.preload = "metadata";
-    // Needed for Web Audio robot graph on cross-origin audio.php URLs
-    audio.crossOrigin = "anonymous";
     audioRef.current = audio;
-    applyPlaybackRate(audio);
+    applyRate(audio);
 
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-    const handleEnded = () => {
+    const onTime = () => setCurrentTime(audio.currentTime);
+    const onEnded = () => {
       playIntentRef.current = false;
       setIsPlaying(false);
       setCurrentTime(0);
       onPauseRef.current?.(id);
     };
-    const handleLoaded = () => {
-      setIsLoading(false);
-      acceptMediaDuration(audio);
+    const onMeta = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        setMediaDuration((prev) =>
+          prev > 0 ? prev : audio.duration
+        );
+      }
     };
-    const handleDurationChange = () => {
-      acceptMediaDuration(audio);
-    };
-    const handleError = () => {
-      // Ignore teardown / aborted loads while switching sources
-      if (!audioRef.current || audioRef.current !== audio) return;
-      setLoadError("Unable to play voice note");
-      setIsPlaying(false);
+    const onError = () => {
+      if (audioRef.current !== audio) return;
       playIntentRef.current = false;
+      setIsPlaying(false);
+      setLoadError("Unable to play voice note");
     };
 
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("loadedmetadata", handleLoaded);
-    audio.addEventListener("durationchange", handleDurationChange);
-    audio.addEventListener("error", handleError);
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("durationchange", onMeta);
+    audio.addEventListener("error", onError);
 
     return () => {
       playIntentRef.current = false;
       playRequestIdRef.current += 1;
       audio.pause();
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("ended", handleEnded);
-      audio.removeEventListener("loadedmetadata", handleLoaded);
-      audio.removeEventListener("durationchange", handleDurationChange);
-      audio.removeEventListener("error", handleError);
-      if (audioRef.current === audio) {
-        audioRef.current = null;
-      }
-      if (robotGraphRef.current) {
-        try {
-          robotGraphRef.current.modulator.stop();
-          void robotGraphRef.current.ctx.close();
-        } catch {
-          /* ignore */
-        }
-        robotGraphRef.current = null;
-      }
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("durationchange", onMeta);
+      audio.removeEventListener("error", onError);
+      if (audioRef.current === audio) audioRef.current = null;
     };
-    // Stable: do not depend on onPause identity (parent inline lambdas)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioUrl, id]);
 
   useEffect(() => {
-    if (!audioRef.current) return;
-    applyPlaybackRate(audioRef.current);
-    syncRobotRouting(robotMode);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (audioRef.current) applyRate(audioRef.current);
   }, [speedIndex, robotMode]);
 
+  // Mutual exclusion only — do not re-trigger play if already starting
   useEffect(() => {
     if (!autoPlay) return;
-
     if (isActive) {
-      // Parent marked this note active — start only if we are not already intending to play
-      if (!playIntentRef.current) {
-        void togglePlayback(true);
-      }
+      if (!playIntentRef.current) void togglePlayback(true);
     } else if (playIntentRef.current || isPlaying) {
       void togglePlayback(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlay, isActive]);
 
-  const ensureRobotGraph = async (
-    audio: HTMLAudioElement
-  ): Promise<RobotGraph | null> => {
-    if (robotGraphRef.current) {
-      if (robotGraphRef.current.ctx.state === "suspended") {
-        await robotGraphRef.current.ctx.resume();
-      }
-      return robotGraphRef.current;
-    }
-
-    try {
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
-      const ctx = new AudioCtx();
-      const source = ctx.createMediaElementSource(audio);
-
-      const dryGain = ctx.createGain();
-      const wetGain = ctx.createGain();
-      const tremolo = ctx.createGain();
-      const modulatorGain = ctx.createGain();
-      const modulator = ctx.createOscillator();
-      const bandpass = ctx.createBiquadFilter();
-      const highShelf = ctx.createBiquadFilter();
-
-      bandpass.type = "bandpass";
-      bandpass.frequency.value = 1400;
-      bandpass.Q.value = 0.7;
-
-      highShelf.type = "highshelf";
-      highShelf.frequency.value = 1800;
-      highShelf.gain.value = 6;
-
-      modulator.type = "sine";
-      modulator.frequency.value = 35;
-      tremolo.gain.value = 1;
-      modulatorGain.gain.value = 0;
-
-      source.connect(dryGain);
-      dryGain.connect(ctx.destination);
-
-      source.connect(bandpass);
-      bandpass.connect(highShelf);
-      highShelf.connect(tremolo);
-      tremolo.connect(wetGain);
-      wetGain.connect(ctx.destination);
-      modulator.connect(modulatorGain);
-      modulatorGain.connect(tremolo.gain);
-
-      dryGain.gain.value = 1;
-      wetGain.gain.value = 0;
-      modulator.start();
-
-      const graph: RobotGraph = {
-        ctx,
-        source,
-        dryGain,
-        wetGain,
-        modulator,
-        modulatorGain,
-      };
-      robotGraphRef.current = graph;
-      if (ctx.state === "suspended") {
-        await ctx.resume();
-      }
-      return graph;
-    } catch (error) {
-      console.error("Failed to init robot audio graph", error);
-      return null;
-    }
-  };
-
-  const syncRobotRouting = (enabled: boolean) => {
-    const graph = robotGraphRef.current;
-    if (!graph) return;
-    graph.dryGain.gain.setTargetAtTime(
-      enabled ? 0.15 : 1,
-      graph.ctx.currentTime,
-      0.03
-    );
-    graph.wetGain.gain.setTargetAtTime(
-      enabled ? 0.85 : 0,
-      graph.ctx.currentTime,
-      0.03
-    );
-    graph.modulatorGain.gain.setTargetAtTime(
-      enabled ? 0.55 : 0,
-      graph.ctx.currentTime,
-      0.03
-    );
-  };
-
-  const ensureAudioReady = (audio: HTMLAudioElement) => {
-    if (audio.readyState >= 2) {
-      return Promise.resolve();
-    }
-
-    return new Promise<void>((resolve, reject) => {
-      const handleLoaded = () => {
-        cleanup();
-        resolve();
-      };
-
-      const handleError = () => {
-        cleanup();
-        reject(new Error("Failed to load audio metadata"));
-      };
-
-      const cleanup = () => {
-        audio.removeEventListener("loadedmetadata", handleLoaded);
-        audio.removeEventListener("error", handleError);
-      };
-
-      audio.addEventListener("loadedmetadata", handleLoaded);
-      audio.addEventListener("error", handleError);
-      try {
-        audio.load();
-      } catch {
-        /* already loading */
-      }
-    });
-  };
-
   const togglePlayback = async (play?: boolean) => {
-    if (!audioRef.current || !audioUrl || sourceLoading || loadError) {
-      return;
-    }
-
-    const shouldPlay = play ?? !isPlaying;
     const audio = audioRef.current;
+    if (!audio || !audioUrl) return;
+
+    const shouldPlay = play ?? !playIntentRef.current;
 
     if (shouldPlay) {
-      if (playIntentRef.current && !audio.paused) {
-        return;
-      }
+      if (playIntentRef.current && !audio.paused) return;
 
       const requestId = ++playRequestIdRef.current;
       playIntentRef.current = true;
+      setLoadError(null);
+      // Optimistic UX: flip to pause icon immediately
+      setIsPlaying(true);
+      onPlayRef.current?.(id);
+      applyRate(audio);
 
       try {
-        setIsLoading(true);
-        setLoadError(null);
-        await ensureAudioReady(audio);
-        if (requestId !== playRequestIdRef.current || !playIntentRef.current) {
-          return;
-        }
-
-        if (
-          Number.isFinite(audio.duration) &&
-          audio.duration > 0 &&
-          storedDurationRef.current <= 0
-        ) {
-          setMediaDuration(audio.duration);
-        }
-
-        if (robotModeRef.current) {
-          const graph = await ensureRobotGraph(audio);
-          if (graph) syncRobotRouting(true);
-        }
-
-        if (requestId !== playRequestIdRef.current || !playIntentRef.current) {
-          return;
-        }
-
-        applyPlaybackRate(audio);
         await audio.play();
-
         if (requestId !== playRequestIdRef.current || !playIntentRef.current) {
           audio.pause();
-          return;
+          setIsPlaying(false);
         }
-
-        setIsPlaying(true);
-        onPlayRef.current?.(id);
       } catch (error) {
-        // AbortError = play interrupted by pause/teardown — not a hard failure
         if (isAbortError(error) || !playIntentRef.current) {
           setIsPlaying(false);
           return;
         }
-        console.error("Failed to play voice note", error);
-        setLoadError("Unable to play voice note");
-        setIsPlaying(false);
         playIntentRef.current = false;
-      } finally {
-        setIsLoading(false);
+        setIsPlaying(false);
+        setLoadError("Unable to play voice note");
       }
     } else {
       playIntentRef.current = false;
@@ -527,26 +243,11 @@ export function WhatsAppVoiceMessage({
     setSpeedIndex((prev) => (prev + 1) % SPEED_STEPS.length);
   };
 
-  const toggleRobotMode = async () => {
+  const toggleRobotMode = () => {
     const next = !robotMode;
     setRobotMode(next);
     robotModeRef.current = next;
-
-    if (!audioRef.current) return;
-
-    if (next) {
-      const graph = await ensureRobotGraph(audioRef.current);
-      if (graph) {
-        if (graph.ctx.state === "suspended") {
-          await graph.ctx.resume();
-        }
-        syncRobotRouting(true);
-      }
-    } else {
-      syncRobotRouting(false);
-    }
-
-    applyPlaybackRate(audioRef.current);
+    if (audioRef.current) applyRate(audioRef.current);
   };
 
   const effectiveDuration =
@@ -569,7 +270,7 @@ export function WhatsAppVoiceMessage({
     effectiveDuration > 0
       ? Math.min(1, (currentTime || 0) / effectiveDuration)
       : isPlaying
-        ? 0.1
+        ? 0.08
         : 0;
 
   const bars = useMemo(() => {
@@ -586,10 +287,10 @@ export function WhatsAppVoiceMessage({
             "w-[3px] rounded-full transition-all duration-100",
             accent === "sent"
               ? isBarActive
-                ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
+                ? "bg-emerald-500"
                 : "bg-emerald-400/40"
               : isBarActive
-                ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.25)]"
+                ? "bg-white"
                 : "bg-white/40"
           )}
           style={{ height: `${height}px` }}
@@ -597,9 +298,6 @@ export function WhatsAppVoiceMessage({
       );
     });
   }, [accent, id, progress, waveform]);
-
-  const showError = Boolean(loadError);
-  const isBusy = isLoading || sourceLoading;
 
   return (
     <div
@@ -626,23 +324,20 @@ export function WhatsAppVoiceMessage({
           size="icon"
           variant="ghost"
           onClick={() => {
-            // Allow retry after a soft failure
             if (loadError) setLoadError(null);
             void togglePlayback();
           }}
-          disabled={sourceLoading || !audioUrl}
+          disabled={!audioUrl}
           className={cn(
             "h-10 w-10 rounded-full border border-white/20 bg-white/10 text-current backdrop-blur transition hover:bg-white/20",
             accent === "received" &&
               "border-transparent bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20",
             isPlaying && "ring-2 ring-white/40 dark:ring-emerald-400/60",
-            (sourceLoading || !audioUrl) && "opacity-60"
+            !audioUrl && "opacity-60"
           )}
           aria-label={isPlaying ? "Pause voice note" : "Play voice note"}
         >
-          {isBusy ? (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : isPlaying ? (
+          {isPlaying ? (
             <Pause className="h-4 w-4" />
           ) : (
             <Play className="h-4 w-4" />
@@ -656,7 +351,7 @@ export function WhatsAppVoiceMessage({
           <div className="mt-1 flex h-10 items-end gap-[2px] overflow-hidden">
             {bars}
           </div>
-          {showError && (
+          {loadError && (
             <p className="mt-2 text-[11px] font-medium text-red-500 dark:text-red-300">
               {loadError}
             </p>
@@ -669,7 +364,7 @@ export function WhatsAppVoiceMessage({
               type="button"
               size="sm"
               variant="ghost"
-              onClick={() => void toggleRobotMode()}
+              onClick={toggleRobotMode}
               disabled={!audioUrl}
               className={cn(
                 "h-7 rounded-full border border-white/30 bg-white/10 px-2 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20",
