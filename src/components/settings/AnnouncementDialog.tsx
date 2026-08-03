@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { sortUsersActiveFirst } from '@/lib/utils/userSort';
 import {
   Announcement,
   AnnouncementPayload,
@@ -222,24 +223,26 @@ export const AnnouncementDialog = ({
   };
 
   const isEditing = !!announcement;
-  const filteredUsers = users.filter((user) => {
-    const userRole = String(user.role || '').toLowerCase();
-    const byRole = recipientRoleFilter === 'all' || userRole === recipientRoleFilter;
-    const query = recipientSearch.trim().toLowerCase();
-    const bySearch =
-      query === '' ||
-      String(user.name || user.username || '')
-        .toLowerCase()
-        .includes(query) ||
-      String(user.username || '')
-        .toLowerCase()
-        .includes(query) ||
-      String(user.email || '')
-        .toLowerCase()
-        .includes(query);
+  const filteredUsers = sortUsersActiveFirst(
+    users.filter((user) => {
+      const userRole = String(user.role || '').toLowerCase();
+      const byRole = recipientRoleFilter === 'all' || userRole === recipientRoleFilter;
+      const query = recipientSearch.trim().toLowerCase();
+      const bySearch =
+        query === '' ||
+        String(user.name || user.username || '')
+          .toLowerCase()
+          .includes(query) ||
+        String(user.username || '')
+          .toLowerCase()
+          .includes(query) ||
+        String(user.email || '')
+          .toLowerCase()
+          .includes(query);
 
-    return byRole && bySearch;
-  });
+      return byRole && bySearch;
+    })
+  );
 
   const roleBadgeClass = (role: string) => {
     const normalized = role.toLowerCase();

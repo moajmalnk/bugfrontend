@@ -37,6 +37,8 @@ import { useState, useEffect, useMemo } from "react";
 import { buildAudioUrl } from "@/lib/mediaUrls";
 import { UpdateDetailsCard } from "@/components/updates/UpdateDetailsCard";
 import { UpdateLifecycleCard } from "@/components/updates/UpdateLifecycleCard";
+import { userService } from "@/services/userService";
+import { compareUsersActiveFirst } from "@/lib/utils/userSort";
 
 type ProjectMemberOption = {
   id: string;
@@ -45,6 +47,8 @@ type ProjectMemberOption = {
   role?: string;
   user_role?: string;
   member_role?: string;
+  account_active?: number;
+  status?: "active" | "idle" | "offline";
 };
 
 
@@ -226,21 +230,34 @@ const UpdateDetails = () => {
     staleTime: 60_000,
   });
 
+  const { data: directoryUsers = [] } = useQuery({
+    queryKey: ["users", "directory"],
+    queryFn: () => userService.getUsers(),
+    enabled: showCompleteDialog,
+    staleTime: 60_000,
+  });
+
   const { testerOptions, developerOptions } = useMemo(() => {
     const members = projectMembersData?.members || [];
     const admins = projectMembersData?.admins || [];
     const byId = new Map<string, ProjectMemberOption>();
+    const usersById = new Map(
+      directoryUsers.map((u) => [String(u.id), u] as const)
+    );
 
     const upsert = (person: ProjectMemberOption) => {
       if (!person?.id) return;
-      byId.set(String(person.id), person);
+      const dir = usersById.get(String(person.id));
+      byId.set(String(person.id), {
+        ...person,
+        account_active: dir?.account_active ?? person.account_active,
+        status: dir?.status ?? person.status,
+      });
     };
     members.forEach(upsert);
     admins.forEach(upsert);
 
-    const people = Array.from(byId.values()).sort((a, b) =>
-      (a.username || "").localeCompare(b.username || "")
-    );
+    const people = Array.from(byId.values()).sort(compareUsersActiveFirst);
 
     const roleOf = (p: ProjectMemberOption) =>
       String(p.user_role || p.member_role || p.role || "").toLowerCase();
@@ -259,7 +276,7 @@ const UpdateDetails = () => {
       testerOptions: testers.length > 0 ? testers : people,
       developerOptions: developers.length > 0 ? developers : people,
     };
-  }, [projectMembersData]);
+  }, [projectMembersData, directoryUsers]);
 
   const updatesListFallback = `/${currentUser?.role || "admin"}/updates`;
   const updatesBackPath = fromProject

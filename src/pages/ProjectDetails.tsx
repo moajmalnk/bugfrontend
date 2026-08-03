@@ -86,6 +86,7 @@ import {
   parseProjectPlatforms,
 } from "@/services/projectService";
 import { updateService } from "@/services/updateService";
+import { userService } from "@/services/userService";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -123,6 +124,8 @@ import {
 import { useEffect, useState, useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getReturnPathFromState } from "@/hooks/useUrlPagination";
+import { useQuery } from "@tanstack/react-query";
+import { sortUsernamesActiveFirst, compareUsersActiveFirst } from "@/lib/utils/userSort";
 import {
   getVerificationFilterKey,
   VERIFICATION_FILTER_OPTIONS,
@@ -202,6 +205,9 @@ interface ProjectUser {
   username: string;
   email: string;
   role: string;
+  account_active?: number;
+  status?: "active" | "idle" | "offline";
+  name?: string;
 }
 
 interface Dashboard {
@@ -3229,13 +3235,19 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
     }
   };
   
+  const { data: directoryUsers = [] } = useQuery({
+    queryKey: ["users", "directory"],
+    queryFn: () => userService.getUsers(),
+    staleTime: 60_000,
+  });
+
   const uniqueCreators = useMemo(() => {
     const creators = updates
       .map((update) => update.created_by)
       .filter(Boolean)
-      .filter((creator, index, arr) => arr.indexOf(creator) === index);
-    return creators.sort();
-  }, [updates]);
+      .filter((creator, index, arr) => arr.indexOf(creator) === index) as string[];
+    return sortUsernamesActiveFirst(creators, directoryUsers);
+  }, [updates, directoryUsers]);
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -6025,9 +6037,7 @@ const ProjectDetails = () => {
                             <CommandGroup>
                               {availableMembers
                                 ?.slice()
-                                .sort((a, b) =>
-                                  (a.username || "").localeCompare(b.username || "")
-                                )
+                                .sort(compareUsersActiveFirst)
                                 .filter((user) => user.id && !selectedUsers.includes(user.id))
                                 .map((user) => (
                                   <CommandItem
@@ -6313,9 +6323,7 @@ const ProjectDetails = () => {
                     <CommandGroup>
                       {availableMembers
                         ?.slice()
-                        .sort((a, b) =>
-                          (a.username || "").localeCompare(b.username || "")
-                        )
+                        .sort(compareUsersActiveFirst)
                         .filter((user) => user.id && !selectedUsers.includes(user.id))
                         .map((user) => (
                           <CommandItem

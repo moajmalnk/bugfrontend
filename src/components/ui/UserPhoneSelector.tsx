@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/popover";
 import { ENV } from "@/lib/env";
 import { cn } from "@/lib/utils";
+import { sortUsersActiveFirst } from "@/lib/utils/userSort";
 import { Check, ChevronsUpDown, Phone, User } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -24,6 +25,8 @@ interface User {
   phone: string;
   email: string;
   role: string;
+  account_active?: number;
+  status?: "active" | "idle" | "offline";
 }
 
 interface UserPhoneSelectorProps {
@@ -90,7 +93,7 @@ export function UserPhoneSelector({
           console.warn("No users with phone numbers found");
         }
 
-        setUsers(usersWithPhones);
+        setUsers(sortUsersActiveFirst(usersWithPhones));
       }
     } catch (error) {
       console.error("Error loading users:", error);
