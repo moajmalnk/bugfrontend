@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Play, Pause, Download, Volume2, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { probeAudioDuration } from "@/components/voice/probeAudioDuration";
 
 export interface WhatsAppVoiceMessageProps {
   id: string;
@@ -18,13 +19,33 @@ export interface WhatsAppVoiceMessageProps {
 }
 
 const SPEED_STEPS: Array<1 | 1.5 | 2> = [1, 1.5, 2];
-/** Higher pitch for robot / brighter voice — no Web Audio delay */
-const ROBOT_PITCH = 1.25;
+/** Noticeable higher / brighter pitch when robot mode is on */
+const ROBOT_PITCH = 1.55;
+
+type RobotGraph = {
+  ctx: AudioContext;
+  dryGain: GainNode;
+  wetGain: GainNode;
+  tremoloGain: GainNode;
+  modulator: OscillatorNode;
+  modDepth: GainNode;
+};
 
 const isAbortError = (error: unknown) => {
   if (!error || typeof error !== "object") return false;
   const name = (error as { name?: string }).name;
   return name === "AbortError" || name === "NotAllowedError";
+};
+
+const setPreservesPitch = (audio: HTMLAudioElement, preserve: boolean) => {
+  const media = audio as HTMLMediaElement & {
+    preservesPitch?: boolean;
+    webkitPreservesPitch?: boolean;
+    mozPreservesPitch?: boolean;
+  };
+  media.preservesPitch = preserve;
+  media.webkitPreservesPitch = preserve;
+  media.mozPreservesPitch = preserve;
 };
 
 export function WhatsAppVoiceMessage({
@@ -56,8 +77,13 @@ export function WhatsAppVoiceMessage({
   const playRequestIdRef = useRef(0);
   const robotModeRef = useRef(false);
   const speedIndexRef = useRef(0);
+  const robotGraphRef = useRef<RobotGraph | null>(null);
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
+  const waveTrackRef = useRef<HTMLDivElement | null>(null);
+  const scrubbingRef = useRef(false);
+  const durationRef = useRef(0);
+  const [isScrubbing, setIsScrubbing] = useState(false);
 
   useEffect(() => {
     onPlayRef.current = onPlay;
@@ -77,6 +103,23 @@ export function WhatsAppVoiceMessage({
       setMediaDuration(duration);
     }
   }, [duration]);
+
+  // If parent didn't pass duration (legacy WebM), discover it once without blocking play
+  useEffect(() => {
+    if (!audioUrl) return;
+    if (Number.isFinite(duration) && duration > 0) return;
+    if (Number.isFinite(mediaDuration) && mediaDuration > 0) return;
+
+    let cancelled = false;
+    void probeAudioDuration(audioUrl).then((seconds) => {
+      if (cancelled || !(seconds && seconds > 0)) return;
+      setMediaDuration(seconds);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [audioUrl, duration, mediaDuration]);
 
   // Resolve blob / string source once
   useEffect(() => {
@@ -128,7 +171,91 @@ export function WhatsAppVoiceMessage({
 
   const applyRate = (audio: HTMLAudioElement) => {
     const base = SPEED_STEPS[speedIndexRef.current] ?? 1;
-    audio.playbackRate = base * (robotModeRef.current ? ROBOT_PITCH : 1);
+    const robot = robotModeRef.current;
+    // Chrome defaults preservesPitch=true, so rate alone won't sound robotic
+    setPreservesPitch(audio, !robot);
+    audio.playbackRate = base * (robot ? ROBOT_PITCH : 1);
+  };
+
+  const syncRobotMix = (enabled: boolean) => {
+    const graph = robotGraphRef.current;
+    if (!graph) return;
+    const t = graph.ctx.currentTime;
+    graph.dryGain.gain.setTargetAtTime(enabled ? 0.2 : 1, t, 0.02);
+    graph.wetGain.gain.setTargetAtTime(enabled ? 0.9 : 0, t, 0.02);
+    graph.modDepth.gain.setTargetAtTime(enabled ? 0.45 : 0, t, 0.02);
+  };
+
+  /**
+   * Why: Lazy Web Audio graph — only built when robot is turned on so
+   * normal play stays instant. Tremolo + EQ give a metallic robot timbre.
+   */
+  const ensureRobotGraph = async (audio: HTMLAudioElement) => {
+    if (robotGraphRef.current) {
+      if (robotGraphRef.current.ctx.state === "suspended") {
+        await robotGraphRef.current.ctx.resume();
+      }
+      return robotGraphRef.current;
+    }
+
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      const ctx = new AudioCtx();
+      const source = ctx.createMediaElementSource(audio);
+
+      const dryGain = ctx.createGain();
+      const wetGain = ctx.createGain();
+      const tremoloGain = ctx.createGain();
+      const modDepth = ctx.createGain();
+      const modulator = ctx.createOscillator();
+      const bandpass = ctx.createBiquadFilter();
+      const highShelf = ctx.createBiquadFilter();
+
+      bandpass.type = "bandpass";
+      bandpass.frequency.value = 1600;
+      bandpass.Q.value = 0.9;
+      highShelf.type = "highshelf";
+      highShelf.frequency.value = 2000;
+      highShelf.gain.value = 8;
+
+      modulator.type = "sine";
+      modulator.frequency.value = 38;
+      tremoloGain.gain.value = 1;
+      modDepth.gain.value = 0;
+
+      source.connect(dryGain);
+      dryGain.connect(ctx.destination);
+
+      source.connect(bandpass);
+      bandpass.connect(highShelf);
+      highShelf.connect(tremoloGain);
+      tremoloGain.connect(wetGain);
+      wetGain.connect(ctx.destination);
+      modulator.connect(modDepth);
+      modDepth.connect(tremoloGain.gain);
+
+      dryGain.gain.value = 1;
+      wetGain.gain.value = 0;
+      modulator.start();
+
+      const graph: RobotGraph = {
+        ctx,
+        dryGain,
+        wetGain,
+        tremoloGain,
+        modulator,
+        modDepth,
+      };
+      robotGraphRef.current = graph;
+      if (ctx.state === "suspended") await ctx.resume();
+      return graph;
+    } catch (error) {
+      console.error("Robot audio graph failed", error);
+      return null;
+    }
   };
 
   // Create audio element once URL is ready — metadata only, play on demand
@@ -138,12 +265,28 @@ export function WhatsAppVoiceMessage({
     playIntentRef.current = false;
     playRequestIdRef.current += 1;
 
-    const audio = new Audio(audioUrl);
+    if (robotGraphRef.current) {
+      try {
+        robotGraphRef.current.modulator.stop();
+        void robotGraphRef.current.ctx.close();
+      } catch {
+        /* ignore */
+      }
+      robotGraphRef.current = null;
+    }
+
+    const audio = new Audio();
+    // Required for createMediaElementSource when streaming via audio.php
+    audio.crossOrigin = "anonymous";
     audio.preload = "metadata";
+    audio.src = audioUrl;
     audioRef.current = audio;
     applyRate(audio);
 
-    const onTime = () => setCurrentTime(audio.currentTime);
+    const onTime = () => {
+      if (scrubbingRef.current) return;
+      setCurrentTime(audio.currentTime);
+    };
     const onEnded = () => {
       playIntentRef.current = false;
       setIsPlaying(false);
@@ -152,9 +295,7 @@ export function WhatsAppVoiceMessage({
     };
     const onMeta = () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
-        setMediaDuration((prev) =>
-          prev > 0 ? prev : audio.duration
-        );
+        setMediaDuration((prev) => (prev > 0 ? prev : audio.duration));
       }
     };
     const onError = () => {
@@ -180,11 +321,22 @@ export function WhatsAppVoiceMessage({
       audio.removeEventListener("durationchange", onMeta);
       audio.removeEventListener("error", onError);
       if (audioRef.current === audio) audioRef.current = null;
+      if (robotGraphRef.current) {
+        try {
+          robotGraphRef.current.modulator.stop();
+          void robotGraphRef.current.ctx.close();
+        } catch {
+          /* ignore */
+        }
+        robotGraphRef.current = null;
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioUrl, id]);
 
   useEffect(() => {
     if (audioRef.current) applyRate(audioRef.current);
+    syncRobotMix(robotMode);
   }, [speedIndex, robotMode]);
 
   // Mutual exclusion only — do not re-trigger play if already starting
@@ -210,10 +362,15 @@ export function WhatsAppVoiceMessage({
       const requestId = ++playRequestIdRef.current;
       playIntentRef.current = true;
       setLoadError(null);
-      // Optimistic UX: flip to pause icon immediately
       setIsPlaying(true);
       onPlayRef.current?.(id);
       applyRate(audio);
+
+      // If robot already on, ensure graph is live before/while playing
+      if (robotModeRef.current) {
+        const graph = await ensureRobotGraph(audio);
+        if (graph) syncRobotMix(true);
+      }
 
       try {
         await audio.play();
@@ -243,11 +400,25 @@ export function WhatsAppVoiceMessage({
     setSpeedIndex((prev) => (prev + 1) % SPEED_STEPS.length);
   };
 
-  const toggleRobotMode = () => {
+  const toggleRobotMode = async () => {
     const next = !robotMode;
     setRobotMode(next);
     robotModeRef.current = next;
-    if (audioRef.current) applyRate(audioRef.current);
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    applyRate(audio);
+
+    if (next) {
+      const graph = await ensureRobotGraph(audio);
+      if (graph) {
+        if (graph.ctx.state === "suspended") await graph.ctx.resume();
+        syncRobotMix(true);
+      }
+    } else {
+      syncRobotMix(false);
+    }
   };
 
   const effectiveDuration =
@@ -255,6 +426,61 @@ export function WhatsAppVoiceMessage({
       ? mediaDuration
       : null) ??
     (Number.isFinite(duration) && duration > 0 ? duration : 0);
+
+  durationRef.current = effectiveDuration;
+
+  const seekToRatio = (ratio: number) => {
+    const audio = audioRef.current;
+    const total = durationRef.current;
+    if (!audio || !(total > 0)) return;
+    const next = Math.min(1, Math.max(0, ratio)) * total;
+    try {
+      audio.currentTime = next;
+    } catch {
+      /* WebM may not seek until buffered — still update UI */
+    }
+    setCurrentTime(next);
+  };
+
+  const ratioFromPointer = (clientX: number) => {
+    const track = waveTrackRef.current;
+    if (!track) return 0;
+    const rect = track.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
+    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  };
+
+  const startScrub = (clientX: number) => {
+    if (!(durationRef.current > 0) || !audioUrl) return;
+    scrubbingRef.current = true;
+    setIsScrubbing(true);
+    seekToRatio(ratioFromPointer(clientX));
+  };
+
+  const moveScrub = (clientX: number) => {
+    if (!scrubbingRef.current) return;
+    seekToRatio(ratioFromPointer(clientX));
+  };
+
+  const endScrub = () => {
+    if (!scrubbingRef.current) return;
+    scrubbingRef.current = false;
+    setIsScrubbing(false);
+  };
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => moveScrub(e.clientX);
+    const onUp = () => endScrub();
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioUrl]);
 
   const formattedDuration = useMemo(
     () => formatTime(effectiveDuration),
@@ -265,7 +491,9 @@ export function WhatsAppVoiceMessage({
     [currentTime]
   );
   const displayCurrentTime =
-    currentTime > 0 || isPlaying ? formattedCurrent : formattedDuration;
+    currentTime > 0 || isPlaying || isScrubbing
+      ? formattedCurrent
+      : formattedDuration;
   const progress =
     effectiveDuration > 0
       ? Math.min(1, (currentTime || 0) / effectiveDuration)
@@ -273,31 +501,36 @@ export function WhatsAppVoiceMessage({
         ? 0.08
         : 0;
 
+  const waveValues = useMemo(
+    () =>
+      waveform && waveform.length > 0 ? waveform : placeholderWaveform(),
+    [waveform]
+  );
+
   const bars = useMemo(() => {
-    const source =
-      waveform && waveform.length > 0 ? waveform : placeholderWaveform();
-    const activeCount = Math.floor(source.length * progress);
-    return source.map((value, index) => {
-      const height = Math.max(12, value * 36);
+    const activeCount = Math.floor(waveValues.length * progress);
+    return waveValues.map((value, index) => {
+      const height = Math.max(10, value * 34);
       const isBarActive = index < activeCount;
       return (
         <div
           key={`${id}-bar-${index}`}
           className={cn(
-            "w-[3px] rounded-full transition-all duration-100",
+            "w-[3px] rounded-full pointer-events-none",
+            !isScrubbing && "transition-[background-color,height] duration-75",
             accent === "sent"
               ? isBarActive
-                ? "bg-emerald-500"
-                : "bg-emerald-400/40"
-              : isBarActive
                 ? "bg-white"
-                : "bg-white/40"
+                : "bg-white/35"
+              : isBarActive
+                ? "bg-emerald-500 dark:bg-white"
+                : "bg-emerald-500/35 dark:bg-white/35"
           )}
           style={{ height: `${height}px` }}
         />
       );
     });
-  }, [accent, id, progress, waveform]);
+  }, [accent, id, isScrubbing, progress, waveValues]);
 
   return (
     <div
@@ -346,10 +579,62 @@ export function WhatsAppVoiceMessage({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between text-[11px] uppercase tracking-wide">
-            <span className="font-semibold">{displayCurrentTime}</span>
+            <span className="font-semibold tabular-nums">
+              {displayCurrentTime}
+              {effectiveDuration > 0 && (isPlaying || isScrubbing || currentTime > 0) ? (
+                <span className="opacity-50 font-medium normal-case">
+                  {" "}
+                  / {formattedDuration}
+                </span>
+              ) : null}
+            </span>
           </div>
-          <div className="mt-1 flex h-10 items-end gap-[2px] overflow-hidden">
-            {bars}
+          <div
+            ref={waveTrackRef}
+            role="slider"
+            tabIndex={effectiveDuration > 0 ? 0 : -1}
+            aria-label="Seek voice note"
+            aria-valuemin={0}
+            aria-valuemax={Math.max(0, Math.floor(effectiveDuration))}
+            aria-valuenow={Math.floor(currentTime || 0)}
+            aria-disabled={!(effectiveDuration > 0)}
+            onPointerDown={(e) => {
+              if (!(effectiveDuration > 0)) return;
+              e.preventDefault();
+              (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+              startScrub(e.clientX);
+            }}
+            onKeyDown={(e) => {
+              if (!(effectiveDuration > 0)) return;
+              const step = Math.max(1, effectiveDuration * 0.05);
+              if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+                e.preventDefault();
+                seekToRatio(
+                  Math.min(1, (currentTime + step) / effectiveDuration)
+                );
+              } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+                e.preventDefault();
+                seekToRatio(
+                  Math.max(0, (currentTime - step) / effectiveDuration)
+                );
+              } else if (e.key === "Home") {
+                e.preventDefault();
+                seekToRatio(0);
+              } else if (e.key === "End") {
+                e.preventDefault();
+                seekToRatio(1);
+              }
+            }}
+            className={cn(
+              "relative mt-1 flex h-11 items-center touch-none select-none",
+              effectiveDuration > 0
+                ? "cursor-pointer"
+                : "cursor-default opacity-80"
+            )}
+          >
+            <div className="flex h-10 w-full items-end gap-[2px] overflow-hidden px-0.5">
+              {bars}
+            </div>
           </div>
           {loadError && (
             <p className="mt-2 text-[11px] font-medium text-red-500 dark:text-red-300">
@@ -364,7 +649,7 @@ export function WhatsAppVoiceMessage({
               type="button"
               size="sm"
               variant="ghost"
-              onClick={toggleRobotMode}
+              onClick={() => void toggleRobotMode()}
               disabled={!audioUrl}
               className={cn(
                 "h-7 rounded-full border border-white/30 bg-white/10 px-2 text-[11px] font-semibold uppercase tracking-wide hover:bg-white/20",

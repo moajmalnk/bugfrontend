@@ -20,16 +20,9 @@ function patchPwaManifestFile(manifestPath: string, origin: string) {
 
 function vendorManualChunks(id: string): string | undefined {
   if (!id.includes("node_modules")) return undefined;
-  // Why: do NOT force recharts/d3 into a shared chunk — their circular imports
-  // cause "Cannot access 'X' before initialization" at runtime.
+  // Why: do NOT force recharts/d3 or pdf libs into shared chunks — circular
+  // imports cause "Cannot access 'X' before initialization" at runtime.
   if (id.includes("firebase")) return "firebase";
-  if (
-    id.includes("jspdf") ||
-    id.includes("@react-pdf") ||
-    id.includes("pdfkit")
-  ) {
-    return "pdf";
-  }
   if (id.includes("framer-motion") || id.includes("@radix-ui")) {
     return "ui-vendor";
   }
@@ -184,9 +177,7 @@ export default defineConfig(({ mode }) => {
         polyfill: true,
         // Why: keep heavy vendor chunks out of cold-load preload so first paint stays lean
         resolveDependencies: (_filename, deps) =>
-          deps.filter(
-            (dep) => !dep.includes("pdf-") && !dep.includes("firebase-")
-          ),
+          deps.filter((dep) => !dep.includes("firebase-")),
       },
       assetsInlineLimit: 4096,
       assetsDir: "assets",

@@ -138,11 +138,14 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Prefer stored duration; probe metadata only for legacy rows without duration
+  // Prefer stored duration; probe WebM metadata for legacy rows without duration
   useEffect(() => {
     if (!bug.attachments) return;
+    let cancelled = false;
 
     const seed: { [key: string]: number } = {};
+    const missing: typeof bug.attachments = [];
+
     for (const attachment of bug.attachments) {
       const isAudio =
         attachment.file_type?.startsWith("audio/") ||
@@ -152,54 +155,35 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
       const stored = attachment.duration;
       if (typeof stored === "number" && Number.isFinite(stored) && stored > 0) {
         seed[attachment.id] = stored;
+      } else {
+        missing.push(attachment);
       }
     }
+
     if (Object.keys(seed).length > 0) {
       setVoiceNoteDurations((prev) => ({ ...prev, ...seed }));
     }
 
-    for (const attachment of bug.attachments) {
-      const isAudio =
-        attachment.file_type?.startsWith("audio/") ||
-        !!attachment.file_name?.match(/\.(wav|mp3|m4a|ogg|webm)$/i);
-      if (!isAudio) continue;
-
-      const stored = attachment.duration;
-      if (typeof stored === "number" && Number.isFinite(stored) && stored > 0) {
-        continue;
-      }
-
-      try {
-        const audioUrl = buildAudioUrl(attachment.file_path);
-        const audio = new Audio();
-
-        const applyIfFinite = () => {
-          if (Number.isFinite(audio.duration) && audio.duration > 0) {
-            setVoiceNoteDurations((prev) => ({
-              ...prev,
-              [attachment.id]: audio.duration,
-            }));
-          }
-        };
-
-        audio.addEventListener("loadedmetadata", applyIfFinite);
-        audio.addEventListener("durationchange", applyIfFinite);
-        audio.addEventListener("error", () => {
-          setVoiceNoteDurations((prev) => ({
-            ...prev,
-            [attachment.id]: prev[attachment.id] ?? 0,
-          }));
-        });
-
-        audio.src = audioUrl;
-        audio.load();
-      } catch {
+    void (async () => {
+      const { probeAudioDuration } = await import(
+        "@/components/voice/probeAudioDuration"
+      );
+      for (const attachment of missing) {
+        if (cancelled) return;
+        const seconds = await probeAudioDuration(
+          buildAudioUrl(attachment.file_path)
+        );
+        if (cancelled || !(seconds && seconds > 0)) continue;
         setVoiceNoteDurations((prev) => ({
           ...prev,
-          [attachment.id]: prev[attachment.id] ?? 0,
+          [attachment.id]: seconds,
         }));
       }
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [bug.attachments]);
 
   const downloadAttachment = (attachment: {
@@ -535,20 +519,10 @@ export function BugContentCards({ bug, onBugUpdated }: BugContentCardsProps) {
                 return (
                   <div
                     key={attachment.id}
-                    className="space-y-2 rounded-lg border border-purple-100 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-900/20 p-3"
+                    className="rounded-xl border border-purple-100 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-900/20 p-3"
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {attachment.file_name}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Voice Note {index + 1}
-                        </div>
-                      </div>
-                      <div className="h-8 w-8 flex items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/50">
-                        <Volume2 className="h-4 w-4 text-purple-600 dark:text-purple-300" />
-                      </div>
+                    <div className="mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                      Voice Note {index + 1}
                     </div>
                     <WhatsAppVoiceMessage
                       id={voiceId}
