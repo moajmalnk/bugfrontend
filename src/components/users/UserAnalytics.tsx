@@ -1,9 +1,11 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MonthFilterChips } from "@/components/ui/MonthFilterChips";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "@/components/ui/use-toast";
 import { currentMonthKey, type MonthFilterValue } from "@/lib/monthFilter";
 import { cn } from "@/lib/utils";
 import {
@@ -15,11 +17,13 @@ import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
   Bug,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Clock,
   Code2,
+  Copy,
   Filter,
   Loader2,
   Search,
@@ -30,7 +34,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 type UserAnalyticsProps = {
@@ -82,6 +86,108 @@ function hasActivity(user: UserAnalyticsMember): boolean {
     Number(current.bugs_reported || 0) > 0 ||
     Number(current.bugs_fixed || 0) > 0
   );
+}
+
+/**
+ * Why: Admins paste month-filtered team attendance into chats/reports —
+ * clipboard text must mirror the active filters (month + hide deactivated).
+ */
+function formatTeamAnalyticsCopy(
+  data: UsersAnalyticsPayload,
+  monthFilter: MonthFilterValue,
+  hideDeactivatedUsers: boolean
+): string {
+  const periodLine =
+    monthFilter === "all"
+      ? `${data.period.name} (${data.period.range}) · ${data.lookback_months}-month window`
+      : `${data.period.name} (${data.period.range}) · ${data.lookback_months}-month lookback averages`;
+
+  const shown =
+    data.filters?.total_users_after_filter ?? data.team_summary.user_count;
+  const totalBefore =
+    data.filters?.total_users_before_filter ?? data.team_summary.user_count;
+  const filterBits = [
+    hideDeactivatedUsers ? "Hide deactivated: on" : "Hide deactivated: off",
+    `Showing ${shown} of ${totalBefore}`,
+    monthFilter === "all" ? "Month: all-time" : `Month: ${monthFilter}`,
+  ];
+
+  const allUsers = ROLE_ORDER.flatMap((role) => data.roles[role]?.users ?? []);
+  const roster = sortByMetric(allUsers, "hours");
+  const activeCount = roster.filter(hasActivity).length;
+
+  let bugsReported = 0;
+  let bugsFixed = 0;
+  let tasksCompleted = 0;
+  let tasksPending = 0;
+  let tasksOngoing = 0;
+  let overtimeHours = 0;
+  let breakMinutes = 0;
+  for (const user of allUsers) {
+    const c = user.current_period;
+    bugsReported += Number(c.bugs_reported || 0);
+    bugsFixed += Number(c.bugs_fixed || 0);
+    tasksCompleted += Number(c.tasks_completed || 0);
+    tasksPending += Number(c.tasks_pending || 0);
+    tasksOngoing += Number(c.tasks_ongoing || 0);
+    overtimeHours += Number(c.overtime_hours || 0);
+    breakMinutes += Number(c.break_minutes || 0);
+  }
+
+  const lines: string[] = [
+    "BugRicer — Team analytics",
+    periodLine,
+    `Filters: ${filterBits.join(" · ")}`,
+    "",
+    "TEAM SUMMARY",
+    `Team avg h/day: ${data.team_summary.avg_hours_per_day.toFixed(1)}h`,
+    `Team avg days: ${data.team_summary.avg_work_days.toFixed(1)}`,
+    `Team avg tasks: ${data.team_summary.avg_tasks_completed.toFixed(1)}`,
+    `Team overtime (avg): ${data.team_summary.avg_overtime_hours.toFixed(1)}h`,
+    `Total hours: ${data.team_summary.total_hours.toFixed(0)}h (${data.team_summary.user_count} tracked)`,
+    `Active members: ${activeCount} · No activity: ${Math.max(roster.length - activeCount, 0)}`,
+    `Bugs reported: ${bugsReported} · Bugs fixed: ${bugsFixed}`,
+    `Tasks done: ${tasksCompleted} (${tasksPending} pending · ${tasksOngoing} ongoing)`,
+    `Total OT: ${overtimeHours.toFixed(1)}h · Break time: ${(breakMinutes / 60).toFixed(1)}h`,
+    "",
+    "BY ROLE",
+  ];
+
+  for (const role of ROLE_ORDER) {
+    const section = data.roles[role];
+    const users = section?.users ?? [];
+    const meta = ROLE_META[role];
+    const active = users.filter(hasActivity).length;
+    const summary = section?.summary;
+    lines.push(
+      `${meta.label}: ${active}/${users.length} active · avg ${Number(summary?.avg_hours_per_day ?? 0).toFixed(1)}h/day · ${Number(summary?.total_hours ?? 0).toFixed(0)}h total`
+    );
+  }
+
+  lines.push("", "ATTENDANCE ROSTER (sorted by hours)");
+  if (roster.length === 0) {
+    lines.push("No members in current filter.");
+  } else {
+    roster.forEach((user, index) => {
+      const c = user.current_period;
+      const name = user.name || user.username;
+      lines.push(
+        `${index + 1}. ${name} (@${user.username}) · ${user.role}`
+      );
+      lines.push(
+        `   Days: ${c.days} · Hours: ${Number(c.hours || 0).toFixed(1)}h · Avg: ${Number(c.avg_hours_per_day || 0).toFixed(1)}h/day · Check-in: ${c.avg_check_in_label || "—"}`
+      );
+      lines.push(
+        `   Tasks: ${c.tasks_completed} done · OT: ${Number(c.overtime_hours || 0).toFixed(1)}h · Bugs: ${c.bugs_reported} · Fixes: ${c.bugs_fixed}`
+      );
+    });
+  }
+
+  if (data.last_updated) {
+    lines.push("", `Last updated: ${data.last_updated}`);
+  }
+
+  return lines.join("\n");
 }
 
 function MetricTile({
@@ -1058,6 +1164,7 @@ function AnalyticsSkeleton() {
 export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
   const [hideDeactivatedUsers, setHideDeactivatedUsers] = useState(true);
   const [monthFilter, setMonthFilter] = useState<MonthFilterValue>(() => currentMonthKey());
+  const [copied, setCopied] = useState(false);
   const { data, isLoading, isError, error, isFetching } = useQuery({
     queryKey: ["usersAnalytics", hideDeactivatedUsers, monthFilter],
     queryFn: () =>
@@ -1066,6 +1173,42 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
         month: monthFilter,
       }),
   });
+
+  const copyText = useMemo(() => {
+    if (!data) return "";
+    return formatTeamAnalyticsCopy(data, monthFilter, hideDeactivatedUsers);
+  }, [data, monthFilter, hideDeactivatedUsers]);
+
+  const handleCopyDetails = useCallback(async () => {
+    const text = copyText.trim();
+    if (!text) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+      setCopied(true);
+      toast({
+        title: "Analytics copied",
+        description: "Filter-based attendance and team details are on your clipboard.",
+      });
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Could not copy to clipboard. Try again.",
+        variant: "destructive",
+      });
+    }
+  }, [copyText]);
 
   if (isLoading) return <AnalyticsSkeleton />;
 
@@ -1099,8 +1242,25 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
                 <p className="text-xs text-muted-foreground sm:text-sm">{periodDetail}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <label className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/70 px-2.5 py-1.5 text-xs font-medium">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleCopyDetails()}
+                disabled={!copyText.trim()}
+                className="h-9 gap-1.5 rounded-xl border-border/60 bg-background/70 px-3 text-xs font-medium"
+                title={copied ? "Copied" : "Copy filter-based attendance details"}
+                aria-label={copied ? "Copied" : "Copy filter-based attendance details"}
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+              <label className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 px-2.5 py-1.5 text-xs font-medium">
                 <Switch
                   checked={hideDeactivatedUsers}
                   onCheckedChange={setHideDeactivatedUsers}
