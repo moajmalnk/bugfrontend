@@ -22,6 +22,7 @@ export interface UserAnalyticsMember {
     avg_check_in_label: string | null;
     bugs_reported: number;
     bugs_fixed: number;
+    projects?: string[];
   };
   lookback: {
     months: number;

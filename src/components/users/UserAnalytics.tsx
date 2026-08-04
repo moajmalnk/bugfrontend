@@ -88,103 +88,97 @@ function hasActivity(user: UserAnalyticsMember): boolean {
   );
 }
 
+/** Why: Attendance copy should lead with people who actually checked in, not bug-only activity. */
+function hasCheckedIn(user: UserAnalyticsMember): boolean {
+  const current = user.current_period;
+  return (
+    Number(current.hours || 0) > 0 ||
+    Number(current.days || 0) > 0 ||
+    Boolean(current.avg_check_in_label)
+  );
+}
+
 /**
- * Why: Admins paste month-filtered team attendance into chats/reports —
- * clipboard text must mirror the active filters (month + hide deactivated).
+ * Why: Admins paste this into WhatsApp/chats — keep it short, scannable,
+ * and free of filter jargon / zero-noise metrics.
  */
 function formatTeamAnalyticsCopy(
   data: UsersAnalyticsPayload,
   monthFilter: MonthFilterValue,
-  hideDeactivatedUsers: boolean
+  _hideDeactivatedUsers: boolean
 ): string {
-  const periodLine =
+  const periodLabel =
     monthFilter === "all"
-      ? `${data.period.name} (${data.period.range}) · ${data.lookback_months}-month window`
-      : `${data.period.name} (${data.period.range}) · ${data.lookback_months}-month lookback averages`;
-
-  const shown =
-    data.filters?.total_users_after_filter ?? data.team_summary.user_count;
-  const totalBefore =
-    data.filters?.total_users_before_filter ?? data.team_summary.user_count;
-  const filterBits = [
-    hideDeactivatedUsers ? "Hide deactivated: on" : "Hide deactivated: off",
-    `Showing ${shown} of ${totalBefore}`,
-    monthFilter === "all" ? "Month: all-time" : `Month: ${monthFilter}`,
-  ];
+      ? `${data.period.name} (${data.period.range})`
+      : data.period.name;
 
   const allUsers = ROLE_ORDER.flatMap((role) => data.roles[role]?.users ?? []);
-  const roster = sortByMetric(allUsers, "hours");
-  const activeCount = roster.filter(hasActivity).length;
+  const roster = sortByMetric(allUsers.filter(hasCheckedIn), "hours");
+  const trackedCount = data.team_summary.user_count || allUsers.length;
 
   let bugsReported = 0;
   let bugsFixed = 0;
   let tasksCompleted = 0;
-  let tasksPending = 0;
-  let tasksOngoing = 0;
-  let overtimeHours = 0;
-  let breakMinutes = 0;
   for (const user of allUsers) {
     const c = user.current_period;
     bugsReported += Number(c.bugs_reported || 0);
     bugsFixed += Number(c.bugs_fixed || 0);
     tasksCompleted += Number(c.tasks_completed || 0);
-    tasksPending += Number(c.tasks_pending || 0);
-    tasksOngoing += Number(c.tasks_ongoing || 0);
-    overtimeHours += Number(c.overtime_hours || 0);
-    breakMinutes += Number(c.break_minutes || 0);
   }
+
+  const devUsers = data.roles.developer?.users ?? [];
+  const testerUsers = data.roles.tester?.users ?? [];
+  const devIn = devUsers.filter(hasCheckedIn).length;
+  const testerIn = testerUsers.filter(hasCheckedIn).length;
 
   const lines: string[] = [
-    "BugRicer — Team analytics",
-    periodLine,
-    `Filters: ${filterBits.join(" · ")}`,
+    "*BugRicer — Attendance*",
+    periodLabel,
     "",
-    "TEAM SUMMARY",
-    `Team avg h/day: ${data.team_summary.avg_hours_per_day.toFixed(1)}h`,
-    `Team avg days: ${data.team_summary.avg_work_days.toFixed(1)}`,
-    `Team avg tasks: ${data.team_summary.avg_tasks_completed.toFixed(1)}`,
-    `Team overtime (avg): ${data.team_summary.avg_overtime_hours.toFixed(1)}h`,
-    `Total hours: ${data.team_summary.total_hours.toFixed(0)}h (${data.team_summary.user_count} tracked)`,
-    `Active members: ${activeCount} · No activity: ${Math.max(roster.length - activeCount, 0)}`,
-    `Bugs reported: ${bugsReported} · Bugs fixed: ${bugsFixed}`,
-    `Tasks done: ${tasksCompleted} (${tasksPending} pending · ${tasksOngoing} ongoing)`,
-    `Total OT: ${overtimeHours.toFixed(1)}h · Break time: ${(breakMinutes / 60).toFixed(1)}h`,
+    `Checked in: ${roster.length}/${trackedCount}`,
+    `Total hours: ${data.team_summary.total_hours.toFixed(0)}h`,
+    `Tasks: ${tasksCompleted} · Bugs: ${bugsReported} · Fixes: ${bugsFixed}`,
+    `Devs: ${devIn}/${devUsers.length} · Testers: ${testerIn}/${testerUsers.length}`,
     "",
-    "BY ROLE",
+    "*Roster*",
   ];
 
-  for (const role of ROLE_ORDER) {
-    const section = data.roles[role];
-    const users = section?.users ?? [];
-    const meta = ROLE_META[role];
-    const active = users.filter(hasActivity).length;
-    const summary = section?.summary;
-    lines.push(
-      `${meta.label}: ${active}/${users.length} active · avg ${Number(summary?.avg_hours_per_day ?? 0).toFixed(1)}h/day · ${Number(summary?.total_hours ?? 0).toFixed(0)}h total`
-    );
-  }
-
-  lines.push("", "ATTENDANCE ROSTER (sorted by hours)");
   if (roster.length === 0) {
-    lines.push("No members in current filter.");
+    lines.push("No one checked in this period.");
   } else {
     roster.forEach((user, index) => {
       const c = user.current_period;
       const name = user.name || user.username;
+      const hours = Number(c.hours || 0);
+      const hoursLabel = Number.isInteger(hours)
+        ? `${hours}h`
+        : `${hours.toFixed(1)}h`;
+      const checkIn = c.avg_check_in_label || "—";
       lines.push(
-        `${index + 1}. ${name} (@${user.username}) · ${user.role}`
+        `${index + 1}. ${name} — ${hoursLabel} · ${c.days}d · in ${checkIn}`
       );
-      lines.push(
-        `   Days: ${c.days} · Hours: ${Number(c.hours || 0).toFixed(1)}h · Avg: ${Number(c.avg_hours_per_day || 0).toFixed(1)}h/day · Check-in: ${c.avg_check_in_label || "—"}`
-      );
-      lines.push(
-        `   Tasks: ${c.tasks_completed} done · OT: ${Number(c.overtime_hours || 0).toFixed(1)}h · Bugs: ${c.bugs_reported} · Fixes: ${c.bugs_fixed}`
-      );
-    });
-  }
 
-  if (data.last_updated) {
-    lines.push("", `Last updated: ${data.last_updated}`);
+      const projects = (c.projects ?? []).filter(Boolean);
+      const detailParts: string[] = [];
+      if (Number(c.tasks_completed || 0) > 0) {
+        detailParts.push(`${c.tasks_completed} tasks`);
+      }
+      if (Number(c.overtime_hours || 0) > 0) {
+        detailParts.push(`OT ${Number(c.overtime_hours).toFixed(1)}h`);
+      }
+      if (projects.length > 0) {
+        const shown = projects.slice(0, 3);
+        const extra = projects.length - shown.length;
+        detailParts.push(
+          extra > 0
+            ? `${shown.join(", ")} +${extra} more`
+            : shown.join(", ")
+        );
+      }
+      if (detailParts.length > 0) {
+        lines.push(`   ${detailParts.join(" · ")}`);
+      }
+    });
   }
 
   return lines.join("\n");
