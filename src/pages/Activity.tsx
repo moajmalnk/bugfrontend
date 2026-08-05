@@ -457,6 +457,9 @@ const Activity = () => {
   const totalPages = Math.max(1, Math.ceil(totalForPagination / itemsPerPage));
   const paginatedActivities = filteredActivities;
 
+  // Must stay above permission early-returns (Rules of Hooks).
+  const hasAnyActivities = useMemo(() => activities.length > 0, [activities]);
+
   if (permissionsLoading) {
     return (
       <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6">
@@ -496,8 +499,6 @@ const Activity = () => {
       </div>
     );
   };
-
-  const hasAnyActivities = useMemo(() => activities.length > 0, [activities]);
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">

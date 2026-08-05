@@ -39,10 +39,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send, Paperclip, File, X, Calendar, Clock, FileImage, Check, ChevronsUpDown, Timer, Flag } from "lucide-react";
+import { ArrowLeft, Bell, FolderOpen, FileText, Plus, User, Send, Paperclip, File, X, Calendar, Clock, FileImage, ChevronsUpDown, Timer, Flag } from "lucide-react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { useState, useRef, useEffect, ChangeEvent } from "react";
+import { useState, useRef, useEffect, useMemo, ChangeEvent } from "react";
 import * as z from "zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -56,6 +56,13 @@ import {
   WhatsAppVoiceRecorder,
 } from "@/components/voice/WhatsAppVoiceRecorder";
 import { WhatsAppVoiceMessage } from "@/components/voice/WhatsAppVoiceMessage";
+import {
+  PROJECT_PICKER_POPOVER_CLASS,
+  ProjectPickerListItemContent,
+  ProjectPickerTriggerMeta,
+  projectPickerSearchValue,
+} from "@/components/bugs/ProjectPickerMeta";
+import { sortProjectsForPicker } from "@/lib/utils/projectUtils";
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -204,6 +211,11 @@ const NewUpdate = () => {
     // fallback: show if user is creator
     return project.created_by === currentUser.id;
   });
+
+  const sortedProjects = useMemo(
+    () => sortProjectsForPicker(projects),
+    [projects]
+  );
 
   // Disable form if no projects
   const isFormDisabled = projects.length === 0;
@@ -614,47 +626,86 @@ const NewUpdate = () => {
                                     disabled={isSubmitting || projects.length === 0}
                                     className="h-12 w-full justify-between rounded-xl border-gray-200 bg-white font-medium shadow-sm hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
                                   >
-                                    <span className="truncate">
-                                      {field.value
-                                        ? projects.find(
-                                            (p: { id: string | number; name: string }) =>
-                                              String(p.id) === String(field.value)
-                                          )?.name ?? "Select a project"
-                                        : "Select a project"}
-                                    </span>
+                                    {(() => {
+                                      const selected = projects.find(
+                                        (p: { id: string | number }) =>
+                                          String(p.id) === String(field.value)
+                                      );
+                                      if (!selected) {
+                                        return (
+                                          <span className="truncate text-muted-foreground">
+                                            Select a project
+                                          </span>
+                                        );
+                                      }
+                                      return (
+                                        <span className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                                          <span className="truncate">{selected.name}</span>
+                                          <ProjectPickerTriggerMeta
+                                            stats={{
+                                              status: selected.status,
+                                              bug_stats: selected.bug_stats,
+                                              update_stats: selected.update_stats,
+                                            }}
+                                          />
+                                        </span>
+                                      );
+                                    })()}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
                                   </Button>
                                 </FormControl>
                               </PopoverTrigger>
                               <PopoverContent
-                                className="w-[--radix-popover-trigger-width] p-0 z-[70]"
+                                className={PROJECT_PICKER_POPOVER_CLASS}
                                 align="start"
+                                collisionPadding={16}
                               >
                                 <Command>
                                   <CommandInput placeholder="Search project..." />
                                   <CommandList>
                                     <CommandEmpty>No project found.</CommandEmpty>
-                                    <CommandGroup>
-                                      {projects.map((project: { id: string | number; name: string }) => (
-                                        <CommandItem
-                                          key={project.id}
-                                          value={`${project.name} ${project.id}`}
-                                          onSelect={() => {
-                                            field.onChange(String(project.id));
-                                            setProjectPickerOpen(false);
-                                          }}
-                                        >
-                                          <Check
-                                            className={`mr-2 h-4 w-4 ${
-                                              String(field.value) === String(project.id)
-                                                ? "opacity-100"
-                                                : "opacity-0"
-                                            }`}
-                                          />
-                                          {project.name}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
+                                    {projectsLoading ? (
+                                      <CommandGroup>
+                                        <CommandItem disabled>Loading projects...</CommandItem>
+                                      </CommandGroup>
+                                    ) : sortedProjects.length === 0 ? (
+                                      <CommandGroup>
+                                        <CommandItem disabled>No projects available</CommandItem>
+                                      </CommandGroup>
+                                    ) : (
+                                      <CommandGroup>
+                                        {sortedProjects.map((project: any) => {
+                                          const stats = {
+                                            status: project.status,
+                                            bug_stats: project.bug_stats,
+                                            update_stats: project.update_stats,
+                                          };
+                                          return (
+                                            <CommandItem
+                                              key={project.id}
+                                              value={projectPickerSearchValue(
+                                                project.name,
+                                                String(project.id),
+                                                stats
+                                              )}
+                                              onSelect={() => {
+                                                field.onChange(String(project.id));
+                                                setProjectPickerOpen(false);
+                                              }}
+                                              className="items-start gap-2 py-2.5"
+                                            >
+                                              <ProjectPickerListItemContent
+                                                name={project.name}
+                                                selected={
+                                                  String(field.value) === String(project.id)
+                                                }
+                                                stats={stats}
+                                              />
+                                            </CommandItem>
+                                          );
+                                        })}
+                                      </CommandGroup>
+                                    )}
                                   </CommandList>
                                 </Command>
                               </PopoverContent>

@@ -767,9 +767,32 @@ export default function AdminAttendanceExceptions() {
               mode="multiple"
               values={exceptionDates}
               onChange={setExceptionDates}
-              placeholder="Pick one or more dates"
+              placeholder="Pick days or a full month"
               className="h-11 rounded-xl border-border/60 bg-background text-sm"
             />
+            <p className="text-[11px] text-muted-foreground">
+              Multi-select days, or use <span className="font-medium text-foreground/80">Select month</span>{' '}
+              in the calendar for a full-month exemption.
+            </p>
+            {exceptionDates.length > 1 ? (
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                {exceptionDates.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    disabled={saving}
+                    onClick={() =>
+                      setExceptionDates((prev) => prev.filter((x) => x !== d))
+                    }
+                    className="inline-flex items-center gap-1 rounded-xl border border-border/60 bg-background px-2 py-0.5 text-[11px] tabular-nums hover:border-destructive/50 hover:text-destructive transition-colors"
+                    title="Remove date"
+                  >
+                    {formatDayShort(d)}
+                    <X className="h-3 w-3 opacity-60" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div className="col-span-12 md:col-span-4 space-y-2">
             <Label htmlFor="att-note">Admin note (optional)</Label>

@@ -290,12 +290,15 @@ export function UserAttendanceExceptions({ userId, username }: Props) {
               mode="multiple"
               values={exceptionDates}
               onChange={setExceptionDates}
-              placeholder="Pick one or more dates"
+              placeholder="Pick days or a full month"
               className="h-11 rounded-xl border-border/60 bg-background text-sm"
             />
+            <p className="text-xs text-muted-foreground">
+              Tap multiple days, or use Select month in the calendar for a full-month exemption.
+            </p>
             {exceptionDates.length > 1 ? (
               <p className="text-xs text-muted-foreground">
-                {exceptionDates.length} dates selected — click dates again to deselect
+                {exceptionDates.length} dates selected — tap a day again to deselect
               </p>
             ) : null}
           </div>
