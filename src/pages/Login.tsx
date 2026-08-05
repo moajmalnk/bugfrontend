@@ -149,7 +149,7 @@ const Login = () => {
           setTimeout(() => {
             setShowSuccess(false);
             setIsAnimating(false);
-            navigate(`/${user.role}/projects`, { replace: true });
+            navigate(`/${user.role}/dashboard`, { replace: true });
           }, 1500);
         } else {
           throw new Error(data.message || "Magic link verification failed");
@@ -182,7 +182,7 @@ const Login = () => {
     const token =
       localStorage.getItem("token") || sessionStorage.getItem("token");
     if (isAuthenticated && currentUser?.role && token) {
-      navigate(`/${currentUser.role}/projects`, { replace: true });
+      navigate(`/${currentUser.role}/dashboard`, { replace: true });
     }
   }, [isAuthenticated, currentUser, navigate, handleMagicLinkVerification]);
 
@@ -382,7 +382,7 @@ const Login = () => {
           setShowSuccess(false);
           setIsAnimating(false);
           // Navigate after animation
-          navigate(`/${user.role}/projects`, { replace: true });
+          navigate(`/${user.role}/dashboard`, { replace: true });
         }, 1500);
       }
     } catch (error: unknown) {
@@ -552,7 +552,7 @@ const Login = () => {
           setShowSuccess(false);
           setIsAnimating(false);
           // Navigate to the appropriate dashboard based on user role
-          navigate(`/${data.user!.role}/projects`, { replace: true });
+          navigate(`/${data.user!.role}/dashboard`, { replace: true });
         }, 1500);
       } else {
         throw new Error(data.message || "Google Sign-In failed");

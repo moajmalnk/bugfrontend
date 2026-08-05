@@ -291,10 +291,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Get the intended destination or default to the user's role-specific projects page
+        // Get the intended destination or default to the user's role dashboard
         const intendedDestination =
           localStorage.getItem("intendedDestination") ||
-          `/${user.role}/projects`;
+          `/${user.role}/dashboard`;
         localStorage.removeItem("intendedDestination");
         navigate(intendedDestination, { replace: true });
         return true;
@@ -336,7 +336,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const user = result.data.user;
         setCurrentUser(user);
         handleAuthFcmSync({ user, fcm_token_epoch: user?.fcm_token_epoch ?? result.fcm_token_epoch });
-        navigate(`/${user.role}/projects`, { replace: true });
+        navigate(`/${user.role}/dashboard`, { replace: true });
         return true;
       }
 
@@ -415,9 +415,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Get the intended destination or default to the user's role-specific projects page
+    // Get the intended destination or default to the user's role dashboard
     const intendedDestination =
-      localStorage.getItem("intendedDestination") || `/${user.role}/projects`;
+      localStorage.getItem("intendedDestination") || `/${user.role}/dashboard`;
     localStorage.removeItem("intendedDestination");
     navigate(intendedDestination, { replace: true });
   };
@@ -445,7 +445,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("bugricer_feedback_submitted");
     
     // Redirect to admin dashboard
-    navigate("/admin/projects", { replace: true });
+    navigate("/admin/dashboard", { replace: true });
     
     // Reload the page to refresh authentication state
     window.location.reload();

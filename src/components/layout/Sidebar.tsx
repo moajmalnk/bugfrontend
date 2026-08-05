@@ -170,7 +170,10 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
         <div className="space-y-6">
           {/* Main Navigation — permission-driven (custom roles use RBAC, not ENUM) */}
           <div className="space-y-1">
-            {can("DASHBOARD_VIEW") && (
+            {(can("DASHBOARD_VIEW") ||
+              role === "developer" ||
+              role === "tester" ||
+              role === "user") && (
               <NavLink
                 to="/dashboard"
                 icon={<LayoutDashboard className="h-5 w-5" />}
@@ -197,21 +200,27 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               icon={<Bell className="h-5 w-5" />}
               label="Updates"
             />
-            {(can("DOCS_VIEW") || can("DOCS_CREATE")) && (
+            {/* Why: Testers focus on bugs/fixes — hide docs/sheets/meet/daily-update/leave from their nav. */}
+            {role !== "tester" && (can("DOCS_VIEW") || can("DOCS_CREATE")) && (
               <NavLink
                 to="/bugdocs"
                 icon={<FileText className="h-5 w-5" />}
                 label="BugDocs"
               />
             )}
-            {(can("SHEETS_VIEW") || can("SHEETS_MANAGE") || can("DOCS_VIEW")) && (
+            {role !== "tester" &&
+              (can("SHEETS_VIEW") || can("SHEETS_MANAGE") || can("DOCS_VIEW")) && (
               <NavLink
                 to="/bugsheets"
                 icon={<FileSpreadsheet className="h-5 w-5" />}
                 label="BugSheets"
               />
             )}
-            {(can("MEETINGS_JOIN") || can("MEETINGS_CREATE") || can("MEETINGS_MANAGE") || role === "developer") && (
+            {role !== "tester" &&
+              (can("MEETINGS_JOIN") ||
+                can("MEETINGS_CREATE") ||
+                can("MEETINGS_MANAGE") ||
+                role === "developer") && (
               <NavLink
                 to="/meet?tab=shared-meets"
                 icon={<Video className="h-5 w-5" />}
@@ -227,7 +236,11 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {(can("DAILY_UPDATE_CREATE") || can("DAILY_UPDATE_VIEW") || can("UPDATES_VIEW") || can("UPDATES_CREATE")) && (
+            {role !== "tester" &&
+              (can("DAILY_UPDATE_CREATE") ||
+                can("DAILY_UPDATE_VIEW") ||
+                can("UPDATES_VIEW") ||
+                can("UPDATES_CREATE")) && (
               <NavLink
                 to="/daily-update"
                 icon={<Calendar className="h-5 w-5" />}
@@ -235,7 +248,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {(can("LEAVE_VIEW") || role === "developer" || role === "user") && (
+            {role !== "tester" &&
+              (can("LEAVE_VIEW") || role === "developer" || role === "user") && (
               <NavLink
                 to="/leave"
                 icon={<PlaneTakeoff className="h-5 w-5" />}

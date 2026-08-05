@@ -102,6 +102,8 @@ const PAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   "page-common-codo": ClipboardCheck,
   "page-messages": MessageSquare,
   "page-admin-dashboard": LayoutDashboard,
+  "page-developer-dashboard": LayoutDashboard,
+  "page-tester-dashboard": LayoutDashboard,
   "page-users": Users,
   "page-attendance-exceptions": CalendarClock,
   "page-clients": Building2,

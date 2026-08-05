@@ -8,7 +8,6 @@ import Home from "@/pages/Home";
 import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useParams, useLocation } from "react-router-dom";
 import { HelpSupportRoute, HelpArticleRoute } from "@/pages/help/HelpRoutes";
-import { getEffectiveRole } from "@/lib/utils";
 
 // Shared page skeleton (mirrors real page geometry — header, toolbar, stats, cards)
 const SkeletonFallback = () => <PageSkeleton />;
@@ -169,16 +168,11 @@ const UserDetails = lazy(() => import("@/pages/UserDetails"));
 const UserWorkStatsPeriod = lazy(() => import("@/pages/UserWorkStatsPeriod"));
 const AdminPushCoverage = lazy(() => import("@/pages/AdminPushCoverage"));
 const Shorts = lazy(() => import("@/pages/Shorts"));
-const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
+const RoleDashboard = lazy(() => import("@/pages/RoleDashboard"));
 
-/** Admin lands on ops dashboard; other roles keep projects as home. */
+/** All roles land on their role dashboard (Ops for admin, personal for others). */
 const RoleHomeRedirect = () => {
-  const { currentUser } = useAuth();
-  const role = getEffectiveRole(currentUser || {});
-  if (role === "admin") {
-    return <Navigate to="dashboard" replace />;
-  }
-  return <Navigate to="projects" replace />;
+  return <Navigate to="dashboard" replace />;
 };
 
 // Component to handle role-neutral bug redirects
@@ -362,7 +356,7 @@ const RouteConfig = () => {
       {/* Protected Routes with role prefix */}
       {isAuthenticated && role && (
         <Route path={`/${role}`} element={<ProtectedRoleLayout />}>
-          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="dashboard" element={<RoleDashboard />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/new" element={<NewProject />} />
           <Route path="projects/:projectId/compliance" element={<ProjectCompliance />} />
