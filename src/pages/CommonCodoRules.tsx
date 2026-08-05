@@ -1,9 +1,23 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { CodoAnalyticsPanel, computeAnalyticsCompletion } from '@/components/codo/CodoAnalyticsPanel';
+import {
+  CodoAnalyticsPanel,
+  computeAnalyticsCompletion,
+  type AnalyticsCompletionFilter,
+  type AnalyticsHealthFilter,
+  type AnalyticsPhaseFilter,
+  type AnalyticsRoleFilter,
+} from '@/components/codo/CodoAnalyticsPanel';
 import { CodoExportPanel } from '@/components/codo/CodoExportPanel';
 import { CodoRuleBody } from '@/components/codo/CodoRuleBody';
 import { CodoRuleDialog } from '@/components/codo/CodoRuleDialog';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   AlertDialog,
@@ -62,6 +76,7 @@ import {
   Search,
   ShieldCheck,
   Trash2,
+  UserRound,
   UserX,
   Users,
 } from 'lucide-react';
@@ -197,6 +212,8 @@ export default function CommonCodoRules() {
   const canDelete =
     hasPermissionOrAdmin(role, hasPermission, 'CODO_MANAGE');
   const canViewAckDetails = canDelete;
+  /** Analytics tab + advanced filters: admins only. */
+  const canViewAnalytics = role === 'admin';
 
   const [rules, setRules] = useState<CodoCommonRule[]>([]);
   const [counts, setCounts] = useState<CodoRuleCounts>({
@@ -207,11 +224,22 @@ export default function CommonCodoRules() {
   });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [phaseFilter, setPhaseFilter] = useState<AnalyticsPhaseFilter>('all');
+  const [healthFilter, setHealthFilter] = useState<AnalyticsHealthFilter>('all');
+  const [completionFilter, setCompletionFilter] =
+    useState<AnalyticsCompletionFilter>('all');
+  const [roleFilter, setRoleFilter] = useState<AnalyticsRoleFilter>('all');
+  const [myStatusFilter, setMyStatusFilter] = useState<
+    'all' | 'pending' | CodoAckStatus
+  >('all');
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = (searchParams.get('tab') || 'all') as TabKey;
-  const [activeTab, setActiveTab] = useState<TabKey>(
-    VALID_TABS.includes(tabParam) ? tabParam : 'all'
-  );
+  const initialTab: TabKey =
+    VALID_TABS.includes(tabParam) &&
+    (tabParam !== 'analytics' || canViewAnalytics)
+      ? tabParam
+      : 'all';
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
@@ -346,13 +374,21 @@ export default function CommonCodoRules() {
 
   useEffect(() => {
     const t = (searchParams.get('tab') || 'all') as TabKey;
+    if (t === 'analytics' && !canViewAnalytics) {
+      setActiveTab('all');
+      const next = new URLSearchParams(searchParams);
+      next.delete('tab');
+      setSearchParams(next, { replace: true });
+      return;
+    }
     if (VALID_TABS.includes(t) && t !== activeTab) {
       setActiveTab(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, canViewAnalytics]);
 
   const setTab = (tab: TabKey) => {
+    if (tab === 'analytics' && !canViewAnalytics) return;
     setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
     if (tab === 'all') next.delete('tab');
@@ -360,11 +396,53 @@ export default function CommonCodoRules() {
     setSearchParams(next, { replace: true });
   };
 
+  const ruleMatchesAdminHealth = (r: CodoCommonRule): boolean => {
+    if (healthFilter === 'all') return true;
+    const a = r.acknowledgements;
+    if (!a || a.required_total <= 0) {
+      return healthFilter === 'no_responses';
+    }
+    const doubt = a.doubt_count ?? a.doubt?.length ?? 0;
+    const notRequired = a.not_required_count ?? a.not_required?.length ?? 0;
+    const responded = a.responded_count ?? a.acknowledged_count ?? 0;
+    switch (healthFilter) {
+      case 'has_pending':
+        return (a.pending_count || 0) > 0;
+      case 'has_doubt':
+        return doubt > 0;
+      case 'has_not_required':
+        return notRequired > 0;
+      case 'complete':
+        return a.pending_count === 0 && a.required_total > 0;
+      case 'incomplete':
+        return a.pending_count > 0;
+      case 'no_responses':
+        return responded === 0;
+      default:
+        return true;
+    }
+  };
+
+  const ruleMatchesMyStatus = (r: CodoCommonRule): boolean => {
+    if (myStatusFilter === 'all') return true;
+    const a = r.acknowledgements;
+    if (!a) return myStatusFilter === 'pending';
+    const userStatus =
+      (a.current_user_status as CodoAckStatus | null | undefined) ||
+      (a.current_user_acknowledged ? ('acknowledged' as const) : null);
+    if (myStatusFilter === 'pending') return !userStatus && a.current_user_must_acknowledge;
+    return userStatus === myStatusFilter;
+  };
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rules.filter((r) => {
       if (activeTab === 'analytics' || activeTab === 'export') return true;
       if (activeTab !== 'all' && r.phase !== activeTab) return false;
+      if (canViewAnalytics) {
+        if (!ruleMatchesAdminHealth(r)) return false;
+        if (!ruleMatchesMyStatus(r)) return false;
+      }
       if (!q) return true;
       return (
         r.title.toLowerCase().includes(q) ||
@@ -373,14 +451,78 @@ export default function CommonCodoRules() {
         r.rule_key.toLowerCase().includes(q)
       );
     });
-  }, [rules, activeTab, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    rules,
+    activeTab,
+    search,
+    canViewAnalytics,
+    healthFilter,
+    myStatusFilter,
+  ]);
 
   const listFiltered = useMemo(() => {
     if (activeTab === 'analytics' || activeTab === 'export') return [];
     return filtered;
   }, [filtered, activeTab]);
 
-  const analyticsCompletion = useMemo(() => computeAnalyticsCompletion(rules), [rules]);
+  const analyticsCompletion = useMemo(
+    () => (canViewAnalytics ? computeAnalyticsCompletion(rules) : 0),
+    [rules, canViewAnalytics]
+  );
+
+  const analyticsFilters = useMemo(
+    () => ({
+      phase: phaseFilter,
+      health: healthFilter,
+      completion: completionFilter,
+      userRole: roleFilter,
+    }),
+    [phaseFilter, healthFilter, completionFilter, roleFilter]
+  );
+
+  const isAnalytics = activeTab === 'analytics';
+  const isExport = activeTab === 'export';
+
+  const hasActiveFilters = Boolean(
+    search.trim() ||
+      (canViewAnalytics &&
+        (isAnalytics
+          ? phaseFilter !== 'all' ||
+            healthFilter !== 'all' ||
+            completionFilter !== 'all' ||
+            roleFilter !== 'all'
+          : !isExport &&
+            (healthFilter !== 'all' || myStatusFilter !== 'all')))
+  );
+
+  const activeFilterCount = [
+    search.trim() && 'Search',
+    canViewAnalytics &&
+      isAnalytics &&
+      phaseFilter !== 'all' &&
+      'Phase',
+    canViewAnalytics && healthFilter !== 'all' && !isExport && 'Response',
+    canViewAnalytics &&
+      isAnalytics &&
+      completionFilter !== 'all' &&
+      'Completion',
+    canViewAnalytics && isAnalytics && roleFilter !== 'all' && 'Role',
+    canViewAnalytics &&
+      !isAnalytics &&
+      !isExport &&
+      myStatusFilter !== 'all' &&
+      'My status',
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setSearch('');
+    setPhaseFilter('all');
+    setHealthFilter('all');
+    setCompletionFilter('all');
+    setRoleFilter('all');
+    setMyStatusFilter('all');
+  };
 
   const pdfRules = useMemo(() => {
     if (activeTab === 'analytics' || activeTab === 'export') return rules;
@@ -590,15 +732,19 @@ export default function CommonCodoRules() {
       countClass:
         'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',
     },
-    {
-      value: 'analytics' as TabKey,
-      label: 'Analytics',
-      shortLabel: 'Stats',
-      icon: BarChart3,
-      count: `${analyticsCompletion}%`,
-      countClass:
-        'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
-    },
+    ...(canViewAnalytics
+      ? [
+          {
+            value: 'analytics' as TabKey,
+            label: 'Analytics',
+            shortLabel: 'Stats',
+            icon: BarChart3,
+            count: `${analyticsCompletion}%`,
+            countClass:
+              'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
+          },
+        ]
+      : []),
     {
       value: 'export' as TabKey,
       label: 'Export',
@@ -613,8 +759,6 @@ export default function CommonCodoRules() {
 
   const defaultPhase: CodoRulePhase =
     activeTab === 'tester' || activeTab === 'project' ? activeTab : 'developer';
-  const isAnalytics = activeTab === 'analytics';
-  const isExport = activeTab === 'export';
 
   const renderRuleCard = (rule: CodoCommonRule) => {
     const meta = PHASE_META[rule.phase];
@@ -1024,7 +1168,12 @@ export default function CommonCodoRules() {
                 </Button>
               </div>
 
-              <TabsList className="hidden lg:grid w-full grid-cols-12 h-14 bg-transparent p-1 gap-1 min-w-0">
+              <TabsList
+                className={cn(
+                  'hidden lg:grid w-full h-14 bg-transparent p-1 gap-1 min-w-0',
+                  canViewAnalytics ? 'grid-cols-12' : 'grid-cols-10'
+                )}
+              >
                 {codoTabs.map((tab) => (
                   <TabsTrigger
                     key={tab.value}
@@ -1118,42 +1267,193 @@ export default function CommonCodoRules() {
                 <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-cyan-50/30 dark:from-gray-800/30 dark:to-cyan-900/30 rounded-2xl" />
                 <div className="relative min-w-0 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6">
                   <div className="space-y-4 min-w-0">
-                    <div className="flex items-center gap-2 mb-2 min-w-0">
-                      <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
-                        <Search className="h-4 w-4 text-white" />
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-cyan-500 rounded-lg shrink-0">
+                          <Search className="h-4 w-4 text-white" />
+                        </div>
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                          Search & Filter
+                        </h3>
                       </div>
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                        Search & Filter
-                      </h3>
+                      {hasActiveFilters ? (
+                        <div className="px-2 py-1 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 rounded-full text-xs font-medium whitespace-nowrap shrink-0">
+                          {activeFilterCount} filter
+                          {activeFilterCount !== 1 ? 's' : ''} active
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="flex flex-col md:flex-row gap-3 sm:gap-4 min-w-0">
-                      <div className="flex-1 relative group min-w-0">
-                        <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-cyan-500 transition-colors pointer-events-none" />
-                        <input
-                          type="text"
-                          placeholder={
+
+                    <div className="w-full min-w-0 relative group">
+                      <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-cyan-500 transition-colors pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder={
+                          isAnalytics
+                            ? 'Search analytics by rule title or key…'
+                            : isExport
+                              ? 'Search rules to include in export…'
+                              : 'Search rules by title, description, or key…'
+                        }
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full min-w-0 max-w-full pl-10 sm:pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      />
+                    </div>
+
+                    {canViewAnalytics && !isExport ? (
+                      <div className="grid grid-cols-12 gap-3 min-w-0">
+                        {isAnalytics ? (
+                          <div className="col-span-12 min-[480px]:col-span-6 lg:col-span-3 flex items-center gap-2 min-w-0">
+                            <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                              <Code2 className="h-4 w-4 text-white" />
+                            </div>
+                            <Select
+                              value={phaseFilter}
+                              onValueChange={(v) =>
+                                setPhaseFilter(v as AnalyticsPhaseFilter)
+                              }
+                            >
+                              <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                                <SelectValue placeholder="Phase" />
+                              </SelectTrigger>
+                              <SelectContent position="popper" className="z-[60]">
+                                <SelectItem value="all">All phases</SelectItem>
+                                <SelectItem value="developer">Developer</SelectItem>
+                                <SelectItem value="tester">Tester / QA</SelectItem>
+                                <SelectItem value="project">Project</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : null}
+
+                        <div
+                          className={cn(
+                            'flex items-center gap-2 min-w-0',
                             isAnalytics
-                              ? 'Search analytics by rule title or key…'
-                              : isExport
-                                ? 'Search rules to include in export…'
-                                : 'Search rules by title, description, or key…'
-                          }
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          className="w-full min-w-0 max-w-full pl-10 sm:pl-12 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
-                        />
+                              ? 'col-span-12 min-[480px]:col-span-6 lg:col-span-3'
+                              : 'col-span-12 min-[480px]:col-span-6'
+                          )}
+                        >
+                          <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0">
+                            <CheckCircle2 className="h-4 w-4 text-white" />
+                          </div>
+                          <Select
+                            value={healthFilter}
+                            onValueChange={(v) =>
+                              setHealthFilter(v as AnalyticsHealthFilter)
+                            }
+                          >
+                            <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                              <SelectValue placeholder="Response health" />
+                            </SelectTrigger>
+                            <SelectContent position="popper" className="z-[60]">
+                              <SelectItem value="all">All response states</SelectItem>
+                              <SelectItem value="has_pending">Has pending</SelectItem>
+                              <SelectItem value="has_doubt">Has doubt</SelectItem>
+                              <SelectItem value="has_not_required">
+                                Has not required
+                              </SelectItem>
+                              <SelectItem value="incomplete">Incomplete</SelectItem>
+                              <SelectItem value="complete">Fully complete</SelectItem>
+                              <SelectItem value="no_responses">No responses</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {isAnalytics ? (
+                          <>
+                            <div className="col-span-12 min-[480px]:col-span-6 lg:col-span-3 flex items-center gap-2 min-w-0">
+                              <div className="p-1.5 bg-violet-500 rounded-lg shrink-0">
+                                <BarChart3 className="h-4 w-4 text-white" />
+                              </div>
+                              <Select
+                                value={completionFilter}
+                                onValueChange={(v) =>
+                                  setCompletionFilter(v as AnalyticsCompletionFilter)
+                                }
+                              >
+                                <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                                  <SelectValue placeholder="Completion" />
+                                </SelectTrigger>
+                                <SelectContent position="popper" className="z-[60]">
+                                  <SelectItem value="all">All completion</SelectItem>
+                                  <SelectItem value="complete">100% complete</SelectItem>
+                                  <SelectItem value="incomplete">
+                                    Incomplete (&lt;100%)
+                                  </SelectItem>
+                                  <SelectItem value="none">No responses yet</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="col-span-12 min-[480px]:col-span-6 lg:col-span-3 flex items-center gap-2 min-w-0">
+                              <div className="p-1.5 bg-amber-500 rounded-lg shrink-0">
+                                <UserRound className="h-4 w-4 text-white" />
+                              </div>
+                              <Select
+                                value={roleFilter}
+                                onValueChange={(v) =>
+                                  setRoleFilter(v as AnalyticsRoleFilter)
+                                }
+                              >
+                                <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                                  <SelectValue placeholder="Audience role" />
+                                </SelectTrigger>
+                                <SelectContent position="popper" className="z-[60]">
+                                  <SelectItem value="all">All roles</SelectItem>
+                                  <SelectItem value="developer">Developers</SelectItem>
+                                  <SelectItem value="tester">Testers</SelectItem>
+                                  <SelectItem value="admin">Admins</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="col-span-12 min-[480px]:col-span-6 flex items-center gap-2 min-w-0">
+                            <div className="p-1.5 bg-amber-500 rounded-lg shrink-0">
+                              <UserRound className="h-4 w-4 text-white" />
+                            </div>
+                            <Select
+                              value={myStatusFilter}
+                              onValueChange={(v) =>
+                                setMyStatusFilter(
+                                  v as 'all' | 'pending' | CodoAckStatus
+                                )
+                              }
+                            >
+                              <SelectTrigger className="w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                                <SelectValue placeholder="My status" />
+                              </SelectTrigger>
+                              <SelectContent position="popper" className="z-[60]">
+                                <SelectItem value="all">All my statuses</SelectItem>
+                                <SelectItem value="pending">Pending for me</SelectItem>
+                                <SelectItem value="acknowledged">
+                                  I acknowledged
+                                </SelectItem>
+                                <SelectItem value="doubt">I marked doubt</SelectItem>
+                                <SelectItem value="not_required">
+                                  I marked not required
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
-                      {search ? (
+                    ) : null}
+
+                    {hasActiveFilters ? (
+                      <div className="flex justify-end">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setSearch('')}
-                          className="h-11 px-4 w-full md:w-auto bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                          onClick={clearFilters}
+                          className="h-11 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                         >
-                          Clear
+                          Clear filters
                         </Button>
-                      ) : null}
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -1165,11 +1465,12 @@ export default function CommonCodoRules() {
                   <Skeleton key={i} className="h-36 w-full rounded-2xl" />
                 ))}
               </div>
-            ) : isAnalytics ? (
+            ) : isAnalytics && canViewAnalytics ? (
               <CodoAnalyticsPanel
                 rules={rules}
                 canViewDetails={canViewAckDetails}
                 search={search}
+                filters={analyticsFilters}
               />
             ) : isExport ? (
               <CodoExportPanel rules={rules} search={search} />
@@ -1184,8 +1485,8 @@ export default function CommonCodoRules() {
                     No CODO Rules Found
                   </h3>
                   <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                    {search
-                      ? 'No rules match your search. Try adjusting your filters.'
+                    {hasActiveFilters
+                      ? 'No rules match your search or filters. Try adjusting them.'
                       : 'No CODO rules have been added yet.'}
                   </p>
                   <Button

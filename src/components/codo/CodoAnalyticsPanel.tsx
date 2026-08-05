@@ -54,26 +54,125 @@ function MiniUser({ user, tone }: { user: CodoAckUser; tone: string }) {
   );
 }
 
+export type AnalyticsPhaseFilter = 'all' | 'developer' | 'tester' | 'project';
+export type AnalyticsHealthFilter =
+  | 'all'
+  | 'has_pending'
+  | 'has_doubt'
+  | 'has_not_required'
+  | 'complete'
+  | 'incomplete'
+  | 'no_responses';
+export type AnalyticsCompletionFilter = 'all' | 'complete' | 'incomplete' | 'none';
+export type AnalyticsRoleFilter = 'all' | 'developer' | 'tester' | 'admin';
+
+export type CodoAnalyticsFilters = {
+  phase?: AnalyticsPhaseFilter;
+  health?: AnalyticsHealthFilter;
+  completion?: AnalyticsCompletionFilter;
+  userRole?: AnalyticsRoleFilter;
+};
+
 type Props = {
   rules: CodoCommonRule[];
   canViewDetails: boolean;
   search?: string;
+  filters?: CodoAnalyticsFilters;
 };
 
-export function CodoAnalyticsPanel({ rules, canViewDetails, search = '' }: Props) {
+function ruleResponsePct(rule: CodoCommonRule): number {
+  const a = rule.acknowledgements;
+  if (!a || a.required_total <= 0) return -1;
+  const responded = a.responded_count ?? a.acknowledged_count ?? 0;
+  return Math.round((responded / a.required_total) * 100);
+}
+
+function ruleMatchesHealth(rule: CodoCommonRule, health: AnalyticsHealthFilter): boolean {
+  if (health === 'all') return true;
+  const a = rule.acknowledgements;
+  if (!a || a.required_total <= 0) {
+    return health === 'no_responses';
+  }
+  const doubt = a.doubt_count ?? a.doubt?.length ?? 0;
+  const notRequired = a.not_required_count ?? a.not_required?.length ?? 0;
+  const responded = a.responded_count ?? a.acknowledged_count ?? 0;
+  switch (health) {
+    case 'has_pending':
+      return (a.pending_count || 0) > 0;
+    case 'has_doubt':
+      return doubt > 0;
+    case 'has_not_required':
+      return notRequired > 0;
+    case 'complete':
+      return a.pending_count === 0 && a.required_total > 0;
+    case 'incomplete':
+      return a.pending_count > 0;
+    case 'no_responses':
+      return responded === 0;
+    default:
+      return true;
+  }
+}
+
+function ruleMatchesCompletion(
+  rule: CodoCommonRule,
+  completion: AnalyticsCompletionFilter
+): boolean {
+  if (completion === 'all') return true;
+  const pct = ruleResponsePct(rule);
+  if (completion === 'none') return pct <= 0;
+  if (completion === 'complete') return pct === 100;
+  if (completion === 'incomplete') return pct >= 0 && pct < 100;
+  return true;
+}
+
+function usersForRole(users: CodoAckUser[] | undefined, role: AnalyticsRoleFilter): CodoAckUser[] {
+  if (!users?.length) return [];
+  if (role === 'all') return users;
+  return users.filter((u) => (u.role || '').toLowerCase() === role);
+}
+
+function ruleHasRoleAudience(rule: CodoCommonRule, role: AnalyticsRoleFilter): boolean {
+  if (role === 'all') return true;
+  const a = rule.acknowledgements;
+  if (!a) return false;
+  const pools = [
+    a.acknowledged,
+    a.doubt,
+    a.not_required,
+    a.pending,
+  ];
+  return pools.some((list) => usersForRole(list, role).length > 0);
+}
+
+export function CodoAnalyticsPanel({
+  rules,
+  canViewDetails,
+  search = '',
+  filters,
+}: Props) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const phase = filters?.phase ?? 'all';
+  const health = filters?.health ?? 'all';
+  const completion = filters?.completion ?? 'all';
+  const userRole = filters?.userRole ?? 'all';
 
   const filteredRules = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rules;
-    return rules.filter(
-      (r) =>
+    return rules.filter((r) => {
+      if (phase !== 'all' && r.phase !== phase) return false;
+      if (!ruleMatchesHealth(r, health)) return false;
+      if (!ruleMatchesCompletion(r, completion)) return false;
+      if (!ruleHasRoleAudience(r, userRole)) return false;
+      if (!q) return true;
+      return (
         r.title.toLowerCase().includes(q) ||
         r.rule_key.toLowerCase().includes(q) ||
         r.description.toLowerCase().includes(q) ||
         (r.subtitle || '').toLowerCase().includes(q)
-    );
-  }, [rules, search]);
+      );
+    });
+  }, [rules, search, phase, health, completion, userRole]);
 
   const stats = useMemo(() => {
     let required = 0;
@@ -181,7 +280,13 @@ export function CodoAnalyticsPanel({ rules, canViewDetails, search = '' }: Props
             <div className="min-w-0">
               <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">CODO Analytics</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Response overview across all rules
+                {search.trim() ||
+                phase !== 'all' ||
+                health !== 'all' ||
+                completion !== 'all' ||
+                userRole !== 'all'
+                  ? `Showing ${stats.ruleCount} matching rule${stats.ruleCount === 1 ? '' : 's'}`
+                  : 'Response overview across all rules'}
               </p>
             </div>
           </div>
@@ -266,7 +371,7 @@ export function CodoAnalyticsPanel({ rules, canViewDetails, search = '' }: Props
 
         {filteredRules.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
-            No rules match your search.
+            No rules match your search or filters.
           </div>
         ) : (
           <ul className="divide-y divide-gray-200/50 dark:divide-gray-700/50">
@@ -276,6 +381,10 @@ export function CodoAnalyticsPanel({ rules, canViewDetails, search = '' }: Props
               const responded = a?.responded_count ?? a?.acknowledged_count ?? 0;
               const pct = required > 0 ? Math.round((responded / required) * 100) : 0;
               const open = expandedId === rule.id;
+              const ackUsers = usersForRole(a?.acknowledged, userRole);
+              const doubtUsers = usersForRole(a?.doubt, userRole);
+              const nrUsers = usersForRole(a?.not_required, userRole);
+              const pendingUsers = usersForRole(a?.pending, userRole);
               return (
                 <li key={rule.id} className="px-4 sm:px-5 py-3.5">
                   <button
@@ -316,16 +425,23 @@ export function CodoAnalyticsPanel({ rules, canViewDetails, search = '' }: Props
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-medium">
                       <span className="text-emerald-700 dark:text-emerald-300">
-                        Ack {a?.acknowledged_count ?? 0}
+                        Ack {userRole === 'all' ? (a?.acknowledged_count ?? 0) : ackUsers.length}
                       </span>
                       <span className="text-amber-700 dark:text-amber-300">
-                        Doubt {a?.doubt_count ?? a?.doubt?.length ?? 0}
+                        Doubt{' '}
+                        {userRole === 'all'
+                          ? (a?.doubt_count ?? a?.doubt?.length ?? 0)
+                          : doubtUsers.length}
                       </span>
                       <span className="text-slate-600 dark:text-slate-300">
-                        N/R {a?.not_required_count ?? a?.not_required?.length ?? 0}
+                        N/R{' '}
+                        {userRole === 'all'
+                          ? (a?.not_required_count ?? a?.not_required?.length ?? 0)
+                          : nrUsers.length}
                       </span>
                       <span className="text-rose-700 dark:text-rose-300">
-                        Pending {a?.pending_count ?? 0}
+                        Pending{' '}
+                        {userRole === 'all' ? (a?.pending_count ?? 0) : pendingUsers.length}
                       </span>
                     </div>
                   </button>
@@ -336,25 +452,25 @@ export function CodoAnalyticsPanel({ rules, canViewDetails, search = '' }: Props
                         [
                           {
                             title: 'Acknowledged',
-                            users: a.acknowledged || [],
+                            users: ackUsers,
                             tone: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
                             header: 'text-emerald-700 dark:text-emerald-300',
                           },
                           {
                             title: 'Doubt',
-                            users: a.doubt || [],
+                            users: doubtUsers,
                             tone: 'bg-amber-500/15 text-amber-800 dark:text-amber-300',
                             header: 'text-amber-700 dark:text-amber-300',
                           },
                           {
                             title: 'Not required',
-                            users: a.not_required || [],
+                            users: nrUsers,
                             tone: 'bg-slate-500/15 text-slate-700 dark:text-slate-300',
                             header: 'text-slate-600 dark:text-slate-300',
                           },
                           {
                             title: 'Pending',
-                            users: a.pending || [],
+                            users: pendingUsers,
                             tone: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
                             header: 'text-rose-700 dark:text-rose-300',
                           },
