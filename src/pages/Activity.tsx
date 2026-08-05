@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
 import { activityService, type Activity, type ActivityResponse } from '@/services/activityService';
 import { useToast } from '@/components/ui/use-toast';
 import { useSearchParams } from 'react-router-dom';
@@ -170,6 +172,11 @@ const HeaderSkeleton = () => (
 
 const Activity = () => {
   const { currentUser } = useAuth();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions(null);
+  const role = getEffectiveRole(currentUser || {});
+  const canViewActivity = hasPermissionOrAdmin(role, hasPermission, 'ACTIVITY_VIEW');
+  const isAdmin =
+    role === 'admin' || hasPermission('ACTIVITY_DELETE') || hasPermission('SUPER_ADMIN');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -197,7 +204,7 @@ const Activity = () => {
   const [activityToDelete, setActivityToDelete] = useState<Activity | null>(null);
 
   // Check if current user is admin
-  const isAdmin = currentUser?.role === 'admin';
+  // (isAdmin defined above from permissions)
 
   // Undo delete hook
   const {
@@ -449,6 +456,25 @@ const Activity = () => {
   const totalForPagination = totalActivities;
   const totalPages = Math.max(1, Math.ceil(totalForPagination / itemsPerPage));
   const paginatedActivities = filteredActivities;
+
+  if (permissionsLoading) {
+    return (
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6">
+        <p className="text-muted-foreground text-center py-12">Verifying access…</p>
+      </main>
+    );
+  }
+
+  if (!canViewActivity) {
+    return (
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+          <p className="text-muted-foreground">You do not have permission to view activities.</p>
+        </div>
+      </main>
+    );
+  }
 
   const renderEmptyState = () => {
     return (

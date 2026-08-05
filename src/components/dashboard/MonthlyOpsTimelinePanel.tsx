@@ -16,6 +16,7 @@ import {
   CalendarRange,
   CheckCircle2,
   Hourglass,
+  Info,
   Megaphone,
   Minus,
   Timer,
@@ -40,6 +41,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { bugService, type MonthlyOpsMonth } from '@/services/bugService';
 
@@ -74,6 +81,65 @@ function formatDeltaDays(delta: number | null | undefined): string {
   const label = abs < 1 ? `${abs.toFixed(1)}d` : `${abs.toFixed(1)}d`;
   if (delta === 0) return '0d';
   return delta < 0 ? `−${label}` : `+${label}`;
+}
+
+type MetricHeadProps = {
+  label: string;
+  description: string;
+  example: string;
+  align?: 'left' | 'right';
+  className?: string;
+};
+
+/** Why: Dense ops metrics need inline definitions + examples without cluttering the table. */
+function MetricHead({
+  label,
+  description,
+  example,
+  align = 'left',
+  className,
+}: MetricHeadProps) {
+  return (
+    <TableHead
+      className={cn(
+        'sticky top-0 z-10 bg-background/95 backdrop-blur',
+        align === 'right' && 'text-right',
+        className
+      )}
+    >
+      <span
+        className={cn(
+          'inline-flex items-center gap-1 min-w-0',
+          align === 'right' && 'justify-end w-full'
+        )}
+      >
+        <span className="whitespace-nowrap">{label}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label={`About ${label}`}
+            >
+              <Info className="h-3 w-3 opacity-80" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent
+            side="top"
+            align={align === 'right' ? 'end' : 'start'}
+            className="max-w-[280px] rounded-xl border bg-popover p-3 text-xs leading-relaxed shadow-lg"
+          >
+            <p className="font-semibold text-foreground mb-1">{label}</p>
+            <p className="text-muted-foreground">{description}</p>
+            <p className="mt-2 rounded-lg bg-muted/60 px-2 py-1.5 text-[11px] text-foreground">
+              <span className="font-semibold text-muted-foreground">Example: </span>
+              {example}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </span>
+    </TableHead>
+  );
 }
 
 function MonthActivityBar({ row, max }: { row: MonthlyOpsMonth; max: number }) {
@@ -520,94 +586,133 @@ export function MonthlyOpsTimelinePanel({ enabled }: { enabled: boolean }) {
 
       <div className="rounded-xl border border-border/60 overflow-hidden">
         <div className="max-h-[min(52vh,420px)] overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur">
-                  Month
-                </TableHead>
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur text-right tabular-nums">
-                  Created
-                </TableHead>
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur text-right tabular-nums">
-                  Fixed
-                </TableHead>
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur text-right tabular-nums">
-                  Updates
-                </TableHead>
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur text-right tabular-nums whitespace-nowrap">
-                  Avg time
-                </TableHead>
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur text-right tabular-nums">
-                  MoM
-                </TableHead>
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur text-right tabular-nums">
-                  Fix %
-                </TableHead>
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur text-right tabular-nums">
-                  Close %
-                </TableHead>
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur text-right tabular-nums">
-                  Upd/Bug
-                </TableHead>
-                <TableHead className="sticky top-0 z-10 bg-background/95 backdrop-blur min-w-[7rem]">
-                  Mix
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tableMonths.map((row) => (
-                <TableRow key={row.month}>
-                  <TableCell className="font-medium whitespace-nowrap">{row.label}</TableCell>
-                  <TableCell className="text-right tabular-nums">{row.bugs_created}</TableCell>
-                  <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                    {row.bugs_fixed}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-indigo-600 dark:text-indigo-300">
-                    {row.updates_created}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums font-semibold text-violet-700 dark:text-violet-300 whitespace-nowrap">
-                    {row.avg_fix_duration_label ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums whitespace-nowrap">
-                    {row.retention_trend ? (
-                      <span
-                        className={cn(
-                          'inline-flex items-center justify-end gap-0.5',
-                          row.retention_trend === 'improving' &&
-                            'text-emerald-600 dark:text-emerald-400',
-                          row.retention_trend === 'slowing' &&
-                            'text-amber-700 dark:text-amber-300',
-                          row.retention_trend === 'stable' && 'text-muted-foreground'
-                        )}
-                      >
-                        {row.retention_trend === 'improving' ? (
-                          <ArrowDownRight className="h-3.5 w-3.5" />
-                        ) : row.retention_trend === 'slowing' ? (
-                          <ArrowUpRight className="h-3.5 w-3.5" />
-                        ) : (
-                          <Minus className="h-3.5 w-3.5" />
-                        )}
-                        {formatDeltaDays(row.retention_delta_days)}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums font-semibold">
-                    {pct(row.fix_rate)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{pct(row.close_rate)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {ratio(row.update_to_bug_ratio)}
-                  </TableCell>
-                  <TableCell>
-                    <MonthActivityBar row={row} max={maxActivity || 1} />
-                  </TableCell>
+          <TooltipProvider delayDuration={200}>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <MetricHead
+                    label="Month"
+                    description="Calendar month for this row of activity."
+                    example="Aug 2026 covers 1–31 Aug 2026."
+                  />
+                  <MetricHead
+                    align="right"
+                    className="tabular-nums"
+                    label="Created"
+                    description="Bugs opened (created) during this month."
+                    example="Created 69 → 69 new bugs were logged in Aug 2026."
+                  />
+                  <MetricHead
+                    align="right"
+                    className="tabular-nums"
+                    label="Fixed"
+                    description="Bugs marked fixed in this month (by fix/update time), including backlog from earlier months."
+                    example="Fixed 98 with Created 69 → more were closed than opened (backlog cleared)."
+                  />
+                  <MetricHead
+                    align="right"
+                    className="tabular-nums"
+                    label="Updates"
+                    description="Project updates created in this month."
+                    example="Updates 1 → one project update was published that month."
+                  />
+                  <MetricHead
+                    align="right"
+                    className="tabular-nums whitespace-nowrap"
+                    label="Avg time"
+                    description="Average time from bug created → fixed, for bugs fixed in this month."
+                    example="16d 21h 17m → typical fix took about 17 days."
+                  />
+                  <MetricHead
+                    align="right"
+                    className="tabular-nums"
+                    label="MoM"
+                    description="Month-over-month change in avg fix time vs the previous month that had fixes. ↓ / negative = faster; ↑ / positive = slower."
+                    example="−2.9d (green ↓) → fixed ~3 days faster than last month. +1.3d (amber ↑) → slower."
+                  />
+                  <MetricHead
+                    align="right"
+                    className="tabular-nums"
+                    label="Fix %"
+                    description="Fixed ÷ Created × 100. Can exceed 100% when clearing prior-month backlog."
+                    example="98 fixed ÷ 69 created = 142%."
+                  />
+                  <MetricHead
+                    align="right"
+                    className="tabular-nums"
+                    label="Close %"
+                    description="(Fixed + Declined + Rejected) ÷ Created × 100. Broader than Fix % — includes bugs closed without a fix."
+                    example="If 98 fixed + 6 declined on 69 created → Close % ≈ 150.7%."
+                  />
+                  <MetricHead
+                    align="right"
+                    className="tabular-nums"
+                    label="Upd/Bug"
+                    description="Updates created ÷ Bugs created that month. Shows update volume relative to bug intake."
+                    example="1 update ÷ 69 bugs = 0.01 Upd/Bug."
+                  />
+                  <MetricHead
+                    className="min-w-[7rem]"
+                    label="Mix"
+                    description="Relative bar of Created (orange), Fixed (green), and Updates (indigo) scaled to the busiest month in the table."
+                    example="A long green segment means Fixed dominated that month’s activity mix."
+                  />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {tableMonths.map((row) => (
+                  <TableRow key={row.month}>
+                    <TableCell className="font-medium whitespace-nowrap">{row.label}</TableCell>
+                    <TableCell className="text-right tabular-nums">{row.bugs_created}</TableCell>
+                    <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                      {row.bugs_fixed}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-indigo-600 dark:text-indigo-300">
+                      {row.updates_created}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-semibold text-violet-700 dark:text-violet-300 whitespace-nowrap">
+                      {row.avg_fix_duration_label ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">
+                      {row.retention_trend ? (
+                        <span
+                          className={cn(
+                            'inline-flex items-center justify-end gap-0.5',
+                            row.retention_trend === 'improving' &&
+                              'text-emerald-600 dark:text-emerald-400',
+                            row.retention_trend === 'slowing' &&
+                              'text-amber-700 dark:text-amber-300',
+                            row.retention_trend === 'stable' && 'text-muted-foreground'
+                          )}
+                        >
+                          {row.retention_trend === 'improving' ? (
+                            <ArrowDownRight className="h-3.5 w-3.5" />
+                          ) : row.retention_trend === 'slowing' ? (
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          ) : (
+                            <Minus className="h-3.5 w-3.5" />
+                          )}
+                          {formatDeltaDays(row.retention_delta_days)}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-semibold">
+                      {pct(row.fix_rate)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{pct(row.close_rate)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {ratio(row.update_to_bug_ratio)}
+                    </TableCell>
+                    <TableCell>
+                      <MonthActivityBar row={row} max={maxActivity || 1} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TooltipProvider>
         </div>
         {months.length > 12 ? (
           <div className="border-t border-border/60 px-4 py-2.5 flex justify-center">
@@ -625,11 +730,9 @@ export function MonthlyOpsTimelinePanel({ enabled }: { enabled: boolean }) {
       </div>
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Created = bugs opened that month. Fixed / declined / rejected = closed that month (by
-        update time). Avg time retention = average created→fixed duration for bugs fixed that
-        month. MoM = change vs previous month with fixes (↓ faster). Fix % = fixed ÷ created
-        (may exceed 100% when clearing backlog). Close % = (fixed + declined + rejected) ÷
-        created. Upd/Bug = updates ÷ bugs created.
+        Tap the <Info className="inline h-3 w-3 mx-0.5 align-text-bottom opacity-80" /> icon on
+        each column for definition and example. Fix % / Close % can exceed 100% when clearing
+        backlog from earlier months.
       </p>
     </div>
   );

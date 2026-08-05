@@ -42,7 +42,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { cn, getEffectiveRole } from '@/lib/utils';
+import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   clearAttendanceExceptionsForUsers,
   listAllAttendanceExceptions,
@@ -176,7 +177,9 @@ type UserRosterRow = {
  */
 export default function AdminAttendanceExceptions() {
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
+  const canManageAttendance = hasPermissionOrAdmin(role, hasPermission, 'ATTENDANCE_MANAGE');
 
   const [data, setData] = useState<AttendanceExceptionsAllPayload | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -592,7 +595,7 @@ export default function AdminAttendanceExceptions() {
     }
   }
 
-  if (role !== 'admin') {
+  if (!canManageAttendance) {
     return (
       <div className="p-6">
         <p className="text-sm text-muted-foreground">Only admins can manage attendance exceptions.</p>

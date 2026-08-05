@@ -21,7 +21,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { getEffectiveRole } from "@/lib/utils";
+import { getEffectiveRole, hasPermissionOrAdmin } from "@/lib/utils";
+import { usePermissions } from "@/hooks/usePermissions";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import { commonBugsService } from "@/services/commonBugsService";
 import { projectService, type Project } from "@/services/projectService";
@@ -48,8 +49,11 @@ import {
 
 const CommonBugs = () => {
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
-  const canAccessCommonBugs = role === "admin" || role === "developer";
+  const canAccessCommonBugs =
+    hasPermissionOrAdmin(role, hasPermission, "COMMON_BUGS_VIEW") ||
+    role === "developer";
   const [bugs, setBugs] = useState<CommonBug[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);

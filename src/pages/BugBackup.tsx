@@ -165,7 +165,7 @@ const BugBackup = () => {
   const [progressValue, setProgressValue] = useState(8);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  const canAccess = hasPermission('SETTINGS_EDIT');
+  const canAccess = hasPermission('BACKUP_MANAGE') || hasPermission('SETTINGS_EDIT');
   const hasSelection = includeDatabase || includeUploads || includeConfig;
 
   const {

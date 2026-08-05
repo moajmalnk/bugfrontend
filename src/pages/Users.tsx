@@ -605,7 +605,7 @@ const Users = () => {
     activePage * itemsPerPage
   );
 
-  // Check for USERS_VIEW permission OR admin role
+  // USERS_VIEW permission (admin ENUM still has SUPER_ADMIN / all perms)
   if (isLoadingPermissions) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
@@ -617,19 +617,7 @@ const Users = () => {
     );
   }
 
-  // Only admins can access Users page
-  if (effectiveRole !== 'admin') {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
-        <p className="text-muted-foreground">
-          Only administrators can access the user management page.
-        </p>
-      </div>
-    );
-  }
-
-  if (!hasPermission('USERS_VIEW')) {
+  if (!hasPermission("USERS_VIEW") && effectiveRole !== "admin") {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <h1 className="text-2xl font-bold mb-4">Access Denied</h1>

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ENV } from "@/lib/env";
 import { useAuth } from "@/context/AuthContext";
+import { getEffectiveRole, hasPermissionOrAdmin } from "@/lib/utils";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -114,6 +116,9 @@ function isPushEnabled(value: boolean | number | undefined | null): boolean {
 
 export default function AdminPushCoverage() {
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
+  const role = getEffectiveRole(currentUser || {});
+  const canViewPush = hasPermissionOrAdmin(role, hasPermission, "PUSH_COVERAGE_VIEW");
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<PushSummary>(defaultSummary);
   const [missingUsers, setMissingUsers] = useState<MissingUser[]>([]);
@@ -313,7 +318,7 @@ export default function AdminPushCoverage() {
     </div>
   );
 
-  if (currentUser?.role !== "admin") {
+  if (!canViewPush) {
     return (
       <main className="p-6">
         <Card>

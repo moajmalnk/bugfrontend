@@ -438,12 +438,12 @@ const Projects = () => {
   }, [projects, directoryUsers]);
 
   useEffect(() => {
-    // Fetch projects when component mounts
+    // Why: Refetch on enter so card Total/Open/Fixed stay correct after bug convert/moves.
     fetchProjects();
     if (currentUser?.role === "admin" || currentUser?.role === "developer") {
       clientService.getClients().then(setClientsList).catch(() => {});
     }
-  }, []);
+  }, [location.pathname]);
 
   useEffect(() => {
     const clientIdFromUrl = searchParams.get("client_id");
@@ -851,7 +851,7 @@ const Projects = () => {
     project.client?.corporate_name || project.client_name || null;
 
   const totalFiltered = filteredProjects.length;
-  // Workload order: Ongoing → open bugs ↓ → approved updates ↓ → total updates ↓ → name
+  // Workload order: open bugs ↓ → Ongoing/Release Ready → approved updates ↓ → total updates ↓ → name
   const sortedProjects = sortProjectsByWorkload(filteredProjects, {
     openBugs: projectOpenBugsCount,
     updatesActive: projectUpdatesApprovedCount,

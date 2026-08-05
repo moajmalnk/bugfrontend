@@ -112,7 +112,7 @@ export default function FeedbackStats() {
     );
   }
 
-  if (!hasPermission('USERS_VIEW')) {
+  if (!hasPermission('FEEDBACK_VIEW') && !hasPermission('USERS_VIEW')) {
     return (
       <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
         <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">

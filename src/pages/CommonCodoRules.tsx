@@ -25,7 +25,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { cn, getEffectiveRole } from '@/lib/utils';
+import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   Collapsible,
   CollapsibleContent,
@@ -187,10 +188,15 @@ function AckUserRow({
 
 export default function CommonCodoRules() {
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
-  const canAccess = role === 'admin' || role === 'developer' || role === 'tester';
-  const canDelete = role === 'admin';
-  const canViewAckDetails = role === 'admin';
+  const canAccess =
+    hasPermissionOrAdmin(role, hasPermission, 'CODO_VIEW') ||
+    role === 'developer' ||
+    role === 'tester';
+  const canDelete =
+    hasPermissionOrAdmin(role, hasPermission, 'CODO_MANAGE');
+  const canViewAckDetails = canDelete;
 
   const [rules, setRules] = useState<CodoCommonRule[]>([]);
   const [counts, setCounts] = useState<CodoRuleCounts>({
@@ -213,6 +219,10 @@ export default function CommonCodoRules() {
   const [deleteTarget, setDeleteTarget] = useState<CodoCommonRule | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [acknowledgingId, setAcknowledgingId] = useState<number | null>(null);
+  const [confirmRespond, setConfirmRespond] = useState<{
+    rule: CodoCommonRule;
+    status: CodoAckStatus;
+  } | null>(null);
   const [expandedAck, setExpandedAck] = useState<Record<number, boolean>>({});
   const [isDownloadingReport, setIsDownloadingReport] = useState(false);
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
@@ -795,7 +805,10 @@ export default function CommonCodoRules() {
                                     : 'bg-white/70 dark:bg-gray-900/60 text-gray-800 dark:text-gray-100 border-gray-200 dark:border-gray-700'
                                 )}
                                 disabled={acknowledgingId === rule.id}
-                                onClick={() => handleRespond(rule, status)}
+                                onClick={() => {
+                                  if (active) return;
+                                  setConfirmRespond({ rule, status });
+                                }}
                               >
                                 {acknowledgingId === rule.id && active ? (
                                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -1203,8 +1216,68 @@ export default function CommonCodoRules() {
         onSubmit={handleSave}
       />
 
+      <AlertDialog
+        open={!!confirmRespond}
+        onOpenChange={(o) => !o && !acknowledgingId && setConfirmRespond(null)}
+      >
+        <AlertDialogContent className="rounded-2xl w-[calc(100%-1.5rem)] max-w-[400px] mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmRespond
+                ? `Confirm: ${STATUS_META[confirmRespond.status].label}?`
+                : 'Confirm response'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRespond?.status === 'acknowledged' &&
+                'Mark this rule as acknowledged. Your response will be recorded for compliance.'}
+              {confirmRespond?.status === 'doubt' &&
+                'Mark this rule as doubt. Admins can follow up on your question.'}
+              {confirmRespond?.status === 'not_required' &&
+                'Mark this rule as not required for you. Use this only when the rule does not apply to your work.'}
+              {confirmRespond ? (
+                <>
+                  {' '}
+                  <span className="font-medium text-foreground">
+                    “{confirmRespond.rule.title}”
+                  </span>
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel
+              className="rounded-xl"
+              disabled={acknowledgingId != null}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(
+                'rounded-xl',
+                confirmRespond && STATUS_META[confirmRespond.status].activeClass
+              )}
+              disabled={acknowledgingId != null || !confirmRespond}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!confirmRespond || acknowledgingId != null) return;
+                const payload = confirmRespond;
+                setConfirmRespond(null);
+                void handleRespond(payload.rule, payload.status);
+              }}
+            >
+              {acknowledgingId != null ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {confirmRespond
+                ? STATUS_META[confirmRespond.status].label
+                : 'Confirm'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <AlertDialogContent className="rounded-2xl w-[calc(100%-1.5rem)] max-w-lg mx-auto">
+        <AlertDialogContent className="rounded-2xl w-[calc(100%-1.5rem)] max-w-[400px] mx-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete CODO rule?</AlertDialogTitle>
             <AlertDialogDescription>

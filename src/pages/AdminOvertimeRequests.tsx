@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { usePermissions } from '@/hooks/usePermissions';
 import { listAllRequestSubmissions, normalizeAllRequestSubmissionsResponse } from '@/services/todoService';
 import { userService } from '@/services/userService';
 import { Button } from '@/components/ui/button';
@@ -168,7 +170,9 @@ export default function AdminOvertimeRequests() {
     }
   }, []);
 
-  const isAdmin = (currentUser?.role || '').toLowerCase() === 'admin';
+  const { hasPermission } = usePermissions(null);
+  const role = getEffectiveRole(currentUser || {});
+  const isAdmin = hasPermissionOrAdmin(role, hasPermission, 'OVERTIME_MANAGE');
 
   useEffect(() => {
     if (!isAdmin) return;

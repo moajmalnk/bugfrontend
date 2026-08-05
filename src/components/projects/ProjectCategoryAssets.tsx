@@ -317,274 +317,300 @@ export function ProjectCategoryAssets({
   return (
     <div className="space-y-5">
       {categories.includes('WEB') && (
-        <div className="space-y-3 rounded-2xl border border-sky-200/60 dark:border-sky-800/40 bg-sky-50/40 dark:bg-sky-950/15 p-4 sm:p-5">
-          <div>
+        <div className="space-y-3 rounded-2xl border border-sky-200/60 dark:border-sky-800/40 bg-sky-50/40 dark:bg-sky-950/15 p-3 sm:p-5 min-w-0 overflow-hidden">
+          <div className="min-w-0">
             <h4 className="text-sm font-bold text-sky-800 dark:text-sky-200">WEB assets</h4>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Required per slot: <strong className="font-semibold">Link</strong> or{' '}
-              <strong className="font-semibold">Upload</strong> for{' '}
+            <p className="text-xs text-muted-foreground mt-0.5 break-words">
+              Optional: Link or Upload for{' '}
               <code className="text-[11px]">.env</code>,{' '}
               <code className="text-[11px]">.json</code>, and README
             </p>
           </div>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <FileSlot
-              title=".env"
-              hint="Environment variables (prefer sanitized examples)"
-              accept=".env,.env.*,text/plain"
-              required
-              category="WEB"
-              folder="config"
-              slotKey="web_env"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('WEB', 'config', 'web_env')}
-            />
-            <FileSlot
-              title="JSON config"
-              hint="package.json, firebase, or other config"
-              accept=".json,application/json"
-              required
-              category="WEB"
-              folder="config"
-              slotKey="web_json"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('WEB', 'config', 'web_json')}
-            />
-            <FileSlot
-              title="README"
-              hint="readme.md or README.txt"
-              accept=".md,.txt,text/plain,text/markdown"
-              required
-              category="WEB"
-              folder="docs"
-              slotKey="web_readme"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('WEB', 'docs', 'web_readme')}
-            />
+          <div className="grid grid-cols-12 gap-3 min-w-0">
+            <div className="col-span-12 md:col-span-6 xl:col-span-4 min-w-0">
+              <FileSlot
+                title=".env"
+                hint="Environment variables (prefer sanitized examples)"
+                accept=".env,.env.*,text/plain"
+                category="WEB"
+                folder="config"
+                slotKey="web_env"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('WEB', 'config', 'web_env')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 xl:col-span-4 min-w-0">
+              <FileSlot
+                title="JSON config"
+                hint="package.json, firebase, or other config"
+                accept=".json,application/json"
+                category="WEB"
+                folder="config"
+                slotKey="web_json"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('WEB', 'config', 'web_json')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 xl:col-span-4 min-w-0">
+              <FileSlot
+                title="README"
+                hint="readme.md or README.txt"
+                accept=".md,.txt,text/plain,text/markdown"
+                category="WEB"
+                folder="docs"
+                slotKey="web_readme"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('WEB', 'docs', 'web_readme')}
+              />
+            </div>
           </div>
         </div>
       )}
 
       {categories.includes('APP') && (
-        <div className="space-y-4 rounded-2xl border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/15 p-4 sm:p-5">
-          <div>
+        <div className="space-y-4 rounded-2xl border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/15 p-3 sm:p-5 min-w-0 overflow-hidden">
+          <div className="min-w-0">
             <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-200">
               APP publisher & files
             </h4>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5 break-words">
               Play Store details plus assets — use Link or Folder/Upload on each card
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-border/60 bg-background/70">
-            <div className="divide-y divide-border/50">
+          <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-border/60 bg-background/70 min-w-0">
+            <div className="divide-y divide-border/50 min-w-0">
               {APP_META_FIELDS.map((field) => (
                 <div
                   key={field.key}
-                  className="grid grid-cols-1 sm:grid-cols-[11rem_1fr] gap-1 sm:gap-3 px-3 py-2.5"
+                  className="grid grid-cols-12 gap-2 px-3 py-2.5 min-w-0"
                 >
-                  <Label className="text-xs font-semibold text-muted-foreground self-center">
+                  <Label className="col-span-12 sm:col-span-4 lg:col-span-3 text-xs font-semibold text-muted-foreground self-center truncate">
                     {field.label}
                   </Label>
-                  <Input
-                    value={appMeta[field.key] || ''}
-                    onChange={(e) =>
-                      onAppMetaChange({ ...appMeta, [field.key]: e.target.value })
-                    }
-                    placeholder={field.placeholder}
-                    className="h-9 text-sm"
-                  />
+                  <div className="col-span-12 sm:col-span-8 lg:col-span-9 min-w-0">
+                    <Input
+                      value={appMeta[field.key] || ''}
+                      onChange={(e) =>
+                        onAppMetaChange({ ...appMeta, [field.key]: e.target.value })
+                      }
+                      placeholder={field.placeholder}
+                      className="h-9 text-sm w-full min-w-0"
+                    />
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-            <FileSlot
-              title="app files"
-              hint="local.properties, key.properties, google-services.json"
-              accept=".properties,.json,.txt,*"
-              category="APP"
-              folder="app_files"
-              directory
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('APP', 'app_files')}
-            />
-            <FileSlot
-              title="key_store"
-              hint="upload-keystore.jks and signing configs"
-              accept=".jks,.keystore,.properties,.json,*"
-              category="APP"
-              folder="key_store"
-              directory
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('APP', 'key_store')}
-            />
-            <FileSlot
-              title="builds"
-              hint="Android .apk / .aab (version folders welcome)"
-              accept=".apk,.aab,*"
-              category="APP"
-              folder="builds"
-              slotKey="android_builds"
-              directory
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('APP', 'builds', 'android_builds')}
-            />
-            <FileSlot
-              title="Mac / iOS IPA"
-              hint="Upload .ipa package (e.g. app.ipa)"
-              accept=".ipa,application/octet-stream"
-              category="APP"
-              folder="builds"
-              slotKey="mac_ipa"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('APP', 'builds', 'mac_ipa')}
-            />
+          <div className="grid grid-cols-12 gap-3 min-w-0">
+            <div className="col-span-12 md:col-span-6 min-w-0">
+              <FileSlot
+                title="app files"
+                hint="local.properties, key.properties, google-services.json"
+                accept=".properties,.json,.txt,*"
+                category="APP"
+                folder="app_files"
+                directory
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('APP', 'app_files')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 min-w-0">
+              <FileSlot
+                title="key_store"
+                hint="upload-keystore.jks and signing configs"
+                accept=".jks,.keystore,.properties,.json,*"
+                category="APP"
+                folder="key_store"
+                directory
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('APP', 'key_store')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 min-w-0">
+              <FileSlot
+                title="builds"
+                hint="Android .apk / .aab (version folders welcome)"
+                accept=".apk,.aab,*"
+                category="APP"
+                folder="builds"
+                slotKey="android_builds"
+                directory
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('APP', 'builds', 'android_builds')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 min-w-0">
+              <FileSlot
+                title="Mac / iOS IPA"
+                hint="Upload .ipa package (e.g. app.ipa)"
+                accept=".ipa,application/octet-stream"
+                category="APP"
+                folder="builds"
+                slotKey="mac_ipa"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('APP', 'builds', 'mac_ipa')}
+              />
+            </div>
           </div>
         </div>
       )}
 
       {categories.includes('PWA') && (
-        <div className="space-y-3 rounded-2xl border border-violet-200/60 dark:border-violet-800/40 bg-violet-50/40 dark:bg-violet-950/15 p-4 sm:p-5">
-          <div>
+        <div className="space-y-3 rounded-2xl border border-violet-200/60 dark:border-violet-800/40 bg-violet-50/40 dark:bg-violet-950/15 p-3 sm:p-5 min-w-0 overflow-hidden">
+          <div className="min-w-0">
             <h4 className="text-sm font-bold text-violet-800 dark:text-violet-200">PWA assets</h4>
             <p className="text-xs text-muted-foreground mt-0.5">
               Manifest, service worker, and icons — Link or Upload
             </p>
           </div>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <FileSlot
-              title="manifest.json"
-              hint="Web app manifest"
-              accept=".json,application/json"
-              category="PWA"
-              folder="pwa"
-              slotKey="pwa_manifest"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('PWA', 'pwa', 'pwa_manifest')}
-            />
-            <FileSlot
-              title="Service worker"
-              hint="sw.js / service-worker.js"
-              accept=".js,text/javascript"
-              category="PWA"
-              folder="pwa"
-              slotKey="pwa_sw"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('PWA', 'pwa', 'pwa_sw')}
-            />
-            <FileSlot
-              title="Icons"
-              hint="Icon pack or zip"
-              accept="image/*,.zip"
-              category="PWA"
-              folder="icons"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('PWA', 'icons')}
-            />
+          <div className="grid grid-cols-12 gap-3 min-w-0">
+            <div className="col-span-12 md:col-span-6 xl:col-span-4 min-w-0">
+              <FileSlot
+                title="manifest.json"
+                hint="Web app manifest"
+                accept=".json,application/json"
+                category="PWA"
+                folder="pwa"
+                slotKey="pwa_manifest"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('PWA', 'pwa', 'pwa_manifest')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 xl:col-span-4 min-w-0">
+              <FileSlot
+                title="Service worker"
+                hint="sw.js / service-worker.js"
+                accept=".js,text/javascript"
+                category="PWA"
+                folder="pwa"
+                slotKey="pwa_sw"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('PWA', 'pwa', 'pwa_sw')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 xl:col-span-4 min-w-0">
+              <FileSlot
+                title="Icons"
+                hint="Icon pack or zip"
+                accept="image/*,.zip"
+                category="PWA"
+                folder="icons"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('PWA', 'icons')}
+              />
+            </div>
           </div>
         </div>
       )}
 
       {categories.includes('SEO') && (
-        <div className="space-y-3 rounded-2xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/40 dark:bg-amber-950/15 p-4 sm:p-5">
-          <div>
+        <div className="space-y-3 rounded-2xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/40 dark:bg-amber-950/15 p-3 sm:p-5 min-w-0 overflow-hidden">
+          <div className="min-w-0">
             <h4 className="text-sm font-bold text-amber-800 dark:text-amber-200">SEO assets</h4>
             <p className="text-xs text-muted-foreground mt-0.5">
               Crawl rules, sitemap, keywords, and notes — Link or Upload
             </p>
           </div>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            <FileSlot
-              title="robots.txt"
-              hint="Crawl directives"
-              accept=".txt,text/plain"
-              category="SEO"
-              folder="seo"
-              slotKey="seo_robots"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('SEO', 'seo', 'seo_robots')}
-            />
-            <FileSlot
-              title="sitemap.xml"
-              hint="XML sitemap"
-              accept=".xml,application/xml,text/xml"
-              category="SEO"
-              folder="seo"
-              slotKey="seo_sitemap"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('SEO', 'seo', 'seo_sitemap')}
-            />
-            <FileSlot
-              title="Keywords"
-              hint="CSV / XLSX keyword sheet"
-              accept=".csv,.xlsx,.xls,text/csv"
-              category="SEO"
-              folder="seo"
-              slotKey="seo_keywords"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('SEO', 'seo', 'seo_keywords')}
-            />
-            <FileSlot
-              title="SEO notes"
-              hint="md / txt brief"
-              accept=".md,.txt,text/plain,text/markdown"
-              category="SEO"
-              folder="seo"
-              slotKey="seo_notes"
-              pending={pendingFiles}
-              existing={existingAttachments}
-              onAdd={addFiles}
-              onRemovePending={removePending}
-              {...slotLinkProps('SEO', 'seo', 'seo_notes')}
-            />
+          <div className="grid grid-cols-12 gap-3 min-w-0">
+            <div className="col-span-12 md:col-span-6 min-w-0">
+              <FileSlot
+                title="robots.txt"
+                hint="Crawl directives"
+                accept=".txt,text/plain"
+                category="SEO"
+                folder="seo"
+                slotKey="seo_robots"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('SEO', 'seo', 'seo_robots')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 min-w-0">
+              <FileSlot
+                title="sitemap.xml"
+                hint="XML sitemap"
+                accept=".xml,application/xml,text/xml"
+                category="SEO"
+                folder="seo"
+                slotKey="seo_sitemap"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('SEO', 'seo', 'seo_sitemap')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 min-w-0">
+              <FileSlot
+                title="Keywords"
+                hint="CSV / XLSX keyword sheet"
+                accept=".csv,.xlsx,.xls,text/csv"
+                category="SEO"
+                folder="seo"
+                slotKey="seo_keywords"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('SEO', 'seo', 'seo_keywords')}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-6 min-w-0">
+              <FileSlot
+                title="SEO notes"
+                hint="md / txt brief"
+                accept=".md,.txt,text/plain,text/markdown"
+                category="SEO"
+                folder="seo"
+                slotKey="seo_notes"
+                pending={pendingFiles}
+                existing={existingAttachments}
+                onAdd={addFiles}
+                onRemovePending={removePending}
+                {...slotLinkProps('SEO', 'seo', 'seo_notes')}
+              />
+            </div>
           </div>
         </div>
       )}
 
       {categories.includes('CREATIVE') && (
-        <div className="space-y-3 rounded-2xl border border-pink-200/60 dark:border-pink-800/40 bg-pink-50/40 dark:bg-pink-950/15 p-4 sm:p-5">
-          <div>
+        <div className="space-y-3 rounded-2xl border border-pink-200/60 dark:border-pink-800/40 bg-pink-50/40 dark:bg-pink-950/15 p-3 sm:p-5 min-w-0 overflow-hidden">
+          <div className="min-w-0">
             <h4 className="text-sm font-bold text-pink-800 dark:text-pink-200">
               Creative assets
             </h4>

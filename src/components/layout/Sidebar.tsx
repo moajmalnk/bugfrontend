@@ -4,7 +4,6 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
 import { cn, getEffectiveRole, showBugMessageInMainNav } from "@/lib/utils";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
-import { PermissionGuard } from "@/components/PermissionGuard";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   Bell,
@@ -53,6 +52,8 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
   const { hasPermission } = usePermissions(null);
   const { setOpen: setSearchOpen } = useGlobalSearchModal();
   const role = getEffectiveRole(currentUser || {});
+  // Why: Bridge legacy ENUM admin until all new permission keys are seeded/granted.
+  const can = (key: string) => role === "admin" || hasPermission(key);
 
   const isActive = (path: string) => {
     if (!role) return false;
@@ -167,9 +168,9 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
       {/* Navigation */}
       <ScrollArea className="flex-1 px-3">
         <div className="space-y-6">
-          {/* Main Navigation */}
+          {/* Main Navigation — permission-driven (custom roles use RBAC, not ENUM) */}
           <div className="space-y-1">
-            {role === "admin" && (
+            {can("DASHBOARD_VIEW") && (
               <NavLink
                 to="/dashboard"
                 icon={<LayoutDashboard className="h-5 w-5" />}
@@ -196,41 +197,37 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               icon={<Bell className="h-5 w-5" />}
               label="Updates"
             />
-            {/* BugDocs - Hide for testers */}
-            {role !== 'tester' && (
+            {(can("DOCS_VIEW") || can("DOCS_CREATE")) && (
               <NavLink
                 to="/bugdocs"
                 icon={<FileText className="h-5 w-5" />}
                 label="BugDocs"
               />
             )}
-            {/* BugSheets - Hide for testers */}
-            {role !== 'tester' && (
+            {(can("SHEETS_VIEW") || can("SHEETS_MANAGE") || can("DOCS_VIEW")) && (
               <NavLink
                 to="/bugsheets"
                 icon={<FileSpreadsheet className="h-5 w-5" />}
                 label="BugSheets"
               />
             )}
-            {/* BugMeet - Hide for testers */}
-            {role !== 'tester' && (
+            {(can("MEETINGS_JOIN") || can("MEETINGS_CREATE") || can("MEETINGS_MANAGE") || role === "developer") && (
               <NavLink
                 to="/meet?tab=shared-meets"
                 icon={<Video className="h-5 w-5" />}
                 label="BugMeet"
               />
             )}
-            
-            {/* Daily Update, My Tasks & BugDocs - Permission-based access, hide for testers */}
-            {role !== 'tester' && (hasPermission('TASKS_VIEW_ALL') || hasPermission('TASKS_VIEW_ASSIGNED') || hasPermission('TASKS_CREATE')) && (
+
+            {(can("TASKS_VIEW_ALL") || can("TASKS_VIEW_ASSIGNED") || can("TASKS_CREATE")) && (
               <NavLink
                 to="/my-tasks?tab=shared-tasks"
                 icon={<ListTodo className="h-5 w-5" />}
                 label="BugToDo"
               />
             )}
-            
-            {role !== 'tester' && (hasPermission('DAILY_UPDATE_CREATE') || hasPermission('DAILY_UPDATE_VIEW') || hasPermission('UPDATES_VIEW') || hasPermission('UPDATES_CREATE')) && (
+
+            {(can("DAILY_UPDATE_CREATE") || can("DAILY_UPDATE_VIEW") || can("UPDATES_VIEW") || can("UPDATES_CREATE")) && (
               <NavLink
                 to="/daily-update"
                 icon={<Calendar className="h-5 w-5" />}
@@ -238,7 +235,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {role !== 'tester' && (
+            {(can("LEAVE_VIEW") || role === "developer" || role === "user") && (
               <NavLink
                 to="/leave"
                 icon={<PlaneTakeoff className="h-5 w-5" />}
@@ -246,7 +243,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {showBugMessageInMainNav(role) && (
+            {(showBugMessageInMainNav(role) || can("MESSAGING_VIEW")) && (
               <NavLink
                 to="/messages"
                 icon={<MessageSquare className="h-5 w-5" />}
@@ -254,7 +251,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {(role === "admin" || role === "developer") && (
+            {can("COMMON_BUGS_VIEW") && (
               <NavLink
                 to="/common-bugs"
                 icon={<Repeat className="h-5 w-5" />}
@@ -262,7 +259,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               />
             )}
 
-            {(role === "admin" || role === "developer" || role === "tester") && (
+            {can("CODO_VIEW") && (
               <NavLink
                 to="/common-codo"
                 icon={<ClipboardCheck className="h-5 w-5" />}
@@ -278,20 +275,41 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             
           </div>
 
-          {/* Administration Section - Only show if user has at least one admin permission */}
+          {/* Administration Section — any admin-level permission */}
           {(() => {
-            // Check if user has at least one admin-level permission
-            const hasUsersPermission = role === "admin";
-            const hasMessagingView = hasPermission('MESSAGING_VIEW');
-            const hasMessagingCreate = hasPermission('MESSAGING_CREATE');
-            const hasFeedbackView = hasPermission('FEEDBACK_VIEW');
-            const hasActivityView = hasPermission('ACTIVITY_VIEW');
-            const hasSettingsEdit = hasPermission('SETTINGS_EDIT');
+            const hasUsersView = can("USERS_VIEW");
+            const hasClientsView = can("CLIENTS_VIEW");
+            const hasOvertimeManage = can("OVERTIME_MANAGE");
+            const hasLeaveManage = can("LEAVE_MANAGE");
+            const hasAttendanceManage = can("ATTENDANCE_MANAGE");
+            const hasMessagingView = can("MESSAGING_VIEW");
+            const hasMessagingCreate = can("MESSAGING_CREATE");
+            // Why: WhatsApp bulk tools are admin-only — hide from developer portal.
+            const showWhatsApp = hasMessagingCreate && role === "admin";
+            const hasFeedbackView = can("FEEDBACK_VIEW");
+            const hasActivityView = can("ACTIVITY_VIEW");
+            const hasSettingsEdit = can("SETTINGS_EDIT");
+            const hasBackupManage = can("BACKUP_MANAGE") || hasSettingsEdit;
+            const hasPushCoverage = can("PUSH_COVERAGE_VIEW");
+            const hasShortsManage = can("SHORTS_MANAGE");
+            const messagesInMain =
+              showBugMessageInMainNav(role) || can("MESSAGING_VIEW");
 
-            const hasAnyAdminLinks = hasUsersPermission || hasMessagingView || hasMessagingCreate || 
-                                    hasFeedbackView || hasActivityView || hasSettingsEdit;
+            const hasAnyAdminLinks =
+              hasUsersView ||
+              hasClientsView ||
+              hasOvertimeManage ||
+              hasLeaveManage ||
+              hasAttendanceManage ||
+              (hasMessagingView && !messagesInMain) ||
+              showWhatsApp ||
+              hasFeedbackView ||
+              hasActivityView ||
+              hasSettingsEdit ||
+              hasBackupManage ||
+              hasPushCoverage ||
+              hasShortsManage;
 
-            // Show Administration section if user has ANY admin permission OR is super admin
             if (!hasAnyAdminLinks) {
               return null;
             }
@@ -307,8 +325,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     </h3>
                   </div>
 
-                  {/* Users Link - Only for Admins */}
-                  {hasUsersPermission && (
+                  {hasUsersView && (
                     <NavLink
                       to="/users"
                       icon={<Users className="h-5 w-5" />}
@@ -316,7 +333,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {hasUsersPermission && (
+                  {hasClientsView && (
                     <NavLink
                       to="/clients"
                       icon={<Building2 className="h-5 w-5" />}
@@ -324,7 +341,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {hasUsersPermission && (
+                  {hasOvertimeManage && (
                     <NavLink
                       to="/overtime-requests"
                       icon={<Timer className="h-5 w-5" />}
@@ -332,7 +349,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {hasUsersPermission && (
+                  {hasLeaveManage && (
                     <NavLink
                       to="/leave-requests"
                       icon={<PlaneTakeoff className="h-5 w-5" />}
@@ -340,7 +357,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {hasUsersPermission && (
+                  {hasAttendanceManage && (
                     <NavLink
                       to="/attendance-exceptions"
                       icon={<CalendarClock className="h-5 w-5" />}
@@ -348,8 +365,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {/* Messaging: BugMessage lives under main nav for admin/developer; others use MESSAGING_VIEW here */}
-                  {hasMessagingView && !showBugMessageInMainNav(role) && (
+                  {hasMessagingView && !messagesInMain && (
                     <NavLink
                       to="/messages"
                       icon={<MessageSquare className="h-5 w-5" />}
@@ -357,7 +373,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {hasMessagingCreate && (
+                  {showWhatsApp && (
                     <NavLink
                       to="/whatsapp-messages"
                       icon={<MessageCircle className="h-5 w-5" />}
@@ -365,7 +381,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {/* Feedback and Activity */}
                   {hasFeedbackView && (
                     <NavLink
                       to="/feedback-stats"
@@ -382,7 +397,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {hasUsersPermission && (
+                  {hasPushCoverage && (
                     <NavLink
                       to="/push-coverage"
                       icon={<Signal className="h-5 w-5" />}
@@ -390,7 +405,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {role === "admin" && (
+                  {hasShortsManage && (
                     <NavLink
                       to="/shorts"
                       icon={<Clapperboard className="h-5 w-5" />}
@@ -398,7 +413,6 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {/* Settings */}
                   {hasSettingsEdit && (
                     <NavLink
                       to="/settings"
@@ -407,8 +421,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                     />
                   )}
 
-                  {/* BugBackup */}
-                  {hasSettingsEdit && (
+                  {hasBackupManage && (
                     <NavLink
                       to="/bugbackup"
                       icon={<Database className="h-5 w-5" />}

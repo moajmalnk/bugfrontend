@@ -8,7 +8,6 @@ import {
   emptyProjectFormValues,
   formValuesToPayload,
   projectService,
-  validateWebCategoryFiles,
   type TaggedProjectFile,
 } from '@/services/projectService';
 import { userService } from '@/services/userService';
@@ -77,22 +76,6 @@ const NewProject = () => {
         variant: 'destructive',
       });
       return;
-    }
-
-    if ((values.project_categories || []).includes('WEB')) {
-      const webError = validateWebCategoryFiles(
-        attachmentFiles,
-        [],
-        values.category_asset_links
-      );
-      if (webError) {
-        toast({
-          title: 'WEB files required',
-          description: webError,
-          variant: 'destructive',
-        });
-        return;
-      }
     }
 
     setIsSubmitting(true);

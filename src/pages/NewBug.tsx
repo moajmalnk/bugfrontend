@@ -30,6 +30,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useBugs } from "@/context/BugContext";
 import { ENV } from "@/lib/env";
+import { suggestedPriorityFromTypes } from "@/lib/bugMetaUtils";
 import { cn } from "@/lib/utils";
 import {
   sortProjectsForPicker,
@@ -44,6 +45,7 @@ import {
   markFilesImported,
 } from "@/lib/shareTargetStorage";
 import { broadcastNotificationService } from "@/services/broadcastNotificationService";
+import { bugTypeService } from "@/services/bugTypeService";
 import { sendNewBugNotification } from "@/services/emailService";
 import { BugLevel, BugPriority, Project } from "@/types";
 import { useQuery } from "@tanstack/react-query";
@@ -154,6 +156,7 @@ const NewBug = () => {
   const [actualResult, setActualResult] = useState("");
   const [projectId, setProjectId] = useState(preSelectedProjectId || "");
   const [priority, setPriority] = useState<BugPriority>("medium");
+  const [priorityTouched, setPriorityTouched] = useState(false);
   const [alreadyRaised, setAlreadyRaised] = useState(false);
   const [bugLevel, setBugLevel] = useState<BugLevel>("normal");
   const [selectedBugTypeIds, setSelectedBugTypeIds] = useState<string[]>([]);
@@ -199,6 +202,19 @@ const NewBug = () => {
     },
     enabled: !!currentUser, // Only fetch when user is available
   });
+
+  const { data: activeBugTypes = [] } = useQuery({
+    queryKey: ["bug-types", "active"],
+    queryFn: () => bugTypeService.list(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const handleBugTypesChange = (ids: string[]) => {
+    setSelectedBugTypeIds(ids);
+    if (priorityTouched) return;
+    const suggested = suggestedPriorityFromTypes(activeBugTypes, ids);
+    if (suggested) setPriority(suggested);
+  };
 
   const sortedProjects = useMemo(
     () => sortProjectsForPicker(projects as ProjectOption[]),
@@ -874,7 +890,10 @@ const NewBug = () => {
                     </Label>
                     <Select
                       value={priority}
-                      onValueChange={(value) => setPriority(value as BugPriority)}
+                      onValueChange={(value) => {
+                        setPriorityTouched(true);
+                        setPriority(value as BugPriority);
+                      }}
                     >
                       <SelectTrigger id="priority" className="h-12 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md">
                         <SelectValue placeholder="Select priority level" />
@@ -951,7 +970,7 @@ const NewBug = () => {
 
                   <BugTypeMultiSelect
                     selectedIds={selectedBugTypeIds}
-                    onChange={setSelectedBugTypeIds}
+                    onChange={handleBugTypesChange}
                     disabled={isSubmitting}
                   />
 

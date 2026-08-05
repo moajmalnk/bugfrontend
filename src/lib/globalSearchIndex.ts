@@ -218,7 +218,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "Common Bugs",
     path: "/common-bugs",
     keywords: ["common bugs", "duplicate", "already raised", "recurring", "known issues"],
-    roles: ["admin", "developer"],
+    permission: "COMMON_BUGS_VIEW",
   },
   {
     id: "page-common-codo",
@@ -235,7 +235,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "quality",
       "standards",
     ],
-    roles: ["admin", "developer", "tester"],
+    permission: "CODO_VIEW",
   },
 
   // —— Messaging ——
@@ -254,7 +254,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "New Project",
     path: "/projects/new",
     keywords: ["new project", "create project", "add project"],
-    adminOnly: true,
+    permission: "PROJECTS_CREATE",
     subtitle: "Administration",
   },
   {
@@ -262,7 +262,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "Reports",
     path: "/reports",
     keywords: ["reports", "analytics", "statistics", "metrics", "insights"],
-    adminOnly: true,
+    permission: "REPORTS_VIEW",
     subtitle: "Administration",
   },
   {
@@ -279,7 +279,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "admin home",
       "home",
     ],
-    adminOnly: true,
+    permission: "DASHBOARD_VIEW",
     subtitle: "Administration",
   },
   {
@@ -298,7 +298,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "staff",
       "employees",
     ],
-    adminOnly: true,
+    permission: "USERS_VIEW",
     subtitle: "Administration",
   },
   {
@@ -318,7 +318,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "grant exception",
       "wfh allowed",
     ],
-    adminOnly: true,
+    permission: "ATTENDANCE_MANAGE",
     subtitle: "Attendance",
   },
   {
@@ -336,7 +336,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "contact",
       "crm",
     ],
-    adminOnly: true,
+    permission: "CLIENTS_VIEW",
     subtitle: "Administration",
   },
   {
@@ -344,7 +344,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "OT Requests",
     path: "/overtime-requests",
     keywords: ["overtime", "ot", "requests", "extra hours", "approval", "ot requests"],
-    adminOnly: true,
+    permission: "OVERTIME_MANAGE",
     subtitle: "Attendance",
   },
   {
@@ -359,7 +359,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "leave admin",
       "leave management",
     ],
-    adminOnly: true,
+    permission: "LEAVE_MANAGE",
     subtitle: "Attendance",
   },
   {
@@ -368,6 +368,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     path: "/whatsapp-messages",
     keywords: ["whatsapp", "messages", "bulk", "notify", "wa"],
     permission: "MESSAGING_CREATE",
+    adminOnly: true,
     subtitle: "Administration",
   },
   {
@@ -399,7 +400,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
       "coverage",
       "firebase",
     ],
-    adminOnly: true,
+    permission: "PUSH_COVERAGE_VIEW",
     subtitle: "Administration",
   },
   {
@@ -407,7 +408,7 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "Shorts",
     path: "/shorts",
     keywords: ["shorts", "videos", "clips", "reel", "media"],
-    adminOnly: true,
+    permission: "SHORTS_MANAGE",
     subtitle: "Administration",
   },
   {
@@ -456,7 +457,10 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     label: "BugBackup",
     path: "/bugbackup",
     keywords: ["backup", "bugbackup", "restore", "database", "archive", "export"],
-    permission: "SETTINGS_EDIT",
+    showWhen: (ctx) =>
+      ctx.role === "admin" ||
+      ctx.hasPermission("BACKUP_MANAGE") ||
+      ctx.hasPermission("SETTINGS_EDIT"),
     subtitle: "Administration",
   },
 ];
@@ -509,11 +513,16 @@ export function isPageVisible(
   entry: PageSearchEntry,
   ctx: SearchVisibilityContext
 ): boolean {
-  if (entry.adminOnly && ctx.role !== "admin") return false;
-  if (entry.roles && !entry.roles.includes(ctx.role)) return false;
   if (entry.excludeRoles?.includes(ctx.role)) return false;
-  if (entry.permission && !ctx.hasPermission(entry.permission)) return false;
   if (entry.showWhen && !entry.showWhen(ctx)) return false;
+
+  if (entry.permission) {
+    if (ctx.role !== "admin" && !ctx.hasPermission(entry.permission)) return false;
+  } else if (entry.adminOnly) {
+    if (ctx.role !== "admin") return false;
+  } else if (entry.roles && !entry.roles.includes(ctx.role)) {
+    return false;
+  }
 
   const helpRoleFilter = getHelpRoleFilterForUser(ctx.role);
 

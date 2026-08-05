@@ -78,6 +78,8 @@ export type BugTypeRef = {
 export type BugType = BugTypeRef & {
   is_active: boolean;
   sort_order: number;
+  /** Suggested bug priority when this type is selected on raise-bug forms */
+  default_priority: BugPriority;
   created_at?: string;
   updated_at?: string;
 };

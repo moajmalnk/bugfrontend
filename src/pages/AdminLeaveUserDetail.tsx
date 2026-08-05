@@ -25,7 +25,8 @@ import {
   type LeaveRequest,
   type LeaveStatus,
 } from '@/services/leaveService';
-import { getEffectiveRole } from '@/lib/utils';
+import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { usePermissions } from '@/hooks/usePermissions';
 import { ENV } from '@/lib/env';
 
 function LeaveStatusPill({ status }: { status: LeaveStatus | string }) {
@@ -73,8 +74,9 @@ function LeaveStatusPill({ status }: { status: LeaveStatus | string }) {
 export default function AdminLeaveUserDetail() {
   const { userId = '' } = useParams<{ userId: string }>();
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
-  const isAdmin = role === 'admin';
+  const isAdmin = hasPermissionOrAdmin(role, hasPermission, 'LEAVE_MANAGE');
   const navigate = useNavigate();
   const [rows, setRows] = useState<LeaveRequest[]>([]);
   const [username, setUsername] = useState('');

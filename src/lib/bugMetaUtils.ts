@@ -48,6 +48,31 @@ export function bugTypeBadgeClass(): string {
   return "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800";
 }
 
+/**
+ * Why: Highest default among selected types drives the suggested bug priority
+ * (high > medium > low) so multi-select stays deterministic.
+ */
+export function suggestedPriorityFromTypes(
+  types: { id: string; default_priority?: string }[],
+  selectedIds: string[]
+): "low" | "medium" | "high" | null {
+  if (!selectedIds.length) return null;
+  const rank: Record<string, number> = { high: 3, medium: 2, low: 1 };
+  let best: "low" | "medium" | "high" | null = null;
+  let bestRank = 0;
+  const selected = new Set(selectedIds);
+  for (const type of types) {
+    if (!selected.has(type.id)) continue;
+    const p = (type.default_priority || "medium") as "low" | "medium" | "high";
+    const r = rank[p] || 0;
+    if (r > bestRank) {
+      best = p;
+      bestRank = r;
+    }
+  }
+  return best;
+}
+
 /** HTML rows for email templates */
 export function bugMetaEmailRows(bug: {
   bug_level?: BugLevel | string | null;

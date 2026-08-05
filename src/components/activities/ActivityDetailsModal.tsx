@@ -22,6 +22,7 @@ import {
 import { activityService } from '@/services/activityService';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { getEffectiveRole } from '@/lib/utils';
 
 interface ActivityDetailsModalProps {
   activity: any;
@@ -169,27 +170,24 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
   };
 
   const getRoleSpecificActions = () => {
-    const userRole = currentUser?.role;
+    const userRole = getEffectiveRole(currentUser || {});
     const actions = [];
 
     if (userRole === 'admin') {
-      // Admin can access all sections
       actions.push(
-        { label: 'All Projects', path: '/admin/projects', icon: FileText },
-        { label: 'All Users', path: '/admin/users', icon: Users },
-        { label: 'System Settings', path: '/admin/settings', icon: Settings }
+        { label: 'All Projects', path: `/${userRole}/projects`, icon: FileText },
+        { label: 'All Users', path: `/${userRole}/users`, icon: Users },
+        { label: 'System Settings', path: `/${userRole}/settings`, icon: Settings }
       );
     } else if (userRole === 'developer') {
-      // Developer specific actions
       actions.push(
-        { label: 'My Fixes', path: '/developer/fixes', icon: CheckSquare },
-        { label: 'Bug Reports', path: '/developer/bugs', icon: Bug }
+        { label: 'My Fixes', path: `/${userRole}/fixes`, icon: CheckSquare },
+        { label: 'Bug Reports', path: `/${userRole}/bugs`, icon: Bug }
       );
     } else if (userRole === 'tester') {
-      // Tester specific actions
       actions.push(
-        { label: 'My Bugs', path: '/tester/bugs', icon: Bug },
-        { label: 'Report New Bug', path: '/tester/bugs/new', icon: Bug }
+        { label: 'My Bugs', path: `/${userRole}/bugs`, icon: Bug },
+        { label: 'Report New Bug', path: `/${userRole}/bugs/new`, icon: Bug }
       );
     }
 

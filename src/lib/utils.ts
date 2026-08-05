@@ -72,3 +72,13 @@ export const canOpenMessagesPage = (
   hasPermission: (key: string) => boolean
 ): boolean =>
   showBugMessageInMainNav(role) || hasPermission("MESSAGING_VIEW");
+
+/**
+ * Why: Bridge legacy ENUM admin with RBAC so custom roles work while existing
+ * admins keep access even before new permission keys are seeded.
+ */
+export const hasPermissionOrAdmin = (
+  role: string | undefined | null,
+  hasPermission: (key: string) => boolean,
+  key: string
+): boolean => role === "admin" || hasPermission(key);

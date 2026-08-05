@@ -46,7 +46,7 @@ export function BugTypeMultiSelect({
       <div className="rounded-xl border border-sky-200/60 dark:border-sky-800/50 bg-gradient-to-br from-sky-50/50 to-blue-50/30 dark:from-sky-950/15 dark:to-blue-950/10 p-4 shadow-sm">
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
           <Tags className="h-3.5 w-3.5 shrink-0" />
-          Choose one or more categories that describe this bug
+          Choose one or more categories. Default priority from the type is suggested automatically.
         </p>
         {isLoading ? (
           <p className="text-sm text-muted-foreground py-2">Loading types…</p>
@@ -62,6 +62,12 @@ export function BugTypeMultiSelect({
           >
             {types.map((type: BugType) => {
               const selected = selectedIds.includes(type.id);
+              const priorityLabel =
+                type.default_priority === "high"
+                  ? "High"
+                  : type.default_priority === "low"
+                    ? "Low"
+                    : "Med";
               return (
                 <button
                   key={type.id}
@@ -70,13 +76,21 @@ export function BugTypeMultiSelect({
                   disabled={disabled}
                   onClick={() => toggle(type.id)}
                   className={cn(
-                    "min-h-11 w-full cursor-pointer flex items-center justify-center rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+                    "min-h-11 w-full cursor-pointer flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                     selected
                       ? SELECTED_CLASS
                       : "border-gray-200/80 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
                   )}
                 >
-                  {type.name}
+                  <span className="text-center leading-tight">{type.name}</span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium",
+                      selected ? "text-white/80" : "text-muted-foreground"
+                    )}
+                  >
+                    Default: {priorityLabel}
+                  </span>
                 </button>
               );
             })}

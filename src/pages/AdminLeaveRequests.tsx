@@ -15,7 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { listLeaveRequests, type LeaveRequest } from '@/services/leaveService';
-import { getEffectiveRole } from '@/lib/utils';
+import { getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { usePermissions } from '@/hooks/usePermissions';
 import { MonthFilterChips } from '@/components/ui/MonthFilterChips';
 import {
   rangeOverlapsMonthFilter,
@@ -165,8 +166,9 @@ function LeaveUserCard({
 
 export default function AdminLeaveRequests() {
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
-  const isAdmin = role === 'admin';
+  const isAdmin = hasPermissionOrAdmin(role, hasPermission, 'LEAVE_MANAGE');
   const navigate = useNavigate();
   const [rows, setRows] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);

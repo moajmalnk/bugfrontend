@@ -43,11 +43,16 @@ import {
   PlusCircle,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, forwardRef, useImperativeHandle, useState } from "react";
 import { toast } from "../ui/use-toast";
 import { AnnouncementDialog } from "./AnnouncementDialog";
 
-export const AnnouncementManager = () => {
+export type AnnouncementManagerHandle = {
+  openCreate: () => void;
+};
+
+export const AnnouncementManager = forwardRef<AnnouncementManagerHandle>(
+  function AnnouncementManager(_props, ref) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -56,6 +61,13 @@ export const AnnouncementManager = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [announcementToDelete, setAnnouncementToDelete] =
     useState<Announcement | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    openCreate: () => {
+      setSelectedAnnouncement(null);
+      setDialogOpen(true);
+    },
+  }));
 
   const fetchAnnouncements = useCallback(async () => {
     setLoading(true);
@@ -130,45 +142,24 @@ export const AnnouncementManager = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-purple-50/30 to-pink-50/50 dark:from-blue-950/20 dark:via-purple-950/10 dark:to-pink-950/20 rounded-2xl"></div>
-        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-          <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-            <div className="space-y-3 min-w-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg">
-                  <BellRing className="h-6 w-6 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
-                    Announcements
-                  </h1>
-                  <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mt-2"></div>
-                </div>
-              </div>
-              <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
-                Create, edit, and manage pop-up announcements for users
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-              <Button
-                onClick={handleAddNew}
-                className="h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
-                <PlusCircle className="mr-2 h-5 w-5" />
-                Add Announcement
-              </Button>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-4 sm:space-y-6 min-w-0 w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+        <p className="text-sm text-muted-foreground min-w-0">
+          Create, edit, and manage pop-up announcements for users
+        </p>
+        <Button
+          onClick={handleAddNew}
+          className="h-11 w-full sm:w-auto rounded-xl px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg shrink-0"
+        >
+          <PlusCircle className="mr-2 h-5 w-5" />
+          Add Announcement
+        </Button>
       </div>
 
       {/* Content Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
-        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+      <div className="relative min-w-0 w-full overflow-x-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl pointer-events-none" />
+        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-x-auto shadow-xl min-w-0">
           {/* Desktop Table View */}
           <div className="hidden lg:block w-full overflow-x-auto">
             <Table className="w-full table-fixed">
@@ -419,4 +410,4 @@ export const AnnouncementManager = () => {
       </AlertDialog>
     </div>
   );
-};
+});

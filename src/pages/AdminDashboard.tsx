@@ -43,7 +43,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { toLocalCalendarDateString } from "@/lib/dateUtils";
-import { cn, getEffectiveRole } from "@/lib/utils";
+import { cn, getEffectiveRole, hasPermissionOrAdmin } from "@/lib/utils";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   formatProjectDate,
   getProjectStatusLabel,
@@ -2034,8 +2035,9 @@ function AttendancePeoplePanel({
 
 export default function AdminDashboard() {
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
-  const isAdmin = role === "admin";
+  const isAdmin = hasPermissionOrAdmin(role, hasPermission, "DASHBOARD_VIEW");
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseDashboardTab(searchParams.get("tab"));

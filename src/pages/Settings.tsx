@@ -1,11 +1,14 @@
-import { AnnouncementManager } from "@/components/settings/AnnouncementManager";
-import { BugTypesTab } from "@/components/settings/BugTypesTab";
-import { NotificationSettingsCard } from "@/components/settings/NotificationSettings";
+import { AnnouncementManager, type AnnouncementManagerHandle } from "@/components/settings/AnnouncementManager";
+import { BugTypesTab, type BugTypesTabHandle } from "@/components/settings/BugTypesTab";
+import {
+  NotificationSettingsCard,
+  type NotificationSettingsHandle,
+} from "@/components/settings/NotificationSettings";
 import {
   OfficeLocationMapPicker,
   OfficeLocationMapPreview,
 } from "@/components/settings/OfficeLocationMapPicker";
-import { RolesTab } from "@/components/settings/RolesTab";
+import { RolesTab, type RolesTabHandle } from "@/components/settings/RolesTab";
 // WhatsApp feature removed
 import { Button } from "@/components/ui/button";
 import {
@@ -41,24 +44,25 @@ import {
   Bell,
   Check,
   ChevronDown,
+  Loader2,
   Map,
   MapPin,
   Megaphone,
   Moon,
+  Plus,
+  Save,
   Settings as SettingsIcon,
   Shield,
   Sun,
   Tags,
   Users,
-  RefreshCw,
-  Loader2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 const Settings = () => {
   const { currentUser } = useAuth();
-  const { hasPermission, isLoading, clearCache, refreshPermissions } = usePermissions(null);
+  const { hasPermission, isLoading } = usePermissions(null);
   const { theme, toggleTheme } = useTheme();
   const [autoAssign, setAutoAssign] = useState(true);
   const [initialAutoAssign, setInitialAutoAssign] = useState(true);
@@ -84,6 +88,10 @@ const Settings = () => {
   const initialTab = normalizeSettingsTab(requestedTab);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
+  const bugTypesRef = useRef<BugTypesTabHandle>(null);
+  const rolesRef = useRef<RolesTabHandle>(null);
+  const announcementsRef = useRef<AnnouncementManagerHandle>(null);
+  const notificationsRef = useRef<NotificationSettingsHandle>(null);
   const settingsTabs = [
     { value: "general", label: "General", shortLabel: "General", icon: SettingsIcon },
     { value: "notifications", label: "Notifications", shortLabel: "Alerts", icon: Bell },
@@ -145,11 +153,11 @@ const Settings = () => {
   // Check for SETTINGS_EDIT permission
   if (isLoading) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-          <Skeleton className="h-40 w-full rounded-2xl" />
-          <Skeleton className="h-16 w-full rounded-2xl" />
-          <Skeleton className="h-80 w-full rounded-2xl" />
+      <main className="min-h-0 w-full min-w-0 bg-background py-2 sm:py-4 md:py-6">
+        <section className="w-full min-w-0 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+          <Skeleton className="h-28 sm:h-40 w-full rounded-2xl" />
+          <Skeleton className="h-12 sm:h-16 w-full rounded-2xl" />
+          <Skeleton className="h-64 sm:h-80 w-full rounded-2xl" />
         </section>
       </main>
     );
@@ -157,14 +165,14 @@ const Settings = () => {
 
   if (!hasPermission('SETTINGS_EDIT')) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-        <section className="max-w-7xl mx-auto">
-          <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 p-12 text-center">
+      <main className="min-h-0 w-full min-w-0 bg-background py-2 sm:py-4 md:py-6">
+        <section className="w-full min-w-0 max-w-7xl mx-auto">
+          <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 p-6 sm:p-12 text-center min-w-0">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
               <Shield className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
-            <p className="text-muted-foreground max-w-md mx-auto">
+            <h1 className="text-xl sm:text-2xl font-bold mb-2">Access Denied</h1>
+            <p className="text-muted-foreground max-w-md mx-auto text-sm sm:text-base">
               You do not have permission to access the settings page.
             </p>
           </div>
@@ -244,48 +252,82 @@ const Settings = () => {
     });
   };
 
-  const handleRefreshPermissions = async () => {
-    clearCache();
-    await refreshPermissions();
-    toast({
-      title: "Permissions Refreshed",
-      description: "Your permissions have been refreshed from the server.",
-    });
-  };
+  const headerAction = (() => {
+    switch (activeTab) {
+      case "types":
+        return {
+          label: "Add types",
+          icon: Plus,
+          onClick: () => bugTypesRef.current?.focusCreate(),
+          disabled: false,
+        };
+      case "roles":
+        return {
+          label: "Add roles",
+          icon: Plus,
+          onClick: () => rolesRef.current?.openCreate(),
+          disabled: false,
+        };
+      case "announcements":
+        return {
+          label: "Add announcement",
+          icon: Plus,
+          onClick: () => announcementsRef.current?.openCreate(),
+          disabled: false,
+        };
+      case "notifications":
+        return {
+          label: "Save notifications",
+          icon: Save,
+          onClick: () => notificationsRef.current?.save(),
+          disabled: false,
+        };
+      default:
+        return {
+          label: "Save changes",
+          icon: Save,
+          onClick: () => void handleSaveGeneral(),
+          disabled: !generalDirty || savingOfficeSettings || loadingOfficeSettings,
+        };
+    }
+  })();
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
-      <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <main className="min-h-0 w-full min-w-0 bg-background py-2 sm:py-4 md:py-6">
+      <section className="w-full min-w-0 max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
         {/* Professional Header */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-green-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20"></div>
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg">
-                    <SettingsIcon className="h-6 w-6 text-white" />
+        <div className="relative overflow-hidden rounded-2xl min-w-0">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-green-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-green-950/20 pointer-events-none" />
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8 min-w-0">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-6 min-w-0">
+              <div className="space-y-2 sm:space-y-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-gradient-to-br from-blue-600 to-emerald-600 rounded-xl shadow-lg shrink-0">
+                    <SettingsIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
+                  <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight">
                       Settings
                     </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2"></div>
+                    <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full mt-2" />
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl">
                   Manage your BugRicer application configuration
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0">
                 <Button
-                  onClick={handleRefreshPermissions}
-                  variant="outline"
-                  className="h-12 px-6 self-start border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-semibold shadow-sm hover:shadow-md"
-                  title="Refresh your permissions from the server"
+                  onClick={headerAction.onClick}
+                  disabled={headerAction.disabled || savingOfficeSettings}
+                  className="h-11 sm:h-12 px-4 sm:px-6 w-full sm:w-auto font-semibold shadow-sm hover:shadow-md rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white disabled:opacity-50"
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh Permissions
+                  {savingOfficeSettings && activeTab === "general" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <headerAction.icon className="mr-2 h-4 w-4" />
+                  )}
+                  {headerAction.label}
                 </Button>
               </div>
             </div>
@@ -404,23 +446,23 @@ const Settings = () => {
             </DrawerContent>
           </Drawer>
 
-          <TabsContent value="general" className="space-y-6 sm:space-y-8 mt-6">
-            <div className="relative">
+          <TabsContent value="general" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6 min-w-0">
+            <div className="relative min-w-0 w-full">
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
-              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl min-w-0">
                 <Card className="border-0 shadow-none bg-transparent">
-                  <CardHeader className="p-6 sm:p-8 pb-2">
-                    <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                      <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shrink-0">
+                  <CardHeader className="p-4 sm:p-6 md:p-8 pb-2">
+                    <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3 min-w-0">
+                      <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shrink-0">
                         <SettingsIcon className="h-5 w-5 text-white" />
                       </div>
-                      General Settings
+                      <span className="min-w-0 break-words">General Settings</span>
                     </CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-400 text-base mt-2">
+                    <CardDescription className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-2">
                       Manage your BugRicer application settings
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4 p-6 sm:p-8 pt-4">
+                  <CardContent className="space-y-4 p-4 sm:p-6 md:p-8 pt-4 min-w-0">
                     <div className="rounded-2xl border border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 p-4 sm:p-5">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div className="flex items-start gap-3">
@@ -676,57 +718,61 @@ const Settings = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="notifications" className="space-y-6 sm:space-y-8 mt-6">
-            <div className="relative">
+          <TabsContent value="notifications" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6 min-w-0">
+            <div className="relative min-w-0 w-full">
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
-              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shrink-0">
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
+                <div className="flex items-start gap-3 mb-4 sm:mb-6 min-w-0">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shrink-0">
                     <Bell className="h-5 w-5 text-white" />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Notifications</h2>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
+                      Notifications
+                    </h2>
                     <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
                       Configure how and when you receive alerts
                     </p>
                   </div>
                 </div>
-                <NotificationSettingsCard />
+                <NotificationSettingsCard ref={notificationsRef} />
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="announcements" className="space-y-6 sm:space-y-8 mt-6">
-            <div className="relative">
+          <TabsContent value="announcements" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6 min-w-0">
+            <div className="relative min-w-0 w-full">
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
-              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg shrink-0">
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
+                <div className="flex items-start gap-3 mb-4 sm:mb-6 min-w-0">
+                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shrink-0">
                     <Megaphone className="h-5 w-5 text-white" />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Announcements</h2>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
+                      Announcements
+                    </h2>
                     <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
                       Broadcast messages to your team
                     </p>
                   </div>
                 </div>
-                <AnnouncementManager />
+                <AnnouncementManager ref={announcementsRef} />
               </div>
             </div>
           </TabsContent>
 
           {activeTab === "types" ? (
-            <div className="space-y-6 sm:space-y-8 mt-6">
-              <div className="relative">
+            <div className="space-y-4 sm:space-y-6 mt-4 sm:mt-6 min-w-0">
+              <div className="relative min-w-0 w-full">
                 <div className="absolute inset-0 bg-gradient-to-r from-sky-50/30 to-blue-50/30 dark:from-sky-900/20 dark:to-blue-900/20 rounded-2xl pointer-events-none" />
-                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-xl">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-gradient-to-br from-sky-500 to-blue-600 rounded-lg shrink-0">
+                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
+                  <div className="flex items-start gap-3 mb-4 sm:mb-6 min-w-0">
+                    <div className="p-2 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl shrink-0">
                       <Tags className="h-5 w-5 text-white" />
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
                         Bug Types
                       </h2>
                       <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
@@ -734,28 +780,30 @@ const Settings = () => {
                       </p>
                     </div>
                   </div>
-                  <BugTypesTab />
+                  <BugTypesTab ref={bugTypesRef} />
                 </div>
               </div>
             </div>
           ) : null}
 
-          <TabsContent value="roles" className="space-y-6 sm:space-y-8 mt-6">
-            <div className="relative">
+          <TabsContent value="roles" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6 min-w-0">
+            <div className="relative min-w-0 w-full">
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
-              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg shrink-0">
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
+                <div className="flex items-start gap-3 mb-4 sm:mb-6 min-w-0">
+                  <div className="p-2 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shrink-0">
                     <Users className="h-5 w-5 text-white" />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Roles</h2>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
+                      Roles
+                    </h2>
                     <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
                       Manage roles and permissions for your organization
                     </p>
                   </div>
                 </div>
-                <RolesTab />
+                <RolesTab ref={rolesRef} />
               </div>
             </div>
           </TabsContent>

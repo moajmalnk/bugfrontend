@@ -11,7 +11,6 @@ import {
   formValuesToPayload,
   projectService,
   projectToFormValues,
-  validateWebCategoryFiles,
   type TaggedProjectFile,
 } from '@/services/projectService';
 import { userService } from '@/services/userService';
@@ -186,27 +185,6 @@ const EditProject = () => {
         variant: 'destructive',
       });
       return;
-    }
-
-    const allAttachments = [
-      ...(project.attachments || []),
-      ...attachments.filter((a) => !(project.attachments || []).some((p) => p.id === a.id)),
-    ];
-
-    if ((values.project_categories || []).includes('WEB')) {
-      const webError = validateWebCategoryFiles(
-        attachmentFiles,
-        allAttachments,
-        values.category_asset_links
-      );
-      if (webError) {
-        toast({
-          title: 'WEB files required',
-          description: webError,
-          variant: 'destructive',
-        });
-        return;
-      }
     }
 
     setIsSubmitting(true);

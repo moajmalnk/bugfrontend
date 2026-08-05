@@ -10,6 +10,7 @@ import { ArrowLeft, Save, AlertCircle, Shield, ChevronDown, ChevronUp } from "lu
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getEffectiveRole } from "@/lib/utils";
 
 type PermissionState = {
   perm: Permission;
@@ -21,6 +22,8 @@ export function UserPermissions() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const rolePath = getEffectiveRole(currentUser || {});
+  const usersListPath = `/${rolePath}/users`;
   
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<Record<string, PermissionState[]>>({});
@@ -137,7 +140,7 @@ export function UserPermissions() {
       });
       
       // Navigate back to users page
-      navigate('/admin/users');
+      navigate(usersListPath);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -190,7 +193,7 @@ export function UserPermissions() {
               <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
                 The user you're looking for doesn't exist or has been removed.
               </p>
-              <Button onClick={() => navigate('/admin/users')} size="lg" className="h-12 px-6">
+              <Button onClick={() => navigate(usersListPath)} size="lg" className="h-12 px-6">
                 <ArrowLeft className="mr-2 h-5 w-5" />
                 Back to Users
               </Button>
@@ -232,7 +235,7 @@ export function UserPermissions() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => navigate('/admin/users')}
+                    onClick={() => navigate(usersListPath)}
                     className="h-10 w-10 shrink-0"
                   >
                     <ArrowLeft className="h-5 w-5" />

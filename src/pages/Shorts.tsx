@@ -30,7 +30,8 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { cn, getEffectiveRole } from "@/lib/utils";
+import { cn, getEffectiveRole, hasPermissionOrAdmin } from "@/lib/utils";
+import { usePermissions } from "@/hooks/usePermissions";
 import { projectService } from "@/services/projectService";
 import {
   SHORT_CATEGORIES,
@@ -85,7 +86,9 @@ function categoryCount(shorts: ShortItem[], value: string) {
 
 export default function Shorts() {
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
   const role = getEffectiveRole(currentUser || {});
+  const canManageShorts = hasPermissionOrAdmin(role, hasPermission, "SHORTS_MANAGE");
   const navigate = useNavigate();
   const { shortId } = useParams<{ shortId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -109,7 +112,7 @@ export default function Shorts() {
   const { data: shorts = [], isLoading, error } = useQuery({
     queryKey: ["shorts", "admin-all"],
     queryFn: () => shortsService.list(),
-    enabled: role === "admin",
+    enabled: canManageShorts,
   });
 
   const { data: projects = [] } = useQuery({
@@ -118,7 +121,7 @@ export default function Shorts() {
       const list = await projectService.getProjects();
       return (list || []).map((p: any) => ({ id: String(p.id), name: String(p.name) }));
     },
-    enabled: role === "admin",
+    enabled: canManageShorts,
     staleTime: 60_000,
   });
 
@@ -188,7 +191,7 @@ export default function Shorts() {
     }
   }, [rawTab, category, searchParams, setSearchParams]);
 
-  if (role !== "admin") {
+  if (!canManageShorts) {
     return <Navigate to={`/${role || "developer"}/projects`} replace />;
   }
 

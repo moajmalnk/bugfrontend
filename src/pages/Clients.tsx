@@ -18,7 +18,8 @@ import {
   getCommercialStatusLabel,
   getMarketIndustryLabel,
 } from '@/lib/utils/clientUtils';
-import { cn, getEffectiveRole } from '@/lib/utils';
+import { cn, getEffectiveRole, hasPermissionOrAdmin } from '@/lib/utils';
+import { usePermissions } from '@/hooks/usePermissions';
 import { clientService } from '@/services/clientService';
 import { Client, CommercialStatus } from '@/types';
 import {
@@ -68,10 +69,12 @@ const ClientCardSkeleton = () => (
 
 const Clients = () => {
   const { currentUser } = useAuth();
+  const { hasPermission } = usePermissions(null);
   const navigate = useNavigate();
   const location = useLocation();
   const listFromState = listReturnState(location.pathname, location.search);
   const role = getEffectiveRole(currentUser || {});
+  const canViewClients = hasPermissionOrAdmin(role, hasPermission, 'CLIENTS_VIEW');
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,10 +107,10 @@ const Clients = () => {
   };
 
   useEffect(() => {
-    if (currentUser?.role === 'admin') {
+    if (canViewClients) {
       fetchClients();
     }
-  }, [currentUser?.role]);
+  }, [canViewClients]);
 
   const tabCounts = useMemo(() => {
     const counts: Record<ClientTab, number> = {
@@ -248,7 +251,7 @@ const Clients = () => {
     activePage * itemsPerPage
   );
 
-  if (currentUser?.role !== 'admin') {
+  if (!canViewClients) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">
         You do not have permission to view clients.

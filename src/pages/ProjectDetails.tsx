@@ -5314,6 +5314,13 @@ const ProjectDetails = () => {
                 )}
                 <span>Created: <span className="text-foreground">{new Date(project.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></span>
                 <span>Status: <span className="capitalize inline-flex items-center px-1.5 py-0.5 rounded-full border bg-muted/40">{project.status}</span></span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:text-red-300 tabular-nums">
+                  <Bug className="h-3 w-3" />
+                  {projectTabCounts.bugs} open
+                  <span className="font-normal text-red-700/70 dark:text-red-300/70">
+                    · {bugs.length} total
+                  </span>
+                </span>
               </div>
               {(project.frontend_domain ||
                 project.backend_domain ||

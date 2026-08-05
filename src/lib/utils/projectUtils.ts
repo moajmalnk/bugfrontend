@@ -183,34 +183,12 @@ function webSlotSatisfied(
   return names.some(isReadmeFileName);
 }
 
-/** WEB category requires .env, .json, README — each via file upload or Drive link. */
+/** WEB category slots (.env / .json / README) are optional — kept for callers. */
 export function validateWebCategoryFiles(
-  pending: Array<{ name: string; category?: string }>,
-  existing: Array<{ file_name: string; category?: string | null }>,
-  assetLinks?: CategoryAssetLinks
+  _pending?: Array<{ name: string; category?: string }>,
+  _existing?: Array<{ file_name: string; category?: string | null }>,
+  _assetLinks?: CategoryAssetLinks
 ): string | null {
-  if (hasValidAssetLink(assetLinks?.WEB)) {
-    return null;
-  }
-  const webPending = pending.filter(
-    (f) => !f.category || f.category === 'WEB' || f.category === 'GENERAL'
-  );
-  const webExisting = existing.filter(
-    (f) => !f.category || f.category === 'WEB' || f.category === 'GENERAL'
-  );
-  const names = [
-    ...webPending.map((f) => f.name),
-    ...webExisting.map((f) => f.file_name),
-  ];
-  if (!webSlotSatisfied('web_env', names, assetLinks)) {
-    return 'WEB projects require a .env file or Drive link.';
-  }
-  if (!webSlotSatisfied('web_json', names, assetLinks)) {
-    return 'WEB projects require a .json file or Drive link.';
-  }
-  if (!webSlotSatisfied('web_readme', names, assetLinks)) {
-    return 'WEB projects require a README file or Drive link.';
-  }
   return null;
 }
 
@@ -607,7 +585,8 @@ export function projectPickerStatusRank(status?: ProjectStatus | string | null):
 
 /**
  * Workload sort for project lists and pickers:
- * Ongoing first, then open bugs ↓, active updates ↓, total updates ↓, name.
+ * open bugs ↓ first (so high-open projects surface even if Release Ready),
+ * then status (Ongoing → Release Ready → …), active updates ↓, total updates ↓, name.
  * Optional live count maps override embedded stats (Projects page cards).
  */
 export type ProjectWorkloadSortCounts = {
@@ -636,10 +615,6 @@ export function compareProjectsByWorkload(
   b: WorkloadSortableProject,
   counts?: ProjectWorkloadSortCounts
 ): number {
-  const statusDiff =
-    projectPickerStatusRank(a.status) - projectPickerStatusRank(b.status);
-  if (statusDiff !== 0) return statusDiff;
-
   const aId = a.id != null ? String(a.id) : "";
   const bId = b.id != null ? String(b.id) : "";
 
@@ -652,6 +627,10 @@ export function compareProjectsByWorkload(
       ? counts.openBugs[bId]
       : b.bug_stats?.open) ?? 0;
   if (bBugs !== aBugs) return bBugs - aBugs;
+
+  const statusDiff =
+    projectPickerStatusRank(a.status) - projectPickerStatusRank(b.status);
+  if (statusDiff !== 0) return statusDiff;
 
   const aUpdatesActive =
     (aId && counts?.updatesActive?.[aId] !== undefined
@@ -685,7 +664,7 @@ export function sortProjectsByWorkload<T extends WorkloadSortableProject>(
 
 /**
  * Sort projects for bug/update pickers:
- * Ongoing first, then by open bugs ↓, open/approved updates ↓, total updates ↓, name.
+ * open bugs ↓, then Ongoing → Release Ready, updates ↓, name.
  */
 export function sortProjectsForPicker<
   T extends {

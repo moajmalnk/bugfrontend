@@ -235,19 +235,19 @@ function SectionBlock({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-4 rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-br from-gray-50/40 to-white/40 dark:from-gray-800/20 dark:to-gray-900/20 p-4 sm:p-5">
-      <div className="flex items-start gap-3">
+    <div className="space-y-4 rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-br from-gray-50/40 to-white/40 dark:from-gray-800/20 dark:to-gray-900/20 p-3 sm:p-5 min-w-0 overflow-hidden">
+      <div className="flex items-start gap-3 min-w-0">
         <div className={cn('p-2 rounded-lg shrink-0', iconClass)}>
           <Icon className="h-4 w-4 text-white" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h3 className="text-base font-bold text-gray-900 dark:text-white">{title}</h3>
           {description && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 break-words">{description}</p>
           )}
         </div>
       </div>
-      <div className="space-y-4">{children}</div>
+      <div className="space-y-4 min-w-0">{children}</div>
     </div>
   );
 }
