@@ -237,16 +237,89 @@ export default function CommonCodoRules() {
   }, [canAccess]);
 
   const handleRespond = async (rule: CodoCommonRule, status: CodoAckStatus) => {
+    if (acknowledgingId === rule.id) return;
+
+    const prevAck = rule.acknowledgements;
+    const nowIso = new Date().toISOString();
+    const prevStatus =
+      prevAck?.current_user_status ??
+      (prevAck?.current_user_acknowledged ? ('acknowledged' as const) : null);
+
+    // Optimistic UI — mark instantly; sync server in background.
+    setRules((prev) =>
+      prev.map((r) => {
+        if (r.id !== rule.id || !r.acknowledgements) return r;
+        const ack = { ...r.acknowledgements };
+        const bump = (key: 'acknowledged_count' | 'doubt_count' | 'not_required_count', delta: number) => {
+          ack[key] = Math.max(0, (ack[key] ?? 0) + delta);
+        };
+        if (prevStatus === 'acknowledged') bump('acknowledged_count', -1);
+        else if (prevStatus === 'doubt') bump('doubt_count', -1);
+        else if (prevStatus === 'not_required') bump('not_required_count', -1);
+        else {
+          ack.pending_count = Math.max(0, (ack.pending_count ?? 0) - 1);
+          ack.responded_count = (ack.responded_count ?? 0) + 1;
+        }
+        if (status === 'acknowledged') bump('acknowledged_count', 1);
+        else if (status === 'doubt') bump('doubt_count', 1);
+        else bump('not_required_count', 1);
+
+        ack.current_user_status = status;
+        ack.current_user_acknowledged_at = nowIso;
+        ack.current_user_acknowledged = status === 'acknowledged';
+        ack.current_user_must_acknowledge = false;
+        return { ...r, acknowledgements: ack };
+      })
+    );
+
     setAcknowledgingId(rule.id);
     try {
       const result = await acknowledgeCodoRule(rule.id, status);
       setRules((prev) =>
+        prev.map((r) => {
+          if (r.id !== rule.id) return r;
+          const server = result.acknowledgements;
+          if (!server) return r;
+          // Non-admin payloads are lightweight — keep optimistic counts, apply user status.
+          const merged = {
+            ...(r.acknowledgements || {}),
+            ...server,
+            current_user_status: server.current_user_status ?? status,
+            current_user_acknowledged_at:
+              server.current_user_acknowledged_at ?? nowIso,
+            current_user_acknowledged:
+              server.current_user_acknowledged ?? status === 'acknowledged',
+            current_user_must_acknowledge: false,
+            acknowledged_count:
+              server.required_total > 0
+                ? server.acknowledged_count
+                : r.acknowledgements?.acknowledged_count ?? server.acknowledged_count,
+            doubt_count:
+              server.required_total > 0
+                ? server.doubt_count
+                : r.acknowledgements?.doubt_count ?? server.doubt_count,
+            not_required_count:
+              server.required_total > 0
+                ? server.not_required_count
+                : r.acknowledgements?.not_required_count ?? server.not_required_count,
+            pending_count:
+              server.required_total > 0
+                ? server.pending_count
+                : r.acknowledgements?.pending_count ?? server.pending_count,
+            responded_count:
+              server.required_total > 0
+                ? server.responded_count
+                : r.acknowledgements?.responded_count ?? server.responded_count,
+          };
+          return { ...r, acknowledgements: merged };
+        })
+      );
+    } catch (e) {
+      setRules((prev) =>
         prev.map((r) =>
-          r.id === rule.id ? { ...r, acknowledgements: result.acknowledgements } : r
+          r.id === rule.id ? { ...r, acknowledgements: prevAck } : r
         )
       );
-      toast({ title: STATUS_META[status].doneLabel });
-    } catch (e) {
       toast({
         title: 'Could not save response',
         description: e instanceof Error ? e.message : 'Please try again',

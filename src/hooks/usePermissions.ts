@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { ENV } from "@/lib/env";
 import { useCallback, useEffect, useState } from "react";
 
 interface CachedPermissions {
@@ -47,8 +48,9 @@ export function usePermissions(projectId: string | null = null) {
         return;
       }
 
+      // Why: Use ENV.API_URL so localhost DEV goes through /api proxy (not raw VITE_API_URL).
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/permissions/user_permissions.php?userId=${currentUser.id}`,
+        `${ENV.API_URL}/permissions/user_permissions.php?userId=${currentUser.id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

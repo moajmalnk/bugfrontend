@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { Button } from "@/components/ui/button";
+import { ENV } from "@/lib/env";
 import {
   Card,
   CardContent,
@@ -70,7 +71,7 @@ interface VoiceNote {
   waveform?: number[];
 }
 
-const API_BASE = import.meta.env.VITE_API_URL + "/updates";
+const API_BASE = ENV.API_URL + "/updates";
 
 const formSchema = z
   .object({
@@ -177,7 +178,7 @@ const NewUpdate = () => {
   const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/projects/getAll.php`, {
+      const response = await fetch(`${ENV.API_URL}/projects/getAll.php`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -422,7 +423,7 @@ const NewUpdate = () => {
       });
       
       const token = localStorage.getItem("token");
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/updates/create.php`, {
+      const response = await fetch(`${ENV.API_URL}/updates/create.php`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

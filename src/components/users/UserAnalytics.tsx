@@ -24,6 +24,8 @@ import {
   Clock,
   Code2,
   Copy,
+  FileSpreadsheet,
+  FileText,
   Filter,
   Loader2,
   Search,
@@ -182,6 +184,266 @@ function formatTeamAnalyticsCopy(
   }
 
   return lines.join("\n");
+}
+
+type AnalyticsExportRow = {
+  rank: number;
+  name: string;
+  username: string;
+  role: string;
+  days: number;
+  hours: number;
+  avgHoursPerDay: number;
+  checkIn: string;
+  tasksCompleted: number;
+  overtimeHours: number;
+  bugsReported: number;
+  bugsFixed: number;
+  projects: string;
+};
+
+function buildAnalyticsExportMeta(
+  data: UsersAnalyticsPayload,
+  monthFilter: MonthFilterValue
+) {
+  const periodLabel =
+    monthFilter === "all"
+      ? `${data.period.name} (${data.period.range})`
+      : data.period.name;
+  const allUsers = ROLE_ORDER.flatMap((role) => data.roles[role]?.users ?? []);
+  const roster = sortByMetric(allUsers.filter(hasCheckedIn), "hours");
+  const trackedCount = data.team_summary.user_count || allUsers.length;
+  let bugsReported = 0;
+  let bugsFixed = 0;
+  let tasksCompleted = 0;
+  for (const user of allUsers) {
+    const c = user.current_period;
+    bugsReported += Number(c.bugs_reported || 0);
+    bugsFixed += Number(c.bugs_fixed || 0);
+    tasksCompleted += Number(c.tasks_completed || 0);
+  }
+  const fileStamp =
+    monthFilter === "all"
+      ? "all-time"
+      : String(monthFilter).replace(/[^\w-]+/g, "_");
+  return {
+    periodLabel,
+    roster,
+    trackedCount,
+    bugsReported,
+    bugsFixed,
+    tasksCompleted,
+    totalHours: data.team_summary.total_hours,
+    fileStamp,
+    lastUpdated: data.last_updated || "",
+  };
+}
+
+function buildAnalyticsExportRows(
+  roster: UserAnalyticsMember[]
+): AnalyticsExportRow[] {
+  return roster.map((user, index) => {
+    const c = user.current_period;
+    return {
+      rank: index + 1,
+      name: user.name || user.username,
+      username: user.username,
+      role: user.role,
+      days: Number(c.days || 0),
+      hours: Number(c.hours || 0),
+      avgHoursPerDay: Number(c.avg_hours_per_day || 0),
+      checkIn: c.avg_check_in_label || "—",
+      tasksCompleted: Number(c.tasks_completed || 0),
+      overtimeHours: Number(c.overtime_hours || 0),
+      bugsReported: Number(c.bugs_reported || 0),
+      bugsFixed: Number(c.bugs_fixed || 0),
+      projects: (c.projects ?? []).filter(Boolean).join("; "),
+    };
+  });
+}
+
+function escapeCsvCell(value: string | number): string {
+  const raw = value == null ? "" : String(value);
+  if (/[",\n\r]/.test(raw)) {
+    return `"${raw.replace(/"/g, '""')}"`;
+  }
+  return raw;
+}
+
+function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * Why: Spreadsheet export for payroll/ops — full roster columns, filter-scoped.
+ */
+function downloadTeamAnalyticsCsv(
+  data: UsersAnalyticsPayload,
+  monthFilter: MonthFilterValue
+) {
+  const meta = buildAnalyticsExportMeta(data, monthFilter);
+  const rows = buildAnalyticsExportRows(meta.roster);
+  const header = [
+    "Rank",
+    "Name",
+    "Username",
+    "Role",
+    "Days",
+    "Hours",
+    "Avg h/day",
+    "Check-in",
+    "Tasks",
+    "OT hours",
+    "Bugs",
+    "Fixes",
+    "Projects",
+  ];
+  const lines = [
+    "BugRicer Team Attendance",
+    `Period,${escapeCsvCell(meta.periodLabel)}`,
+    `Checked in,${meta.roster.length}/${meta.trackedCount}`,
+    `Total hours,${meta.totalHours.toFixed(1)}`,
+    `Tasks,${meta.tasksCompleted}`,
+    `Bugs,${meta.bugsReported}`,
+    `Fixes,${meta.bugsFixed}`,
+    meta.lastUpdated ? `Generated,${escapeCsvCell(meta.lastUpdated)}` : "",
+    "",
+    header.join(","),
+    ...rows.map((row) =>
+      [
+        row.rank,
+        escapeCsvCell(row.name),
+        escapeCsvCell(row.username),
+        escapeCsvCell(row.role),
+        row.days,
+        row.hours.toFixed(1),
+        row.avgHoursPerDay.toFixed(1),
+        escapeCsvCell(row.checkIn),
+        row.tasksCompleted,
+        row.overtimeHours.toFixed(1),
+        row.bugsReported,
+        row.bugsFixed,
+        escapeCsvCell(row.projects),
+      ].join(",")
+    ),
+  ].filter((line, i, arr) => !(line === "" && arr[i - 1] === ""));
+
+  downloadBlob(
+    `bugricer-attendance-${meta.fileStamp}.csv`,
+    new Blob(["\uFEFF" + lines.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    })
+  );
+}
+
+/**
+ * Why: Printable PDF for management share — summary + roster table.
+ */
+async function downloadTeamAnalyticsPdf(
+  data: UsersAnalyticsPayload,
+  monthFilter: MonthFilterValue
+) {
+  const meta = buildAnalyticsExportMeta(data, monthFilter);
+  const rows = buildAnalyticsExportRows(meta.roster);
+  const { jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("BugRicer — Team Attendance", 40, 36);
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80);
+  doc.text(meta.periodLabel, 40, 54);
+  doc.text(
+    `Checked in: ${meta.roster.length}/${meta.trackedCount}   ·   Total hours: ${meta.totalHours.toFixed(0)}h   ·   Tasks: ${meta.tasksCompleted}   ·   Bugs: ${meta.bugsReported}   ·   Fixes: ${meta.bugsFixed}`,
+    40,
+    70
+  );
+  if (meta.lastUpdated) {
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text(`Generated: ${meta.lastUpdated}`, 40, 84);
+  }
+  doc.setTextColor(0);
+
+  autoTable(doc, {
+    startY: meta.lastUpdated ? 96 : 84,
+    head: [
+      [
+        "#",
+        "Name",
+        "Role",
+        "Days",
+        "Hours",
+        "Avg/day",
+        "Check-in",
+        "Tasks",
+        "OT",
+        "Bugs",
+        "Fixes",
+        "Projects",
+      ],
+    ],
+    body: rows.map((row) => [
+      row.rank,
+      row.name,
+      row.role,
+      row.days,
+      row.hours.toFixed(1),
+      row.avgHoursPerDay.toFixed(1),
+      row.checkIn,
+      row.tasksCompleted,
+      row.overtimeHours.toFixed(1),
+      row.bugsReported,
+      row.bugsFixed,
+      row.projects || "—",
+    ]),
+    styles: {
+      fontSize: 8,
+      cellPadding: 4,
+      overflow: "linebreak",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [79, 70, 229],
+      textColor: 255,
+      fontStyle: "bold",
+      fontSize: 8,
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 24 },
+      1: { cellWidth: 90 },
+      2: { cellWidth: 55 },
+      11: { cellWidth: 160 },
+    },
+    margin: { left: 40, right: 40 },
+  });
+
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(140);
+    doc.text(
+      `Page ${i} of ${pageCount}  ·  BugRicer`,
+      doc.internal.pageSize.getWidth() / 2,
+      doc.internal.pageSize.getHeight() - 20,
+      { align: "center" }
+    );
+  }
+
+  doc.save(`bugricer-attendance-${meta.fileStamp}.pdf`);
 }
 
 function MetricTile({
@@ -1159,6 +1421,7 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
   const [hideDeactivatedUsers, setHideDeactivatedUsers] = useState(true);
   const [monthFilter, setMonthFilter] = useState<MonthFilterValue>(() => currentMonthKey());
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const { data, isLoading, isError, error, isFetching } = useQuery({
     queryKey: ["usersAnalytics", hideDeactivatedUsers, monthFilter],
     queryFn: () =>
@@ -1172,6 +1435,8 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
     if (!data) return "";
     return formatTeamAnalyticsCopy(data, monthFilter, hideDeactivatedUsers);
   }, [data, monthFilter, hideDeactivatedUsers]);
+
+  const canExport = Boolean(data);
 
   const handleCopyDetails = useCallback(async () => {
     const text = copyText.trim();
@@ -1204,6 +1469,46 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
     }
   }, [copyText]);
 
+  const handleDownloadCsv = useCallback(() => {
+    if (!data || exporting) return;
+    setExporting("csv");
+    try {
+      downloadTeamAnalyticsCsv(data, monthFilter);
+      toast({
+        title: "CSV downloaded",
+        description: "Attendance roster saved as a spreadsheet.",
+      });
+    } catch {
+      toast({
+        title: "CSV download failed",
+        description: "Could not generate the CSV. Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(null);
+    }
+  }, [data, monthFilter, exporting]);
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (!data || exporting) return;
+    setExporting("pdf");
+    try {
+      await downloadTeamAnalyticsPdf(data, monthFilter);
+      toast({
+        title: "PDF downloaded",
+        description: "Attendance report saved as a PDF.",
+      });
+    } catch {
+      toast({
+        title: "PDF download failed",
+        description: "Could not generate the PDF. Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(null);
+    }
+  }, [data, monthFilter, exporting]);
+
   if (isLoading) return <AnalyticsSkeleton />;
 
   if (isError || !data) {
@@ -1221,6 +1526,8 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
       ? `${data.period.name} (${data.period.range}) · ${data.lookback_months}-month window`
       : `${data.period.name} (${data.period.range}) · ${data.lookback_months}-month lookback averages`;
 
+  const exportBusy = exporting !== null;
+
   return (
     <div className="space-y-6 sm:space-y-8">
       <Card className="relative overflow-hidden rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-sm dark:border-gray-800/60 dark:bg-gray-900/80">
@@ -1237,23 +1544,59 @@ export function UserAnalytics({ rolePath = "admin" }: UserAnalyticsProps) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void handleCopyDetails()}
-                disabled={!copyText.trim()}
-                className="h-9 gap-1.5 rounded-xl border-border/60 bg-background/70 px-3 text-xs font-medium"
-                title={copied ? "Copied" : "Copy filter-based attendance details"}
-                aria-label={copied ? "Copied" : "Copy filter-based attendance details"}
-              >
-                {copied ? (
-                  <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
-                )}
-                {copied ? "Copied" : "Copy"}
-              </Button>
+              <div className="inline-flex items-center gap-1 rounded-xl border border-border/60 bg-background/70 p-1 shadow-sm">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleCopyDetails()}
+                  disabled={!copyText.trim() || exportBusy}
+                  className="h-8 gap-1.5 rounded-lg px-2.5 text-xs font-medium"
+                  title={copied ? "Copied" : "Copy attendance summary"}
+                  aria-label={copied ? "Copied" : "Copy attendance summary"}
+                >
+                  {copied ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDownloadCsv}
+                  disabled={!canExport || exportBusy}
+                  className="h-8 gap-1.5 rounded-lg px-2.5 text-xs font-medium"
+                  title="Download CSV"
+                  aria-label="Download CSV"
+                >
+                  {exporting === "csv" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  )}
+                  CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleDownloadPdf()}
+                  disabled={!canExport || exportBusy}
+                  className="h-8 gap-1.5 rounded-lg px-2.5 text-xs font-medium"
+                  title="Download PDF"
+                  aria-label="Download PDF"
+                >
+                  {exporting === "pdf" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                  )}
+                  PDF
+                </Button>
+              </div>
               <label className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 px-2.5 py-1.5 text-xs font-medium">
                 <Switch
                   checked={hideDeactivatedUsers}

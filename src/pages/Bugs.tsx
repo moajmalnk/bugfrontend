@@ -2,11 +2,14 @@ import {
   BugCard,
   BugCardGridSkeletonAnimated,
 } from "@/components/bugs/BugCard";
+import { BulkConvertBar } from "@/components/bugs/BulkConvertBar";
+import { BulkConvertBugsDialog } from "@/components/bugs/BulkConvertBugsDialog";
 import {
   BugTypeFilterSelect,
 } from "@/components/bugs/BugTypeFilterSelect";
 import { ItemsPerPageSelect } from "@/components/pagination/ItemsPerPageSelect";
 import { Button } from "@/components/ui/button";
+import { useBulkBugConvert } from "@/hooks/useBulkBugConvert";
 import {
   Select,
   SelectContent,
@@ -263,6 +266,11 @@ const Bugs = () => {
   const myBugsTabCount = bugsData?.pagination?.counts?.myOpen ?? 0;
   const skeletonLoading = loading && !bugsData;
   const paginatedBugs = bugs;
+  const canBulkConvert =
+    currentUser?.role === "admin" ||
+    currentUser?.role === "developer" ||
+    currentUser?.role === "tester";
+  const bulk = useBulkBugConvert(paginatedBugs);
   const totalPages = Math.max(
     1,
     bugsData?.pagination?.totalPages ||
@@ -849,14 +857,33 @@ const Bugs = () => {
                   </div>
                 </div>
               ) : (
-                <div
-                  className="grid gap-4 mt-4 grid-cols-1"
-                  style={{ minHeight: 200 }}
-                  aria-label="Bug list"
-                >
-                  {paginatedBugs.map((bug) => (
-                    <BugCard key={bug.id} bug={bug} onConverted={() => refreshBugs()} />
-                  ))}
+                <div className="mt-4 space-y-0">
+                  {canBulkConvert ? (
+                    <BulkConvertBar
+                      selectedCount={bulk.selectedCount}
+                      pageSelectableCount={bulk.pageSelectableCount}
+                      allPageSelected={bulk.allPageSelected}
+                      onToggleSelectPage={bulk.onToggleSelectPage}
+                      onClear={bulk.clearSelection}
+                      onBulkConvert={() => bulk.setBulkOpen(true)}
+                    />
+                  ) : null}
+                  <div
+                    className="grid gap-4 grid-cols-1"
+                    style={{ minHeight: 200 }}
+                    aria-label="Bug list"
+                  >
+                    {paginatedBugs.map((bug) => (
+                      <BugCard
+                        key={bug.id}
+                        bug={bug}
+                        onConverted={() => refreshBugs()}
+                        selectable={canBulkConvert}
+                        selected={bulk.isSelected(bug.id)}
+                        onSelectedChange={bulk.onSelectedChange}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </TabsContent>
@@ -1149,19 +1176,50 @@ const Bugs = () => {
               ) : filteredBugs.length === 0 ? (
                 renderEmptyState()
               ) : (
-                <div
-                  className="grid gap-4 grid-cols-1"
-                  style={{ minHeight: 200 }}
-                  aria-label="Bug list"
-                >
-                  {paginatedBugs.map((bug) => (
-                    <BugCard key={bug.id} bug={bug} onConverted={() => refreshBugs()} />
-                  ))}
+                <div>
+                  {canBulkConvert ? (
+                    <BulkConvertBar
+                      selectedCount={bulk.selectedCount}
+                      pageSelectableCount={bulk.pageSelectableCount}
+                      allPageSelected={bulk.allPageSelected}
+                      onToggleSelectPage={bulk.onToggleSelectPage}
+                      onClear={bulk.clearSelection}
+                      onBulkConvert={() => bulk.setBulkOpen(true)}
+                    />
+                  ) : null}
+                  <div
+                    className="grid gap-4 grid-cols-1"
+                    style={{ minHeight: 200 }}
+                    aria-label="Bug list"
+                  >
+                    {paginatedBugs.map((bug) => (
+                      <BugCard
+                        key={bug.id}
+                        bug={bug}
+                        onConverted={() => refreshBugs()}
+                        selectable={canBulkConvert}
+                        selected={bulk.isSelected(bug.id)}
+                        onSelectedChange={bulk.onSelectedChange}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         )}
+
+        {canBulkConvert ? (
+          <BulkConvertBugsDialog
+            bugs={bulk.selectedBugs}
+            open={bulk.bulkOpen}
+            onOpenChange={bulk.setBulkOpen}
+            onConverted={() => {
+              bulk.clearSelection();
+              refreshBugs();
+            }}
+          />
+        ) : null}
       </section>
     </main>
   );

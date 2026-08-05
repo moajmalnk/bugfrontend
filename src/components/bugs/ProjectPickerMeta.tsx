@@ -83,12 +83,12 @@ export function ProjectPickerTriggerMeta({
   stats,
   className,
 }: {
-  stats: ProjectPickerStats;
+  stats?: ProjectPickerStats | null;
   className?: string;
 }) {
-  const status = (stats.status as ProjectStatus) || "active";
-  const bugs = stats.bug_stats ?? EMPTY_BUGS;
-  const updates = stats.update_stats ?? EMPTY_UPDATES;
+  const status = (stats?.status as ProjectStatus) || "active";
+  const bugs = stats?.bug_stats ?? EMPTY_BUGS;
+  const updates = stats?.update_stats ?? EMPTY_UPDATES;
 
   return (
     <span className={cn("flex items-center gap-2 shrink-0", className)}>
@@ -125,12 +125,12 @@ export function ProjectPickerListMeta({
   stats,
   className,
 }: {
-  stats: ProjectPickerStats;
+  stats?: ProjectPickerStats | null;
   className?: string;
 }) {
-  const status = (stats.status as ProjectStatus) || "active";
-  const bugs = stats.bug_stats ?? EMPTY_BUGS;
-  const updates = stats.update_stats ?? EMPTY_UPDATES;
+  const status = (stats?.status as ProjectStatus) || "active";
+  const bugs = stats?.bug_stats ?? EMPTY_BUGS;
+  const updates = stats?.update_stats ?? EMPTY_UPDATES;
 
   return (
     <div
@@ -175,7 +175,7 @@ export function ProjectPickerListItemContent({
 }: {
   name: string;
   selected: boolean;
-  stats: ProjectPickerStats;
+  stats?: ProjectPickerStats | null;
 }) {
   return (
     <>

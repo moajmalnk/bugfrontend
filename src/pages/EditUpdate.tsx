@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { ENV } from "@/lib/env";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ImagePlus, Paperclip, File, X, FileImage, Edit2, FolderOpen, Bell, AlertCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -108,7 +109,7 @@ const formSchema = z
     }
   });
 
-const API_BASE = import.meta.env.VITE_API_URL + "/updates";
+const API_BASE = ENV.API_URL + "/updates";
 
 const EditUpdate = () => {
   const navigate = useNavigate();
@@ -144,7 +145,7 @@ const EditUpdate = () => {
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects", currentUser?.username],
     queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/projects/getAll.php`, {
+      const response = await fetch(`${ENV.API_URL}/projects/getAll.php`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },

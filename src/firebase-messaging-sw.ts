@@ -637,7 +637,12 @@ async function saveFcmToken(token: string, options?: { force?: boolean }): Promi
 
   const savePaths = [
     "/save-fcm-token.php",
-    "https://bugbackend.bugricer.com/api/save-fcm-token.php",
+    // Production fallback only when not already on the local /api proxy
+    ...(typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1")
+      ? []
+      : ["https://bugbackend.bugricer.com/api/save-fcm-token.php"]),
   ];
 
   let lastError = "";

@@ -13,6 +13,7 @@ import { Plus, Search, Filter, Clock, ListChecks, User, FileText, Calendar, User
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { useAuth } from '@/context/AuthContext';
+import { ENV } from '@/lib/env';
 import { useUndoDelete } from '@/hooks/useUndoDelete';
 import { UndoDeleteNotificationPortal } from '@/components/ui/UndoDeleteNotification';
 import { useSearchParams } from 'react-router-dom';
@@ -257,7 +258,7 @@ export default function MyTasks() {
 
   async function loadUsers() {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/get.php`, {
+      const response = await fetch(`${ENV.API_URL}/users/get.php`, {
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem("token") || localStorage.getItem("token")}`,
         },

@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/use-toast";
+import { ENV } from "@/lib/env";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronLeft,
@@ -145,7 +146,7 @@ export function ScreenshotViewer({
       ? screenshots[Math.min(currentIndex, screenshots.length - 1)]
       : null;
   const imageUrl = currentScreenshot
-    ? `${import.meta.env.VITE_API_URL}/image.php?path=${encodeURIComponent(currentScreenshot.file_path)}`
+    ? `${ENV.API_URL}/image.php?path=${encodeURIComponent(currentScreenshot.file_path)}`
     : "";
 
   // Reset image dimensions when screenshot changes
@@ -375,7 +376,7 @@ export function ScreenshotViewer({
   const downloadScreenshot = useCallback(() => {
     try {
       // Use the proper API endpoint for downloading
-      const downloadUrl = `${import.meta.env.VITE_API_URL}/get_attachment.php?path=${encodeURIComponent(currentScreenshot.file_path)}&name=${encodeURIComponent(currentScreenshot.file_name)}${bug_id ? `&bug_id=${encodeURIComponent(bug_id)}` : ''}`;
+      const downloadUrl = `${ENV.API_URL}/get_attachment.php?path=${encodeURIComponent(currentScreenshot.file_path)}&name=${encodeURIComponent(currentScreenshot.file_name)}${bug_id ? `&bug_id=${encodeURIComponent(bug_id)}` : ''}`;
       
       const link = document.createElement("a");
       link.href = downloadUrl;
@@ -494,7 +495,7 @@ export function ScreenshotViewer({
 
       // Make API call to delete the screenshot
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/bugs/delete_image.php`,
+        `${ENV.API_URL}/bugs/delete_image.php`,
         {
           method: "DELETE",
           headers: {

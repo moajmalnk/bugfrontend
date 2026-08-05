@@ -178,8 +178,17 @@ export const bugService = {
       data: { bugs: Bug[]; pagination: any };
     }>(`/bugs/getAll.php?${params.toString()}`);
     if (response.data.success && response.data.data?.bugs) {
+      const raw = Array.isArray(response.data.data.bugs) ? response.data.data.bugs : [];
+      // Why: Guard against legacy API JOIN fan-out returning the same bug id multiple times.
+      const seen = new Set<string>();
+      const bugs = raw.filter((bug) => {
+        const id = String(bug?.id ?? "");
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
       return {
-        bugs: Array.isArray(response.data.data.bugs) ? response.data.data.bugs : [],
+        bugs,
         pagination: response.data.data.pagination,
       };
     }

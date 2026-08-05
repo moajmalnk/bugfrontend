@@ -87,13 +87,23 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-function countBugsFromList(bugs: Array<{ status: string }>) {
-  const open = bugs.filter(
+function countBugsFromList(
+  bugs: Array<{ id?: string | number; status: string }>
+) {
+  const seen = new Set<string>();
+  const unique = bugs.filter((bug) => {
+    const id = String(bug?.id ?? "");
+    if (!id) return true;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  const open = unique.filter(
     (bug) => bug.status === 'pending' || bug.status === 'in_progress'
   ).length;
-  const fixed = bugs.filter((bug) => bug.status === 'fixed').length;
+  const fixed = unique.filter((bug) => bug.status === 'fixed').length;
   return {
-    total: bugs.length,
+    total: unique.length,
     open,
     fixed,
   };

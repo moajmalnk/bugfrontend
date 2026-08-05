@@ -23,6 +23,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
+import { ENV } from "@/lib/env";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
@@ -117,7 +118,7 @@ async function handlePasswordChange(
   if (!token) throw new Error("Authentication token not found.");
 
   const res = await fetch(
-    `${import.meta.env.VITE_API_URL}/users/change-password.php`,
+    `${ENV.API_URL}/users/change-password.php`,
     {
       method: "POST",
       headers: {

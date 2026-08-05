@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConvertBugDialog } from "@/components/bugs/ConvertBugDialog";
 import { useAuth } from "@/context/AuthContext";
@@ -41,6 +42,10 @@ interface BugCardProps {
   bug: Bug;
   onDelete?: () => void;
   onConverted?: (updated: BugType) => void;
+  /** Bulk convert selection */
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectedChange?: (bugId: string, selected: boolean) => void;
 }
 
 const priorityColors = {
@@ -67,18 +72,45 @@ function canConvertBug(role?: string | null) {
   return role === "admin" || role === "developer" || role === "tester";
 }
 
-export function BugCard({ bug, onDelete, onConverted }: BugCardProps) {
+export function BugCard({
+  bug,
+  onDelete,
+  onConverted,
+  selectable = false,
+  selected = false,
+  onSelectedChange,
+}: BugCardProps) {
   const location = useLocation();
   const { currentUser } = useAuth();
   const isFromProject = location.pathname.includes("/projects/");
   const [convertOpen, setConvertOpen] = useState(false);
   const showConvert =
     canConvertBug(currentUser?.role) && bug.status !== "declined";
+  const canSelect = selectable && showConvert;
 
   return (
-    <Card className="group relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm w-full h-full p-4 sm:p-5 hover:shadow-xl transition-all duration-300">
+    <Card
+      className={`group relative overflow-hidden rounded-2xl border bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm w-full h-full p-4 sm:p-5 hover:shadow-xl transition-all duration-300 ${
+        selected
+          ? "border-sky-400/80 dark:border-sky-500/60 ring-1 ring-sky-400/30"
+          : "border-gray-200/60 dark:border-gray-800/60"
+      }`}
+    >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-50/40 via-transparent to-red-50/40 dark:from-orange-950/15 dark:via-transparent dark:to-red-950/15"></div>
       <div className="relative w-full h-full flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-1 min-w-0 gap-3">
+        {canSelect ? (
+          <div className="pt-1 shrink-0">
+            <Checkbox
+              checked={selected}
+              onCheckedChange={(v) =>
+                onSelectedChange?.(bug.id, v === true)
+              }
+              aria-label={`Select ${bug.title || "bug"}`}
+              className="h-5 w-5 rounded-md"
+            />
+          </div>
+        ) : null}
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <h4 className="font-semibold text-base sm:text-lg break-words whitespace-pre-line w-full text-gray-900 dark:text-white">
@@ -125,6 +157,7 @@ export function BugCard({ bug, onDelete, onConverted }: BugCardProps) {
             </p>
           )}
         </div>
+      </div>
       </div>
 
       <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4">

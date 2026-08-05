@@ -1,5 +1,7 @@
 import { ActivityList } from "@/components/activities/ActivityList";
 import { BugCard } from "@/components/bugs/BugCard";
+import { BulkConvertBar } from "@/components/bugs/BulkConvertBar";
+import { BulkConvertBugsDialog } from "@/components/bugs/BulkConvertBugsDialog";
 import {
   BugTypeFilterSelect,
   bugMatchesTypeFilter,
@@ -11,6 +13,7 @@ import Bugs from "@/pages/Bugs";
 import Fixes from "@/pages/Fixes";
 import MyTasks from "@/pages/MyTasks";
 import Updates from "@/pages/Updates";
+import { useBulkBugConvert } from "@/hooks/useBulkBugConvert";
 import { sharedTaskService, SharedTask } from "@/services/sharedTaskService";
 import {
   AlertDialog,
@@ -751,12 +754,19 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
         page: 1,
         limit: 1000,
       });
-      setBugs(data.bugs);
+      const seen = new Set<string>();
+      const uniqueBugs = (data.bugs || []).filter((bug) => {
+        const id = String(bug?.id ?? "");
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+      setBugs(uniqueBugs);
       setCurrentPage(1);
       setTotalBugs(data.pagination.totalBugs);
       
       // Calculate pending bugs from all fetched bugs
-      const pendingCount = data.bugs.filter(
+      const pendingCount = uniqueBugs.filter(
         (bug) => bug.status === "pending"
       ).length;
       setPendingBugsCount(pendingCount);
@@ -827,6 +837,11 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
     currentPage * itemsPerPage
   );
   const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+  const canBulkConvert =
+    currentUser?.role === "admin" ||
+    currentUser?.role === "developer" ||
+    currentUser?.role === "tester";
+  const bulk = useBulkBugConvert(paginatedBugs);
 
   const uniqueRaisers = useMemo(() => {
     const byId = new Map<string, string>();
@@ -1404,10 +1419,29 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                 </div>
               </div>
             ) : (
-              <div className="grid gap-4 grid-cols-1">
-                {paginatedBugs.map((bug) => (
-                  <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
-                ))}
+              <div>
+                {canBulkConvert ? (
+                  <BulkConvertBar
+                    selectedCount={bulk.selectedCount}
+                    pageSelectableCount={bulk.pageSelectableCount}
+                    allPageSelected={bulk.allPageSelected}
+                    onToggleSelectPage={bulk.onToggleSelectPage}
+                    onClear={bulk.clearSelection}
+                    onBulkConvert={() => bulk.setBulkOpen(true)}
+                  />
+                ) : null}
+                <div className="grid gap-4 grid-cols-1">
+                  {paginatedBugs.map((bug) => (
+                    <BugCard
+                      key={bug.id}
+                      bug={bug}
+                      onConverted={() => fetchBugs()}
+                      selectable={canBulkConvert}
+                      selected={bulk.isSelected(bug.id)}
+                      onSelectedChange={bulk.onSelectedChange}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </TabsContent>
@@ -1833,15 +1867,46 @@ const BugsWithInitialParams = ({ projectId, initialTab, initialStatus }: { proje
                 </div>
               </div>
             ) : (
-              <div className="grid gap-4 grid-cols-1">
-                {paginatedBugs.map((bug) => (
-                  <BugCard key={bug.id} bug={bug} onConverted={() => fetchBugs()} />
-                ))}
+              <div>
+                {canBulkConvert ? (
+                  <BulkConvertBar
+                    selectedCount={bulk.selectedCount}
+                    pageSelectableCount={bulk.pageSelectableCount}
+                    allPageSelected={bulk.allPageSelected}
+                    onToggleSelectPage={bulk.onToggleSelectPage}
+                    onClear={bulk.clearSelection}
+                    onBulkConvert={() => bulk.setBulkOpen(true)}
+                  />
+                ) : null}
+                <div className="grid gap-4 grid-cols-1">
+                  {paginatedBugs.map((bug) => (
+                    <BugCard
+                      key={bug.id}
+                      bug={bug}
+                      onConverted={() => fetchBugs()}
+                      selectable={canBulkConvert}
+                      selected={bulk.isSelected(bug.id)}
+                      onSelectedChange={bulk.onSelectedChange}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {canBulkConvert ? (
+        <BulkConvertBugsDialog
+          bugs={bulk.selectedBugs}
+          open={bulk.bulkOpen}
+          onOpenChange={bulk.setBulkOpen}
+          onConverted={() => {
+            bulk.clearSelection();
+            void fetchBugs();
+          }}
+        />
+      ) : null}
     </div>
   );
 };
@@ -1936,9 +2001,14 @@ const FixesWithInitialParams = ({ projectId, initialTab, initialStatus }: { proj
         limit: 1000,
       });
       // Fixes tab: fixed + rejected (rejected = closed on our side)
-      const resolvedBugs = data.bugs.filter(
-        (bug) => bug.status === "fixed" || bug.status === "rejected"
-      );
+      const seen = new Set<string>();
+      const resolvedBugs = (data.bugs || []).filter((bug) => {
+        if (bug.status !== "fixed" && bug.status !== "rejected") return false;
+        const id = String(bug?.id ?? "");
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
       setBugs(resolvedBugs);
       setCurrentPage(1);
       setTotalBugs(resolvedBugs.length);
@@ -4525,6 +4595,14 @@ const ProjectDetails = () => {
   const activeProjectTab =
     projectTabs.find((tab) => tab.value === activeTab) ?? projectTabs[0];
 
+  // Why: Keep tabs edge-to-edge on a 12-col shell with equal 1fr columns so every role's tab count fills the bar.
+  const projectTabGridStyle = useMemo(
+    () => ({
+      gridTemplateColumns: `repeat(${Math.max(projectTabs.length, 1)}, minmax(0, 1fr))`,
+    }),
+    [projectTabs.length]
+  );
+
   const fetchProjectDetails = async () => {
     try {
       const projectData = await projectService.getProject(projectId!);
@@ -4571,12 +4649,21 @@ const ProjectDetails = () => {
 
   const fetchProjectBugs = async () => {
     try {
-      const { bugs } = await bugService.getBugs({
+      const { bugs: fetched } = await bugService.getBugs({
         projectId,
         page: 1,
         limit: 1000,
       });
-      setBugs(bugs);
+      // Why: Prefer unique bug ids so tab badges match SQL counts (not JOIN fan-out).
+      const seen = new Set<string>();
+      setBugs(
+        (fetched || []).filter((bug) => {
+          const id = String(bug?.id ?? "");
+          if (!id || seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        })
+      );
     } catch (error) {
       toast({
         title: "Error",
@@ -4885,9 +4972,18 @@ const ProjectDetails = () => {
 
   const projectTabCounts = useMemo(() => {
     const openBugStatuses = ["pending", "in_progress"];
+    const uniqueBugs = (() => {
+      const seen = new Set<string>();
+      return bugs.filter((bug) => {
+        const id = String(bug?.id ?? "");
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+    })();
     return {
-      bugs: bugs.filter((bug) => openBugStatuses.includes(bug.status)).length,
-      fixes: bugs.filter(
+      bugs: uniqueBugs.filter((bug) => openBugStatuses.includes(bug.status)).length,
+      fixes: uniqueBugs.filter(
         (bug) => bug.status === "fixed" || bug.status === "rejected"
       ).length,
       updates: updates.length,
@@ -5120,7 +5216,7 @@ const ProjectDetails = () => {
     return (
       <span
         className={cn(
-          "ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold flex-shrink-0 tabular-nums",
+          "ml-1 sm:ml-1.5 inline-flex h-5 min-w-5 items-center justify-center px-1.5 rounded-full text-[10px] sm:text-xs font-bold leading-none flex-shrink-0 tabular-nums",
           style
         )}
       >
@@ -5315,14 +5411,14 @@ const ProjectDetails = () => {
       >
         <div className="relative mb-4">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50 rounded-2xl"></div>
-          <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-1 sm:p-2">
+          <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-1.5">
             {projectTabs.length > 2 ? (
               <>
                 <Drawer
                   open={isMobileTabSelectorOpen}
                   onOpenChange={setIsMobileTabSelectorOpen}
                 >
-                  <div className="xl:hidden p-1">
+                  <div className="xl:hidden p-0.5">
                     <DrawerTrigger asChild>
                       <Button
                         type="button"
@@ -5408,34 +5504,44 @@ const ProjectDetails = () => {
                   </DrawerContent>
                 </Drawer>
 
-                <TabsList className="hidden xl:flex w-full gap-1 sm:gap-2 flex-wrap p-1 bg-transparent">
+                <div className="hidden xl:grid grid-cols-12 gap-1 sm:gap-2 w-full min-w-0">
+                  <TabsList
+                    className="col-span-12 grid w-full h-auto min-h-0 gap-1 sm:gap-2 p-0 bg-transparent"
+                    style={projectTabGridStyle}
+                  >
+                    {projectTabs.map((tab) => (
+                      <TabsTrigger
+                        key={tab.value}
+                        value={tab.value}
+                        className="font-semibold h-9 sm:h-10 py-0 w-full min-w-0 border border-transparent data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap px-2 sm:px-3 text-xs sm:text-sm inline-flex items-center justify-center cursor-pointer pointer-events-auto"
+                      >
+                        <tab.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 flex-shrink-0" />
+                        <span className="truncate leading-none">{tab.label}</span>
+                        {renderProjectTabBadge(tab.value)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-12 gap-1 sm:gap-2 md:gap-3 w-full min-w-0">
+                <TabsList
+                  className="col-span-12 grid w-full h-auto min-h-0 gap-1 sm:gap-2 md:gap-3 p-0 bg-transparent"
+                  style={projectTabGridStyle}
+                >
                   {projectTabs.map((tab) => (
                     <TabsTrigger
                       key={tab.value}
                       value={tab.value}
-                      className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-[5.5rem] px-2 sm:px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto"
+                      className="font-semibold h-9 sm:h-10 py-0 w-full min-w-0 border border-transparent data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap px-2 sm:px-3 text-xs sm:text-sm inline-flex items-center justify-center cursor-pointer pointer-events-auto"
                     >
-                      <tab.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 flex-shrink-0" />
-                      <span className="truncate">{tab.label}</span>
+                      <tab.icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                      <span className="truncate leading-none">{tab.label}</span>
                       {renderProjectTabBadge(tab.value)}
                     </TabsTrigger>
                   ))}
                 </TabsList>
-              </>
-            ) : (
-              <TabsList className="flex w-full gap-1 sm:gap-2 md:gap-3 p-1 bg-transparent">
-                {projectTabs.map((tab) => (
-                  <TabsTrigger
-                    key={tab.value}
-                    value={tab.value}
-                    className="font-semibold data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:border data-[state=active]:border-gray-200 dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:border-gray-700 rounded-xl transition-all duration-300 whitespace-nowrap flex-1 min-w-0 px-3 py-2 text-xs sm:text-sm flex items-center justify-center cursor-pointer pointer-events-auto"
-                  >
-                    <tab.icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
-                    <span className="truncate">{tab.label}</span>
-                    {renderProjectTabBadge(tab.value)}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+              </div>
             )}
           </div>
         </div>
