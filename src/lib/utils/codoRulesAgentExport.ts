@@ -116,7 +116,7 @@ const PHASE_LABEL: Record<CodoRulePhase, string> = {
 
 const PHASE_ORDER: CodoRulePhase[] = ['developer', 'tester', 'project'];
 
-/** Builtin catalog as CodoCommonRule-shaped rows (32 developer + 13 QA). */
+/** Builtin catalog as CodoCommonRule-shaped rows (39 developer + 13 QA). */
 export function getBuiltinCodoRulesForExport(): CodoCommonRule[] {
   const developer: CodoCommonRule[] = DEVELOPER_RULES.map((r) => ({
     id: r.number,
@@ -224,7 +224,7 @@ export function buildCodoAgentExportContent(
   switch (formatId) {
     case 'cursor':
       return `---
-description: BugRicer Common CODO engineering and QA rules (dev_rule_1–32, QA stress matrix)
+description: BugRicer Common CODO engineering and QA rules (dev_rule_1–43 SEO/marketing, QA stress matrix)
 alwaysApply: true
 ---
 

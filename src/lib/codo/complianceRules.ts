@@ -238,6 +238,55 @@ export const DEVELOPER_RULES: DeveloperRule[] = [
     description:
       'Sorting operations on datasets must create explicit copy instances ([...data].sort()) or perform sorting at database query level.\n\nMalayalam: ഡാറ്റാബേസിൽ നിന്നോ അറേയിൽ നിന്നോ ഓർഡർ കാണിക്കുമ്പോൾ ഡാറ്റ തെറ്റിയ മുൻഗണനയിൽ വരാൻ പാടില്ല.',
   },
+  {
+    key: 'dev_rule_33',
+    number: 33,
+    titleEn: 'Canonical Tag Injection',
+    description:
+      'Ensure all rendered pages include a self-referencing canonical tag.\n\nMalayalam: എല്ലാ റെൻഡർ ചെയ്യുന്ന പേജുകളിലും സെൽഫ്-റഫറൻസിംഗ് canonical ടാഗ് ഉണ്ടായിരിക്കണം.',
+  },
+  {
+    key: 'dev_rule_35',
+    number: 35,
+    titleEn: 'Heading Hierarchy Enforcement',
+    description:
+      'Exactly one <h1> per page, followed sequentially by <h2>, <h3>.\n\nMalayalam: ഓരോ പേജിലും ഒരു <h1> മാത്രം; അതിന് ശേഷം <h2>, <h3> ക്രമത്തിൽ ഉപയോഗിക്കുക.',
+  },
+  {
+    key: 'dev_rule_36',
+    number: 36,
+    titleEn: 'Image WebP & Alt Text Standard',
+    description:
+      'All image assets must use WebP extension and require non-empty alt text.\n\nMalayalam: എല്ലാ ഇമേജ് അസറ്റുകളും WebP ആയിരിക്കണം; ശൂന്യമല്ലാത്ത alt ടെക്സ്റ്റ് നിർബന്ധമാണ്.',
+  },
+  {
+    key: 'dev_rule_37',
+    number: 37,
+    titleEn: 'Structured Data JSON-LD',
+    description:
+      'Inject valid JSON-LD schemas (Organization, LocalBusiness, FAQPage, etc.) into page metadata.\n\nMalayalam: Organization, LocalBusiness, FAQPage പോലുള്ള സാധുവായ JSON-LD സ്കീമകൾ പേജ് മെറ്റാഡാറ്റയിൽ ഇൻജക്റ്റ് ചെയ്യണം.',
+  },
+  {
+    key: 'dev_rule_38',
+    number: 38,
+    titleEn: 'Conversion Telemetry & GA4 Event Tracking',
+    description:
+      'Attach gtag or analytics click event triggers to all WhatsApp, phone, and form submission buttons.\n\nMalayalam: WhatsApp, ഫോൺ, ഫോം സബ്മിറ്റ് ബട്ടണുകളിൽ gtag/അനലിറ്റിക്സ് ക്ലിക്ക് ഇവന്റുകൾ ബന്ധിപ്പിക്കണം.',
+  },
+  {
+    key: 'dev_rule_40',
+    number: 40,
+    titleEn: 'Core Web Vitals Optimization',
+    description:
+      'Preload critical fonts, enforce image loading="lazy", and prevent layout shifts (CLS < 0.1).\n\nMalayalam: ക്രിട്ടിക്കൽ ഫോണ്ടുകൾ preload ചെയ്യുക, ഇമേജുകൾക്ക് loading="lazy" നൽകുക, ലേഔട്ട് ഷിഫ്റ്റ് തടയുക (CLS < 0.1).',
+  },
+  {
+    key: 'dev_rule_43',
+    number: 43,
+    titleEn: 'Custom 404 Routing',
+    description:
+      'Include a custom branded 404 page component for all unhandled routes.\n\nMalayalam: കൈകാര്യം ചെയ്യാത്ത എല്ലാ റൂട്ടുകൾക്കും ബ്രാൻഡഡ് കസ്റ്റം 404 പേജ് ഉണ്ടായിരിക്കണം.',
+  },
 ];
 
 export const QA_STRESS_RULES: QaStressRule[] = [

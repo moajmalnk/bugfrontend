@@ -339,6 +339,77 @@ try {
     language: 'JavaScript',
   },
 
+  // ── Section 8: SEO, Tracking & Marketing (selected keys) ───────────────
+  dev_rule_33: {
+    bad: '// No canonical — duplicate URLs compete in search',
+    good: '<link rel="canonical" href={currentFullUrl} />',
+    language: 'HTML',
+  },
+  dev_rule_35: {
+    bad: '<h1>Projects</h1>\n<h1>Filters</h1> // Multiple H1s',
+    good: `<h1>Projects</h1>
+<h2>Active filters</h2>
+<h3>Status</h3>`,
+    language: 'HTML',
+  },
+  dev_rule_36: {
+    bad: '<img src="/hero.png" /> // Heavy PNG, missing alt',
+    good: `<img
+  src="/hero.webp"
+  alt="Product dashboard overview"
+  loading="lazy"
+  decoding="async"
+/>`,
+    language: 'JavaScript',
+  },
+  dev_rule_37: {
+    bad: '// No structured data on public marketing pages',
+    good: `<script type="application/ld+json">
+{JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "BugRicer",
+  url: "https://bugs.bugricer.com",
+})}
+</script>`,
+    language: 'JavaScript',
+  },
+  dev_rule_38: {
+    bad: '<a href="https://wa.me/…">Chat</a> // No conversion event',
+    good: `<button
+  type="button"
+  onClick={() => {
+    window.gtag?.("event", "whatsapp_click", { location: "footer" });
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+  }}
+>
+  Chat on WhatsApp
+</button>`,
+    language: 'JavaScript',
+  },
+  dev_rule_40: {
+    bad: '// No font preload; eager full-bleed PNG causes CLS',
+    good: `<!-- index.html -->
+<link
+  rel="preload"
+  href="/fonts/brand.woff2"
+  as="font"
+  type="font/woff2"
+  crossorigin
+/>
+
+<img src="/hero.webp" alt="Hero" width={1200} height={630} loading="lazy" />`,
+    language: 'HTML',
+  },
+  dev_rule_43: {
+    bad: '// Unhandled routes fall through to a blank screen',
+    good: `<Routes>
+  {/* …app routes… */}
+  <Route path="*" element={<NotFoundPage />} />
+</Routes>`,
+    language: 'JavaScript',
+  },
+
   // ── Tester / QA Stress Matrix (13) ─────────────────────────────────────
   qa_apple_sandbox: {
     bad: 'Checked Chrome on desktop only — skipped Safari / iOS WebKit.',
