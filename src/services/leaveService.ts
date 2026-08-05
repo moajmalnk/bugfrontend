@@ -49,8 +49,10 @@ export type AttendanceStatus = {
     start_date: string;
     end_date: string;
   } | null;
-  /** Check-in policy (10:00 AM IST / late strikes / Office-only week) */
+  /** Check-in policy (configurable IST cutoff / late strikes / Office-only week) */
   checkin_cutoff?: string;
+  checkin_cutoff_enabled?: boolean;
+  checkin_cutoff_label?: string;
   is_sunday?: boolean;
   late_count?: number;
   late_limit?: number;

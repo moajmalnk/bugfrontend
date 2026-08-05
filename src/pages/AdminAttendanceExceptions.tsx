@@ -74,6 +74,15 @@ function formatDay(date: string) {
   }
 }
 
+/** Compact date for dense mobile roster chips. */
+function formatDayShort(date: string) {
+  try {
+    return format(parseISO(date), 'MMM d');
+  } catch {
+    return date;
+  }
+}
+
 function formatCheckIn(value?: string | null) {
   if (!value) return 'Late';
   try {
@@ -607,26 +616,26 @@ export default function AdminAttendanceExceptions() {
   const usersWithExceptions = roster.filter((r) => r.exceptionCount > 0).length;
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 max-w-7xl mx-auto min-w-0 w-full overflow-x-hidden">
+      <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between min-w-0">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <CalendarClock className="h-6 w-6 text-sky-600 dark:text-sky-400" />
-            Attendance exceptions
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 min-w-0">
+            <CalendarClock className="h-5 w-5 sm:h-6 sm:w-6 text-sky-600 dark:text-sky-400 shrink-0" />
+            <span className="truncate">Attendance exceptions</span>
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
             Browse teammates, open a person for full day details, then grant WFH or forgive late
             check-ins.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="rounded-xl tabular-nums">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
+          <Badge variant="outline" className="rounded-xl tabular-nums text-[10px] sm:text-xs">
             {data?.exception_count ?? 0} days active
           </Badge>
-          <Badge variant="secondary" className="rounded-xl tabular-nums">
+          <Badge variant="secondary" className="rounded-xl tabular-nums text-[10px] sm:text-xs">
             {usersWithExceptions} people
           </Badge>
-          <Badge variant="outline" className="rounded-xl tabular-nums">
+          <Badge variant="outline" className="rounded-xl tabular-nums text-[10px] sm:text-xs">
             {data?.late_count ?? 0} late on record
           </Badge>
         </div>
@@ -704,17 +713,17 @@ export default function AdminAttendanceExceptions() {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-border/60 bg-card/60 p-4 sm:p-5 space-y-4">
+      <div className="rounded-2xl border border-border/60 bg-card/60 p-3 sm:p-4 md:p-5 space-y-3 sm:space-y-4 min-w-0 overflow-hidden">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-sm font-semibold">Grant exception</p>
           {detailUserId ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[11px] sm:text-xs text-muted-foreground">
               Granting for selected user · change below if needed
             </p>
           ) : null}
         </div>
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 md:col-span-4 space-y-2">
+        <div className="grid grid-cols-12 gap-3 sm:gap-4">
+          <div className="col-span-12 md:col-span-4 space-y-2 min-w-0">
             <Label>User</Label>
             <Select
               value={grantUserId}
@@ -723,7 +732,7 @@ export default function AdminAttendanceExceptions() {
               }}
               disabled={saving || users.length === 0}
             >
-              <SelectTrigger className="h-11 rounded-xl">
+              <SelectTrigger className="h-11 rounded-xl min-w-0">
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent className="rounded-xl max-h-72">
@@ -773,22 +782,26 @@ export default function AdminAttendanceExceptions() {
               className="h-11 rounded-xl"
             />
           </div>
-          <div className="col-span-12 sm:col-span-6 flex items-center justify-between gap-3 rounded-xl border border-border/60 px-4 py-3">
+          <div className="col-span-12 sm:col-span-6 flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 sm:px-4 py-3 min-w-0">
             <div className="flex items-start gap-2 min-w-0">
               <Home className="h-4 w-4 mt-0.5 text-emerald-600 shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm font-medium">Allow WFH</p>
-                <p className="text-xs text-muted-foreground">Even during Office-only week</p>
+                <p className="text-[11px] sm:text-xs text-muted-foreground break-words">
+                  Even during Office-only week
+                </p>
               </div>
             </div>
             <Switch checked={allowWfh} onCheckedChange={setAllowWfh} disabled={saving} />
           </div>
-          <div className="col-span-12 sm:col-span-6 flex items-center justify-between gap-3 rounded-xl border border-border/60 px-4 py-3">
+          <div className="col-span-12 sm:col-span-6 flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 sm:px-4 py-3 min-w-0">
             <div className="flex items-start gap-2 min-w-0">
               <MapPin className="h-4 w-4 mt-0.5 text-rose-600 shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-medium">Forgive late (after 10:00 AM)</p>
-                <p className="text-xs text-muted-foreground">Clears late strike for those days</p>
+                <p className="text-sm font-medium">Forgive late check-in</p>
+                <p className="text-[11px] sm:text-xs text-muted-foreground break-words">
+                  Clears late strike for those days
+                </p>
               </div>
             </div>
             <Switch checked={forgiveLate} onCheckedChange={setForgiveLate} disabled={saving} />
@@ -827,23 +840,23 @@ export default function AdminAttendanceExceptions() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-12 gap-4">
-          <Skeleton className="col-span-12 lg:col-span-5 h-80 rounded-2xl" />
-          <Skeleton className="col-span-12 lg:col-span-7 h-80 rounded-2xl" />
+        <div className="grid grid-cols-12 gap-3 sm:gap-4">
+          <Skeleton className="col-span-12 lg:col-span-5 h-64 sm:h-80 rounded-2xl" />
+          <Skeleton className="col-span-12 lg:col-span-7 h-64 sm:h-80 rounded-2xl" />
         </div>
       ) : (
-        <div className="grid grid-cols-12 gap-4 items-start">
-          {/* User roster */}
+        <div className="grid grid-cols-12 gap-3 sm:gap-4 items-start min-w-0">
+          {/* User roster — hidden on mobile while a person detail is open */}
           <div
             className={cn(
-              'col-span-12 space-y-3',
-              detailUserId ? 'lg:col-span-5' : 'lg:col-span-12'
+              'col-span-12 space-y-3 min-w-0',
+              detailUserId ? 'hidden lg:block lg:col-span-5' : 'lg:col-span-12'
             )}
           >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <p className="text-sm font-semibold">People</p>
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 min-w-0">
+              <p className="text-sm font-semibold shrink-0">People</p>
+              <div className="relative w-full sm:max-w-xs min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -854,13 +867,13 @@ export default function AdminAttendanceExceptions() {
             </div>
 
             {roster.length === 0 ? (
-              <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border/60 px-4 py-10 text-center">
+              <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border/60 px-4 py-8 text-center">
                 {query.trim() ? 'No people match this search.' : 'No active teammates found.'}
               </p>
             ) : (
               <div
                 className={cn(
-                  'grid gap-3',
+                  'grid gap-2 sm:gap-3',
                   detailUserId
                     ? 'grid-cols-1'
                     : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
@@ -870,13 +883,21 @@ export default function AdminAttendanceExceptions() {
                   const uid = String(row.user.id);
                   const active = detailUserId === uid;
                   const hoursLabel = formatHoursShort(row.user.today_hours_worked);
+                  const statusBit =
+                    row.user.status === 'active'
+                      ? 'Active'
+                      : row.user.status === 'idle'
+                        ? 'Idle'
+                        : row.user.checked_in_today
+                          ? 'Checked in'
+                          : '';
                   return (
                     <button
                       key={uid}
                       type="button"
                       onClick={() => openUser(uid)}
                       className={cn(
-                        'text-left rounded-2xl border px-4 py-3.5 transition-colors',
+                        'text-left rounded-xl sm:rounded-2xl border px-3 py-2.5 sm:px-4 sm:py-3 transition-colors min-w-0 w-full',
                         'hover:border-sky-500/40 hover:bg-sky-500/5',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40',
                         active
@@ -884,56 +905,63 @@ export default function AdminAttendanceExceptions() {
                           : 'border-border/60 bg-card/40'
                       )}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <div className="mt-0.5 h-9 w-9 rounded-xl bg-muted/80 flex items-center justify-center shrink-0">
-                            <UserRound className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold truncate">{row.user.username}</p>
-                            <p className="text-xs text-muted-foreground capitalize mt-0.5">
-                              {row.user.role}
-                              {hoursLabel ? ` · ${hoursLabel} today` : ''}
-                              {row.user.status === 'active'
-                                ? ' · Active'
-                                : row.user.status === 'idle'
-                                  ? ' · Idle'
-                                  : row.user.checked_in_today
-                                    ? ' · Checked in'
-                                    : ''}
+                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                        <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-muted/80 flex items-center justify-center shrink-0">
+                          <UserRound className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="font-semibold text-sm sm:text-base truncate">
+                              {row.user.username}
                             </p>
+                            <ChevronRight
+                              className={cn(
+                                'h-4 w-4 shrink-0 text-muted-foreground ms-auto',
+                                active && 'text-sky-600 dark:text-sky-400'
+                              )}
+                            />
+                          </div>
+                          <p className="text-[11px] sm:text-xs text-muted-foreground capitalize truncate mt-0.5">
+                            {[
+                              row.user.role,
+                              hoursLabel ? `${hoursLabel} today` : null,
+                              statusBit || null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            <Badge
+                              variant={row.exceptionCount > 0 ? 'secondary' : 'outline'}
+                              className="rounded-lg sm:rounded-xl tabular-nums text-[10px] sm:text-xs h-5 sm:h-6 px-1.5 sm:px-2.5"
+                            >
+                              <span className="sm:hidden">{row.exceptionCount} exc</span>
+                              <span className="hidden sm:inline">
+                                {row.exceptionCount} exception
+                                {row.exceptionCount === 1 ? '' : 's'}
+                              </span>
+                            </Badge>
+                            <Badge
+                              variant={row.lateCount > 0 ? 'destructive' : 'outline'}
+                              className={cn(
+                                'rounded-lg sm:rounded-xl tabular-nums text-[10px] sm:text-xs h-5 sm:h-6 px-1.5 sm:px-2.5',
+                                row.lateCount > 0 ? '' : 'text-muted-foreground'
+                              )}
+                            >
+                              {row.lateCount} late
+                            </Badge>
+                            {row.latestExceptionDate ? (
+                              <span className="text-[10px] sm:text-[11px] text-muted-foreground tabular-nums">
+                                <span className="sm:hidden">
+                                  {formatDayShort(row.latestExceptionDate)}
+                                </span>
+                                <span className="hidden sm:inline">
+                                  Latest {formatDay(row.latestExceptionDate)}
+                                </span>
+                              </span>
+                            ) : null}
                           </div>
                         </div>
-                        <ChevronRight
-                          className={cn(
-                            'h-4 w-4 shrink-0 mt-1 text-muted-foreground',
-                            active && 'text-sky-600 dark:text-sky-400'
-                          )}
-                        />
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        <Badge
-                          variant={row.exceptionCount > 0 ? 'secondary' : 'outline'}
-                          className="rounded-xl tabular-nums"
-                        >
-                          {row.exceptionCount} exception{row.exceptionCount === 1 ? '' : 's'}
-                        </Badge>
-                        <Badge
-                          variant={row.lateCount > 0 ? 'destructive' : 'outline'}
-                          className={cn(
-                            'rounded-xl tabular-nums',
-                            row.lateCount > 0
-                              ? ''
-                              : 'text-muted-foreground'
-                          )}
-                        >
-                          {row.lateCount} late
-                        </Badge>
-                        {row.latestExceptionDate ? (
-                          <span className="text-[11px] text-muted-foreground self-center">
-                            Latest {formatDay(row.latestExceptionDate)}
-                          </span>
-                        ) : null}
                       </div>
                     </button>
                   );
@@ -942,27 +970,27 @@ export default function AdminAttendanceExceptions() {
             )}
           </div>
 
-          {/* User detail */}
+          {/* User detail — full width on mobile */}
           {detailUserId ? (
-            <div className="col-span-12 lg:col-span-7 space-y-4">
-              <div className="rounded-2xl border border-border/60 bg-card/60 overflow-hidden">
-                <div className="px-4 sm:px-5 py-4 border-b border-border/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
+            <div className="col-span-12 lg:col-span-7 space-y-3 sm:space-y-4 min-w-0">
+              <div className="rounded-2xl border border-border/60 bg-card/60 overflow-hidden min-w-0">
+                <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-border/60 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                  <div className="flex items-start gap-2 sm:gap-3 min-w-0">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="rounded-xl shrink-0 -ml-1"
+                      className="rounded-xl shrink-0 -ms-1 h-9 px-2"
                       onClick={closeDetail}
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
                       People
                     </Button>
                     <div className="min-w-0">
-                      <h2 className="text-base font-bold truncate">
+                      <h2 className="text-sm sm:text-base font-bold truncate">
                         {detailUser?.username || 'User'}
                       </h2>
-                      <p className="text-xs text-muted-foreground capitalize">
+                      <p className="text-[11px] sm:text-xs text-muted-foreground capitalize truncate">
                         {detailUser?.role || 'teammate'}
                         {detailUser?.today_hours_worked
                           ? ` · ${formatHoursShort(detailUser.today_hours_worked)} today`
@@ -970,7 +998,12 @@ export default function AdminAttendanceExceptions() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" className="rounded-xl shrink-0" asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl shrink-0 w-full sm:w-auto"
+                    asChild
+                  >
                     <Link to={`/${role}/users/${detailUserId}`}>
                       Full profile
                       <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
@@ -1035,7 +1068,7 @@ export default function AdminAttendanceExceptions() {
                           No day exceptions for this user yet. Use Grant exception above.
                         </p>
                       ) : (
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-2 sm:gap-3">
                           {detailExceptions.map((row) => {
                             const key = exceptionKey({ ...row, user_id: detailUserId });
                             const checked = selectedKeys.includes(key);
@@ -1043,15 +1076,15 @@ export default function AdminAttendanceExceptions() {
                               <div
                                 key={`${key}-${row.id ?? 'x'}`}
                                 className={cn(
-                                  'rounded-xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3',
+                                  'rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 min-w-0',
                                   checked
                                     ? 'border-primary/50 bg-primary/5'
                                     : 'border-border/60'
                                 )}
                               >
-                                <div className="flex items-start gap-3 min-w-0">
+                                <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
                                   <Checkbox
-                                    className="mt-1 rounded-md"
+                                    className="mt-1 rounded-md shrink-0"
                                     checked={checked}
                                     disabled={saving}
                                     onCheckedChange={(v) => toggleKey(key, v === true)}
@@ -1059,22 +1092,33 @@ export default function AdminAttendanceExceptions() {
                                   />
                                   <div className="min-w-0">
                                     <p className="text-sm font-medium">
-                                      {formatDay(row.exception_date)}
+                                      <span className="sm:hidden">
+                                        {formatDayShort(row.exception_date)}
+                                      </span>
+                                      <span className="hidden sm:inline">
+                                        {formatDay(row.exception_date)}
+                                      </span>
                                     </p>
-                                    <div className="flex flex-wrap gap-2 mt-1.5">
+                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
                                       {row.allow_wfh ? (
-                                        <Badge variant="secondary" className="rounded-xl">
+                                        <Badge
+                                          variant="secondary"
+                                          className="rounded-lg sm:rounded-xl text-[10px] sm:text-xs"
+                                        >
                                           WFH allowed
                                         </Badge>
                                       ) : null}
                                       {row.forgive_late ? (
-                                        <Badge variant="outline" className="rounded-xl">
+                                        <Badge
+                                          variant="outline"
+                                          className="rounded-lg sm:rounded-xl text-[10px] sm:text-xs"
+                                        >
                                           Late forgiven
                                         </Badge>
                                       ) : null}
                                     </div>
                                     {row.admin_note ? (
-                                      <p className="text-xs text-muted-foreground mt-1">
+                                      <p className="text-[11px] sm:text-xs text-muted-foreground mt-1 break-words">
                                         {row.admin_note}
                                       </p>
                                     ) : null}
@@ -1083,7 +1127,7 @@ export default function AdminAttendanceExceptions() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="rounded-xl shrink-0"
+                                  className="rounded-xl shrink-0 w-full sm:w-auto"
                                   disabled={saving}
                                   onClick={() =>
                                     setPendingRemove([{ ...row, user_id: detailUserId }])

@@ -41,7 +41,6 @@ import {
   PROJECT_PLATFORM_OPTIONS,
   sortProjectsByWorkload,
   formatProjectDate,
-  computeProjectDurationDays,
 } from "@/lib/utils/projectUtils";
 import { Project, projectService } from "@/services/projectService";
 import { userService } from "@/services/userService";
@@ -65,6 +64,7 @@ import {
   Shield,
   ShieldCheck,
   TestTube,
+  Timer,
   Trash2,
   Undo2,
   Users,
@@ -109,6 +109,77 @@ function isDeadlineOverdue(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return d.getTime() < today.getTime();
+}
+
+type DeadlineTimerTone = "ok" | "soon" | "today" | "overdue" | "done" | "none";
+
+/** Full deadline countdown reminder for project cards (not a cryptic day count). */
+function getDeadlineTimerReminder(
+  deadline?: string | null,
+  status?: string | null
+): { label: string; tone: DeadlineTimerTone; daysUntil: number | null } {
+  if (!deadline) {
+    return { label: "No deadline set", tone: "none", daysUntil: null };
+  }
+  if (status === "completed" || status === "archived") {
+    return { label: "Project closed", tone: "done", daysUntil: null };
+  }
+  const end = new Date(
+    deadline.includes("T") ? deadline : `${deadline}T00:00:00`
+  );
+  if (Number.isNaN(end.getTime())) {
+    return { label: "No deadline set", tone: "none", daysUntil: null };
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  const daysUntil = Math.round(
+    (end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (daysUntil < 0) {
+    const overdue = Math.abs(daysUntil);
+    return {
+      label: `${overdue} day${overdue === 1 ? "" : "s"} overdue`,
+      tone: "overdue",
+      daysUntil,
+    };
+  }
+  if (daysUntil === 0) {
+    return { label: "Due today — act now", tone: "today", daysUntil: 0 };
+  }
+  if (daysUntil === 1) {
+    return { label: "1 day left", tone: "soon", daysUntil: 1 };
+  }
+  if (daysUntil <= 7) {
+    return {
+      label: `${daysUntil} days left — due soon`,
+      tone: "soon",
+      daysUntil,
+    };
+  }
+  return {
+    label: `${daysUntil} days left`,
+    tone: "ok",
+    daysUntil,
+  };
+}
+
+function deadlineTimerToneClass(tone: DeadlineTimerTone): string {
+  switch (tone) {
+    case "overdue":
+      return "border-red-300/80 bg-red-50 text-red-800 dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-200";
+    case "today":
+      return "border-amber-300/80 bg-amber-50 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200";
+    case "soon":
+      return "border-orange-300/80 bg-orange-50 text-orange-900 dark:border-orange-800/60 dark:bg-orange-950/40 dark:text-orange-200";
+    case "done":
+      return "border-slate-300/70 bg-slate-50 text-slate-700 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-slate-300";
+    case "none":
+      return "border-border/60 bg-muted/40 text-muted-foreground";
+    default:
+      return "border-cyan-200/80 bg-cyan-50 text-cyan-800 dark:border-cyan-800/50 dark:bg-cyan-950/30 dark:text-cyan-200";
+  }
 }
 
 // Enhanced Professional Project Card Skeleton with animations
@@ -1423,49 +1494,61 @@ const Projects = () => {
                 </CardHeader>
                 <CardContent className="relative flex-1 flex flex-col justify-end py-2 px-4 sm:px-5">
                   <div className="flex flex-col gap-3">
-                    {/* Key dates & deadlines (most wanted milestones) */}
+                    {/* Key dates — Start, Deadline, Testing only */}
                     {(() => {
                       const startLabel = formatCardMilestone(project.start_date);
                       const deadlineLabel = formatCardMilestone(
                         project.deadline_date
                       );
-                      const publishLabel = formatCardMilestone(
-                        project.expected_publish_date
-                      );
                       const testingLabel = formatCardMilestone(
                         project.testing_end_date || project.testing_start_date
                       );
                       const hasAny =
-                        startLabel ||
-                        deadlineLabel ||
-                        publishLabel ||
-                        testingLabel;
+                        startLabel || deadlineLabel || testingLabel;
                       if (!hasAny) return null;
 
                       const overdue = isDeadlineOverdue(
                         project.deadline_date,
                         project.status
                       );
-                      const durationDays = computeProjectDurationDays(project);
+                      const timer = getDeadlineTimerReminder(
+                        project.deadline_date,
+                        project.status
+                      );
 
                       return (
                         <div className="rounded-xl border border-border/60 bg-muted/25 dark:bg-muted/15 px-2.5 py-2.5 space-y-2">
-                          <div className="flex items-center justify-between gap-2 min-w-0">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 text-white shrink-0">
-                                <Calendar className="h-3.5 w-3.5" />
-                              </span>
-                              <span className="text-xs font-semibold text-foreground truncate">
-                                Timeline
-                              </span>
-                            </div>
-                            {durationDays > 0 ? (
-                              <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0 tabular-nums">
-                                {durationDays}d
-                              </span>
-                            ) : null}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 text-white shrink-0">
+                              <Calendar className="h-3.5 w-3.5" />
+                            </span>
+                            <span className="text-xs font-semibold text-foreground truncate">
+                              Timeline
+                            </span>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
+
+                          <div
+                            className={`flex items-start gap-2 rounded-xl border px-2.5 py-2 ${deadlineTimerToneClass(timer.tone)}`}
+                            role="status"
+                          >
+                            <Timer className="h-3.5 w-3.5 mt-0.5 shrink-0 opacity-80" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+                                Deadline reminder
+                              </p>
+                              <p className="text-xs sm:text-sm font-bold leading-snug break-words">
+                                {timer.label}
+                                {deadlineLabel ? (
+                                  <span className="font-medium opacity-80">
+                                    {" "}
+                                    · {deadlineLabel}
+                                  </span>
+                                ) : null}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                             <div className="rounded-xl border border-border/50 bg-background/70 dark:bg-background/40 px-2 py-1.5 min-w-0">
                               <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                 <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 shrink-0" />
@@ -1500,15 +1583,6 @@ const Projects = () => {
                                 }`}
                               >
                                 {deadlineLabel || "—"}
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-border/50 bg-background/70 dark:bg-background/40 px-2 py-1.5 min-w-0">
-                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 shrink-0" />
-                                Publish
-                              </div>
-                              <p className="mt-0.5 text-[11px] sm:text-xs font-semibold text-foreground truncate">
-                                {publishLabel || "—"}
                               </p>
                             </div>
                             <div className="rounded-xl border border-border/50 bg-background/70 dark:bg-background/40 px-2 py-1.5 min-w-0">

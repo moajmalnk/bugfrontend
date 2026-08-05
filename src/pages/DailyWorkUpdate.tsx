@@ -13,7 +13,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2, LocateFixed, RefreshCw } from 'lucide-react';
+import { ClipboardCopy, Clock, FileText, Share2, FolderKanban, PauseCircle, PlayCircle, Search, X, LogOut, Calendar, ListTodo, AlertTriangle, Building2, Home, MapPin, Loader2, LocateFixed, RefreshCw, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { projectService, Project } from '@/services/projectService';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -30,16 +30,24 @@ import {
   OfficeLocationError,
   queryGeolocationPermission,
   resolveOfficeConfig,
+  watchGeolocationPermission,
   type CheckInPosition,
   type GeolocationPermissionState,
   type OfficeLocationErrorCode,
 } from '@/lib/officeLocation';
+import {
+  detectLocationClient,
+  getAlternateLocationHelpGuides,
+  getLocationPermissionHelp,
+  type LocationHelpGuide,
+} from '@/lib/locationPermissionHelp';
 import { ENV } from '@/lib/env';
 import {
   getAttendanceStatus,
   type AttendanceStatus,
   type WorkMode,
 } from '@/services/leaveService';
+import { formatCheckInCutoffLabel } from '@/services/settingsService';
 import { requestWfhForToday } from '@/services/wfhRequestService';
 import {
   calendarMonthKey,
@@ -280,6 +288,16 @@ export function DailyWorkFlowPanel({
   const [officeGeoPermission, setOfficeGeoPermission] =
     useState<GeolocationPermissionState>('unknown');
   const [officePosition, setOfficePosition] = useState<CheckInPosition | null>(null);
+  const [locationHelpPreset, setLocationHelpPreset] = useState<string>('auto');
+  const locationClient = useMemo(() => detectLocationClient(), []);
+  const locationHelpAlternates = useMemo(() => getAlternateLocationHelpGuides(), []);
+  const locationHelpGuide: LocationHelpGuide = useMemo(() => {
+    if (locationHelpPreset !== 'auto') {
+      const found = locationHelpAlternates.find((g) => g.key === locationHelpPreset);
+      if (found) return found.guide;
+    }
+    return getLocationPermissionHelp(locationClient);
+  }, [locationHelpPreset, locationHelpAlternates, locationClient]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingProjectStats, setLoadingProjectStats] = useState(false);
@@ -325,22 +343,28 @@ export function DailyWorkFlowPanel({
   const hasActiveWorkSession = hasCheckedIn && !todaySubmissionComplete && !isEditing;
   const attendanceBlocked = attendanceGate != null && attendanceGate.allowed === false;
   const officeOnlyActive = Boolean(attendanceGate?.office_only);
-  const workModeLockedToOffice = attendanceGate?.work_mode_locked_to === 'office' || officeOnlyActive;
   const allowWfhToday = Boolean(attendanceGate?.allow_wfh_today);
+  /** Why: WFH choice only when Attendance exceptions grant it for today. */
+  const canChooseWfh = allowWfhToday;
+  const workModeLockedToOffice = !canChooseWfh;
   const wfhRequestStatus = String(attendanceGate?.wfh_request_status ?? 'none').toLowerCase();
   const canRequestWfh = Boolean(attendanceGate?.can_request_wfh);
   const wfhRequestPending = wfhRequestStatus === 'pending';
-  const showRequestWfhAction = workModeLockedToOffice && !allowWfhToday;
+  const showRequestWfhAction = !canChooseWfh && (canRequestWfh || wfhRequestPending);
   /** Why: When Office geo fails, always offer an admin WFH request escape hatch. */
   const showGeoAdminWfhRequest =
-    !allowWfhToday &&
+    !canChooseWfh &&
     wfhRequestStatus !== 'approved' &&
-    (canRequestWfh || showRequestWfhAction || !workModeLockedToOffice);
+    (canRequestWfh || showRequestWfhAction || workModeLockedToOffice);
   const forgiveLateToday = Boolean(attendanceGate?.forgive_late_today);
   const lateCount = attendanceGate?.late_count ?? 0;
   const lateLimit = attendanceGate?.late_limit ?? 3;
   const isSundayHoliday = Boolean(attendanceGate?.is_sunday);
   const upcomingOfficeWeek = attendanceGate?.upcoming_office_only_week ?? null;
+  const checkInCutoffEnabled = attendanceGate?.checkin_cutoff_enabled !== false;
+  const checkInCutoffLabel =
+    attendanceGate?.checkin_cutoff_label ||
+    formatCheckInCutoffLabel(attendanceGate?.checkin_cutoff);
   const officeGeoConfig = useMemo(
     () =>
       resolveOfficeConfig({
@@ -369,6 +393,7 @@ export function DailyWorkFlowPanel({
     setOfficeGeoErrorCode(null);
     setOfficeGeoPermission('unknown');
     setOfficePosition(null);
+    setLocationHelpPreset('auto');
   }, []);
 
   const verifyOfficeLocation = useCallback(async () => {
@@ -380,7 +405,7 @@ export function DailyWorkFlowPanel({
     setOfficeGeoPermission(permission);
     if (permission === 'denied') {
       setOfficeGeoMessage(
-        'Location is blocked for this site. Open the lock icon in the address bar → Site settings → Location → Allow, then try again.'
+        'Location is blocked for this site. Use the device steps below, then tap “I’ve allowed location”.'
       );
     } else if (permission === 'prompt') {
       setOfficeGeoMessage('Waiting for location access… Choose Allow when your browser asks.');
@@ -428,6 +453,29 @@ export function DailyWorkFlowPanel({
     }
   }, [verifyOfficeLocation]);
 
+  /** Why: After user unlocks Location in OS/browser settings, auto-retry when PermissionStatus flips. */
+  useEffect(() => {
+    if (workMode !== 'office') return;
+    if (officeGeoStatus !== 'error') return;
+    if (officeGeoErrorCode !== 'denied' && officeGeoPermission !== 'denied') return;
+
+    return watchGeolocationPermission((state) => {
+      setOfficeGeoPermission(state);
+      if (state === 'granted' || state === 'prompt') {
+        void retryOfficeLocation();
+      }
+    });
+  }, [
+    workMode,
+    officeGeoStatus,
+    officeGeoErrorCode,
+    officeGeoPermission,
+    retryOfficeLocation,
+  ]);
+
+  const locationDenied =
+    officeGeoErrorCode === 'denied' || officeGeoPermission === 'denied';
+
   const officeLocationAction = useMemo(() => {
     if (officeGeoErrorCode === 'out_of_range' || officeGeoPermission === 'granted') {
       return {
@@ -436,11 +484,11 @@ export function DailyWorkFlowPanel({
         hint: null as string | null,
       };
     }
-    if (officeGeoErrorCode === 'denied' || officeGeoPermission === 'denied') {
+    if (locationDenied) {
       return {
-        label: 'Enable location',
-        icon: LocateFixed,
-        hint: 'Location permission is off for this site. Enable it in the address-bar lock menu, then try again.',
+        label: 'I’ve allowed location',
+        icon: CheckCircle2,
+        hint: null as string | null,
       };
     }
     if (officeGeoErrorCode === 'timeout' || officeGeoErrorCode === 'unavailable') {
@@ -455,12 +503,12 @@ export function DailyWorkFlowPanel({
       icon: LocateFixed,
       hint: null as string | null,
     };
-  }, [officeGeoErrorCode, officeGeoPermission]);
+  }, [officeGeoErrorCode, officeGeoPermission, locationDenied]);
 
   const selectWorkMode = useCallback(
     async (mode: WorkMode) => {
       if (mode === 'wfh') {
-        if (workModeLockedToOffice && !allowWfhToday) return;
+        if (!canChooseWfh) return;
         setWorkMode('wfh');
         clearOfficeGeoState();
         return;
@@ -472,7 +520,7 @@ export function DailyWorkFlowPanel({
         // status/message already set
       }
     },
-    [workModeLockedToOffice, allowWfhToday, clearOfficeGeoState, verifyOfficeLocation]
+    [canChooseWfh, clearOfficeGeoState, verifyOfficeLocation]
   );
 
   const openWfhRequestDialog = useCallback(() => {
@@ -1113,12 +1161,11 @@ export function DailyWorkFlowPanel({
         });
         return;
       }
-      if (workModeLockedToOffice && !allowWfhToday && workMode === 'wfh') {
+      if (!canChooseWfh && workMode === 'wfh') {
         toast({
-          title: 'Office only this week',
-          description: attendanceGate?.office_only_week_start
-            ? `WFH is blocked (${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end}). Request WFH if you need an exception.`
-            : 'WFH is not allowed during your Office-only week. Request WFH if you need an exception.',
+          title: 'Office check-in only',
+          description:
+            'WFH is available only when an admin grants it under Attendance exceptions for today. Request WFH if you need approval.',
           variant: 'destructive',
         });
         return;
@@ -1226,8 +1273,7 @@ export function DailyWorkFlowPanel({
     }
   }, [
     workMode,
-    workModeLockedToOffice,
-    allowWfhToday,
+    canChooseWfh,
     attendanceGate,
     officePosition,
     officeGeoStatus,
@@ -2055,11 +2101,12 @@ export function DailyWorkFlowPanel({
         <div className="w-full rounded-xl border border-amber-300/80 dark:border-amber-700/60 bg-amber-50/90 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-950 dark:text-amber-100 flex items-start gap-2 mb-3">
           <Building2 className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="min-w-0">
-            <p className="font-semibold">Office only this week — WFH disabled</p>
+            <p className="font-semibold">Office-only penalty week</p>
             <p className="text-xs mt-0.5 opacity-90">
               {attendanceGate?.office_only_week_start && attendanceGate?.office_only_week_end
-                ? `${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end}. Check in from Office after 3 late arrivals.`
-                : 'Check in from Office only after 3 late arrivals.'}
+                ? `${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end}. `
+                : ''}
+              Check in from Office after 3 late arrivals. WFH still requires an Attendance exception for the day.
             </p>
           </div>
         </div>
@@ -2067,10 +2114,12 @@ export function DailyWorkFlowPanel({
         <div className="w-full rounded-xl border border-emerald-300/80 dark:border-emerald-700/60 bg-emerald-50/90 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-950 dark:text-emerald-100 flex items-start gap-2 mb-3">
           <Home className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="min-w-0">
-            <p className="font-semibold">WFH allowed today (admin exception)</p>
+            <p className="font-semibold">WFH available today (Attendance exception)</p>
             <p className="text-xs mt-0.5 opacity-90">
-              You may check in as WFH today
-              {forgiveLateToday ? '. Late after 10:00 AM will not count as a strike.' : '.'}
+              You may choose Office or WFH at check-in
+              {forgiveLateToday
+                ? `. Late after ${checkInCutoffLabel} will not count as a strike.`
+                : '.'}
             </p>
           </div>
         </div>
@@ -2078,9 +2127,9 @@ export function DailyWorkFlowPanel({
         <div className="w-full rounded-xl border border-orange-300/80 dark:border-orange-700/60 bg-orange-50/90 dark:bg-orange-950/40 px-4 py-3 text-sm text-orange-950 dark:text-orange-100 flex items-start gap-2 mb-3">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
           <div className="min-w-0">
-            <p className="font-semibold">Upcoming Office-only week</p>
+            <p className="font-semibold">Upcoming Office-only penalty week</p>
             <p className="text-xs mt-0.5 opacity-90">
-              {upcomingOfficeWeek.week_start} – {upcomingOfficeWeek.week_end}: WFH will not be allowed.
+              {upcomingOfficeWeek.week_start} – {upcomingOfficeWeek.week_end}: stricter Office attendance after late strikes. WFH still needs an Attendance exception.
             </p>
           </div>
         </div>
@@ -2092,7 +2141,9 @@ export function DailyWorkFlowPanel({
               Late strikes: {lateCount}/{lateLimit}
             </p>
             <p className="text-xs mt-0.5 opacity-90">
-              Check in before 10:00 AM IST (Mon–Sat). After {lateLimit} late check-ins, next week is Office only.
+              {checkInCutoffEnabled
+                ? `Check in before ${checkInCutoffLabel} (Mon–Sat). After ${lateLimit} late check-ins, next week is Office only.`
+                : `Late check-in cutoff is currently disabled by admin. After ${lateLimit} late check-ins (when enabled), next week is Office only.`}
             </p>
           </div>
         </div>
@@ -2270,13 +2321,18 @@ export function DailyWorkFlowPanel({
               <p className="text-xs text-muted-foreground rounded-xl border border-border/60 bg-background/80 px-3 py-2">
                 Sunday holiday — check-in anytime. Hours are not auto-added.
               </p>
+            ) : checkInCutoffEnabled ? (
+              <p className="text-xs text-muted-foreground rounded-xl border border-border/60 bg-background/80 px-3 py-2">
+                Please check in before {checkInCutoffLabel}. Late check-ins are allowed but count
+                toward Office-only weeks.
+              </p>
             ) : (
               <p className="text-xs text-muted-foreground rounded-xl border border-border/60 bg-background/80 px-3 py-2">
-                Please check in before 10:00 AM IST. Late check-ins are allowed but count toward Office-only weeks.
+                Late check-in cutoff is disabled — check-ins are not marked late by time today.
               </p>
             )}
 
-            {/* Office / WFH */}
+            {/* Office / WFH — WFH only when Attendance exception grants it */}
             <div className="space-y-3">
               <Label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
@@ -2284,29 +2340,55 @@ export function DailyWorkFlowPanel({
                 </div>
                 Work location
                 <span className="text-rose-500">*</span>
+                {canChooseWfh ? (
+                  <span className="ml-auto inline-flex items-center rounded-xl border border-emerald-300/80 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-200">
+                    Exception · WFH open
+                  </span>
+                ) : (
+                  <span className="ml-auto inline-flex items-center rounded-xl border border-blue-300/80 bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-800 dark:border-blue-700/60 dark:bg-blue-950/40 dark:text-blue-200">
+                    Office only
+                  </span>
+                )}
               </Label>
-              {workModeLockedToOffice ? (
-                <p className="text-xs text-amber-800 dark:text-amber-200">
-                  Office only this week
-                  {attendanceGate?.office_only_week_start
-                    ? ` (${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end})`
+
+              {canChooseWfh ? (
+                <p className="text-xs text-emerald-800 dark:text-emerald-200 rounded-xl border border-emerald-300/70 bg-emerald-50/80 dark:border-emerald-800/50 dark:bg-emerald-950/30 px-3 py-2">
+                  An admin granted a WFH Attendance exception for today — choose Office or WFH.
+                  {officeOnlyActive
+                    ? ' (Also covers your Office-only penalty week.)'
                     : ''}
-                  {allowWfhToday
-                    ? '. WFH is allowed for you today.'
-                    : wfhRequestPending
-                      ? '. Your WFH request is pending admin approval.'
-                      : '. Use Request WFH for today if you need an exception.'}
                 </p>
-              ) : null}
+              ) : (
+                <p className="text-xs text-muted-foreground rounded-xl border border-border/60 bg-background/80 px-3 py-2">
+                  {officeOnlyActive
+                    ? `Office-only penalty week${
+                        attendanceGate?.office_only_week_start
+                          ? ` (${attendanceGate.office_only_week_start} – ${attendanceGate.office_only_week_end})`
+                          : ''
+                      }. `
+                    : ''}
+                  Default is Office. WFH appears here only when an admin adds an Attendance exception day
+                  {wfhRequestPending
+                    ? '. Your WFH request is pending approval.'
+                    : canRequestWfh
+                      ? ' — or request WFH below for admin approval.'
+                      : '.'}
+                </p>
+              )}
+
               <p className="text-xs text-muted-foreground">
-                Office check-in requires your location within {officeGeoConfig.radiusM} m of {officeGeoConfig.label}.
+                Office check-in requires your location within {officeGeoConfig.radiusM} m of{' '}
+                {officeGeoConfig.label}.
               </p>
-              <div className="grid grid-cols-12 gap-4">
+
+              <div className="grid grid-cols-12 gap-3 sm:gap-4">
                 <button
                   type="button"
                   onClick={() => void selectWorkMode('office')}
                   disabled={officeGeoStatus === 'checking' || isCheckingIn}
-                  className={`col-span-6 sm:col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-60 ${
+                  className={`${
+                    canChooseWfh ? 'col-span-6' : 'col-span-12'
+                  } flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-60 ${
                     workMode === 'office'
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
                       : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300'
@@ -2314,32 +2396,19 @@ export function DailyWorkFlowPanel({
                 >
                   <Building2 className="h-6 w-6" />
                   <span className="text-sm font-semibold">Office</span>
-                </button>
-                {showRequestWfhAction ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (wfhRequestPending || !canRequestWfh) return;
-                      openWfhRequestDialog();
-                    }}
-                    disabled={wfhRequestPending || !canRequestWfh || isCheckingIn || wfhRequestSubmitting}
-                    className={`col-span-6 sm:col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                      wfhRequestPending
-                        ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100'
-                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-emerald-300'
-                    }`}
-                  >
-                    <Home className="h-6 w-6" />
-                    <span className="text-sm font-semibold text-center leading-tight">
-                      {wfhRequestPending ? 'WFH pending' : 'Request WFH for today'}
+                  {!canChooseWfh ? (
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      Required unless exception granted
                     </span>
-                  </button>
-                ) : (
+                  ) : null}
+                </button>
+
+                {canChooseWfh ? (
                   <button
                     type="button"
                     onClick={() => void selectWorkMode('wfh')}
                     disabled={officeGeoStatus === 'checking' || isCheckingIn}
-                    className={`col-span-6 sm:col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    className={`col-span-6 flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                       workMode === 'wfh'
                         ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100'
                         : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-emerald-300'
@@ -2347,14 +2416,45 @@ export function DailyWorkFlowPanel({
                   >
                     <Home className="h-6 w-6" />
                     <span className="text-sm font-semibold">WFH</span>
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      Exception granted
+                    </span>
                   </button>
-                )}
+                ) : null}
               </div>
-              {wfhRequestPending ? (
-                <p className="text-xs rounded-xl border border-amber-300/80 bg-amber-50/90 px-3 py-2 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100">
-                  WFH request pending — waiting for admin. You will be able to check in as WFH after approval.
-                </p>
+
+              {!canChooseWfh && showRequestWfhAction ? (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-xl border border-border/60 bg-muted/20 p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-foreground">Need to work from home?</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {wfhRequestPending
+                        ? 'Waiting for admin approval. WFH will unlock after it is granted as an Attendance exception.'
+                        : 'Submit a request — an admin can approve it as an Attendance exception for today.'}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={
+                      wfhRequestPending ||
+                      !canRequestWfh ||
+                      isCheckingIn ||
+                      wfhRequestSubmitting
+                    }
+                    onClick={() => {
+                      if (wfhRequestPending || !canRequestWfh) return;
+                      openWfhRequestDialog();
+                    }}
+                    className="h-10 rounded-xl shrink-0 border-emerald-300/80 text-emerald-900 dark:border-emerald-700/60 dark:text-emerald-100"
+                  >
+                    <Home className="h-3.5 w-3.5 mr-1.5" />
+                    {wfhRequestPending ? 'WFH pending' : 'Request WFH for today'}
+                  </Button>
+                </div>
               ) : null}
+
               {workMode === 'office' ? (
                 <div
                   className={`flex items-start gap-3 rounded-xl border px-3 py-3 text-xs ${
@@ -2376,12 +2476,85 @@ export function DailyWorkFlowPanel({
                         `Office check-in requires your location within ${officeGeoConfig.radiusM} m of ${officeGeoConfig.label}.`}
                     </p>
                     {officeGeoStatus === 'error' ? (
-                      <div className="space-y-2">
-                        {officeLocationAction.hint ? (
+                      <div className="space-y-3">
+                        {locationDenied ? (
+                          <div className="rounded-xl border border-rose-200/80 bg-white/80 dark:bg-rose-950/30 dark:border-rose-800/50 p-3 space-y-3">
+                            <div className="flex items-start gap-2 min-w-0">
+                              <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-300" />
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <p className="text-xs font-bold text-rose-950 dark:text-rose-50 leading-snug">
+                                  {locationHelpGuide.title}
+                                </p>
+                                <p className="text-[11px] text-rose-800/90 dark:text-rose-100/80 leading-relaxed">
+                                  {locationHelpGuide.summary}
+                                </p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-700/70 dark:text-rose-200/60">
+                                  Detected: {locationClient.label}
+                                </p>
+                              </div>
+                            </div>
+
+                            <ol className="flex flex-col gap-2 list-none m-0 p-0">
+                              {locationHelpGuide.steps.map((step, idx) => (
+                                <li
+                                  key={`${idx}-${step.slice(0, 24)}`}
+                                  className="grid grid-cols-12 gap-2 items-start"
+                                >
+                                  <span className="col-span-1 flex h-5 w-5 items-center justify-center rounded-lg bg-rose-600 text-[10px] font-bold text-white shrink-0">
+                                    {idx + 1}
+                                  </span>
+                                  <span className="col-span-11 text-[11px] leading-relaxed text-rose-950 dark:text-rose-50">
+                                    {step}
+                                  </span>
+                                </li>
+                              ))}
+                            </ol>
+
+                            {locationHelpGuide.tip ? (
+                              <p className="text-[11px] leading-relaxed rounded-xl border border-amber-300/70 bg-amber-50/90 px-2.5 py-2 text-amber-950 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-100">
+                                {locationHelpGuide.tip}
+                              </p>
+                            ) : null}
+
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-700/70 dark:text-rose-200/60">
+                                Wrong device? Pick yours
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setLocationHelpPreset('auto')}
+                                  className={`rounded-xl border px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                                    locationHelpPreset === 'auto'
+                                      ? 'border-rose-500 bg-rose-600 text-white'
+                                      : 'border-rose-200/80 bg-background/80 text-rose-900 dark:border-rose-800/60 dark:text-rose-100'
+                                  }`}
+                                >
+                                  Auto
+                                </button>
+                                {locationHelpAlternates.map((alt) => (
+                                  <button
+                                    key={alt.key}
+                                    type="button"
+                                    onClick={() => setLocationHelpPreset(alt.key)}
+                                    className={`rounded-xl border px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                                      locationHelpPreset === alt.key
+                                        ? 'border-rose-500 bg-rose-600 text-white'
+                                        : 'border-rose-200/80 bg-background/80 text-rose-900 dark:border-rose-800/60 dark:text-rose-100'
+                                    }`}
+                                  >
+                                    {alt.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ) : officeLocationAction.hint ? (
                           <p className="text-[11px] opacity-80 leading-relaxed">
                             {officeLocationAction.hint}
                           </p>
                         ) : null}
+
                         <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
@@ -2391,7 +2564,9 @@ export function DailyWorkFlowPanel({
                             onClick={() => void retryOfficeLocation()}
                             className="h-9 rounded-xl border-rose-300/80 bg-background/90 px-3 text-xs font-semibold text-rose-900 hover:bg-rose-100 dark:border-rose-700/60 dark:text-rose-100 dark:hover:bg-rose-950/60"
                           >
-                            {officeLocationAction.icon === LocateFixed ? (
+                            {officeLocationAction.icon === CheckCircle2 ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                            ) : officeLocationAction.icon === LocateFixed ? (
                               <LocateFixed className="h-3.5 w-3.5 mr-1.5" />
                             ) : (
                               <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
@@ -2429,7 +2604,7 @@ export function DailyWorkFlowPanel({
                     (officeGeoPermission === 'prompt' || officeGeoPermission === 'denied') ? (
                       <p className="text-[11px] opacity-80">
                         {officeGeoPermission === 'denied'
-                          ? 'Enable Location in the site settings menu, then try again.'
+                          ? 'Finish the device steps above, then we’ll re-check automatically when permission changes.'
                           : 'Look for the browser location prompt and choose Allow.'}
                       </p>
                     ) : null}

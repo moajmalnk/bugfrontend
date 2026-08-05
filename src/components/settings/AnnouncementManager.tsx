@@ -143,18 +143,6 @@ export const AnnouncementManager = forwardRef<AnnouncementManagerHandle>(
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0 w-full">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
-        <p className="text-sm text-muted-foreground min-w-0">
-          Create, edit, and manage pop-up announcements for users
-        </p>
-        <Button
-          onClick={handleAddNew}
-          className="h-11 w-full sm:w-auto rounded-xl px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg shrink-0"
-        >
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Add Announcement
-        </Button>
-      </div>
 
       {/* Content Section */}
       <div className="relative min-w-0 w-full overflow-x-hidden">

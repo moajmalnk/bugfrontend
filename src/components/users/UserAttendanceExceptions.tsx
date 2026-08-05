@@ -326,7 +326,7 @@ export function UserAttendanceExceptions({ userId, username }: Props) {
             <div className="flex items-start gap-2 min-w-0">
               <MapPin className="h-4 w-4 mt-0.5 text-rose-600 shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-medium">Forgive late (after 10:00 AM)</p>
+                <p className="text-sm font-medium">Forgive late check-in</p>
                 <p className="text-xs text-muted-foreground">
                   Unmark this day from the late list / strike count
                 </p>
@@ -461,7 +461,7 @@ export function UserAttendanceExceptions({ userId, username }: Props) {
         </div>
 
         <div className="col-span-12 lg:col-span-6 space-y-3">
-          <p className="text-sm font-semibold">Late check-ins (after 10:00 AM)</p>
+          <p className="text-sm font-semibold">Late check-ins</p>
           {lateDays.length === 0 ? (
             <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border/60 px-4 py-6 text-center">
               No late check-ins on record.

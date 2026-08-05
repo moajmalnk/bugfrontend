@@ -35,15 +35,21 @@ import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
+  defaultCheckInCutoffSettings,
   defaultOfficeLocationSettings,
+  formatCheckInCutoffLabel,
   getAppSettings,
+  updateCheckInCutoffSettings,
   updateOfficeLocationSettings,
+  type CheckInCutoffSettings,
   type OfficeLocationSettings,
 } from "@/services/settingsService";
+import { TimePicker } from "@/components/ui/TimePicker";
 import {
   Bell,
   Check,
   ChevronDown,
+  Clock,
   Loader2,
   Map,
   MapPin,
@@ -75,6 +81,11 @@ const Settings = () => {
   const [officeDefaults, setOfficeDefaults] = useState<OfficeLocationSettings>(
     defaultOfficeLocationSettings()
   );
+  const [checkInCutoff, setCheckInCutoff] = useState<CheckInCutoffSettings>(
+    defaultCheckInCutoffSettings()
+  );
+  const [initialCheckInCutoff, setInitialCheckInCutoff] =
+    useState<CheckInCutoffSettings>(defaultCheckInCutoffSettings());
   const [loadingOfficeSettings, setLoadingOfficeSettings] = useState(true);
   const [savingOfficeSettings, setSavingOfficeSettings] = useState(false);
   const [officeMapOpen, setOfficeMapOpen] = useState(false);
@@ -124,6 +135,15 @@ const Settings = () => {
       if (settings.office_defaults) {
         setOfficeDefaults(settings.office_defaults);
       }
+      const cutoff: CheckInCutoffSettings = {
+        checkin_cutoff_enabled: settings.checkin_cutoff_enabled,
+        checkin_cutoff_time: settings.checkin_cutoff_time,
+        checkin_cutoff_label:
+          settings.checkin_cutoff_label ||
+          formatCheckInCutoffLabel(settings.checkin_cutoff_time),
+      };
+      setCheckInCutoff(cutoff);
+      setInitialCheckInCutoff(cutoff);
     } catch (e) {
       toast({
         title: "Could not load office location",
@@ -148,7 +168,15 @@ const Settings = () => {
     );
   }, [officeLocation, initialOfficeLocation]);
 
-  const generalDirty = autoAssign !== initialAutoAssign || officeDirty;
+  const cutoffDirty = useMemo(() => {
+    return (
+      checkInCutoff.checkin_cutoff_enabled !==
+        initialCheckInCutoff.checkin_cutoff_enabled ||
+      checkInCutoff.checkin_cutoff_time !== initialCheckInCutoff.checkin_cutoff_time
+    );
+  }, [checkInCutoff, initialCheckInCutoff]);
+
+  const generalDirty = autoAssign !== initialAutoAssign || officeDirty || cutoffDirty;
 
   // Check for SETTINGS_EDIT permission
   if (isLoading) {
@@ -213,12 +241,26 @@ const Settings = () => {
         setInitialOfficeLocation(saved);
       }
 
+      if (cutoffDirty) {
+        const time = checkInCutoff.checkin_cutoff_time.trim();
+        if (!/^\d{1,2}:\d{2}(:\d{2})?$/.test(time)) {
+          throw new Error("Enter a valid check-in cutoff time.");
+        }
+        const savedCutoff = await updateCheckInCutoffSettings({
+          checkin_cutoff_enabled: checkInCutoff.checkin_cutoff_enabled,
+          checkin_cutoff_time: time,
+        });
+        setCheckInCutoff(savedCutoff);
+        setInitialCheckInCutoff(savedCutoff);
+      }
+
       setInitialAutoAssign(autoAssign);
       toast({
         title: "Settings saved",
-        description: officeDirty
-          ? "Office check-in location and general settings updated."
-          : "Your general settings have been updated.",
+        description:
+          officeDirty || cutoffDirty
+            ? "Check-in policy and general settings updated."
+            : "Your general settings have been updated.",
       });
     } catch (e) {
       toast({
@@ -238,6 +280,7 @@ const Settings = () => {
     setAutoAssign(true);
     setInitialAutoAssign(true);
     setOfficeLocation(initialOfficeLocation);
+    setCheckInCutoff(initialCheckInCutoff);
     toast({
       title: "Settings reset",
       description: "Unsaved changes were discarded.",
@@ -451,17 +494,6 @@ const Settings = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
               <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl min-w-0">
                 <Card className="border-0 shadow-none bg-transparent">
-                  <CardHeader className="p-4 sm:p-6 md:p-8 pb-2">
-                    <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3 min-w-0">
-                      <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shrink-0">
-                        <SettingsIcon className="h-5 w-5 text-white" />
-                      </div>
-                      <span className="min-w-0 break-words">General Settings</span>
-                    </CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-2">
-                      Manage your BugRicer application settings
-                    </CardDescription>
-                  </CardHeader>
                   <CardContent className="space-y-4 p-4 sm:p-6 md:p-8 pt-4 min-w-0">
                     <div className="rounded-2xl border border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 p-4 sm:p-5">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -675,6 +707,106 @@ const Settings = () => {
                       )}
                     </div>
 
+                    <div className="rounded-2xl border border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 p-4 sm:p-5 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/40 shrink-0">
+                            <Clock className="h-5 w-5 text-amber-700 dark:text-amber-300" />
+                          </div>
+                          <div className="space-y-1 min-w-0">
+                            <p className="text-base font-semibold text-gray-900 dark:text-white">
+                              Check-in before time
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Employees should check in before this IST time (Mon–Sat). After the
+                              cutoff, check-ins count as late toward Office-only weeks. Sundays are
+                              never late.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            setCheckInCutoff(defaultCheckInCutoffSettings())
+                          }
+                          disabled={loadingOfficeSettings || savingOfficeSettings}
+                          className="h-10 rounded-xl shrink-0"
+                        >
+                          Load defaults
+                        </Button>
+                      </div>
+
+                      {loadingOfficeSettings ? (
+                        <div className="grid grid-cols-12 gap-4">
+                          <Skeleton className="col-span-12 h-14 rounded-xl" />
+                          <Skeleton className="col-span-12 md:col-span-6 h-11 rounded-xl" />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-12 gap-4">
+                          <div className="col-span-12 flex items-center justify-between gap-4 rounded-xl border border-border/60 px-4 py-3 min-w-0">
+                            <div className="min-w-0 space-y-0.5">
+                              <Label
+                                htmlFor="checkinCutoffEnabled"
+                                className="text-sm font-semibold text-gray-900 dark:text-white"
+                              >
+                                Enforce late check-in cutoff
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                When off, no check-in is marked late and Office-only weeks are not
+                                triggered by time.
+                              </p>
+                            </div>
+                            <Switch
+                              id="checkinCutoffEnabled"
+                              checked={checkInCutoff.checkin_cutoff_enabled}
+                              onCheckedChange={(checked) =>
+                                setCheckInCutoff((prev) => ({
+                                  ...prev,
+                                  checkin_cutoff_enabled: checked,
+                                }))
+                              }
+                              className="shrink-0"
+                            />
+                          </div>
+
+                          <div
+                            className={`col-span-12 md:col-span-6 space-y-2 min-w-0 ${
+                              checkInCutoff.checkin_cutoff_enabled
+                                ? ""
+                                : "opacity-50 pointer-events-none"
+                            }`}
+                          >
+                            <Label className="text-sm font-medium">
+                              Must check in before (IST)
+                            </Label>
+                            <TimePicker
+                              value={checkInCutoff.checkin_cutoff_time}
+                              onChange={(value) =>
+                                setCheckInCutoff((prev) => ({
+                                  ...prev,
+                                  checkin_cutoff_time: value,
+                                  checkin_cutoff_label: formatCheckInCutoffLabel(value),
+                                }))
+                              }
+                              placeholder="Select cutoff time"
+                              className="h-11 rounded-xl"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Current policy:{" "}
+                              <span className="font-medium text-foreground">
+                                {checkInCutoff.checkin_cutoff_enabled
+                                  ? `before ${formatCheckInCutoffLabel(
+                                      checkInCutoff.checkin_cutoff_time
+                                    )}`
+                                  : "late cutoff disabled"}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     <OfficeLocationMapPicker
                       open={officeMapOpen}
                       onOpenChange={setOfficeMapOpen}
@@ -722,19 +854,6 @@ const Settings = () => {
             <div className="relative min-w-0 w-full">
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
               <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
-                <div className="flex items-start gap-3 mb-4 sm:mb-6 min-w-0">
-                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shrink-0">
-                    <Bell className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
-                      Notifications
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
-                      Configure how and when you receive alerts
-                    </p>
-                  </div>
-                </div>
                 <NotificationSettingsCard ref={notificationsRef} />
               </div>
             </div>
@@ -745,17 +864,6 @@ const Settings = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
               <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
                 <div className="flex items-start gap-3 mb-4 sm:mb-6 min-w-0">
-                  <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shrink-0">
-                    <Megaphone className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
-                      Announcements
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
-                      Broadcast messages to your team
-                    </p>
-                  </div>
                 </div>
                 <AnnouncementManager ref={announcementsRef} />
               </div>
@@ -767,19 +875,6 @@ const Settings = () => {
               <div className="relative min-w-0 w-full">
                 <div className="absolute inset-0 bg-gradient-to-r from-sky-50/30 to-blue-50/30 dark:from-sky-900/20 dark:to-blue-900/20 rounded-2xl pointer-events-none" />
                 <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
-                  <div className="flex items-start gap-3 mb-4 sm:mb-6 min-w-0">
-                    <div className="p-2 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl shrink-0">
-                      <Tags className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
-                        Bug Types
-                      </h2>
-                      <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
-                        Manage multi-select categories used when raising bugs
-                      </p>
-                    </div>
-                  </div>
                   <BugTypesTab ref={bugTypesRef} />
                 </div>
               </div>
@@ -790,19 +885,6 @@ const Settings = () => {
             <div className="relative min-w-0 w-full">
               <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-blue-50/30 dark:from-gray-800/30 dark:to-blue-900/30 rounded-2xl pointer-events-none" />
               <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-3 sm:p-6 md:p-8 shadow-xl min-w-0 overflow-x-hidden">
-                <div className="flex items-start gap-3 mb-4 sm:mb-6 min-w-0">
-                  <div className="p-2 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shrink-0">
-                    <Users className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">
-                      Roles
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base mt-1">
-                      Manage roles and permissions for your organization
-                    </p>
-                  </div>
-                </div>
                 <RolesTab ref={rolesRef} />
               </div>
             </div>

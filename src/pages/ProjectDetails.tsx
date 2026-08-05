@@ -3886,29 +3886,29 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
               </div>
             ) : (
               <>
-                {/* Table for larger screens */}
-                <div className="hidden lg:block relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
-                  <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
-                    <Table className="w-full table-fixed">
+                {/* Table for larger screens — scroll instead of crushing columns */}
+                <div className="hidden lg:block relative overflow-x-auto">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl pointer-events-none"></div>
+                  <div className="relative min-w-[980px] bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+                    <Table className="w-full">
                       <TableHeader className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900">
                         <TableRow className="border-b border-gray-200/50 dark:border-gray-700/50">
-                          <TableHead className="w-[40%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="min-w-[180px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Title
                           </TableHead>
-                          <TableHead className="w-[20%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="w-[120px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Type
                           </TableHead>
-                          <TableHead className="w-[30%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="min-w-[120px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Project
                           </TableHead>
-                          <TableHead className="w-[15%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="min-w-[170px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Created
                           </TableHead>
-                          <TableHead className="w-[15%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="min-w-[180px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Approved / Declined
                           </TableHead>
-                          <TableHead className="w-[10%] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="w-[100px] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Actions
                           </TableHead>
                         </TableRow>
@@ -3921,13 +3921,13 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                               index % 2 === 0 ? 'bg-white/50 dark:bg-gray-900/50' : 'bg-gray-50/30 dark:bg-gray-800/30'
                             }`}
                           >
-                            <TableCell className="w-[40%] px-4 font-semibold text-sm sm:text-base text-gray-900 dark:text-white py-4 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                {update.title}
+                            <TableCell className="min-w-[180px] px-4 font-semibold text-sm sm:text-base text-gray-900 dark:text-white py-4 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                              <div className="flex items-start gap-2 min-w-0">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full shrink-0 mt-2"></div>
+                                <span className="break-words">{update.title}</span>
                               </div>
                             </TableCell>
-                            <TableCell className="w-[20%] px-4 py-4">
+                            <TableCell className="w-[120px] px-4 py-4">
                               <Badge
                                 variant="outline"
                                 className={`font-medium text-xs sm:text-sm px-2 py-1 rounded-full shadow-sm ${getTypeColor(
@@ -3937,28 +3937,30 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                                 {update.type}
                               </Badge>
                             </TableCell>
-                            <TableCell className="w-[30%] px-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
+                            <TableCell className="min-w-[120px] px-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium break-words">
                               {update.project_name}
                             </TableCell>
-                            <TableCell className="w-[15%] px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4 whitespace-nowrap">
+                            <TableCell className="min-w-[170px] px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4 whitespace-nowrap">
                               {update.created_at
                                 ? formatLocalDate(update.created_at, 'datetime')
                                 : '—'}
                             </TableCell>
-                            <TableCell className="w-[15%] px-4 text-xs sm:text-sm py-4">
+                            <TableCell className="min-w-[180px] px-4 text-xs sm:text-sm py-4">
                               {update.status === 'approved' && update.approved_at ? (
-                                <span className="text-emerald-700 dark:text-emerald-300">
+                                <span className="block leading-snug text-emerald-700 dark:text-emerald-300">
                                   Approved · {formatLocalDate(update.approved_at, 'datetime')}
                                 </span>
                               ) : update.status === 'declined' && update.declined_at ? (
-                                <span className="text-rose-700 dark:text-rose-300">
+                                <span className="block leading-snug text-rose-700 dark:text-rose-300">
                                   Declined · {formatLocalDate(update.declined_at, 'datetime')}
                                 </span>
                               ) : (
-                                <span className="text-muted-foreground italic">Awaiting approval</span>
+                                <span className="block leading-snug text-muted-foreground italic whitespace-nowrap">
+                                  Awaiting approval
+                                </span>
                               )}
                             </TableCell>
-                            <TableCell className="w-[10%] pr-4 text-right py-4">
+                            <TableCell className="w-[100px] pr-4 text-right py-4">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -4185,29 +4187,29 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
               </div>
             ) : (
               <>
-                {/* Table for larger screens */}
-                <div className="hidden lg:block relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl"></div>
-                  <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
-                    <Table className="w-full table-fixed">
+                {/* Table for larger screens — scroll instead of crushing columns */}
+                <div className="hidden lg:block relative overflow-x-auto">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-50/20 to-blue-50/20 dark:from-gray-800/20 dark:to-blue-900/20 rounded-2xl pointer-events-none"></div>
+                  <div className="relative min-w-[980px] bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+                    <Table className="w-full">
                       <TableHeader className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900">
                         <TableRow className="border-b border-gray-200/50 dark:border-gray-700/50">
-                          <TableHead className="w-[40%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="min-w-[180px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Title
                           </TableHead>
-                          <TableHead className="w-[20%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="w-[120px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Type
                           </TableHead>
-                          <TableHead className="w-[30%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="min-w-[120px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Project
                           </TableHead>
-                          <TableHead className="w-[15%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="min-w-[170px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Created
                           </TableHead>
-                          <TableHead className="w-[15%] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="min-w-[180px] px-4 font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Approved / Declined
                           </TableHead>
-                          <TableHead className="w-[10%] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
+                          <TableHead className="w-[100px] pr-4 text-right font-bold text-sm sm:text-base text-gray-900 dark:text-white py-4">
                             Actions
                           </TableHead>
                         </TableRow>
@@ -4220,13 +4222,13 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                               index % 2 === 0 ? 'bg-white/50 dark:bg-gray-900/50' : 'bg-gray-50/30 dark:bg-gray-800/30'
                             }`}
                           >
-                            <TableCell className="w-[40%] px-4 font-semibold text-sm sm:text-base text-gray-900 dark:text-white py-4 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                {update.title}
+                            <TableCell className="min-w-[180px] px-4 font-semibold text-sm sm:text-base text-gray-900 dark:text-white py-4 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                              <div className="flex items-start gap-2 min-w-0">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full shrink-0 mt-2"></div>
+                                <span className="break-words">{update.title}</span>
                               </div>
                             </TableCell>
-                            <TableCell className="w-[20%] px-4 py-4">
+                            <TableCell className="w-[120px] px-4 py-4">
                               <Badge
                                 variant="outline"
                                 className={`font-medium text-xs sm:text-sm px-2 py-1 rounded-full shadow-sm ${getTypeColor(
@@ -4236,28 +4238,30 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                                 {update.type}
                               </Badge>
                             </TableCell>
-                            <TableCell className="w-[30%] px-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium">
+                            <TableCell className="min-w-[120px] px-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 py-4 font-medium break-words">
                               {update.project_name}
                             </TableCell>
-                            <TableCell className="w-[15%] px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4 whitespace-nowrap">
+                            <TableCell className="min-w-[170px] px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400 py-4 whitespace-nowrap">
                               {update.created_at
                                 ? formatLocalDate(update.created_at, 'datetime')
                                 : '—'}
                             </TableCell>
-                            <TableCell className="w-[15%] px-4 text-xs sm:text-sm py-4">
+                            <TableCell className="min-w-[180px] px-4 text-xs sm:text-sm py-4">
                               {update.status === 'approved' && update.approved_at ? (
-                                <span className="text-emerald-700 dark:text-emerald-300">
+                                <span className="block leading-snug text-emerald-700 dark:text-emerald-300">
                                   Approved · {formatLocalDate(update.approved_at, 'datetime')}
                                 </span>
                               ) : update.status === 'declined' && update.declined_at ? (
-                                <span className="text-rose-700 dark:text-rose-300">
+                                <span className="block leading-snug text-rose-700 dark:text-rose-300">
                                   Declined · {formatLocalDate(update.declined_at, 'datetime')}
                                 </span>
                               ) : (
-                                <span className="text-muted-foreground italic">Awaiting approval</span>
+                                <span className="block leading-snug text-muted-foreground italic whitespace-nowrap">
+                                  Awaiting approval
+                                </span>
                               )}
                             </TableCell>
-                            <TableCell className="w-[10%] pr-4 text-right py-4">
+                            <TableCell className="w-[100px] pr-4 text-right py-4">
                               <Button
                                 variant="outline"
                                 size="sm"

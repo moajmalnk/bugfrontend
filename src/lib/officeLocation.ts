@@ -85,7 +85,53 @@ export async function queryGeolocationPermission(): Promise<GeolocationPermissio
 }
 
 const LOCATION_DENIED_MESSAGE =
-  'Location is blocked for this site. Tap the lock icon in the address bar → Site settings → Location → Allow, then tap Allow location again.';
+  'Location is blocked for this site. Follow the steps below for your device, then tap “I’ve allowed location”.';
+
+/**
+ * Why: When the user flips Location to Allow in system/site settings,
+ * Chrome/Edge fire onchange — auto-retry without another click when possible.
+ */
+export function watchGeolocationPermission(
+  onChange: (state: GeolocationPermissionState) => void
+): () => void {
+  let cancelled = false;
+  let statusRef: PermissionStatus | null = null;
+
+  const handleChange = () => {
+    if (cancelled || !statusRef) return;
+    const s = statusRef.state;
+    if (s === 'granted' || s === 'prompt' || s === 'denied') {
+      onChange(s);
+    } else {
+      onChange('unknown');
+    }
+  };
+
+  void (async () => {
+    try {
+      if (typeof navigator === 'undefined' || !navigator.permissions?.query) return;
+      const status = await navigator.permissions.query({
+        name: 'geolocation' as PermissionName,
+      });
+      if (cancelled) return;
+      statusRef = status;
+      status.addEventListener('change', handleChange);
+    } catch {
+      // Safari / older browsers — no PermissionStatus events
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+    if (statusRef) {
+      try {
+        statusRef.removeEventListener('change', handleChange);
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+}
 
 /**
  * Request current GPS and verify it is within the office geofence.
