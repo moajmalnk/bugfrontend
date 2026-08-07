@@ -577,18 +577,31 @@ export default function AdminAttendanceExceptions() {
     if (!wfhReview || wfhReviewing) return;
     setWfhReviewing(true);
     try {
-      const result = await reviewWfhRequest({
-        user_id: wfhReview.request.user_id,
-        date: wfhReview.request.request_date,
-        action: wfhReview.action,
-      });
-      toast({
-        title: wfhReview.action === 'approve' ? 'WFH approved' : 'WFH rejected',
-        description:
-          result.message ||
-          `${wfhReview.request.username || 'User'} · ${formatDay(wfhReview.request.request_date)}`,
-      });
       const reviewedUserId = wfhReview.request.user_id;
+      const dayLabel = formatDay(wfhReview.request.request_date);
+      const who = wfhReview.request.username || 'User';
+
+      if (wfhReview.action === 'delete') {
+        const result = await deleteWfhRequest({
+          user_id: reviewedUserId,
+          date: wfhReview.request.request_date,
+        });
+        toast({
+          title: 'WFH request deleted',
+          description: result.message || `${who} · ${dayLabel}`,
+        });
+      } else {
+        const result = await reviewWfhRequest({
+          user_id: reviewedUserId,
+          date: wfhReview.request.request_date,
+          action: wfhReview.action,
+        });
+        toast({
+          title: wfhReview.action === 'approve' ? 'WFH approved' : 'WFH rejected',
+          description: result.message || `${who} · ${dayLabel}`,
+        });
+      }
+
       setWfhReview(null);
       await loadOverview();
       if (detailUserId === reviewedUserId) {
@@ -596,8 +609,13 @@ export default function AdminAttendanceExceptions() {
       }
     } catch (e) {
       toast({
-        title: 'Review failed',
-        description: e instanceof Error ? e.message : 'Could not update WFH request.',
+        title: wfhReview.action === 'delete' ? 'Delete failed' : 'Review failed',
+        description:
+          e instanceof Error
+            ? e.message
+            : wfhReview.action === 'delete'
+              ? 'Could not delete WFH request.'
+              : 'Could not update WFH request.',
         variant: 'destructive',
       });
     } finally {
@@ -695,6 +713,17 @@ export default function AdminAttendanceExceptions() {
                     >
                       <X className="h-3.5 w-3.5 mr-1.5" />
                       Reject
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl text-destructive hover:text-destructive"
+                      disabled={saving || wfhReviewing}
+                      onClick={() => setWfhReview({ request: req, action: 'delete' })}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      Delete
                     </Button>
                     <Button
                       type="button"
@@ -1233,31 +1262,44 @@ export default function AdminAttendanceExceptions() {
                                     </p>
                                   </div>
                                 ) : null}
-                                {status === 'pending' ? (
-                                  <div className="flex flex-wrap gap-2 pt-1">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      className="rounded-xl"
-                                      disabled={saving || wfhReviewing}
-                                      onClick={() => setWfhReview({ request: row, action: 'approve' })}
-                                    >
-                                      <Check className="h-3.5 w-3.5 mr-1.5" />
-                                      Approve
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      className="rounded-xl"
-                                      disabled={saving || wfhReviewing}
-                                      onClick={() => setWfhReview({ request: row, action: 'reject' })}
-                                    >
-                                      <X className="h-3.5 w-3.5 mr-1.5" />
-                                      Reject
-                                    </Button>
-                                  </div>
-                                ) : null}
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                  {status === 'pending' ? (
+                                    <>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        className="rounded-xl"
+                                        disabled={saving || wfhReviewing}
+                                        onClick={() => setWfhReview({ request: row, action: 'approve' })}
+                                      >
+                                        <Check className="h-3.5 w-3.5 mr-1.5" />
+                                        Approve
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-xl"
+                                        disabled={saving || wfhReviewing}
+                                        onClick={() => setWfhReview({ request: row, action: 'reject' })}
+                                      >
+                                        <X className="h-3.5 w-3.5 mr-1.5" />
+                                        Reject
+                                      </Button>
+                                    </>
+                                  ) : null}
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-xl text-destructive hover:text-destructive"
+                                    disabled={saving || wfhReviewing}
+                                    onClick={() => setWfhReview({ request: row, action: 'delete' })}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Delete
+                                  </Button>
+                                </div>
                               </div>
                             );
                           })}
@@ -1381,7 +1423,11 @@ export default function AdminAttendanceExceptions() {
         <AlertDialogContent className="max-w-[400px] rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {wfhReview?.action === 'approve' ? 'Approve WFH request?' : 'Reject WFH request?'}
+              {wfhReview?.action === 'approve'
+                ? 'Approve WFH request?'
+                : wfhReview?.action === 'delete'
+                  ? 'Delete WFH request?'
+                  : 'Reject WFH request?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {wfhReview
@@ -1390,7 +1436,11 @@ export default function AdminAttendanceExceptions() {
                   )}${
                     wfhReview.action === 'approve'
                       ? '. This grants Allow WFH for that day so they can check in as WFH.'
-                      : '. They will stay on Office-only until you grant an exception.'
+                      : wfhReview.action === 'delete'
+                        ? String(wfhReview.request.status || '').toLowerCase() === 'approved'
+                          ? '. This permanently removes the request and revokes Allow WFH for that day.'
+                          : '. This permanently removes the request from history.'
+                        : '. They will stay on Office-only until you grant an exception.'
                   }`
                 : ''}
             </AlertDialogDescription>
@@ -1402,7 +1452,7 @@ export default function AdminAttendanceExceptions() {
             <AlertDialogAction
               className={cn(
                 'rounded-xl',
-                wfhReview?.action === 'reject' &&
+                (wfhReview?.action === 'reject' || wfhReview?.action === 'delete') &&
                   'bg-destructive text-destructive-foreground hover:bg-destructive/90'
               )}
               disabled={wfhReviewing || !wfhReview}
@@ -1414,10 +1464,12 @@ export default function AdminAttendanceExceptions() {
               {wfhReviewing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving…
+                  {wfhReview?.action === 'delete' ? 'Deleting…' : 'Saving…'}
                 </>
               ) : wfhReview?.action === 'approve' ? (
                 'Approve'
+              ) : wfhReview?.action === 'delete' ? (
+                'Delete'
               ) : (
                 'Reject'
               )}
