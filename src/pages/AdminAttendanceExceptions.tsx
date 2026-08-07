@@ -54,6 +54,7 @@ import {
   type LateDayRow,
 } from '@/services/attendanceExceptionService';
 import {
+  deleteWfhRequest,
   listPendingWfhRequests,
   listUserWfhRequests,
   reviewWfhRequest,
@@ -198,7 +199,7 @@ export default function AdminAttendanceExceptions() {
   const [pendingWfh, setPendingWfh] = useState<WfhRequest[]>([]);
   const [wfhReview, setWfhReview] = useState<{
     request: WfhRequest;
-    action: 'approve' | 'reject';
+    action: 'approve' | 'reject' | 'delete';
   } | null>(null);
   const [wfhReviewing, setWfhReviewing] = useState(false);
 

@@ -122,3 +122,30 @@ export async function reviewWfhRequest(payload: {
     message: data.message,
   };
 }
+
+export async function deleteWfhRequest(payload: {
+  user_id: string;
+  date: string;
+}): Promise<{
+  deleted?: WfhRequest | null;
+  exception?: unknown;
+  policy?: Record<string, unknown>;
+  message?: string;
+}> {
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      action: 'delete',
+      user_id: payload.user_id,
+      date: payload.date,
+    }),
+  });
+  const data = await parseJson(res);
+  return {
+    deleted: (data.data?.deleted as WfhRequest | null | undefined) ?? null,
+    exception: data.data?.exception,
+    policy: data.data?.policy,
+    message: data.message,
+  };
+}
