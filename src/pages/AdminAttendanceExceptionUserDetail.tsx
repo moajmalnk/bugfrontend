@@ -5,9 +5,11 @@ import {
   CalendarClock,
   Check,
   ExternalLink,
+  Filter,
   Home,
   Loader2,
   MapPin,
+  Search,
   Trash2,
   UserRound,
   X,
@@ -28,6 +30,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -93,6 +102,10 @@ export default function AdminAttendanceExceptionUserDetail() {
   const [detailWfhActiveDays, setDetailWfhActiveDays] = useState(0);
   const [detailAttendanceDays, setDetailAttendanceDays] = useState<AttendanceModeDay[]>([]);
   const [attendanceTableTab, setAttendanceTableTab] = useState<'weekly' | 'monthly'>('weekly');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('all');
+  const [wfhStatusFilter, setWfhStatusFilter] = useState('all');
+  const [exceptionKindFilter, setExceptionKindFilter] = useState('all');
 
   const [exceptionDates, setExceptionDates] = useState<string[]>([todayYMD()]);
   const [allowWfh, setAllowWfh] = useState(true);
@@ -203,10 +216,81 @@ export default function AdminAttendanceExceptionUserDetail() {
     [detailAttendanceDays]
   );
 
+  const filteredExceptions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return detailExceptions.filter((row) => {
+      if (exceptionKindFilter === 'wfh' && !row.allow_wfh) return false;
+      if (exceptionKindFilter === 'forgive_late' && !row.forgive_late) return false;
+      if (!q) return true;
+      const hay = [row.exception_date, formatDay(row.exception_date), row.admin_note || '']
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [detailExceptions, searchQuery, exceptionKindFilter]);
+
+  const filteredWfhRequests = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return detailWfhRequests.filter((row) => {
+      const status = String(row.status || 'pending').toLowerCase();
+      if (wfhStatusFilter !== 'all' && status !== wfhStatusFilter) return false;
+      if (!q) return true;
+      const hay = [row.request_date, formatDay(row.request_date), row.user_note || '', row.admin_note || '', status]
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [detailWfhRequests, searchQuery, wfhStatusFilter]);
+
+  const filteredLates = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return detailLates;
+    return detailLates.filter((row) => {
+      const hay = [row.submission_date, formatDay(row.submission_date), formatCheckIn(row.check_in_time)]
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [detailLates, searchQuery]);
+
+  const filteredWeeklyRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return weeklyAttendanceRows;
+    return weeklyAttendanceRows.filter((row) => row.label.toLowerCase().includes(q));
+  }, [weeklyAttendanceRows, searchQuery]);
+
+  const filteredMonthlyRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return monthlyAttendanceRows;
+    return monthlyAttendanceRows.filter((row) => row.label.toLowerCase().includes(q));
+  }, [monthlyAttendanceRows, searchQuery]);
+
+  const showOffice = sectionFilter === 'all' || sectionFilter === 'office';
+  const showExceptions = sectionFilter === 'all' || sectionFilter === 'exceptions';
+  const showWfh = sectionFilter === 'all' || sectionFilter === 'wfh';
+  const showLate = sectionFilter === 'all' || sectionFilter === 'late';
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    sectionFilter !== 'all' ||
+    wfhStatusFilter !== 'all' ||
+    exceptionKindFilter !== 'all';
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSectionFilter('all');
+    setWfhStatusFilter('all');
+    setExceptionKindFilter('all');
+  };
+
+  const filterTriggerClass =
+    'w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-sky-500/40 focus:ring-offset-0 data-[state=open]:ring-2 data-[state=open]:ring-sky-500/40';
+  const filterFieldClass = 'flex items-center gap-2 min-w-0 w-full';
+
   const allSelected =
-    detailExceptions.length > 0 &&
+    filteredExceptions.length > 0 &&
     selectedKeys.length > 0 &&
-    detailExceptions.every((row) =>
+    filteredExceptions.every((row) =>
       selectedKeys.includes(exceptionKey({ ...row, user_id: userId }))
     );
 
@@ -224,7 +308,7 @@ export default function AdminAttendanceExceptionUserDetail() {
       setSelectedKeys([]);
       return;
     }
-    setSelectedKeys(detailExceptions.map((row) => exceptionKey({ ...row, user_id: userId })));
+    setSelectedKeys(filteredExceptions.map((row) => exceptionKey({ ...row, user_id: userId })));
   }
 
   async function handleSave() {
@@ -409,85 +493,204 @@ export default function AdminAttendanceExceptionUserDetail() {
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-sky-50/50 via-transparent to-blue-50/50 dark:from-sky-950/20 dark:via-transparent dark:to-blue-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
-              <div className="flex items-start gap-3 min-w-0">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-xl shrink-0 -ms-1 h-9 px-2"
-                  onClick={backToList}
-                >
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  People
-                </Button>
-                <div className="p-2 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl shadow-lg shrink-0">
-                  <UserRound className="h-6 w-6 text-white" aria-hidden />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
-                    {displayName}
-                  </h1>
-                  <div className="h-1 w-20 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full mt-2" />
-                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-2 capitalize">
-                    <span className="font-medium text-gray-800 dark:text-gray-200">
-                      {(detailUser?.role || 'teammate').toString()}
-                    </span>
-                    {detailUser?.today_hours_worked
-                      ? ` · ${formatHoursShort(detailUser.today_hours_worked)} today`
-                      : ''}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    <Badge
-                      variant="secondary"
-                      className="rounded-xl tabular-nums text-[10px] sm:text-xs gap-1 bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
-                    >
-                      <MapPin className="h-3 w-3 shrink-0" />
-                      {detailOfficeActiveDays} office
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className="rounded-xl tabular-nums text-[10px] sm:text-xs gap-1 border-emerald-300 dark:border-emerald-700"
-                    >
-                      <Home className="h-3 w-3 shrink-0" />
-                      {detailWfhActiveDays} WFH
-                    </Badge>
-                    <Badge variant="outline" className="rounded-xl tabular-nums text-[10px] sm:text-xs">
-                      {detailExceptions.length} exception{detailExceptions.length === 1 ? '' : 's'}
-                    </Badge>
-                    <Badge
-                      variant={detailLates.length > 0 ? 'destructive' : 'outline'}
-                      className="rounded-xl tabular-nums text-[10px] sm:text-xs"
-                    >
-                      {detailLates.length} late
-                    </Badge>
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-6 min-w-0">
+              <div className="space-y-3 min-w-0 flex-1">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-xl shrink-0 -ms-1 h-9 px-2"
+                    onClick={backToList}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">People</span>
+                  </Button>
+                  <div className="p-2 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl shadow-lg shrink-0">
+                    <UserRound className="h-5 w-5 sm:h-6 sm:w-6 text-white" aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
+                      {displayName}
+                    </h1>
+                    <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full mt-2" />
                   </div>
                 </div>
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl min-w-0 break-words capitalize">
+                  <span className="font-medium text-gray-800 dark:text-gray-200">
+                    {(detailUser?.role || 'teammate').toString()}
+                  </span>
+                  {detailUser?.today_hours_worked
+                    ? ` · ${formatHoursShort(detailUser.today_hours_worked)} today`
+                    : ''}
+                  {' · '}
+                  Grant WFH or forgive late check-ins for this teammate
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Badge
+                    variant="secondary"
+                    className="rounded-xl tabular-nums text-[10px] sm:text-xs gap-1 bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
+                  >
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    {detailOfficeActiveDays} office
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="rounded-xl tabular-nums text-[10px] sm:text-xs gap-1 border-emerald-300 dark:border-emerald-700"
+                  >
+                    <Home className="h-3 w-3 shrink-0" />
+                    {detailWfhActiveDays} WFH
+                  </Badge>
+                  <Badge variant="outline" className="rounded-xl tabular-nums text-[10px] sm:text-xs">
+                    {detailExceptions.length} exception{detailExceptions.length === 1 ? '' : 's'}
+                  </Badge>
+                  <Badge
+                    variant={detailLates.length > 0 ? 'destructive' : 'outline'}
+                    className="rounded-xl tabular-nums text-[10px] sm:text-xs"
+                  >
+                    {detailLates.length} late
+                  </Badge>
+                </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0 w-full lg:w-auto">
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11 w-full sm:w-auto rounded-xl border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-semibold"
+                  size="lg"
+                  className="h-12 w-full sm:w-auto rounded-xl border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-semibold shadow-sm hover:shadow-md"
                   asChild
                 >
                   <Link to={`/${role}/users/${userId}`}>
-                    <ExternalLink className="mr-2 h-4 w-4 shrink-0" />
+                    <ExternalLink className="mr-2 h-5 w-5 shrink-0" />
                     Full profile
                   </Link>
                 </Button>
                 <Button
                   type="button"
+                  size="lg"
                   onClick={backToList}
-                  className="h-11 w-full sm:w-auto shrink-0 px-5 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-semibold shadow-lg rounded-xl"
+                  className="h-12 w-full sm:w-auto px-6 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 rounded-xl"
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4 shrink-0" />
+                  <ArrowLeft className="mr-2 h-5 w-5 shrink-0" />
                   All people
                 </Button>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Search & Filter — Bugs / Fixes / Updates pattern */}
+        {!loading ? (
+          <div className="relative w-full min-w-0">
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-sky-50/30 dark:from-gray-800/30 dark:to-sky-900/30 rounded-2xl pointer-events-none" />
+            <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
+              <div className="space-y-3 sm:space-y-4 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-sky-500 rounded-lg shrink-0">
+                      <Search className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                      Search &amp; Filter
+                    </h3>
+                  </div>
+                  {hasActiveFilters ? (
+                    <p className="text-sm text-muted-foreground">
+                      Filters active on day records below
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="relative group w-full min-w-0">
+                  <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-sky-500 transition-colors pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search by date, note, or week/month label…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                    autoComplete="off"
+                    aria-label="Search day records"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 min-w-0">
+                  <div className={filterFieldClass}>
+                    <div className="p-1.5 bg-blue-500 rounded-lg shrink-0">
+                      <Filter className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                        <SelectTrigger className={filterTriggerClass}>
+                          <SelectValue placeholder="Section" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All sections</SelectItem>
+                          <SelectItem value="office">Office &amp; WFH tables</SelectItem>
+                          <SelectItem value="exceptions">Day exceptions</SelectItem>
+                          <SelectItem value="wfh">WFH requests</SelectItem>
+                          <SelectItem value="late">Late check-ins</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className={filterFieldClass}>
+                    <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0">
+                      <Home className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Select value={wfhStatusFilter} onValueChange={setWfhStatusFilter}>
+                        <SelectTrigger className={filterTriggerClass}>
+                          <SelectValue placeholder="WFH status" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All WFH statuses</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="approved">Approved</SelectItem>
+                          <SelectItem value="rejected">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className={filterFieldClass}>
+                    <div className="p-1.5 bg-violet-500 rounded-lg shrink-0">
+                      <CalendarClock className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Select value={exceptionKindFilter} onValueChange={setExceptionKindFilter}>
+                        <SelectTrigger className={filterTriggerClass}>
+                          <SelectValue placeholder="Exception type" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[60]">
+                          <SelectItem value="all">All exception types</SelectItem>
+                          <SelectItem value="wfh">WFH allowed</SelectItem>
+                          <SelectItem value="forgive_late">Late forgiven</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {hasActiveFilters ? (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="h-10 sm:h-11 w-full sm:w-auto px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Grant exception — locked to this user */}
         <div className="relative overflow-hidden">
@@ -608,13 +811,14 @@ export default function AdminAttendanceExceptionUserDetail() {
             <div className="absolute inset-0 bg-gradient-to-br from-sky-50/40 via-transparent to-blue-50/40 dark:from-sky-950/20 dark:to-blue-950/20 rounded-2xl" />
             <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6 grid grid-cols-12 gap-5 sm:gap-6 min-w-0 shadow-sm">
               {/* Office & WFH */}
+              {showOffice ? (
               <div className="col-span-12 space-y-3 min-w-0">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-sky-500 rounded-lg shrink-0">
                       <MapPin className="h-3.5 w-3.5 text-white" />
                     </div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
                       Office &amp; WFH days
                     </p>
                   </div>
@@ -644,9 +848,11 @@ export default function AdminAttendanceExceptionUserDetail() {
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="weekly" className="mt-3">
-                    {weeklyAttendanceRows.length === 0 ? (
+                    {filteredWeeklyRows.length === 0 ? (
                       <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-8 text-center bg-white/40 dark:bg-gray-900/40">
-                        No office or WFH days recorded for this user yet.
+                        {searchQuery.trim()
+                          ? 'No weeks match this search.'
+                          : 'No office or WFH days recorded for this user yet.'}
                       </p>
                     ) : (
                       <div className="rounded-xl border border-gray-200/70 dark:border-gray-700/70 overflow-x-auto bg-white/60 dark:bg-gray-900/40">
@@ -669,7 +875,7 @@ export default function AdminAttendanceExceptionUserDetail() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {weeklyAttendanceRows.map((row) => (
+                            {filteredWeeklyRows.map((row) => (
                               <TableRow key={row.key}>
                                 <TableCell className="text-xs sm:text-sm font-medium whitespace-nowrap">
                                   {row.label}
@@ -694,9 +900,11 @@ export default function AdminAttendanceExceptionUserDetail() {
                     )}
                   </TabsContent>
                   <TabsContent value="monthly" className="mt-3">
-                    {monthlyAttendanceRows.length === 0 ? (
+                    {filteredMonthlyRows.length === 0 ? (
                       <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-8 text-center bg-white/40 dark:bg-gray-900/40">
-                        No office or WFH days recorded for this user yet.
+                        {searchQuery.trim()
+                          ? 'No months match this search.'
+                          : 'No office or WFH days recorded for this user yet.'}
                       </p>
                     ) : (
                       <div className="rounded-xl border border-gray-200/70 dark:border-gray-700/70 overflow-x-auto bg-white/60 dark:bg-gray-900/40">
@@ -719,7 +927,7 @@ export default function AdminAttendanceExceptionUserDetail() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {monthlyAttendanceRows.map((row) => (
+                            {filteredMonthlyRows.map((row) => (
                               <TableRow key={row.key}>
                                 <TableCell className="text-xs sm:text-sm font-medium whitespace-nowrap">
                                   {row.label}
@@ -745,17 +953,22 @@ export default function AdminAttendanceExceptionUserDetail() {
                   </TabsContent>
                 </Tabs>
               </div>
+              ) : null}
 
               {/* Day exceptions */}
+              {showExceptions ? (
               <div className="col-span-12 space-y-3 min-w-0">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold">
+                  <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
                     Day exceptions
                     <span className="text-muted-foreground font-normal ml-2 tabular-nums">
-                      {detailExceptions.length}
+                      {filteredExceptions.length}
+                      {filteredExceptions.length !== detailExceptions.length
+                        ? ` / ${detailExceptions.length}`
+                        : ''}
                     </span>
                   </p>
-                  {detailExceptions.length > 0 ? (
+                  {filteredExceptions.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
                         type="button"
@@ -774,7 +987,7 @@ export default function AdminAttendanceExceptionUserDetail() {
                         className="rounded-xl h-8"
                         disabled={saving || selectedKeys.length === 0}
                         onClick={() => {
-                          const rows = detailExceptions.filter((r) =>
+                          const rows = filteredExceptions.filter((r) =>
                             selectedKeys.includes(exceptionKey({ ...r, user_id: userId }))
                           );
                           setPendingRemove(rows.map((r) => ({ ...r, user_id: userId })));
@@ -787,13 +1000,15 @@ export default function AdminAttendanceExceptionUserDetail() {
                   ) : null}
                 </div>
 
-                {detailExceptions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border/60 px-4 py-8 text-center">
-                    No day exceptions for this user yet. Use Grant exception above.
+                {filteredExceptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-8 text-center">
+                    {detailExceptions.length === 0
+                      ? 'No day exceptions for this user yet. Use Grant exception above.'
+                      : 'No exceptions match this search and filters.'}
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2 sm:gap-3">
-                    {detailExceptions.map((row) => {
+                    {filteredExceptions.map((row) => {
                       const key = exceptionKey({ ...row, user_id: userId });
                       const checked = selectedKeys.includes(key);
                       return (
@@ -859,27 +1074,34 @@ export default function AdminAttendanceExceptionUserDetail() {
                   </div>
                 )}
               </div>
+              ) : null}
 
               {/* WFH requests */}
+              {showWfh ? (
               <div className="col-span-12 space-y-3 min-w-0">
-                <p className="text-sm font-semibold">
+                <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
                   WFH requests
                   <span className="text-muted-foreground font-normal ml-2 tabular-nums">
-                    {detailWfhRequests.length}
+                    {filteredWfhRequests.length}
+                    {filteredWfhRequests.length !== detailWfhRequests.length
+                      ? ` / ${detailWfhRequests.length}`
+                      : ''}
                   </span>
-                  {detailWfhRequests.some((r) => r.status === 'rejected') ? (
+                  {filteredWfhRequests.some((r) => r.status === 'rejected') ? (
                     <span className="text-rose-600 dark:text-rose-400 font-normal ml-2 text-xs">
-                      · {detailWfhRequests.filter((r) => r.status === 'rejected').length} rejected
+                      · {filteredWfhRequests.filter((r) => r.status === 'rejected').length} rejected
                     </span>
                   ) : null}
                 </p>
-                {detailWfhRequests.length === 0 ? (
-                  <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border/60 px-4 py-8 text-center">
-                    No WFH requests for this user yet.
+                {filteredWfhRequests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-8 text-center">
+                    {detailWfhRequests.length === 0
+                      ? 'No WFH requests for this user yet.'
+                      : 'No WFH requests match this search and filters.'}
                   </p>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {detailWfhRequests.map((row) => {
+                    {filteredWfhRequests.map((row) => {
                       const status = String(row.status || 'pending').toLowerCase();
                       const reviewedAt = formatDateTime(row.reviewed_at);
                       return (
@@ -933,7 +1155,7 @@ export default function AdminAttendanceExceptionUserDetail() {
                                 <Button
                                   type="button"
                                   size="sm"
-                                  className="rounded-xl"
+                                  className="rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white"
                                   disabled={saving || wfhReviewing}
                                   onClick={() => setWfhReview({ request: row, action: 'approve' })}
                                 >
@@ -971,22 +1193,27 @@ export default function AdminAttendanceExceptionUserDetail() {
                   </div>
                 )}
               </div>
+              ) : null}
 
               {/* Late check-ins */}
+              {showLate ? (
               <div className="col-span-12 space-y-3 min-w-0">
-                <p className="text-sm font-semibold">
+                <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
                   Late check-ins
                   <span className="text-muted-foreground font-normal ml-2 tabular-nums">
-                    {detailLates.length}
+                    {filteredLates.length}
+                    {filteredLates.length !== detailLates.length ? ` / ${detailLates.length}` : ''}
                   </span>
                 </p>
-                {detailLates.length === 0 ? (
-                  <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border/60 px-4 py-8 text-center">
-                    No late check-ins on record for this user.
+                {filteredLates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-8 text-center">
+                    {detailLates.length === 0
+                      ? 'No late check-ins on record for this user.'
+                      : 'No late check-ins match this search.'}
                   </p>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {detailLates.map((row) => (
+                    {filteredLates.map((row) => (
                       <div
                         key={`${row.user_id}-${row.id}`}
                         className="rounded-xl border border-rose-200/70 dark:border-rose-900/50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
@@ -1014,6 +1241,7 @@ export default function AdminAttendanceExceptionUserDetail() {
                   </div>
                 )}
               </div>
+              ) : null}
             </div>
           </div>
         )}

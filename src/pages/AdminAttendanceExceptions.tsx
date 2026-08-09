@@ -4,10 +4,12 @@ import {
   CalendarClock,
   Check,
   ChevronRight,
+  Filter,
   Home,
   Loader2,
   MapPin,
   Search,
+  Shield,
   Trash2,
   UserRound,
   X,
@@ -79,6 +81,8 @@ export default function AdminAttendanceExceptions() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [activityFilter, setActivityFilter] = useState('all');
   const [pendingWfh, setPendingWfh] = useState<WfhRequest[]>([]);
   const [wfhReview, setWfhReview] = useState<{
     request: WfhRequest;
@@ -212,26 +216,49 @@ export default function AdminAttendanceExceptions() {
       };
     });
 
-    const filtered = q
-      ? rows.filter((row) => {
-          const hay = [
-            row.user.username,
-            row.user.name,
-            row.user.role,
-            row.user.status,
-            row.exceptionCount ? 'exception' : '',
-            row.lateCount ? 'late' : '',
-            row.officeActiveDays ? 'office' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-          return hay.includes(q);
-        })
-      : rows;
+    const filtered = rows.filter((row) => {
+      if (roleFilter !== 'all') {
+        const r = String(row.user.role || '').toLowerCase();
+        if (r !== roleFilter) return false;
+      }
+      if (activityFilter === 'exceptions' && row.exceptionCount <= 0) return false;
+      if (activityFilter === 'late' && row.lateCount <= 0) return false;
+      if (activityFilter === 'office' && row.officeActiveDays <= 0) return false;
+      if (activityFilter === 'clean' && (row.exceptionCount > 0 || row.lateCount > 0)) {
+        return false;
+      }
+      if (!q) return true;
+      const hay = [
+        row.user.username,
+        row.user.name,
+        row.user.role,
+        row.user.status,
+        row.exceptionCount ? 'exception' : '',
+        row.lateCount ? 'late' : '',
+        row.officeActiveDays ? 'office' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
 
     return [...filtered].sort((a, b) => compareUsersByActivityThenHours(a.user, b.user));
-  }, [users, exceptionsByUser, query]);
+  }, [users, exceptionsByUser, query, roleFilter, activityFilter]);
+
+  const hasActiveFilters =
+    query.trim() !== '' || roleFilter !== 'all' || activityFilter !== 'all';
+
+  const clearFilters = () => {
+    setQuery('');
+    setRoleFilter('all');
+    setActivityFilter('all');
+  };
+
+  const filterTriggerClass =
+    'w-full min-w-0 h-11 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-2 focus:ring-sky-500/40 focus:ring-offset-0 data-[state=open]:ring-2 data-[state=open]:ring-sky-500/40';
+
+  const filterFieldClass = 'flex items-center gap-2 min-w-0 w-full';
 
   const grantUser = users.find((u) => String(u.id) === grantUserId);
 
@@ -358,7 +385,10 @@ export default function AdminAttendanceExceptions() {
     );
   }
 
-  const usersWithExceptions = roster.filter((r) => r.exceptionCount > 0).length;
+  const usersWithExceptions = users.filter((u) => {
+    const stats = exceptionsByUser.get(String(u.id));
+    return (stats?.exceptionCount ?? 0) > 0;
+  }).length;
   const grantUserOfficeDays = exceptionsByUser.get(String(grantUserId))?.officeActiveDays ?? 0;
   const selectedOfficeName =
     users.find((u) => String(u.id) === grantUserId)?.username || 'selected';
@@ -368,27 +398,27 @@ export default function AdminAttendanceExceptions() {
       <section className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full">
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-sky-50/50 via-transparent to-blue-50/50 dark:from-sky-950/20 dark:via-transparent dark:to-blue-950/20" />
-          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-              <div className="space-y-3 min-w-0">
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-6 min-w-0">
+              <div className="space-y-3 min-w-0 flex-1">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl shadow-lg shrink-0">
-                    <CalendarClock className="h-6 w-6 text-white" />
+                    <CalendarClock className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
                   <div className="min-w-0">
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
+                    <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
                       Attendance exceptions
                     </h1>
-                    <div className="h-1 w-20 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full mt-2" />
+                    <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full mt-2" />
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-base lg:text-lg font-medium max-w-2xl">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl min-w-0 break-words">
                   Browse people below, then open their page for day details, weekly Office &amp; WFH
                   tables, exceptions, and late check-ins.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-stretch gap-3">
+              <div className="flex flex-wrap items-stretch gap-3 shrink-0 w-full lg:w-auto">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/30 border border-sky-200 dark:border-sky-800 rounded-xl shadow-sm min-w-0">
                   <div className="p-1.5 bg-sky-500 rounded-lg shrink-0">
                     <MapPin className="h-5 w-5 text-white" />
@@ -690,135 +720,230 @@ export default function AdminAttendanceExceptions() {
 
         {loading ? (
           <div className="grid grid-cols-12 gap-4 sm:gap-6">
+            <Skeleton className="col-span-12 h-28 rounded-2xl" />
             <Skeleton className="col-span-12 h-64 sm:h-80 rounded-2xl" />
           </div>
         ) : (
-          <div className="grid grid-cols-12 gap-4 sm:gap-6 items-start min-w-0">
-            <div className="col-span-12 lg:col-span-12 space-y-3 min-w-0">
-              <div className="relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-gray-50/40 to-sky-50/40 dark:from-gray-800/40 dark:to-sky-900/40 rounded-2xl" />
-                <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 space-y-4 min-w-0">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 min-w-0">
+          <div className="space-y-6 sm:space-y-8 min-w-0">
+            {/* Search & Filter — same pattern as Bugs / Fixes / Updates */}
+            <div className="relative w-full min-w-0">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/30 to-sky-50/30 dark:from-gray-800/30 dark:to-sky-900/30 rounded-2xl pointer-events-none" />
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6">
+                <div className="space-y-3 sm:space-y-4 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-sky-500 rounded-lg">
-                        <UserRound className="h-4 w-4 text-white" />
+                      <div className="p-1.5 bg-sky-500 rounded-lg shrink-0">
+                        <Search className="h-4 w-4 text-white" />
                       </div>
-                      <p className="text-base font-semibold text-gray-900 dark:text-white shrink-0">
-                        People
-                      </p>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                        Search &amp; Filter
+                      </h3>
                     </div>
-                    <div className="relative w-full sm:max-w-xs min-w-0">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      <Input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search people…"
-                        className="h-11 rounded-xl pl-9 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm"
-                      />
+                    {hasActiveFilters ? (
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-semibold text-sky-600 dark:text-sky-400">
+                          {roster.length}
+                        </span>{' '}
+                        matching {roster.length === 1 ? 'person' : 'people'}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="relative group w-full min-w-0">
+                    <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-sky-500 transition-colors pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search by name, role, or status…"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      className="w-full min-w-0 pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 text-sm font-medium transition-all duration-300 shadow-sm hover:shadow-md"
+                      autoComplete="off"
+                      aria-label="Search people"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 min-w-0">
+                    <div className={filterFieldClass}>
+                      <div className="p-1.5 bg-violet-500 rounded-lg shrink-0">
+                        <Shield className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Select value={roleFilter} onValueChange={setRoleFilter}>
+                          <SelectTrigger className={filterTriggerClass}>
+                            <SelectValue placeholder="Role" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All roles</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="developer">Developer</SelectItem>
+                            <SelectItem value="user">User</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className={filterFieldClass}>
+                      <div className="p-1.5 bg-orange-500 rounded-lg shrink-0">
+                        <Filter className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Select value={activityFilter} onValueChange={setActivityFilter}>
+                          <SelectTrigger className={filterTriggerClass}>
+                            <SelectValue placeholder="Activity" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="z-[60]">
+                            <SelectItem value="all">All activity</SelectItem>
+                            <SelectItem value="exceptions">Has exceptions</SelectItem>
+                            <SelectItem value="late">Has late marks</SelectItem>
+                            <SelectItem value="office">Has office days</SelectItem>
+                            <SelectItem value="clean">No exceptions or late</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
 
-                  {roster.length === 0 ? (
-                    <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-8 text-center">
-                      {query.trim()
-                        ? 'No people match this search.'
-                        : 'No active teammates found.'}
-                    </p>
-                  ) : (
-                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-                      {roster.map((row) => {
-                        const uid = String(row.user.id);
-                        const hoursLabel = formatHoursShort(row.user.today_hours_worked);
-                        const statusBit =
-                          row.user.status === 'active'
-                            ? 'Active'
-                            : row.user.status === 'idle'
-                              ? 'Idle'
-                              : row.user.checked_in_today
-                                ? 'Checked in'
-                                : '';
-                        return (
-                          <button
-                            key={uid}
-                            type="button"
-                            onClick={() => openUser(uid)}
-                            className={cn(
-                              'text-left rounded-2xl border px-3 py-3 sm:px-4 transition-all min-w-0 w-full shadow-sm',
-                              'hover:border-sky-500/40 hover:bg-sky-500/5 hover:shadow-md',
-                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40',
-                              'border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-800/50'
-                            )}
-                          >
-                            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                              <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-muted/80 flex items-center justify-center shrink-0">
-                                <UserRound className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <p className="font-semibold text-sm sm:text-base truncate">
-                                    {row.user.username}
-                                  </p>
-                                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground ms-auto" />
-                                </div>
-                                <p className="text-[11px] sm:text-xs text-muted-foreground capitalize truncate mt-0.5">
-                                  {[
-                                    row.user.role,
-                                    hoursLabel ? `${hoursLabel} today` : null,
-                                    statusBit || null,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(' · ')}
+                  {hasActiveFilters ? (
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={clearFilters}
+                        className="h-10 sm:h-11 w-full sm:w-auto px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                      >
+                        Clear filters
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {/* People roster cards */}
+            <div className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-50/40 to-sky-50/40 dark:from-gray-800/40 dark:to-sky-900/40 rounded-2xl" />
+              <div className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-5 md:p-6 space-y-4 min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-sky-500 rounded-lg">
+                    <UserRound className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+                    People
+                  </h3>
+                  <Badge variant="outline" className="rounded-xl tabular-nums ms-auto">
+                    {roster.length}
+                  </Badge>
+                </div>
+
+                {roster.length === 0 ? (
+                  <div className="relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-sky-50/40 via-transparent to-blue-50/40 dark:from-sky-950/20 dark:to-blue-950/20 rounded-2xl" />
+                    <div className="relative rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-10 sm:py-12 text-center">
+                      <div className="mx-auto w-14 h-14 bg-gradient-to-br from-sky-500 to-blue-600 rounded-full flex items-center justify-center shadow-xl mb-4">
+                        <UserRound className="h-7 w-7 text-white" />
+                      </div>
+                      <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                        {hasActiveFilters
+                          ? 'No people match this search and filters.'
+                          : 'No active teammates found.'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+                    {roster.map((row) => {
+                      const uid = String(row.user.id);
+                      const hoursLabel = formatHoursShort(row.user.today_hours_worked);
+                      const statusBit =
+                        row.user.status === 'active'
+                          ? 'Active'
+                          : row.user.status === 'idle'
+                            ? 'Idle'
+                            : row.user.checked_in_today
+                              ? 'Checked in'
+                              : '';
+                      return (
+                        <button
+                          key={uid}
+                          type="button"
+                          onClick={() => openUser(uid)}
+                          className={cn(
+                            'text-left rounded-2xl border px-3 py-3 sm:px-4 transition-all min-w-0 w-full shadow-sm',
+                            'hover:border-sky-500/40 hover:bg-sky-500/5 hover:shadow-md hover:scale-[1.01]',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40',
+                            'border-gray-200/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-800/50'
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-sky-500/15 to-blue-600/15 flex items-center justify-center shrink-0">
+                              <UserRound className="h-4 w-4 sm:h-5 sm:w-5 text-sky-600 dark:text-sky-400" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <p className="font-semibold text-sm sm:text-base truncate text-gray-900 dark:text-white">
+                                  {row.user.username}
                                 </p>
-                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                  <Badge
-                                    variant="outline"
-                                    className="rounded-lg sm:rounded-xl tabular-nums text-[10px] sm:text-xs h-5 sm:h-6 px-1.5 sm:px-2.5 gap-1"
-                                  >
-                                    <MapPin className="h-3 w-3 shrink-0 opacity-70" />
-                                    <span className="sm:hidden">{row.officeActiveDays} off</span>
+                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground ms-auto" />
+                              </div>
+                              <p className="text-[11px] sm:text-xs text-muted-foreground capitalize truncate mt-0.5">
+                                {[
+                                  row.user.role,
+                                  hoursLabel ? `${hoursLabel} today` : null,
+                                  statusBit || null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className="rounded-xl tabular-nums text-[10px] sm:text-xs h-5 sm:h-6 px-1.5 sm:px-2.5 gap-1"
+                                >
+                                  <MapPin className="h-3 w-3 shrink-0 opacity-70" />
+                                  <span className="sm:hidden">{row.officeActiveDays} off</span>
+                                  <span className="hidden sm:inline">
+                                    {row.officeActiveDays} office day
+                                    {row.officeActiveDays === 1 ? '' : 's'}
+                                  </span>
+                                </Badge>
+                                <Badge
+                                  variant={row.exceptionCount > 0 ? 'secondary' : 'outline'}
+                                  className="rounded-xl tabular-nums text-[10px] sm:text-xs h-5 sm:h-6 px-1.5 sm:px-2.5"
+                                >
+                                  <span className="sm:hidden">{row.exceptionCount} exc</span>
+                                  <span className="hidden sm:inline">
+                                    {row.exceptionCount} exception
+                                    {row.exceptionCount === 1 ? '' : 's'}
+                                  </span>
+                                </Badge>
+                                <Badge
+                                  variant={row.lateCount > 0 ? 'destructive' : 'outline'}
+                                  className={cn(
+                                    'rounded-xl tabular-nums text-[10px] sm:text-xs h-5 sm:h-6 px-1.5 sm:px-2.5',
+                                    row.lateCount > 0 ? '' : 'text-muted-foreground'
+                                  )}
+                                >
+                                  {row.lateCount} late
+                                </Badge>
+                                {row.latestExceptionDate ? (
+                                  <span className="text-[10px] sm:text-[11px] text-muted-foreground tabular-nums">
+                                    <span className="sm:hidden">
+                                      {formatDayShort(row.latestExceptionDate)}
+                                    </span>
                                     <span className="hidden sm:inline">
-                                      {row.officeActiveDays} office day
-                                      {row.officeActiveDays === 1 ? '' : 's'}
+                                      Latest {formatDay(row.latestExceptionDate)}
                                     </span>
-                                  </Badge>
-                                  <Badge
-                                    variant={row.exceptionCount > 0 ? 'secondary' : 'outline'}
-                                    className="rounded-lg sm:rounded-xl tabular-nums text-[10px] sm:text-xs h-5 sm:h-6 px-1.5 sm:px-2.5"
-                                  >
-                                    <span className="sm:hidden">{row.exceptionCount} exc</span>
-                                    <span className="hidden sm:inline">
-                                      {row.exceptionCount} exception
-                                      {row.exceptionCount === 1 ? '' : 's'}
-                                    </span>
-                                  </Badge>
-                                  <Badge
-                                    variant={row.lateCount > 0 ? 'destructive' : 'outline'}
-                                    className={cn(
-                                      'rounded-lg sm:rounded-xl tabular-nums text-[10px] sm:text-xs h-5 sm:h-6 px-1.5 sm:px-2.5',
-                                      row.lateCount > 0 ? '' : 'text-muted-foreground'
-                                    )}
-                                  >
-                                    {row.lateCount} late
-                                  </Badge>
-                                  {row.latestExceptionDate ? (
-                                    <span className="text-[10px] sm:text-[11px] text-muted-foreground tabular-nums">
-                                      <span className="sm:hidden">
-                                        {formatDayShort(row.latestExceptionDate)}
-                                      </span>
-                                      <span className="hidden sm:inline">
-                                        Latest {formatDay(row.latestExceptionDate)}
-                                      </span>
-                                    </span>
-                                  ) : null}
-                                </div>
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
