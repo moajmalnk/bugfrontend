@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ENV } from '@/lib/env';
 import { ProfessionalRefreshButton } from '@/components/ui/ProfessionalRefreshButton';
 import { isBrowserOnline, subscribeNetworkStatus } from '@/lib/networkStatus';
+import { isOfflineChunkFailure } from '@/lib/chunkLoadError';
 
 interface ErrorState {
   type: 'inactivity' | 'network' | 'version' | 'cache' | 'auth' | 'server' | 'unknown';
@@ -244,7 +245,8 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
     return () => clearInterval(interval);
   }, [isOnline]);
 
-  // Global error handler — only surface real app/chunk failures, not background fetch noise
+  // Global error handler — only surface real deploy/cache chunk failures while online.
+  // Offline dynamic-import misses are owned by ChunkErrorHandler ("You're offline").
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       const message = event.message || '';
@@ -252,6 +254,7 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
         message.includes('Loading chunk') ||
         message.includes('Failed to fetch dynamically imported module')
       ) {
+        if (isOfflineChunkFailure(message)) return;
         showError({
           type: 'cache',
           message:
@@ -261,8 +264,6 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
           severity: 'error',
         });
       }
-      // Do not map generic "Failed to fetch" / Network Error here — those come from
-      // background polls (heartbeat, notifications) and spam Connection Issue UI.
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
