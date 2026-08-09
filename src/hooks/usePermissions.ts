@@ -1,5 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
+import { isBrowserOnline, isNetworkSettling } from "@/lib/networkStatus";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface CachedPermissions {
@@ -46,22 +47,40 @@ export function usePermissions(projectId: string | null = null) {
           }
         }
 
-        const token = sessionStorage.getItem("token") || localStorage.getItem("token");
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
+        if (!isBrowserOnline() || isNetworkSettling()) {
+          // Serve stale cache during boot / Wi-Fi settle; avoid noisy failed fetches
+          if (cached) {
+            try {
+              const cachedData: CachedPermissions = JSON.parse(cached);
+              setPermissions(cachedData.permissions);
+            } catch {
+              /* ignore */
+            }
+          }
           setIsLoading(false);
           return false;
         }
 
+        const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+
         // Why: Use ENV.API_URL so localhost DEV goes through /api proxy (not raw VITE_API_URL).
-        const response = await fetch(
-          `${ENV.API_URL}/permissions/user_permissions.php?userId=${currentUser.id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12_000);
+        let response: Response;
+        try {
+          response = await fetch(
+            `${ENV.API_URL}/permissions/user_permissions.php?userId=${currentUser.id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              signal: controller.signal,
+            }
+          );
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         if (response.ok) {
           const data = await response.json();
@@ -79,15 +98,10 @@ export function usePermissions(projectId: string | null = null) {
         }
 
         // Keep prior permissions on failure — avoid silent empty denials
-        if (import.meta.env.DEV) {
-          console.error("Failed to load permissions: HTTP", response.status);
-        }
         setIsLoading(false);
         return false;
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.error("Failed to load permissions:", error);
-        }
+      } catch {
+        // Transport flaps (ERR_NETWORK_CHANGED, etc.) — keep prior/cached permissions
         setIsLoading(false);
         return false;
       }
@@ -99,12 +113,27 @@ export function usePermissions(projectId: string | null = null) {
     void loadPermissions();
   }, [loadPermissions]);
 
+  // If boot / Wi-Fi settle skipped the first fetch, retry once network is ready
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!isBrowserOnline()) return;
+    if (!isNetworkSettling()) return;
+
+    const timer = setTimeout(() => {
+      void loadPermissions();
+    }, 4_500);
+
+    return () => clearTimeout(timer);
+  }, [currentUser, loadPermissions]);
+
   // Refresh permissions periodically (every 5 minutes)
   useEffect(() => {
     if (!currentUser) return;
 
     const interval = setInterval(() => {
-      void loadPermissions({ force: true });
+      if (isBrowserOnline() && !isNetworkSettling()) {
+        void loadPermissions({ force: true });
+      }
     }, CACHE_TTL);
 
     return () => clearInterval(interval);

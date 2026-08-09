@@ -90,8 +90,15 @@ export function AdminShortsStrip() {
         ? 120_000
         : false,
     staleTime: 60_000,
-    enabled: !onShortsPage && !onUsersPage,
-    retry: false,
+    enabled:
+      !onShortsPage &&
+      !onUsersPage &&
+      typeof navigator !== "undefined" &&
+      navigator.onLine,
+    // Soft background strip — retry quietly after Wi-Fi/DNS flaps; never block the dashboard
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {

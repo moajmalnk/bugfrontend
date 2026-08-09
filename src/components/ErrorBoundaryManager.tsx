@@ -6,6 +6,7 @@ import { AlertTriangle, Wifi, WifiOff, RefreshCw, LogOut, Clock, AlertCircle, Za
 import { useAuth } from '@/context/AuthContext';
 import { ENV } from '@/lib/env';
 import { ProfessionalRefreshButton } from '@/components/ui/ProfessionalRefreshButton';
+import { isBrowserOnline, subscribeNetworkStatus } from '@/lib/networkStatus';
 
 interface ErrorState {
   type: 'inactivity' | 'network' | 'version' | 'cache' | 'auth' | 'server' | 'unknown';
@@ -19,6 +20,8 @@ interface ErrorState {
 interface ErrorBoundaryContextType {
   showError: (error: Partial<ErrorState>) => void;
   clearError: () => void;
+  /** Drop Connection Issue / soft server banners after connectivity recovers */
+  clearTransientConnectivityError: () => void;
   isOnline: boolean;
   lastActivity: number;
 }
@@ -39,11 +42,26 @@ interface ErrorBoundaryProviderProps {
 
 export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ children }) => {
   const [errorState, setErrorState] = useState<ErrorState | null>(null);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(() => isBrowserOnline());
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [inactivityWarning, setInactivityWarning] = useState(false);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const { logout, currentUser } = useAuth();
+
+  // Keep online flag in sync; drop transient Connection Issue when connectivity returns
+  useEffect(() => {
+    setIsOnline(isBrowserOnline());
+    return subscribeNetworkStatus((online) => {
+      setIsOnline(online);
+      if (online) {
+        setErrorState((prev) =>
+          prev && (prev.type === 'network' || prev.type === 'server') && prev.severity !== 'critical'
+            ? null
+            : prev
+        );
+      }
+    });
+  }, []);
 
   // Constants - TEMPORARY SHORTER TIMEOUTS FOR TESTING
 //   const INACTIVITY_TIMEOUT = 30 * 1000; // 30 seconds (normally 5 minutes)
@@ -63,19 +81,42 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
   }, []);
 
   const showError = useCallback((error: Partial<ErrorState>) => {
-    setErrorState({
-      type: error.type || 'unknown',
-      message: error.message || 'An unexpected error occurred',
-      canRetry: error.canRetry ?? true,
-      requiresLogin: error.requiresLogin ?? false,
-      severity: error.severity || 'error',
-      timestamp: Date.now()
+    setErrorState((prev) => {
+      // Never downgrade a critical auth/session modal with a soft network warning
+      if (
+        prev?.severity === 'critical' &&
+        error.severity !== 'critical' &&
+        (error.type === 'network' || error.type === 'server' || error.type === 'unknown')
+      ) {
+        return prev;
+      }
+      return {
+        type: error.type || 'unknown',
+        message: error.message || 'An unexpected error occurred',
+        canRetry: error.canRetry ?? true,
+        requiresLogin: error.requiresLogin ?? false,
+        severity: error.severity || 'error',
+        timestamp: Date.now(),
+      };
     });
   }, []);
 
   const clearError = useCallback(() => {
     setErrorState(null);
     setInactivityWarning(false);
+  }, []);
+
+  const clearTransientConnectivityError = useCallback(() => {
+    setErrorState((prev) => {
+      if (!prev) return null;
+      if (
+        (prev.type === 'network' || prev.type === 'server') &&
+        prev.severity !== 'critical'
+      ) {
+        return null;
+      }
+      return prev;
+    });
   }, []);
 
   // Activity monitoring - TEMPORARILY DISABLED
@@ -283,7 +324,9 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
   };
 
   return (
-    <ErrorBoundaryContext.Provider value={{ showError, clearError, isOnline, lastActivity }}>
+    <ErrorBoundaryContext.Provider
+      value={{ showError, clearError, clearTransientConnectivityError, isOnline, lastActivity }}
+    >
       {children}
       
       {/* Error Modal */}
@@ -349,7 +392,7 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
       {/* Non-critical error notifications */}
       {errorState && errorState.severity !== 'critical' && (
         <div className="fixed top-4 right-4 z-40 max-w-sm">
-          <Alert className={`border-2 ${
+          <Alert className={`rounded-2xl border-2 ${
             errorState.severity === 'warning' ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20' :
             'border-orange-200 bg-orange-50 dark:bg-orange-900/20'
           }`}>
@@ -365,25 +408,13 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
                     label="Refresh"
                     size="sm"
                     variant="outline"
-                    className="h-8"
+                    className="h-8 rounded-xl"
                   />
                 )}
-                <Button onClick={clearError} size="sm" variant="ghost">
+                <Button onClick={clearError} size="sm" variant="ghost" className="rounded-xl">
                   Dismiss
                 </Button>
               </div>
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
-
-      {/* Network status indicator (small) */}
-      {!isOnline && !errorState && (
-        <div className="fixed bottom-4 right-4 z-40">
-          <Alert className="w-auto border-red-200 bg-red-50 dark:bg-red-900/20">
-            <WifiOff className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              No internet connection
             </AlertDescription>
           </Alert>
         </div>

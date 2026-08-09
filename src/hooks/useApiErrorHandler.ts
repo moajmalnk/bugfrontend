@@ -1,21 +1,36 @@
 import { useEffect, useRef } from 'react';
 import { apiClient } from '@/lib/axios';
 import { useErrorBoundary } from '@/components/ErrorBoundaryManager';
-import { isBrowserOnline } from '@/lib/networkStatus';
+import {
+  isBrowserOnline,
+  noteNetworkFailureAndShouldAlert,
+  noteNetworkSuccess,
+} from '@/lib/networkStatus';
 
-const NETWORK_ALERT_COOLDOWN_MS = 90_000;
+const SERVER_ALERT_COOLDOWN_MS = 120_000;
 
 export const useApiErrorHandler = () => {
-  const { showError } = useErrorBoundary();
-  const lastNetworkAlertAt = useRef(0);
+  const { showError, clearTransientConnectivityError } = useErrorBoundary();
+  const lastServerAlertAt = useRef(0);
 
   useEffect(() => {
     const responseInterceptor = apiClient.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        noteNetworkSuccess();
+        clearTransientConnectivityError();
+        return response;
+      },
       (error: any) => {
         const config = error?.config as
-          | { silentError?: boolean; skipErrorHandler?: boolean; url?: string }
+          | {
+              silentError?: boolean;
+              skipErrorHandler?: boolean;
+              url?: string;
+              baseURL?: string;
+            }
           | undefined;
+
+        const requestUrl = `${config?.baseURL ?? ''}${config?.url ?? ''}`;
 
         // Background / optional calls must not open Connection Issue UI
         if (config?.silentError || config?.skipErrorHandler) {
@@ -23,6 +38,7 @@ export const useApiErrorHandler = () => {
         }
 
         if (error.response) {
+          noteNetworkSuccess();
           const status = error.response.status;
 
           switch (status) {
@@ -64,8 +80,8 @@ export const useApiErrorHandler = () => {
             case 503:
             case 504: {
               const now = Date.now();
-              if (now - lastNetworkAlertAt.current >= NETWORK_ALERT_COOLDOWN_MS) {
-                lastNetworkAlertAt.current = now;
+              if (now - lastServerAlertAt.current >= SERVER_ALERT_COOLDOWN_MS) {
+                lastServerAlertAt.current = now;
                 showError({
                   type: 'server',
                   message:
@@ -82,14 +98,13 @@ export const useApiErrorHandler = () => {
               break;
           }
         } else if (error.request) {
-          // Already offline → rely on the slim top banner, not Connection Issue alerts
+          // Already offline → slim top banner only (App OfflineBanner)
           if (!isBrowserOnline()) {
             return Promise.reject(error);
           }
 
-          const now = Date.now();
-          if (now - lastNetworkAlertAt.current >= NETWORK_ALERT_COOLDOWN_MS) {
-            lastNetworkAlertAt.current = now;
+          // Transient DNS / Wi-Fi flaps: retry silently; alert only after sustained failures
+          if (noteNetworkFailureAndShouldAlert(requestUrl)) {
             showError({
               type: 'network',
               message:
@@ -108,5 +123,5 @@ export const useApiErrorHandler = () => {
     return () => {
       apiClient.interceptors.response.eject(responseInterceptor);
     };
-  }, [showError]);
+  }, [showError, clearTransientConnectivityError]);
 };

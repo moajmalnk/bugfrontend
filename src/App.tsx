@@ -33,6 +33,7 @@ import { ModernErrorBoundary } from "@/components/error/ModernErrorBoundary";
 import { RouteSEO } from "@/components/seo/RouteSEO";
 import { ProfessionalRefreshButton } from '@/components/ui/ProfessionalRefreshButton';
 import { RefreshKeyboardShortcuts } from '@/components/ui/RefreshKeyboardShortcuts';
+import { WifiOff } from 'lucide-react';
 
 const LazyPWAEngagementPrompt = lazy(() =>
   import("@/components/pwa/PWAEngagementPrompt").then((m) => ({
@@ -201,7 +202,7 @@ function OfflineBanner({ show }: { show: boolean }) {
       role="status"
       className="fixed inset-x-0 top-0 z-[9998] flex items-center justify-center gap-2 border-b border-amber-500/30 bg-amber-500/95 px-4 py-2 text-center text-sm font-medium text-amber-950 shadow-sm dark:border-amber-400/20 dark:bg-amber-600/95 dark:text-amber-50"
     >
-      <span aria-hidden>📡</span>
+      <WifiOff className="h-4 w-4 shrink-0" aria-hidden />
       <span>You're offline. BugRicer will reconnect automatically when you're back online.</span>
     </div>
   );
@@ -217,7 +218,7 @@ function AppContent() {
   });
 
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(false);
   const { currentUser } = useAuth();
 
   // Initialize service worker and offline detector
@@ -235,20 +236,31 @@ function AppContent() {
       setShowUpdateModal(true);
     });
 
-    serviceWorkerManager.onOffline(() => {
-      setIsOffline(true);
-    });
+    let offlineTimer: ReturnType<typeof setTimeout> | null = null;
 
-    serviceWorkerManager.onOnline(() => {
+    const applyOnline = () => {
+      if (offlineTimer) {
+        clearTimeout(offlineTimer);
+        offlineTimer = null;
+      }
       setIsOffline(false);
-    });
+    };
 
-    // Native online/offline as primary signal (SW callbacks can miss flaps)
-    const onOnline = () => setIsOffline(false);
-    const onOffline = () => setIsOffline(true);
-    window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
-    setIsOffline(!navigator.onLine);
+    // Why: Brief Wi-Fi/DNS flaps fire offline→online within ~1s; delay the banner
+    // so open/refresh does not flash a false "You're offline" strip.
+    const applyOffline = () => {
+      if (offlineTimer) clearTimeout(offlineTimer);
+      offlineTimer = setTimeout(() => {
+        if (!navigator.onLine) setIsOffline(true);
+      }, 1500);
+    };
+
+    serviceWorkerManager.onOffline(applyOffline);
+    serviceWorkerManager.onOnline(applyOnline);
+
+    window.addEventListener('online', applyOnline);
+    window.addEventListener('offline', applyOffline);
+    if (!navigator.onLine) applyOffline();
 
     // Initialize offline detector as fallback
     const cleanup = initOfflineDetector();
@@ -260,8 +272,9 @@ function AppContent() {
     return () => {
       cleanup();
       cleanupShadow();
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
+      if (offlineTimer) clearTimeout(offlineTimer);
+      window.removeEventListener('online', applyOnline);
+      window.removeEventListener('offline', applyOffline);
     };
   }, []);
 

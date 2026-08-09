@@ -110,12 +110,23 @@ class ShortsService {
   }
 
   async list(params?: { category?: string; published?: boolean | string }): Promise<ShortItem[]> {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return [];
+    }
     const qs = new URLSearchParams();
     if (params?.category) qs.set('category', params.category);
     if (params?.published !== undefined) qs.set('published', String(params.published));
     const url = `${this.baseUrl}/list.php${qs.toString() ? `?${qs}` : ''}`;
-    const data = await this.parse(await fetch(url, { headers: this.authHeaders() }));
-    return (data.data || []) as ShortItem[];
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const data = await this.parse(
+        await fetch(url, { headers: this.authHeaders(), signal: controller.signal })
+      );
+      return (data.data || []) as ShortItem[];
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   async get(id: string): Promise<ShortItem> {
