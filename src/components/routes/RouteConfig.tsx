@@ -154,6 +154,7 @@ const LeaveRequests = lazy(() => import("@/pages/LeaveRequests"));
 const AdminLeaveRequests = lazy(() => import("@/pages/AdminLeaveRequests"));
 const AdminLeaveUserDetail = lazy(() => import("@/pages/AdminLeaveUserDetail"));
 const AdminAttendanceExceptions = lazy(() => import("@/pages/AdminAttendanceExceptions"));
+const AdminAttendanceExceptionUserDetail = lazy(() => import("@/pages/AdminAttendanceExceptionUserDetail"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
 const CommonBugs = lazy(() => import("@/pages/CommonBugs"));
 const CommonCodoRules = lazy(() => import("@/pages/CommonCodoRules"));
@@ -402,6 +403,7 @@ const RouteConfig = () => {
           <Route path="overtime-requests" element={<AdminOvertimeRequests />} />
           <Route path="leave-requests/:userId" element={<AdminLeaveUserDetail />} />
           <Route path="leave-requests" element={<AdminLeaveRequests />} />
+          <Route path="attendance-exceptions/:userId" element={<AdminAttendanceExceptionUserDetail />} />
           <Route path="attendance-exceptions" element={<AdminAttendanceExceptions />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
           <Route path="common-bugs" element={<CommonBugs />} />

@@ -26,6 +26,14 @@ export type LateDayRow = {
   work_mode?: string | null;
 };
 
+export type AttendanceModeDay = {
+  date: string;
+  work_mode: 'office' | 'wfh';
+  is_late?: boolean;
+  check_in_time?: string | null;
+  source?: 'checkin' | 'exception';
+};
+
 export type AttendanceExceptionsPayload = {
   user_id: string;
   today: string;
@@ -39,6 +47,10 @@ export type AttendanceExceptionsPayload = {
   upcoming_office_only_week?: { week_start: string; week_end: string } | null;
   allow_wfh_today?: boolean;
   forgive_late_today?: boolean;
+  office_active_days?: number;
+  wfh_active_days?: number;
+  attendance_days?: AttendanceModeDay[];
+  attendance_from?: string;
 };
 
 export type AttendanceExceptionUserSummary = {
@@ -47,6 +59,7 @@ export type AttendanceExceptionUserSummary = {
   role?: string | null;
   exception_count: number;
   late_count: number;
+  office_active_days?: number;
   latest_exception_date?: string | null;
   latest_late_date?: string | null;
 };
@@ -58,6 +71,7 @@ export type AttendanceExceptionsAllPayload = {
   users?: AttendanceExceptionUserSummary[];
   exception_count: number;
   late_count: number;
+  office_active_days_total?: number;
   late_limit: number;
 };
 
