@@ -11,9 +11,9 @@ type NetworkListener = (online: boolean) => void;
 const listeners = new Set<NetworkListener>();
 let initialized = false;
 
-/** First paint / session start — suppress connection alerts during boot flaps */
+/** First paint / session start — suppress connection *alerts* during boot flaps */
 const APP_BOOT_AT = typeof performance !== 'undefined' ? performance.now() : Date.now();
-const BOOT_GRACE_MS = 12_000;
+const BOOT_ALERT_GRACE_MS = 12_000;
 
 /** After online/offline events, browser DNS/routes are still settling */
 const SETTLE_MS = 4_000;
@@ -95,12 +95,20 @@ function bootElapsedMs(): number {
   return Date.now() - (APP_BOOT_AT as number);
 }
 
-/** True while Wi-Fi/DNS is still settling after boot or online/offline flaps. */
+/**
+ * True briefly after online/offline flaps (DNS/routes settling).
+ * Does NOT include boot grace — callers should still fetch on open.
+ */
 export function isNetworkSettling(): boolean {
   ensureNetworkListeners();
-  if (bootElapsedMs() < BOOT_GRACE_MS) return true;
   if (!isBrowserOnline()) return false;
+  if (!lastNetworkTransitionAt) return false;
   return Date.now() - lastNetworkTransitionAt < SETTLE_MS;
+}
+
+/** Suppress Connection Issue UI during first paint / early parallel requests. */
+export function isInBootAlertGrace(): boolean {
+  return bootElapsedMs() < BOOT_ALERT_GRACE_MS;
 }
 
 export function isSilentNetworkUrl(url: string | undefined): boolean {
@@ -122,6 +130,7 @@ export function noteNetworkFailureAndShouldAlert(url?: string): boolean {
 
   if (!isBrowserOnline()) return false;
   if (isSilentNetworkUrl(url)) return false;
+  if (isInBootAlertGrace()) return false;
   if (isNetworkSettling()) return false;
 
   const now = Date.now();

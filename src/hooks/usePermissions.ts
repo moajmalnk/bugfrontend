@@ -47,8 +47,22 @@ export function usePermissions(projectId: string | null = null) {
           }
         }
 
-        if (!isBrowserOnline() || isNetworkSettling()) {
-          // Serve stale cache during boot / Wi-Fi settle; avoid noisy failed fetches
+        if (!isBrowserOnline()) {
+          // Serve stale cache when offline; avoid noisy failed fetches
+          if (cached) {
+            try {
+              const cachedData: CachedPermissions = JSON.parse(cached);
+              setPermissions(cachedData.permissions);
+            } catch {
+              /* ignore */
+            }
+          }
+          setIsLoading(false);
+          return false;
+        }
+
+        // Brief post-reconnect settle — use cache, then deferred effect will refetch
+        if (isNetworkSettling()) {
           if (cached) {
             try {
               const cachedData: CachedPermissions = JSON.parse(cached);
