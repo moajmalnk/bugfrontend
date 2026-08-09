@@ -87,11 +87,18 @@ const CommonBugs = () => {
   const [isMobileTabSelectorOpen, setIsMobileTabSelectorOpen] = useState(false);
 
   useEffect(() => {
-    if (currentUser?.role === "admin") {
-      fetchBugs();
-      fetchProjects();
+    if (!currentUser) return;
+    // Why: Developers (and permission holders) can open this page; previously only
+    // admins triggered fetchBugs, so non-admins stayed on skeleton forever.
+    if (!canAccessCommonBugs) {
+      setLoading(false);
+      setSkeletonLoading(false);
+      return;
     }
-  }, [currentUser?.role]);
+    fetchBugs();
+    fetchProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, canAccessCommonBugs]);
 
   useEffect(() => {
     const urlTab = searchParams.get("tab") || "all-common";

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { getEffectiveRole } from "@/lib/utils";
@@ -35,6 +35,11 @@ import { toast } from "@/components/ui/use-toast";
 import { googleSheetsService, UserSheet, Template } from "@/services/googleSheetsService";
 import { projectService } from "@/services/projectService";
 import { ProjectCardsGrid, ProjectWithCount } from "@/components/docs/ProjectCardsGrid";
+import { resolveProjectLabels } from "@/lib/projectLabels";
+import {
+  AccessUsersPicker,
+  parseAllowedUserIds,
+} from "@/components/docs/AccessUsersPicker";
 import {
   FileSpreadsheet,
   Plus,
@@ -56,6 +61,8 @@ import {
   TestTube,
   Users,
   CheckCircle2,
+  AlertTriangle,
+  Lightbulb,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -148,6 +155,14 @@ const BugSheetsPage = () => {
   const isAdmin = userRole === 'admin';
   const isDevOrTester = userRole === 'developer' || userRole === 'tester';
 
+  /** Edit/Delete: creator or admin only — never expose controls to other roles. */
+  const canManageSheet = (sheet: UserSheet): boolean => {
+    if (!currentUser?.id) return false;
+    if (isAdmin) return true;
+    if (activeTab === "my-sheets") return true;
+    return String(sheet.creator_user_id ?? "") === String(currentUser.id);
+  };
+
   const [sheets, setSheets] = useState<UserSheet[]>([]);
   const [allSheetsGrouped, setAllSheetsGrouped] = useState<Array<{
     project_id: string | null;
@@ -160,6 +175,8 @@ const BugSheetsPage = () => {
   const [sharedSheetsCount, setSharedSheetsCount] = useState<number>(0);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [projects, setProjects] = useState<ProjectWithCount[]>([]);
+  // Why: Full catalog is for card name badges only — pickers must stay membership-scoped.
+  const [projectNameCatalog, setProjectNameCatalog] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -191,8 +208,10 @@ const BugSheetsPage = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("0");
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(["all"]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [projectSearchTerm, setProjectSearchTerm] = useState("");
   const [editProjectSearchTerm, setEditProjectSearchTerm] = useState("");
+  const [editSelectedUserIds, setEditSelectedUserIds] = useState<string[]>([]);
 
   // Tab and filter state
   const [searchParams, setSearchParams] = useSearchParams();
@@ -254,14 +273,53 @@ const BugSheetsPage = () => {
   const loadProjects = async () => {
     setIsLoadingProjects(true);
     try {
-      const projsWithCounts = await googleSheetsService.getProjectsWithSheetCounts();
-      setProjects(projsWithCounts.map(p => ({ ...p, document_count: p.sheet_count })));
+      const [projsWithCounts, allProjs] = await Promise.all([
+        googleSheetsService.getProjectsWithSheetCounts().catch(() => [] as Array<{
+          id: string;
+          name: string;
+          sheet_count?: number;
+        }>),
+        projectService.getProjects().catch(() => [] as Array<{ id: string; name: string }>),
+      ]);
+
+      // Create/Edit pickers: only projects the user is assigned to (counts API is membership-scoped for non-admins).
+      const assignable = projsWithCounts
+        .filter((p) => p.id && p.id !== "no-project")
+        .map((p) => ({
+          id: String(p.id),
+          name: p.name || "Untitled",
+          description: "",
+          status: "active",
+          document_count: (p as { sheet_count?: number }).sheet_count ?? 0,
+        }));
+      setProjects(assignable);
+
+      // Why: Shared sheets may reference projects outside the assignable list — keep a name catalog for badges.
+      const nameById = new Map<string, string>();
+      for (const p of allProjs) {
+        nameById.set(String(p.id), p.name);
+      }
+      for (const p of assignable) {
+        if (p.name) nameById.set(p.id, p.name);
+      }
+      setProjectNameCatalog(
+        Array.from(nameById.entries()).map(([id, name]) => ({ id, name }))
+      );
     } catch (error: any) {
       console.error("Error loading projects:", error);
-      // Fallback to regular project service
       try {
-        const projs = await projectService.getProjects();
-        setProjects(projs.map(p => ({ ...p, document_count: 0 })));
+        const projs = await googleSheetsService.getProjectsWithSheetCounts();
+        setProjects(
+          projs
+            .filter((p) => p.id && p.id !== "no-project")
+            .map((p) => ({
+              id: String(p.id),
+              name: p.name || "Untitled",
+              description: "",
+              status: "active",
+              document_count: p.sheet_count ?? 0,
+            }))
+        );
       } catch (fallbackError) {
         console.error("Error loading projects fallback:", fallbackError);
       }
@@ -451,10 +509,10 @@ const BugSheetsPage = () => {
       return;
     }
 
-    if (selectedRoles.length === 0) {
+    if (selectedRoles.length === 0 && selectedUserIds.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please select at least one role",
+        description: "Select at least one role or specific user",
         variant: "destructive",
       });
       return;
@@ -473,16 +531,24 @@ const BugSheetsPage = () => {
         : null;
 
       // Convert roles array to comma-separated string (or 'all' if only 'all' is selected)
-      const roleValue = selectedRoles.length === 1 && selectedRoles[0] === 'all' 
-        ? 'all' 
-        : selectedRoles.filter(r => r !== 'all').join(',');
+      // Why: Users-only share uses for_me + allowed_user_ids so access stays private to invitees.
+      let roleValue =
+        selectedRoles.length === 1 && selectedRoles[0] === 'all'
+          ? 'all'
+          : selectedRoles.filter(r => r !== 'all').join(',');
+      if (!roleValue && selectedUserIds.length > 0) {
+        roleValue = 'for_me';
+      }
+      const allowedUsers =
+        roleValue === 'all' ? [] : selectedUserIds;
 
       const result = await googleSheetsService.createGeneralSheet(
         sheetTitle.trim(),
         templateId,
         'general',
         projectIdValue,
-        roleValue
+        roleValue || 'for_me',
+        allowedUsers
       );
 
       toast({
@@ -496,13 +562,7 @@ const BugSheetsPage = () => {
       // Reload sheets list
       await refreshSheets();
 
-      // Reset form and close modal
-      setSheetTitle("");
-      setSelectedTemplateId("0");
-      setSelectedProjectIds([]);
-      setSelectedRoles(["all"]);
-      setProjectSearchTerm("");
-      setIsCreateModalOpen(false);
+      closeCreateModal();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -515,34 +575,105 @@ const BugSheetsPage = () => {
   };
 
   const handleDeleteClick = (sheet: UserSheet) => {
+    if (!canManageSheet(sheet)) return;
     setSheetToDelete(sheet);
     setIsDeleteDialogOpen(true);
   };
 
-  const handleEditClick = (sheet: UserSheet) => {
+  const clearEditParam = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        if (!prev.has("edit")) return prev;
+        const next = new URLSearchParams(prev);
+        next.delete("edit");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
+
+  const clearCreateParam = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        if (!prev.has("create")) return prev;
+        const next = new URLSearchParams(prev);
+        next.delete("create");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
+
+  const resetCreateForm = useCallback(() => {
+    setSheetTitle("");
+    setSelectedTemplateId("0");
+    setSelectedProjectIds([]);
+    setSelectedRoles(["all"]);
+    setSelectedUserIds([]);
+    setProjectSearchTerm("");
+  }, []);
+
+  const openCreateModal = useCallback(() => {
+    setIsCreateModalOpen(true);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("edit");
+        next.set("create", "1");
+        return next;
+      },
+      { replace: false }
+    );
+  }, [setSearchParams]);
+
+  const closeCreateModal = useCallback(() => {
+    setIsCreateModalOpen(false);
+    resetCreateForm();
+    clearCreateParam();
+  }, [resetCreateForm, clearCreateParam]);
+
+  const populateEditForm = useCallback((sheet: UserSheet) => {
     setSheetToEdit(sheet);
     setEditSheetTitle(sheet.sheet_title);
-    // Parse comma-separated project IDs into array, or empty array if null/empty
     const projectIdValue = sheet.project_id || "";
-    const projectIdsArray = projectIdValue ? projectIdValue.split(",").map((p: string) => p.trim()) : [];
+    const projectIdsArray = projectIdValue
+      ? projectIdValue.split(",").map((p: string) => p.trim())
+      : [];
     setEditSelectedProjectIds(projectIdsArray);
-    // template_id might not be in the interface but exists in database
-    setEditSelectedTemplateId((sheet as any).template_id ? (sheet as any).template_id.toString() : "0");
-    // Parse comma-separated roles into array, or default to ['all']
+    setEditSelectedTemplateId(
+      (sheet as any).template_id ? (sheet as any).template_id.toString() : "0"
+    );
     const roleValue = (sheet as any).role || "all";
     let rolesArray: string[];
     if (!roleValue || roleValue === "all") {
       rolesArray = ["all"];
     } else {
-      // Split by comma and filter out empty strings
-      rolesArray = roleValue.split(",").map((r: string) => r.trim()).filter((r: string) => r.length > 0);
-      // If no valid roles after parsing, default to ['all']
+      rolesArray = roleValue
+        .split(",")
+        .map((r: string) => r.trim())
+        .filter((r: string) => r.length > 0);
       if (rolesArray.length === 0) {
         rolesArray = ["all"];
       }
     }
     setEditSelectedRoles(rolesArray);
+    setEditSelectedUserIds(parseAllowedUserIds(sheet.allowed_user_ids));
+    setEditProjectSearchTerm("");
     setIsEditDialogOpen(true);
+  }, []);
+
+  const handleEditClick = (sheet: UserSheet) => {
+    if (!canManageSheet(sheet)) return;
+    populateEditForm(sheet);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("create");
+        next.set("edit", String(sheet.id));
+        return next;
+      },
+      { replace: false }
+    );
   };
 
   const handleEditCancel = () => {
@@ -552,7 +683,9 @@ const BugSheetsPage = () => {
     setEditSelectedProjectIds([]);
     setEditSelectedTemplateId("0");
     setEditSelectedRoles(["all"]);
+    setEditSelectedUserIds([]);
     setEditProjectSearchTerm("");
+    clearEditParam();
   };
 
   const handleEditConfirm = async () => {
@@ -565,10 +698,10 @@ const BugSheetsPage = () => {
       return;
     }
 
-    if (editSelectedRoles.length === 0) {
+    if (editSelectedRoles.length === 0 && editSelectedUserIds.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please select at least one role",
+        description: "Select at least one role or specific user",
         variant: "destructive",
       });
       return;
@@ -583,16 +716,21 @@ const BugSheetsPage = () => {
       const templateId = editSelectedTemplateId && editSelectedTemplateId !== "0" ? parseInt(editSelectedTemplateId) : null;
       
       // Convert roles array to comma-separated string (or 'all' if only 'all' is selected)
-      const roleValue = editSelectedRoles.length === 1 && editSelectedRoles[0] === 'all' 
+      let roleValue = editSelectedRoles.length === 1 && editSelectedRoles[0] === 'all' 
         ? 'all' 
         : editSelectedRoles.filter(r => r !== 'all').join(',');
+      if (!roleValue && editSelectedUserIds.length > 0) {
+        roleValue = 'for_me';
+      }
+      const allowedUsers = roleValue === 'all' ? [] : editSelectedUserIds;
 
       await googleSheetsService.updateSheet(
         sheetToEdit.id,
         editSheetTitle.trim(),
         projectIdValue,
         templateId,
-        roleValue
+        roleValue || 'for_me',
+        allowedUsers
       );
 
       toast({
@@ -603,13 +741,7 @@ const BugSheetsPage = () => {
       // Reload sheets list
       await refreshSheets();
 
-      // Close dialog and reset state
-      setIsEditDialogOpen(false);
-      setSheetToEdit(null);
-      setEditSheetTitle("");
-      setEditSelectedProjectIds([]);
-      setEditSelectedTemplateId("0");
-      setEditSelectedRoles(["all"]);
+      handleEditCancel();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -739,30 +871,21 @@ const BugSheetsPage = () => {
     return roles.map(r => getRoleBadge(r));
   };
 
-  // Get project names for comma-separated project IDs
-  const getProjectNames = (projectId: string | null | undefined): string[] => {
-    if (!projectId) {
-      return [];
-    }
-    
-    const projectIds = projectId.split(",").map(id => id.trim()).filter(id => id);
-    return projectIds.map(id => {
-      const project = projects.find(p => p.id === id);
-      return project ? project.name : id;
-    });
-  };
+  // Get project names for comma-separated project IDs (never show raw UUIDs)
+  const getProjectNames = (
+    projectId: string | null | undefined,
+    projectName?: string | null
+  ): string[] => resolveProjectLabels(projectId, projectNameCatalog, projectName);
 
   // Filtered sheets with useMemo - sorted by latest first
   const filteredSheets = useMemo(() => {
     let filtered = [...sheets];
 
-    // Filter by tab
-    if (activeTab === "my-sheets") {
-      // For now, show all sheets in both tabs
-      // In the future, this could filter by user ownership
-      filtered = sheets;
-    } else if (activeTab === "all-sheets") {
-      filtered = sheets;
+    // Shared Sheets: never list the current user's own sheets (those live in My Sheets)
+    if (activeTab === "shared-sheets" && currentUser?.id) {
+      filtered = filtered.filter(
+        (sheet) => String(sheet.creator_user_id ?? "") !== String(currentUser.id)
+      );
     }
 
     // Apply search filter (use localSearchTerm for immediate filtering)
@@ -824,7 +947,7 @@ const BugSheetsPage = () => {
       const dateB = new Date(b.created_at);
       return dateB.getTime() - dateA.getTime(); // Descending order (latest first)
     });
-  }, [sheets, activeTab, localSearchTerm, dateFilter, projectFilter]);
+  }, [sheets, activeTab, localSearchTerm, dateFilter, projectFilter, currentUser?.id]);
 
 
   // Get tab counts - use separate state variables for accurate counts
@@ -859,6 +982,73 @@ const BugSheetsPage = () => {
     if (urlTab !== activeTab) setActiveTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Deep-link / browser Back: ?edit=<id> opens Edit Sheet; removing it closes
+  useEffect(() => {
+    const editIdRaw = searchParams.get("edit");
+    if (!editIdRaw) {
+      if (isEditDialogOpen) {
+        setIsEditDialogOpen(false);
+        setSheetToEdit(null);
+        setEditSheetTitle("");
+        setEditSelectedProjectIds([]);
+        setEditSelectedTemplateId("0");
+        setEditSelectedRoles(["all"]);
+        setEditProjectSearchTerm("");
+      }
+      return;
+    }
+
+    const editId = Number(editIdRaw);
+    if (!Number.isFinite(editId)) {
+      clearEditParam();
+      return;
+    }
+
+    if (isEditDialogOpen && sheetToEdit?.id === editId) return;
+
+    const sheet =
+      sheets.find((s) => s.id === editId) ||
+      allSheetsGrouped.flatMap((g) => g.sheets).find((s) => s.id === editId);
+
+    if (!sheet) return;
+
+    const allowed =
+      !!currentUser?.id &&
+      (isAdmin ||
+        activeTab === "my-sheets" ||
+        String(sheet.creator_user_id ?? "") === String(currentUser.id));
+
+    if (allowed) {
+      populateEditForm(sheet);
+    } else {
+      clearEditParam();
+    }
+  }, [
+    searchParams,
+    sheets,
+    allSheetsGrouped,
+    isEditDialogOpen,
+    sheetToEdit?.id,
+    currentUser?.id,
+    isAdmin,
+    activeTab,
+    clearEditParam,
+    populateEditForm,
+  ]);
+
+  // Deep-link / browser Back: ?create=1 opens Create Sheet
+  useEffect(() => {
+    const wantsCreate = searchParams.get("create") === "1";
+    if (wantsCreate) {
+      if (!isCreateModalOpen) setIsCreateModalOpen(true);
+      return;
+    }
+    if (isCreateModalOpen && !searchParams.has("edit")) {
+      setIsCreateModalOpen(false);
+      resetCreateForm();
+    }
+  }, [searchParams, isCreateModalOpen, resetCreateForm]);
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
@@ -895,7 +1085,7 @@ const BugSheetsPage = () => {
                   <>
                 {isConnected && (
                   <Button
-                    onClick={() => setIsCreateModalOpen(true)}
+                    onClick={openCreateModal}
                     className="h-12 px-6 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 self-start"
                   >
                     <Plus className="mr-2 h-5 w-5" />
@@ -1191,7 +1381,7 @@ const BugSheetsPage = () => {
                           </Button>
                         ) : (
                           <Button
-                            onClick={() => setIsCreateModalOpen(true)}
+                            onClick={openCreateModal}
                             className="h-12 px-6 bg-gradient-to-r from-green-600 to-blue-700 hover:from-green-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                           >
                             <Plus className="h-5 w-5 mr-2" />
@@ -1250,7 +1440,10 @@ const BugSheetsPage = () => {
                                 <div className="flex-1 min-w-0">
                                   <div className="text-xs text-gray-500 dark:text-gray-500 font-medium mb-1">Projects</div>
                                   {(() => {
-                                    const projectNames = getProjectNames(sheet.project_id);
+                                    const projectNames = getProjectNames(
+                                      sheet.project_id,
+                                      sheet.project_name
+                                    );
                                     if (projectNames.length === 0) {
                                       return (
                                         <span className="italic text-gray-400 text-sm">No Project</span>
@@ -1314,53 +1507,57 @@ const BugSheetsPage = () => {
                               </div>
                             </div>
 
-                            {/* Action Buttons */}
-                            <div className="grid grid-cols-4 gap-2 pt-4 border-t border-gray-100 dark:border-gray-700 min-w-0">
+                            {/* Action Buttons — View/Edit flex; Copy/Delete fixed icon size (no w-full stretch) */}
+                            <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-700 min-w-0">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 title="View sheet"
                                 onClick={() => handleViewSheet(sheet)}
-                                className="h-9 w-full min-w-0 px-2 inline-flex items-center justify-center gap-1 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-green-200 dark:border-green-800 hover:from-green-100 hover:to-blue-100 dark:hover:from-green-900/30 dark:hover:to-blue-900/30 text-green-700 dark:text-green-300 font-semibold"
+                                className="h-9 min-w-0 flex-1 px-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-green-200 dark:border-green-800 hover:from-green-100 hover:to-blue-100 dark:hover:from-green-900/30 dark:hover:to-blue-900/30 text-green-700 dark:text-green-300 font-semibold"
                               >
                                 <ExternalLink className="h-4 w-4 shrink-0" />
-                                <span className="hidden xl:inline truncate">View</span>
+                                <span className="truncate text-xs sm:text-sm">View</span>
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                title="Edit sheet"
-                                onClick={() => handleEditClick(sheet)}
-                                className="h-9 w-full min-w-0 px-2 inline-flex items-center justify-center gap-1 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold"
-                              >
-                                <Edit className="h-4 w-4 shrink-0" />
-                                <span className="hidden xl:inline truncate">Edit</span>
-                              </Button>
+                              {canManageSheet(sheet) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  title="Edit sheet"
+                                  onClick={() => handleEditClick(sheet)}
+                                  className="h-9 min-w-0 flex-1 px-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold"
+                                >
+                                  <Edit className="h-4 w-4 shrink-0" />
+                                  <span className="truncate text-xs sm:text-sm">Edit</span>
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
                                 title="Copy sheet URL"
                                 onClick={() => handleCopySheetUrl(sheet)}
-                                className="h-9 w-full min-w-0 px-2 inline-flex items-center justify-center bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                                className="h-9 w-9 shrink-0 px-0 inline-flex items-center justify-center rounded-xl bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
                               >
                                 <Copy className="h-4 w-4 shrink-0" />
                                 <span className="sr-only">Copy</span>
                               </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                title="Delete sheet"
-                                onClick={() => handleDeleteClick(sheet)}
-                                disabled={isDeleting === sheet.id}
-                                className="h-9 w-full min-w-0 px-2 inline-flex items-center justify-center"
-                              >
-                                {isDeleting === sheet.id ? (
-                                  <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4 shrink-0" />
-                                )}
-                                <span className="sr-only">Delete</span>
-                              </Button>
+                              {canManageSheet(sheet) && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  title="Delete sheet"
+                                  onClick={() => handleDeleteClick(sheet)}
+                                  disabled={isDeleting === sheet.id}
+                                  className="h-9 w-9 shrink-0 px-0 inline-flex items-center justify-center rounded-xl"
+                                >
+                                  {isDeleting === sheet.id ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4 shrink-0" />
+                                  )}
+                                  <span className="sr-only">Delete</span>
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1373,313 +1570,332 @@ const BugSheetsPage = () => {
           </Tabs>
         )}
 
-        {/* Create Sheet Modal */}
+        {/* Create Sheet Modal — large form; URL: ?create=1 */}
         {isConnected && (
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-lg sm:text-xl">Create New Sheet</DialogTitle>
-                <DialogDescription className="text-sm sm:text-base">
+          <Dialog
+            open={isCreateModalOpen}
+            onOpenChange={(open) => {
+              if (!open) closeCreateModal();
+            }}
+          >
+            <DialogContent className="flex h-[min(92vh,920px)] w-[min(96vw,56rem)] max-w-none flex-col gap-0 overflow-hidden rounded-2xl border border-border/60 p-0 shadow-2xl sm:max-w-none">
+              <DialogHeader className="shrink-0 space-y-2 border-b border-border/50 bg-gradient-to-br from-muted/50 via-background to-background px-6 pb-5 pt-7 text-left sm:px-8 sm:pb-6 sm:pt-8 pr-14">
+                <DialogTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+                  Create New Sheet
+                </DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground sm:text-base max-w-2xl">
                   Create a new Google Sheet from a template or start from scratch
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sheet-title" className="text-sm font-medium">Sheet Title *</Label>
-                  <Input
-                    id="sheet-title"
-                    placeholder="Enter sheet title..."
-                    value={sheetTitle}
-                    onChange={(e) => setSheetTitle(e.target.value)}
-                    disabled={isCreating}
-                    className="w-full"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="template" className="text-sm font-medium">Template (Optional)</Label>
-                  <Select
-                    value={selectedTemplateId}
-                    onValueChange={setSelectedTemplateId}
-                    disabled={isCreating}
-                  >
-                    <SelectTrigger id="template" className="w-full">
-                      <SelectValue placeholder="Blank sheet (no template)" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px] overflow-y-auto">
-                      <SelectItem value="0">Blank sheet (no template)</SelectItem>
-                      {templates.map((template) => (
-                        <SelectItem key={template.id} value={template.id.toString()}>
-                          <div className="flex flex-col items-start">
-                            <span>{template.template_name}</span>
-                            {!template.is_configured && (
-                              <span className="text-orange-500 text-xs">
-                                (not configured)
-                              </span>
-                            )}
-                            {template.is_configured && template.description && (
-                              <span className="text-muted-foreground text-xs">
-                                ({template.category})
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">
-                      Templates provide pre-formatted structures for your sheets
-                    </p>
-                    {templates.some(t => !t.is_configured) && (
-                      <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                        <span>⚠️</span>
-                        <span>Templates marked "not configured" will create blank sheets</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="project" className="text-sm font-medium flex items-center gap-2">
-                      <FolderOpen className="h-4 w-4" />
-                      Project (Optional)
-                    </Label>
-                    {selectedProjectIds.length > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {selectedProjectIds.length} selected
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  {/* Selected Projects Chips */}
-                  {selectedProjectIds.length > 0 && (
-                    <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
-                      {selectedProjectIds.map((projectId) => {
-                        const project = projects.find(p => p.id === projectId);
-                        if (!project) return null;
-                        return (
-                          <Badge
-                            key={projectId}
-                            variant="secondary"
-                            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
-                          >
-                            <FolderOpen className="h-3 w-3" />
-                            {project.name}
-                            <button
-                              type="button"
-                              onClick={() => setSelectedProjectIds(prev => prev.filter(id => id !== projectId))}
-                              className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
-                              disabled={isCreating}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Search Projects */}
-                  {projects.length > 3 && (
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="text"
-                        placeholder="Search projects..."
-                        value={projectSearchTerm}
-                        onChange={(e) => setProjectSearchTerm(e.target.value)}
-                        className="pl-9 h-9"
-                        disabled={isCreating}
-                      />
-                    </div>
-                  )}
-
-                  {/* Projects List */}
-                  <div className="space-y-2 p-4 border rounded-lg bg-background max-h-[200px] overflow-y-auto">
-                    {projects.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <FolderOpen className="h-8 w-8 text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground">No projects available</p>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <div className="px-6 py-6 sm:px-8 sm:py-8">
+                  <div className="grid gap-8 lg:grid-cols-2 lg:gap-10 lg:items-start">
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="sheet-title" className="text-sm font-medium">Sheet Title *</Label>
+                        <Input
+                          id="sheet-title"
+                          placeholder="Enter sheet title..."
+                          value={sheetTitle}
+                          onChange={(e) => setSheetTitle(e.target.value)}
+                          disabled={isCreating}
+                          className="w-full rounded-xl"
+                        />
                       </div>
-                    ) : (
-                      (() => {
-                        const filteredProjects = projectSearchTerm
-                          ? projects.filter(p => p.name.toLowerCase().includes(projectSearchTerm.toLowerCase()))
-                          : projects;
-                        
-                        if (filteredProjects.length === 0) {
-                          return (
-                            <div className="flex flex-col items-center justify-center py-6 text-center">
-                              <Search className="h-6 w-6 text-muted-foreground mb-2" />
-                              <p className="text-sm text-muted-foreground">No projects found</p>
-                            </div>
-                          );
-                        }
+                      <div className="space-y-2">
+                        <Label htmlFor="template" className="text-sm font-medium">Template (Optional)</Label>
+                        <Select
+                          value={selectedTemplateId}
+                          onValueChange={setSelectedTemplateId}
+                          disabled={isCreating}
+                        >
+                          <SelectTrigger id="template" className="w-full rounded-xl">
+                            <SelectValue placeholder="Blank sheet (no template)" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[min(280px,45vh)] overflow-y-auto z-[200]">
+                            <SelectItem value="0">Blank sheet (no template)</SelectItem>
+                            {templates.map((template) => (
+                              <SelectItem key={template.id} value={template.id.toString()}>
+                                <div className="flex flex-col items-start">
+                                  <span>{template.template_name}</span>
+                                  {!template.is_configured && (
+                                    <span className="text-orange-500 text-xs">
+                                      (not configured)
+                                    </span>
+                                  )}
+                                  {template.is_configured && template.description && (
+                                    <span className="text-muted-foreground text-xs">
+                                      ({template.category})
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">
+                            Templates provide pre-formatted structures for your sheets
+                          </p>
+                          {templates.some((t) => !t.is_configured) && (
+                            <p className="text-xs text-orange-600 dark:text-orange-400 flex items-start gap-2 rounded-xl border border-orange-200/60 bg-orange-50/50 p-3 dark:border-orange-900/40 dark:bg-orange-950/20">
+                              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+                              <span>Templates marked &quot;not configured&quot; will create blank sheets</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
 
-                        return filteredProjects.map((project) => (
-                          <div
-                            key={project.id}
-                            className={`flex items-center space-x-3 p-2 rounded-md transition-colors ${
-                              selectedProjectIds.includes(project.id)
-                                ? "bg-primary/10 border border-primary/20"
-                                : "hover:bg-muted/50 border border-transparent"
-                            }`}
-                          >
-                            <Checkbox
-                              id={`project-${project.id}`}
-                              checked={selectedProjectIds.includes(project.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedProjectIds((prev) => [...prev, project.id]);
-                                } else {
-                                  setSelectedProjectIds((prev) => prev.filter(id => id !== project.id));
-                                }
-                              }}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="role" className="text-sm font-medium flex items-center gap-2">
+                            <Shield className="h-4 w-4" />
+                            Accessible to Roles *
+                          </Label>
+                          {selectedRoles.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {selectedRoles.length} selected
+                            </Badge>
+                          )}
+                        </div>
+
+                        {selectedRoles.length > 0 && (
+                          <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-xl border border-dashed">
+                            {selectedRoles.map((roleValue) => {
+                              const roleMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                                for_me: { label: "For Me", icon: <User className="h-3 w-3" />, color: "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300" },
+                                all: { label: "All Users", icon: <Users className="h-3 w-3" />, color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300" },
+                                admins: { label: "Admins Only", icon: <Shield className="h-3 w-3" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300" },
+                                developers: { label: "Developers Only", icon: <Code className="h-3 w-3" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" },
+                                testers: { label: "Testers Only", icon: <TestTube className="h-3 w-3" />, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300" },
+                              };
+                              const role = roleMap[roleValue];
+                              if (!role) return null;
+                              return (
+                                <Badge
+                                  key={roleValue}
+                                  variant="outline"
+                                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.color}`}
+                                >
+                                  {role.icon}
+                                  {role.label}
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedRoles((prev) => prev.filter((r) => r !== roleValue))}
+                                    className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                                    disabled={isCreating}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <div className="space-y-2 p-4 border rounded-xl bg-background">
+                          {[
+                            { value: "for_me", label: "For Me", icon: <User className="h-4 w-4" />, color: "text-orange-600 dark:text-orange-400" },
+                            { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
+                            { value: "admins", label: "Admins Only", icon: <Shield className="h-4 w-4" />, color: "text-purple-600 dark:text-purple-400" },
+                            { value: "developers", label: "Developers Only", icon: <Code className="h-4 w-4" />, color: "text-blue-600 dark:text-blue-400" },
+                            { value: "testers", label: "Testers Only", icon: <TestTube className="h-4 w-4" />, color: "text-pink-600 dark:text-pink-400" },
+                          ].map((role) => (
+                            <div
+                              key={role.value}
+                              className={`flex items-center space-x-3 p-2.5 rounded-xl transition-colors ${
+                                selectedRoles.includes(role.value)
+                                  ? "bg-primary/10 border border-primary/20"
+                                  : "hover:bg-muted/50 border border-transparent"
+                              }`}
+                            >
+                              <Checkbox
+                                id={`role-${role.value}`}
+                                checked={selectedRoles.includes(role.value)}
+                                onCheckedChange={(checked) => {
+                                  if (role.value === "all") {
+                                    setSelectedRoles(checked ? ["all"] : []);
+                                    if (checked) setSelectedUserIds([]);
+                                  } else if (role.value === "for_me") {
+                                    setSelectedRoles(checked ? ["for_me"] : []);
+                                  } else if (checked) {
+                                    setSelectedRoles((prev) =>
+                                      prev.filter((r) => r !== "all" && r !== "for_me").concat(role.value)
+                                    );
+                                  } else {
+                                    setSelectedRoles((prev) => prev.filter((r) => r !== role.value));
+                                  }
+                                }}
+                                disabled={isCreating}
+                              />
+                              <label
+                                htmlFor={`role-${role.value}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
+                              >
+                                <span className={role.color}>{role.icon}</span>
+                                {role.label}
+                                {selectedRoles.includes(role.value) && (
+                                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                                )}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                          <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                          <p className="text-xs text-blue-900 dark:text-blue-100">
+                            <strong>Tip:</strong> &quot;For Me&quot; is private to you (plus any specific users below). &quot;All Users&quot; overrides other roles and clears specific users.
+                          </p>
+                        </div>
+                        <AccessUsersPicker
+                          selectedUserIds={selectedUserIds}
+                          onChange={setSelectedUserIds}
+                          disabled={selectedRoles.includes("all")}
+                          excludeUserId={currentUser?.id}
+                          idPrefix="sheet-create-user"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="project" className="text-sm font-medium flex items-center gap-2">
+                            <FolderOpen className="h-4 w-4" />
+                            Project (Optional)
+                          </Label>
+                          {selectedProjectIds.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {selectedProjectIds.length} selected
+                            </Badge>
+                          )}
+                        </div>
+
+                        {selectedProjectIds.length > 0 && (
+                          <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-xl border border-dashed">
+                            {selectedProjectIds.map((projectId) => {
+                              const project = projects.find((p) => p.id === projectId);
+                              if (!project) return null;
+                              return (
+                                <Badge
+                                  key={projectId}
+                                  variant="secondary"
+                                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
+                                >
+                                  <FolderOpen className="h-3 w-3" />
+                                  {project.name}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedProjectIds((prev) => prev.filter((id) => id !== projectId))
+                                    }
+                                    className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                                    disabled={isCreating}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {projects.length > 3 && (
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="text"
+                              placeholder="Search projects..."
+                              value={projectSearchTerm}
+                              onChange={(e) => setProjectSearchTerm(e.target.value)}
+                              className="pl-9 h-9 rounded-xl"
                               disabled={isCreating}
                             />
-                            <label
-                              htmlFor={`project-${project.id}`}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
-                            >
-                              <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                              {project.name}
-                              {selectedProjectIds.includes(project.id) && (
-                                <CheckCircle2 className="h-4 w-4 text-primary" />
-                              )}
-                            </label>
                           </div>
-                        ));
-                      })()
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <span>💡</span>
-                    <span>Select one or more projects to associate this sheet with</span>
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="role" className="text-sm font-medium flex items-center gap-2">
-                      <Shield className="h-4 w-4" />
-                      Accessible to Roles *
-                    </Label>
-                    {selectedRoles.length > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {selectedRoles.length} selected
-                      </Badge>
-                    )}
-                  </div>
+                        )}
 
-                  {/* Selected Roles Chips */}
-                  {selectedRoles.length > 0 && (
-                    <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
-                      {selectedRoles.map((roleValue) => {
-                        const roleMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-                          for_me: { label: "For Me", icon: <User className="h-3 w-3" />, color: "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300" },
-                          all: { label: "All Users", icon: <Users className="h-3 w-3" />, color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300" },
-                          admins: { label: "Admins Only", icon: <Shield className="h-3 w-3" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300" },
-                          developers: { label: "Developers Only", icon: <Code className="h-3 w-3" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" },
-                          testers: { label: "Testers Only", icon: <TestTube className="h-3 w-3" />, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300" },
-                        };
-                        const role = roleMap[roleValue];
-                        if (!role) return null;
-                        return (
-                          <Badge
-                            key={roleValue}
-                            variant="outline"
-                            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.color}`}
-                          >
-                            {role.icon}
-                            {role.label}
-                            <button
-                              type="button"
-                              onClick={() => setSelectedRoles(prev => prev.filter(r => r !== roleValue))}
-                              className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
-                              disabled={isCreating}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  )}
+                        <div className="space-y-2 p-4 border rounded-xl bg-background max-h-[min(420px,45vh)] overflow-y-auto">
+                          {projects.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                              <FolderOpen className="h-8 w-8 text-muted-foreground mb-2" />
+                              <p className="text-sm text-muted-foreground">No projects available</p>
+                            </div>
+                          ) : (
+                            (() => {
+                              const filteredProjects = projectSearchTerm
+                                ? projects.filter((p) =>
+                                    p.name.toLowerCase().includes(projectSearchTerm.toLowerCase())
+                                  )
+                                : projects;
 
-                  {/* Roles List */}
-                  <div className="space-y-2 p-4 border rounded-lg bg-background">
-                    {[
-                      { value: "for_me", label: "For Me", icon: <User className="h-4 w-4" />, color: "text-orange-600 dark:text-orange-400" },
-                      { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
-                      { value: "admins", label: "Admins Only", icon: <Shield className="h-4 w-4" />, color: "text-purple-600 dark:text-purple-400" },
-                      { value: "developers", label: "Developers Only", icon: <Code className="h-4 w-4" />, color: "text-blue-600 dark:text-blue-400" },
-                      { value: "testers", label: "Testers Only", icon: <TestTube className="h-4 w-4" />, color: "text-pink-600 dark:text-pink-400" },
-                    ].map((role) => (
-                      <div
-                        key={role.value}
-                        className={`flex items-center space-x-3 p-2.5 rounded-md transition-colors ${
-                          selectedRoles.includes(role.value)
-                            ? "bg-primary/10 border border-primary/20"
-                            : "hover:bg-muted/50 border border-transparent"
-                        }`}
-                      >
-                        <Checkbox
-                          id={`role-${role.value}`}
-                          checked={selectedRoles.includes(role.value)}
-                          onCheckedChange={(checked) => {
-                            if (role.value === "all") {
-                              // If "All Users" is selected, clear other selections
-                              setSelectedRoles(checked ? ["all"] : []);
-                            } else if (role.value === "for_me") {
-                              // If "For Me" is selected, clear all other selections (exclusive)
-                              setSelectedRoles(checked ? ["for_me"] : []);
-                            } else {
-                              // If a specific role is selected, remove "all" and "for_me" and toggle the role
-                              if (checked) {
-                                setSelectedRoles((prev) => 
-                                  prev.filter(r => r !== "all" && r !== "for_me").concat(role.value)
+                              if (filteredProjects.length === 0) {
+                                return (
+                                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                                    <Search className="h-6 w-6 text-muted-foreground mb-2" />
+                                    <p className="text-sm text-muted-foreground">No projects found</p>
+                                  </div>
                                 );
-                              } else {
-                                setSelectedRoles((prev) => prev.filter(r => r !== role.value));
                               }
-                            }
-                          }}
-                          disabled={isCreating}
-                        />
-                        <label
-                          htmlFor={`role-${role.value}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
-                        >
-                          <span className={role.color}>{role.icon}</span>
-                          {role.label}
-                          {selectedRoles.includes(role.value) && (
-                            <CheckCircle2 className="h-4 w-4 text-primary" />
+
+                              return filteredProjects.map((project) => (
+                                <div
+                                  key={project.id}
+                                  className={`flex items-center space-x-3 p-2 rounded-xl transition-colors ${
+                                    selectedProjectIds.includes(project.id)
+                                      ? "bg-primary/10 border border-primary/20"
+                                      : "hover:bg-muted/50 border border-transparent"
+                                  }`}
+                                >
+                                  <Checkbox
+                                    id={`project-${project.id}`}
+                                    checked={selectedProjectIds.includes(project.id)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedProjectIds((prev) => [...prev, project.id]);
+                                      } else {
+                                        setSelectedProjectIds((prev) =>
+                                          prev.filter((id) => id !== project.id)
+                                        );
+                                      }
+                                    }}
+                                    disabled={isCreating}
+                                  />
+                                  <label
+                                    htmlFor={`project-${project.id}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
+                                  >
+                                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                                    {project.name}
+                                    {selectedProjectIds.includes(project.id) && (
+                                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                                    )}
+                                  </label>
+                                </div>
+                              ));
+                            })()
                           )}
-                        </label>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Select one or more projects to associate this sheet with
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                  <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
-                    <p className="text-xs text-blue-900 dark:text-blue-100">
-                      <strong>Tip:</strong> "For Me" makes the sheet private to you only. "All Users" will automatically override other role selections. 
-                      For specific access, uncheck "All Users" and select individual roles.
-                    </p>
+                    </div>
                   </div>
                 </div>
               </div>
-              <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+              <DialogFooter className="shrink-0 flex flex-col-reverse gap-2 border-t border-border/50 bg-muted/20 px-6 py-4 sm:flex-row sm:justify-end sm:px-8">
                 <Button
                   variant="outline"
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={closeCreateModal}
                   disabled={isCreating}
-                  className="w-full sm:w-auto order-2 sm:order-1"
+                  className="w-full sm:w-auto rounded-xl"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleCreateSheet}
-                  disabled={isCreating}
-                  className="w-full sm:w-auto order-1 sm:order-2"
+                  disabled={isCreating || !sheetTitle.trim()}
+                  className="w-full sm:w-auto rounded-xl"
                 >
                   {isCreating ? (
                     <>
@@ -1698,16 +1914,25 @@ const BugSheetsPage = () => {
           </Dialog>
         )}
 
-        {/* Edit Sheet Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">Edit Sheet</DialogTitle>
-              <DialogDescription className="text-sm sm:text-base">
-                Update the sheet title, project, and template
+        {/* Edit Sheet Dialog — large form; URL: ?edit=<id> */}
+        <Dialog
+          open={isEditDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) handleEditCancel();
+          }}
+        >
+          <DialogContent className="flex h-[min(92vh,920px)] w-[min(96vw,56rem)] max-w-none flex-col gap-0 overflow-hidden rounded-2xl border border-border/60 p-0 shadow-2xl sm:max-w-none">
+            <DialogHeader className="shrink-0 space-y-2 border-b border-border/50 bg-gradient-to-br from-muted/50 via-background to-background px-6 pb-5 pt-7 text-left sm:px-8 sm:pb-6 sm:pt-8 pr-14">
+              <DialogTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+                Edit Sheet
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed text-muted-foreground sm:text-base max-w-2xl">
+                Update the sheet title, project, template, and who can access it
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="space-y-4 px-6 py-6 sm:px-8 sm:py-8">
+            <div className="space-y-4 py-0">
               <div className="space-y-2">
                 <Label htmlFor="edit-sheet-title" className="text-sm font-medium">Sheet Title *</Label>
                 <Input
@@ -1947,6 +2172,7 @@ const BugSheetsPage = () => {
                           if (role.value === "all") {
                             // If "All Users" is selected, clear other selections
                             setEditSelectedRoles(checked ? ["all"] : []);
+                            if (checked) setEditSelectedUserIds([]);
                           } else if (role.value === "for_me") {
                             // If "For Me" is selected, clear all other selections (exclusive)
                             setEditSelectedRoles(checked ? ["for_me"] : []);
@@ -1976,28 +2202,36 @@ const BugSheetsPage = () => {
                     </div>
                   ))}
                 </div>
-                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
+                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                   <p className="text-xs text-blue-900 dark:text-blue-100">
-                    <strong>Tip:</strong> "For Me" makes the sheet private to you only. "All Users" will automatically override other role selections. 
-                    For specific access, uncheck "All Users" and select individual roles.
+                    <strong>Tip:</strong> &quot;For Me&quot; is private to you (plus any specific users below). &quot;All Users&quot; overrides other roles and clears specific users.
                   </p>
                 </div>
+                <AccessUsersPicker
+                  selectedUserIds={editSelectedUserIds}
+                  onChange={setEditSelectedUserIds}
+                  disabled={editSelectedRoles.includes("all") || isUpdating}
+                  excludeUserId={currentUser?.id}
+                  idPrefix="sheet-edit-user"
+                />
               </div>
             </div>
-            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+              </div>
+            </div>
+            <DialogFooter className="shrink-0 flex flex-col-reverse gap-2 border-t border-border/50 bg-muted/20 px-6 py-4 sm:flex-row sm:justify-end sm:px-8">
               <Button
                 variant="outline"
                 onClick={handleEditCancel}
                 disabled={isUpdating}
-                className="w-full sm:w-auto order-2 sm:order-1"
+                className="w-full sm:w-auto rounded-xl"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleEditConfirm}
                 disabled={isUpdating || !editSheetTitle.trim()}
-                className="w-full sm:w-auto order-1 sm:order-2"
+                className="w-full sm:w-auto rounded-xl"
               >
                 {isUpdating ? (
                   <>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { getEffectiveRole } from "@/lib/utils";
@@ -35,6 +35,11 @@ import { toast } from "@/components/ui/use-toast";
 import { googleDocsService, UserDocument, Template } from "@/services/googleDocsService";
 import { projectService } from "@/services/projectService";
 import { ProjectCardsGrid, ProjectWithCount } from "@/components/docs/ProjectCardsGrid";
+import { resolveProjectLabels } from "@/lib/projectLabels";
+import {
+  AccessUsersPicker,
+  parseAllowedUserIds,
+} from "@/components/docs/AccessUsersPicker";
 import {
   FileText,
   Plus,
@@ -150,6 +155,15 @@ const BugDocsPage = () => {
   const isAdmin = userRole === 'admin';
   const isDevOrTester = userRole === 'developer' || userRole === 'tester';
 
+  /** Edit/Delete: creator or admin only — never expose controls to other roles. */
+  const canManageDocument = (doc: UserDocument): boolean => {
+    if (!currentUser?.id) return false;
+    if (isAdmin) return true;
+    // My Docs is owner-scoped; always allow manage even if API omits creator_user_id
+    if (activeTab === "my-docs") return true;
+    return String(doc.creator_user_id ?? "") === String(currentUser.id);
+  };
+
   const [documents, setDocuments] = useState<UserDocument[]>([]);
   const [allDocumentsGrouped, setAllDocumentsGrouped] = useState<Array<{
     project_id: string | null;
@@ -162,6 +176,8 @@ const BugDocsPage = () => {
   const [sharedDocsCount, setSharedDocsCount] = useState<number>(0);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [projects, setProjects] = useState<ProjectWithCount[]>([]);
+  // Why: Full catalog is for card name badges only — pickers must stay membership-scoped.
+  const [projectNameCatalog, setProjectNameCatalog] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -193,8 +209,10 @@ const BugDocsPage = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("0");
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(["all"]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [projectSearchTerm, setProjectSearchTerm] = useState("");
   const [editProjectSearchTerm, setEditProjectSearchTerm] = useState("");
+  const [editSelectedUserIds, setEditSelectedUserIds] = useState<string[]>([]);
 
   // Tab and filter state
   const [searchParams, setSearchParams] = useSearchParams();
@@ -256,14 +274,49 @@ const BugDocsPage = () => {
   const loadProjects = async () => {
     setIsLoadingProjects(true);
     try {
-      const projsWithCounts = await googleDocsService.getProjectsWithDocumentCounts();
-      setProjects(projsWithCounts);
+      const [projsWithCounts, allProjs] = await Promise.all([
+        googleDocsService.getProjectsWithDocumentCounts().catch(() => [] as ProjectWithCount[]),
+        projectService.getProjects().catch(() => [] as Array<{ id: string; name: string }>),
+      ]);
+
+      // Create/Edit pickers: only projects the user is assigned to (counts API is membership-scoped for non-admins).
+      const assignable = projsWithCounts
+        .filter((p) => p.id && p.id !== "no-project")
+        .map((p) => ({
+          id: String(p.id),
+          name: p.name || "Untitled",
+          description: (p as ProjectWithCount).description || "",
+          status: (p as ProjectWithCount).status || "active",
+          document_count: p.document_count ?? 0,
+        }));
+      setProjects(assignable);
+
+      // Why: Shared docs may reference projects outside the assignable list — keep a name catalog for badges.
+      const nameById = new Map<string, string>();
+      for (const p of allProjs) {
+        nameById.set(String(p.id), p.name);
+      }
+      for (const p of assignable) {
+        if (p.name) nameById.set(p.id, p.name);
+      }
+      setProjectNameCatalog(
+        Array.from(nameById.entries()).map(([id, name]) => ({ id, name }))
+      );
     } catch (error: any) {
       console.error("Error loading projects:", error);
-      // Fallback to regular project service
       try {
-        const projs = await projectService.getProjects();
-        setProjects(projs.map(p => ({ ...p, document_count: 0 })));
+        const projs = await googleDocsService.getProjectsWithDocumentCounts();
+        setProjects(
+          projs
+            .filter((p) => p.id && p.id !== "no-project")
+            .map((p) => ({
+              id: String(p.id),
+              name: p.name || "Untitled",
+              description: p.description || "",
+              status: p.status || "active",
+              document_count: p.document_count ?? 0,
+            }))
+        );
       } catch (fallbackError) {
         console.error("Error loading projects fallback:", fallbackError);
       }
@@ -453,10 +506,10 @@ const BugDocsPage = () => {
       return;
     }
 
-    if (selectedRoles.length === 0) {
+    if (selectedRoles.length === 0 && selectedUserIds.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please select at least one role",
+        description: "Select at least one role or specific user",
         variant: "destructive",
       });
       return;
@@ -475,16 +528,21 @@ const BugDocsPage = () => {
         : null;
 
       // Convert roles array to comma-separated string (or 'all' if only 'all' is selected)
-      const roleValue = selectedRoles.length === 1 && selectedRoles[0] === 'all' 
+      let roleValue = selectedRoles.length === 1 && selectedRoles[0] === 'all' 
         ? 'all' 
         : selectedRoles.filter(r => r !== 'all').join(',');
+      if (!roleValue && selectedUserIds.length > 0) {
+        roleValue = 'for_me';
+      }
+      const allowedUsers = roleValue === 'all' ? [] : selectedUserIds;
 
       const result = await googleDocsService.createGeneralDocument(
         docTitle.trim(),
         templateId,
         'general',
         projectIdValue,
-        roleValue
+        roleValue || 'for_me',
+        allowedUsers
       );
 
       toast({
@@ -503,6 +561,7 @@ const BugDocsPage = () => {
       setSelectedTemplateId("0");
       setSelectedProjectIds([]);
       setSelectedRoles(["all"]);
+      setSelectedUserIds([]);
       setProjectSearchTerm("");
       setIsCreateModalOpen(false);
     } catch (error: any) {
@@ -517,34 +576,64 @@ const BugDocsPage = () => {
   };
 
   const handleDeleteClick = (doc: UserDocument) => {
+    if (!canManageDocument(doc)) return;
     setDocumentToDelete(doc);
     setIsDeleteDialogOpen(true);
   };
 
-  const handleEditClick = (doc: UserDocument) => {
+  const clearEditParam = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        if (!prev.has("edit")) return prev;
+        const next = new URLSearchParams(prev);
+        next.delete("edit");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
+
+  const populateEditForm = useCallback((doc: UserDocument) => {
     setDocumentToEdit(doc);
     setEditDocTitle(doc.doc_title);
-    // Parse comma-separated project IDs into array, or empty array if null/empty
     const projectIdValue = doc.project_id || "";
-    const projectIdsArray = projectIdValue ? projectIdValue.split(",").map((p: string) => p.trim()) : [];
+    const projectIdsArray = projectIdValue
+      ? projectIdValue.split(",").map((p: string) => p.trim())
+      : [];
     setEditSelectedProjectIds(projectIdsArray);
-    // template_id might not be in the interface but exists in database
-    setEditSelectedTemplateId((doc as any).template_id ? (doc as any).template_id.toString() : "0");
-    // Parse comma-separated roles into array, or default to ['all']
+    setEditSelectedTemplateId(
+      (doc as any).template_id ? (doc as any).template_id.toString() : "0"
+    );
     const roleValue = (doc as any).role || "all";
     let rolesArray: string[];
     if (!roleValue || roleValue === "all") {
       rolesArray = ["all"];
     } else {
-      // Split by comma and filter out empty strings
-      rolesArray = roleValue.split(",").map((r: string) => r.trim()).filter((r: string) => r.length > 0);
-      // If no valid roles after parsing, default to ['all']
+      rolesArray = roleValue
+        .split(",")
+        .map((r: string) => r.trim())
+        .filter((r: string) => r.length > 0);
       if (rolesArray.length === 0) {
         rolesArray = ["all"];
       }
     }
     setEditSelectedRoles(rolesArray);
+    setEditSelectedUserIds(parseAllowedUserIds(doc.allowed_user_ids));
+    setEditProjectSearchTerm("");
     setIsEditDialogOpen(true);
+  }, []);
+
+  const handleEditClick = (doc: UserDocument) => {
+    if (!canManageDocument(doc)) return;
+    populateEditForm(doc);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("edit", String(doc.id));
+        return next;
+      },
+      { replace: false }
+    );
   };
 
   const handleEditCancel = () => {
@@ -554,7 +643,9 @@ const BugDocsPage = () => {
     setEditSelectedProjectIds([]);
     setEditSelectedTemplateId("0");
     setEditSelectedRoles(["all"]);
+    setEditSelectedUserIds([]);
     setEditProjectSearchTerm("");
+    clearEditParam();
   };
 
   const handleEditConfirm = async () => {
@@ -567,10 +658,10 @@ const BugDocsPage = () => {
       return;
     }
 
-    if (editSelectedRoles.length === 0) {
+    if (editSelectedRoles.length === 0 && editSelectedUserIds.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please select at least one role",
+        description: "Select at least one role or specific user",
         variant: "destructive",
       });
       return;
@@ -585,16 +676,21 @@ const BugDocsPage = () => {
       const templateId = editSelectedTemplateId && editSelectedTemplateId !== "0" ? parseInt(editSelectedTemplateId) : null;
       
       // Convert roles array to comma-separated string (or 'all' if only 'all' is selected)
-      const roleValue = editSelectedRoles.length === 1 && editSelectedRoles[0] === 'all' 
+      let roleValue = editSelectedRoles.length === 1 && editSelectedRoles[0] === 'all' 
         ? 'all' 
         : editSelectedRoles.filter(r => r !== 'all').join(',');
+      if (!roleValue && editSelectedUserIds.length > 0) {
+        roleValue = 'for_me';
+      }
+      const allowedUsers = roleValue === 'all' ? [] : editSelectedUserIds;
 
       await googleDocsService.updateDocument(
         documentToEdit.id,
         editDocTitle.trim(),
         projectIdValue,
         templateId,
-        roleValue
+        roleValue || 'for_me',
+        allowedUsers
       );
 
       toast({
@@ -605,13 +701,8 @@ const BugDocsPage = () => {
       // Reload documents list
       await refreshDocuments();
 
-      // Close dialog and reset state
-      setIsEditDialogOpen(false);
-      setDocumentToEdit(null);
-      setEditDocTitle("");
-      setEditSelectedProjectIds([]);
-      setEditSelectedTemplateId("0");
-      setEditSelectedRoles(["all"]);
+      // Close dialog and reset state + URL
+      handleEditCancel();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -741,30 +832,21 @@ const BugDocsPage = () => {
     return roles.map(r => getRoleBadge(r));
   };
 
-  // Get project names for comma-separated project IDs
-  const getProjectNames = (projectId: string | null | undefined): string[] => {
-    if (!projectId) {
-      return [];
-    }
-    
-    const projectIds = projectId.split(",").map(id => id.trim()).filter(id => id);
-    return projectIds.map(id => {
-      const project = projects.find(p => p.id === id);
-      return project ? project.name : id;
-    });
-  };
+  // Get project names for comma-separated project IDs (never show raw UUIDs)
+  const getProjectNames = (
+    projectId: string | null | undefined,
+    projectName?: string | null
+  ): string[] => resolveProjectLabels(projectId, projectNameCatalog, projectName);
 
   // Filtered documents with useMemo - sorted by latest first
   const filteredDocuments = useMemo(() => {
     let filtered = [...documents];
 
-    // Filter by tab
-    if (activeTab === "my-docs") {
-      // For now, show all documents in both tabs
-      // In the future, this could filter by user ownership
-      filtered = documents;
-    } else if (activeTab === "all-docs") {
-      filtered = documents;
+    // Shared Docs: never list the current user's own documents (those live in My Docs)
+    if (activeTab === "shared-docs" && currentUser?.id) {
+      filtered = filtered.filter(
+        (doc) => String(doc.creator_user_id ?? "") !== String(currentUser.id)
+      );
     }
 
     // Apply search filter (use localSearchTerm for immediate filtering)
@@ -826,7 +908,7 @@ const BugDocsPage = () => {
       const dateB = new Date(b.created_at);
       return dateB.getTime() - dateA.getTime(); // Descending order (latest first)
     });
-  }, [documents, activeTab, localSearchTerm, dateFilter, projectFilter]);
+  }, [documents, activeTab, localSearchTerm, dateFilter, projectFilter, currentUser?.id]);
 
 
   // Get tab counts - use separate state variables for accurate counts
@@ -861,6 +943,60 @@ const BugDocsPage = () => {
     if (urlTab !== activeTab) setActiveTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Deep-link / browser Back: ?edit=<id> opens Edit Document; removing it closes
+  useEffect(() => {
+    const editIdRaw = searchParams.get("edit");
+    if (!editIdRaw) {
+      if (isEditDialogOpen) {
+        setIsEditDialogOpen(false);
+        setDocumentToEdit(null);
+        setEditDocTitle("");
+        setEditSelectedProjectIds([]);
+        setEditSelectedTemplateId("0");
+        setEditSelectedRoles(["all"]);
+        setEditProjectSearchTerm("");
+      }
+      return;
+    }
+
+    const editId = Number(editIdRaw);
+    if (!Number.isFinite(editId)) {
+      clearEditParam();
+      return;
+    }
+
+    if (isEditDialogOpen && documentToEdit?.id === editId) return;
+
+    const doc =
+      documents.find((d) => d.id === editId) ||
+      allDocumentsGrouped.flatMap((g) => g.documents).find((d) => d.id === editId);
+
+    if (!doc) return;
+
+    const allowed =
+      !!currentUser?.id &&
+      (isAdmin ||
+        activeTab === "my-docs" ||
+        String(doc.creator_user_id ?? "") === String(currentUser.id));
+
+    if (allowed) {
+      populateEditForm(doc);
+    } else {
+      clearEditParam();
+    }
+  }, [
+    searchParams,
+    documents,
+    allDocumentsGrouped,
+    isEditDialogOpen,
+    documentToEdit?.id,
+    currentUser?.id,
+    isAdmin,
+    activeTab,
+    clearEditParam,
+    populateEditForm,
+  ]);
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-background px-3 py-4 sm:px-6 sm:py-6 md:px-8 lg:px-10 lg:py-8">
@@ -1252,7 +1388,10 @@ const BugDocsPage = () => {
                                 <div className="flex-1 min-w-0">
                                   <div className="text-xs text-gray-500 dark:text-gray-500 font-medium mb-1">Projects</div>
                                   {(() => {
-                                    const projectNames = getProjectNames(doc.project_id);
+                                    const projectNames = getProjectNames(
+                                      doc.project_id,
+                                      doc.project_name
+                                    );
                                     if (projectNames.length === 0) {
                                       return (
                                         <span className="italic text-gray-400 text-sm">No Project</span>
@@ -1317,46 +1456,50 @@ const BugDocsPage = () => {
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
+                            <div className="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-700 min-w-0">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleViewDocument(doc)}
-                                className="flex-1 h-9 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-800 hover:from-orange-100 hover:to-red-100 dark:hover:from-orange-900/30 dark:hover:to-red-900/30 text-orange-700 dark:text-orange-300 font-semibold"
+                                className="flex-1 h-9 min-w-0 rounded-xl bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-800 hover:from-orange-100 hover:to-red-100 dark:hover:from-orange-900/30 dark:hover:to-red-900/30 text-orange-700 dark:text-orange-300 font-semibold"
                               >
-                                <ExternalLink className="h-4 w-4 mr-1.5" />
-                                <span className="hidden sm:inline">View</span>
+                                <ExternalLink className="h-4 w-4 mr-1.5 shrink-0" />
+                                <span className="truncate text-xs sm:text-sm">View</span>
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditClick(doc)}
-                                className="flex-1 h-9 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold"
-                              >
-                                <Edit className="h-4 w-4 mr-1.5" />
-                                <span className="hidden sm:inline"></span>
-                              </Button>
+                              {canManageDocument(doc) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditClick(doc)}
+                                  className="flex-1 h-9 min-w-0 rounded-xl bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold"
+                                >
+                                  <Edit className="h-4 w-4 mr-1.5 shrink-0" />
+                                  <span className="truncate text-xs sm:text-sm">Edit</span>
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleCopyDocumentUrl(doc)}
-                                className="h-9 px-3 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                                className="h-9 w-9 shrink-0 px-0 rounded-xl bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
                               >
                                 <Copy className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDeleteClick(doc)}
-                                disabled={isDeleting === doc.id}
-                                className="h-9 px-3"
-                              >
-                                {isDeleting === doc.id ? (
-                                  <RefreshCw className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
+                              {canManageDocument(doc) && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDeleteClick(doc)}
+                                  disabled={isDeleting === doc.id}
+                                  className="h-9 w-9 shrink-0 px-0 rounded-xl"
+                                >
+                                  {isDeleting === doc.id ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1636,6 +1779,7 @@ const BugDocsPage = () => {
                             if (role.value === "all") {
                               // If "All Users" is selected, clear other selections
                               setSelectedRoles(checked ? ["all"] : []);
+                              if (checked) setSelectedUserIds([]);
                             } else if (role.value === "for_me") {
                               // If "For Me" is selected, clear all other selections (exclusive)
                               setSelectedRoles(checked ? ["for_me"] : []);
@@ -1668,10 +1812,16 @@ const BugDocsPage = () => {
                   <div className="flex items-start gap-3 rounded-xl border border-blue-200/70 bg-blue-50/80 p-4 dark:border-blue-900/50 dark:bg-blue-950/25">
                     <Lightbulb className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" aria-hidden />
                     <p className="text-xs leading-relaxed text-blue-900 dark:text-blue-100">
-                      <strong>Tip:</strong> "For Me" makes the document private to you only. "All Users" will automatically override other role selections. 
-                      For specific access, uncheck "All Users" and select individual roles.
+                      <strong>Tip:</strong> &quot;For Me&quot; is private to you (plus any specific users below). &quot;All Users&quot; overrides other roles and clears specific users.
                     </p>
                   </div>
+                  <AccessUsersPicker
+                    selectedUserIds={selectedUserIds}
+                    onChange={setSelectedUserIds}
+                    disabled={selectedRoles.includes("all")}
+                    excludeUserId={currentUser?.id}
+                    idPrefix="doc-create-user"
+                  />
                 </div>
                 </div>
                 </div>
@@ -1707,16 +1857,26 @@ const BugDocsPage = () => {
           </Dialog>
         )}
 
-        {/* Edit Document Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">Edit Document</DialogTitle>
-              <DialogDescription className="text-sm sm:text-base">
-                Update the document title, project, and template
+        {/* Edit Document Dialog — large form; URL: ?edit=<id> */}
+        <Dialog
+          open={isEditDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) handleEditCancel();
+          }}
+        >
+          <DialogContent className="flex h-[min(92vh,920px)] w-[min(96vw,56rem)] max-w-none flex-col gap-0 overflow-hidden rounded-2xl border border-border/60 p-0 shadow-2xl sm:max-w-none">
+            <DialogHeader className="shrink-0 space-y-2 border-b border-border/50 bg-gradient-to-br from-muted/50 via-background to-background px-6 pb-5 pt-7 text-left sm:px-8 sm:pb-6 sm:pt-8 pr-14">
+              <DialogTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+                Edit Document
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed text-muted-foreground sm:text-base max-w-2xl">
+                Update the document title, project, template, and who can access it
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="px-6 py-6 sm:px-8 sm:py-8">
+                <div className="grid gap-8 lg:grid-cols-2 lg:gap-10 lg:items-start">
+                  <div className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="edit-doc-title" className="text-sm font-medium">Document Title *</Label>
                 <Input
@@ -1743,7 +1903,7 @@ const BugDocsPage = () => {
                   <SelectTrigger id="edit-template" className="w-full">
                     <SelectValue placeholder="No template" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[200px] overflow-y-auto">
+                  <SelectContent className="max-h-[min(280px,45vh)] overflow-y-auto z-[200]">
                     <SelectItem value="0">No template</SelectItem>
                     {templates.map((template) => (
                       <SelectItem key={template.id} value={template.id.toString()}>
@@ -1767,6 +1927,122 @@ const BugDocsPage = () => {
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
+                  <Label htmlFor="edit-role" className="text-sm font-medium flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Accessible to Roles *
+                  </Label>
+                  {editSelectedRoles.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {editSelectedRoles.length} selected
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Selected Roles Chips */}
+                {editSelectedRoles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-xl border border-dashed">
+                    {editSelectedRoles.map((roleValue) => {
+                      const roleMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                        for_me: { label: "For Me", icon: <User className="h-3 w-3" />, color: "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300" },
+                        all: { label: "All Users", icon: <Users className="h-3 w-3" />, color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300" },
+                        admins: { label: "Admins Only", icon: <Shield className="h-3 w-3" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300" },
+                        developers: { label: "Developers Only", icon: <Code className="h-3 w-3" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" },
+                        testers: { label: "Testers Only", icon: <TestTube className="h-3 w-3" />, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300" },
+                      };
+                      const role = roleMap[roleValue];
+                      if (!role) return null;
+                      return (
+                        <Badge
+                          key={roleValue}
+                          variant="outline"
+                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.color}`}
+                        >
+                          {role.icon}
+                          {role.label}
+                          <button
+                            type="button"
+                            onClick={() => setEditSelectedRoles(prev => prev.filter(r => r !== roleValue))}
+                            className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+                            disabled={isUpdating}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Roles List */}
+                <div className="space-y-2 p-4 border rounded-xl bg-background">
+                  {[
+                    { value: "for_me", label: "For Me", icon: <User className="h-4 w-4" />, color: "text-orange-600 dark:text-orange-400" },
+                    { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
+                    { value: "admins", label: "Admins Only", icon: <Shield className="h-4 w-4" />, color: "text-purple-600 dark:text-purple-400" },
+                    { value: "developers", label: "Developers Only", icon: <Code className="h-4 w-4" />, color: "text-blue-600 dark:text-blue-400" },
+                    { value: "testers", label: "Testers Only", icon: <TestTube className="h-4 w-4" />, color: "text-pink-600 dark:text-pink-400" },
+                  ].map((role) => (
+                    <div
+                      key={role.value}
+                      className={`flex items-center space-x-3 p-2.5 rounded-xl transition-colors ${
+                        editSelectedRoles.includes(role.value)
+                          ? "bg-primary/10 border border-primary/20"
+                          : "hover:bg-muted/50 border border-transparent"
+                      }`}
+                    >
+                      <Checkbox
+                        id={`edit-role-${role.value}`}
+                        checked={editSelectedRoles.includes(role.value)}
+                        onCheckedChange={(checked) => {
+                          if (role.value === "all") {
+                            setEditSelectedRoles(checked ? ["all"] : []);
+                            if (checked) setEditSelectedUserIds([]);
+                          } else if (role.value === "for_me") {
+                            setEditSelectedRoles(checked ? ["for_me"] : []);
+                          } else {
+                            if (checked) {
+                              setEditSelectedRoles((prev) =>
+                                prev.filter(r => r !== "all" && r !== "for_me").concat(role.value)
+                              );
+                            } else {
+                              setEditSelectedRoles((prev) => prev.filter(r => r !== role.value));
+                            }
+                          }
+                        }}
+                        disabled={isUpdating}
+                      />
+                      <label
+                        htmlFor={`edit-role-${role.value}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
+                      >
+                        <span className={role.color}>{role.icon}</span>
+                        {role.label}
+                        {editSelectedRoles.includes(role.value) && (
+                          <CheckCircle2 className="h-4 w-4 text-primary" />
+                        )}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-blue-900 dark:text-blue-100">
+                    <strong>Tip:</strong> &quot;For Me&quot; is private to you (plus any specific users below). &quot;All Users&quot; overrides other roles and clears specific users.
+                  </p>
+                </div>
+                <AccessUsersPicker
+                  selectedUserIds={editSelectedUserIds}
+                  onChange={setEditSelectedUserIds}
+                  disabled={editSelectedRoles.includes("all") || isUpdating}
+                  excludeUserId={currentUser?.id}
+                  idPrefix="doc-edit-user"
+                />
+              </div>
+                  </div>
+
+                  <div className="space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
                   <Label htmlFor="edit-project" className="text-sm font-medium flex items-center gap-2">
                     <FolderOpen className="h-4 w-4" />
                     Project (Optional)
@@ -1780,7 +2056,7 @@ const BugDocsPage = () => {
                 
                 {/* Selected Projects Chips */}
                 {editSelectedProjectIds.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
+                  <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-xl border border-dashed">
                     {editSelectedProjectIds.map((projectId) => {
                       const project = projects.find(p => p.id === projectId);
                       if (!project) return null;
@@ -1815,14 +2091,14 @@ const BugDocsPage = () => {
                       placeholder="Search projects..."
                       value={editProjectSearchTerm}
                       onChange={(e) => setEditProjectSearchTerm(e.target.value)}
-                      className="pl-9 h-9"
+                      className="pl-9 h-9 rounded-xl"
                       disabled={isUpdating}
                     />
                   </div>
                 )}
 
                 {/* Projects List */}
-                <div className="space-y-2 p-4 border rounded-lg bg-background max-h-[200px] overflow-y-auto">
+                <div className="space-y-2 p-4 border rounded-xl bg-background max-h-[min(360px,40vh)] overflow-y-auto">
                   {projects.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <FolderOpen className="h-8 w-8 text-muted-foreground mb-2" />
@@ -1846,7 +2122,7 @@ const BugDocsPage = () => {
                       return filteredProjects.map((project) => (
                         <div
                           key={project.id}
-                          className={`flex items-center space-x-3 p-2 rounded-md transition-colors ${
+                          className={`flex items-center space-x-3 p-2 rounded-xl transition-colors ${
                             editSelectedProjectIds.includes(project.id)
                               ? "bg-primary/10 border border-primary/20"
                               : "hover:bg-muted/50 border border-transparent"
@@ -1879,134 +2155,27 @@ const BugDocsPage = () => {
                     })()
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <span>💡</span>
-                  <span>Select one or more projects to associate this document with</span>
+                <p className="text-xs text-muted-foreground">
+                  Select one or more projects to associate this document with
                 </p>
               </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="edit-role" className="text-sm font-medium flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Accessible to Roles *
-                  </Label>
-                  {editSelectedRoles.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      {editSelectedRoles.length} selected
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Selected Roles Chips */}
-                {editSelectedRoles.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border border-dashed">
-                    {editSelectedRoles.map((roleValue) => {
-                      const roleMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-                        for_me: { label: "For Me", icon: <User className="h-3 w-3" />, color: "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300" },
-                        all: { label: "All Users", icon: <Users className="h-3 w-3" />, color: "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300" },
-                        admins: { label: "Admins Only", icon: <Shield className="h-3 w-3" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300" },
-                        developers: { label: "Developers Only", icon: <Code className="h-3 w-3" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" },
-                        testers: { label: "Testers Only", icon: <TestTube className="h-3 w-3" />, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300" },
-                      };
-                      const role = roleMap[roleValue];
-                      if (!role) return null;
-                      return (
-                        <Badge
-                          key={roleValue}
-                          variant="outline"
-                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium ${role.color}`}
-                        >
-                          {role.icon}
-                          {role.label}
-                          <button
-                            type="button"
-                            onClick={() => setEditSelectedRoles(prev => prev.filter(r => r !== roleValue))}
-                            className="ml-1 hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
-                            disabled={isUpdating}
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      );
-                    })}
                   </div>
-                )}
-
-                {/* Roles List */}
-                <div className="space-y-2 p-4 border rounded-lg bg-background">
-                  {[
-                    { value: "for_me", label: "For Me", icon: <User className="h-4 w-4" />, color: "text-orange-600 dark:text-orange-400" },
-                    { value: "all", label: "All Users", icon: <Users className="h-4 w-4" />, color: "text-green-600 dark:text-green-400" },
-                    { value: "admins", label: "Admins Only", icon: <Shield className="h-4 w-4" />, color: "text-purple-600 dark:text-purple-400" },
-                    { value: "developers", label: "Developers Only", icon: <Code className="h-4 w-4" />, color: "text-blue-600 dark:text-blue-400" },
-                    { value: "testers", label: "Testers Only", icon: <TestTube className="h-4 w-4" />, color: "text-pink-600 dark:text-pink-400" },
-                  ].map((role) => (
-                    <div
-                      key={role.value}
-                      className={`flex items-center space-x-3 p-2.5 rounded-md transition-colors ${
-                        editSelectedRoles.includes(role.value)
-                          ? "bg-primary/10 border border-primary/20"
-                          : "hover:bg-muted/50 border border-transparent"
-                      }`}
-                    >
-                      <Checkbox
-                        id={`edit-role-${role.value}`}
-                        checked={editSelectedRoles.includes(role.value)}
-                        onCheckedChange={(checked) => {
-                          if (role.value === "all") {
-                            // If "All Users" is selected, clear other selections
-                            setEditSelectedRoles(checked ? ["all"] : []);
-                          } else if (role.value === "for_me") {
-                            // If "For Me" is selected, clear all other selections (exclusive)
-                            setEditSelectedRoles(checked ? ["for_me"] : []);
-                          } else {
-                            // If a specific role is selected, remove "all" and "for_me" and toggle the role
-                            if (checked) {
-                              setEditSelectedRoles((prev) => 
-                                prev.filter(r => r !== "all" && r !== "for_me").concat(role.value)
-                              );
-                            } else {
-                              setEditSelectedRoles((prev) => prev.filter(r => r !== role.value));
-                            }
-                          }
-                        }}
-                        disabled={isUpdating}
-                      />
-                      <label
-                        htmlFor={`edit-role-${role.value}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1 flex items-center gap-2"
-                      >
-                        <span className={role.color}>{role.icon}</span>
-                        {role.label}
-                        {editSelectedRoles.includes(role.value) && (
-                          <CheckCircle2 className="h-4 w-4 text-primary" />
-                        )}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
-                  <p className="text-xs text-blue-900 dark:text-blue-100">
-                    <strong>Tip:</strong> "For Me" makes the document private to you only. "All Users" will automatically override other role selections. 
-                    For specific access, uncheck "All Users" and select individual roles.
-                  </p>
                 </div>
               </div>
             </div>
-            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+            <DialogFooter className="shrink-0 flex flex-col-reverse gap-2 border-t border-border/50 bg-muted/20 px-6 py-4 sm:flex-row sm:justify-end sm:px-8">
               <Button
                 variant="outline"
                 onClick={handleEditCancel}
                 disabled={isUpdating}
-                className="w-full sm:w-auto order-2 sm:order-1"
+                className="w-full sm:w-auto rounded-xl"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleEditConfirm}
                 disabled={isUpdating || !editDocTitle.trim()}
-                className="w-full sm:w-auto order-1 sm:order-2"
+                className="w-full sm:w-auto rounded-xl"
               >
                 {isUpdating ? (
                   <>

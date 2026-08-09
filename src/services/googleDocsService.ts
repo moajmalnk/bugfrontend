@@ -40,6 +40,7 @@ export interface UserDocument {
   creator_user_id?: string;
   creator_name?: string | null;
   role?: string;
+  allowed_user_ids?: string | null;
 }
 
 export interface Template {
@@ -208,7 +209,8 @@ class GoogleDocsService {
     templateId?: number,
     docType: string = 'general',
     projectId?: string | null,
-    role?: string
+    role?: string,
+    allowedUserIds?: string[] | string | null
   ): Promise<{ success: boolean; id: number; document_url: string; document_title: string }> {
     try {
       const response = await apiClient.post<{
@@ -223,6 +225,7 @@ class GoogleDocsService {
         doc_type: docType,
         project_id: projectId || null,
         role: role || 'all',
+        allowed_user_ids: allowedUserIds || null,
       });
 
       if (!response.data.success) {
@@ -399,7 +402,8 @@ class GoogleDocsService {
     newTitle: string,
     projectId?: string | null,
     templateId?: number | null,
-    role?: string
+    role?: string,
+    allowedUserIds?: string[] | string | null
   ): Promise<{ success: boolean; message: string; data?: { id: number; doc_title: string } }> {
     try {
       const response = await apiClient.post<{
@@ -412,6 +416,7 @@ class GoogleDocsService {
         project_id: projectId || null,
         template_id: templateId || null,
         role: role || 'all',
+        allowed_user_ids: allowedUserIds || null,
       });
 
       if (!response.data.success) {

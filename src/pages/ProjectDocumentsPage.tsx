@@ -46,6 +46,15 @@ const ProjectDocumentsPage = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const userRole = currentUser ? getEffectiveRole(currentUser) : null;
+  const isAdmin = userRole === 'admin';
+
+  /** Edit/Delete: creator or admin only. */
+  const canManageDocument = (doc: UserDocument): boolean => {
+    if (!currentUser?.id) return false;
+    if (isAdmin) return true;
+    return String(doc.creator_user_id ?? "") === String(currentUser.id);
+  };
+
   const [documents, setDocuments] = useState<UserDocument[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -117,6 +126,7 @@ const ProjectDocumentsPage = () => {
   };
 
   const handleDeleteClick = (doc: UserDocument) => {
+    if (!canManageDocument(doc)) return;
     setDocumentToDelete(doc);
     setIsDeleteDialogOpen(true);
   };
@@ -146,6 +156,7 @@ const ProjectDocumentsPage = () => {
   };
 
   const handleEditClick = (doc: UserDocument) => {
+    if (!canManageDocument(doc)) return;
     setDocumentToEdit(doc);
     setEditDocTitle(doc.doc_title);
     setEditSelectedProjectId(doc.project_id || "none");
@@ -507,7 +518,7 @@ const ProjectDocumentsPage = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 justify-end sm:justify-start">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 justify-end sm:justify-start flex-wrap">
                         <Button
                           variant="outline"
                           size="sm"
@@ -517,15 +528,17 @@ const ProjectDocumentsPage = () => {
                           <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
                           <span className="sm:inline">View</span>
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditClick(doc)}
-                          className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
-                        >
-                          <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
-                          <span className="sm:inline">Edit</span>
-                        </Button>
+                        {canManageDocument(doc) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditClick(doc)}
+                            className="flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 font-semibold shadow-sm hover:shadow-md transition-all duration-300 text-xs sm:text-sm"
+                          >
+                            <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                            <span className="sm:inline">Edit</span>
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -535,25 +548,27 @@ const ProjectDocumentsPage = () => {
                           <Copy className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
                           <span className="sm:inline">Copy URL</span>
                         </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteClick(doc)}
-                          disabled={isDeleting === doc.id}
-                          className="flex-1 sm:flex-initial h-9 sm:h-10 w-auto px-3 sm:px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
-                        >
-                          {isDeleting === doc.id ? (
-                            <>
-                              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin sm:mr-1" />
-                              <span className="hidden sm:inline">Delete</span>
-                            </>
-                          ) : (
-                            <>
-                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
-                              <span className="sm:inline">Delete</span>
-                            </>
-                          )}
-                        </Button>
+                        {canManageDocument(doc) && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteClick(doc)}
+                            disabled={isDeleting === doc.id}
+                            className="flex-1 sm:flex-initial h-9 sm:h-10 w-auto px-3 sm:px-4 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-300"
+                          >
+                            {isDeleting === doc.id ? (
+                              <>
+                                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 animate-spin sm:mr-1" />
+                                <span className="hidden sm:inline">Delete</span>
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                                <span className="sm:inline">Delete</span>
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

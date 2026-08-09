@@ -40,6 +40,7 @@ export interface UserSheet {
   creator_user_id?: string;
   creator_name?: string | null;
   role?: string;
+  allowed_user_ids?: string | null;
 }
 
 export interface Template {
@@ -208,7 +209,8 @@ class GoogleSheetsService {
     templateId?: number,
     sheetType: string = 'general',
     projectId?: string | null,
-    role?: string
+    role?: string,
+    allowedUserIds?: string[] | string | null
   ): Promise<{ success: boolean; id: number; sheet_url: string; sheet_title: string }> {
     try {
       const response = await apiClient.post<{
@@ -223,6 +225,7 @@ class GoogleSheetsService {
         sheet_type: sheetType,
         project_id: projectId || null,
         role: role || 'all',
+        allowed_user_ids: allowedUserIds || null,
       });
 
       if (!response.data.success) {
@@ -399,7 +402,8 @@ class GoogleSheetsService {
     newTitle: string,
     projectId?: string | null,
     templateId?: number | null,
-    role?: string
+    role?: string,
+    allowedUserIds?: string[] | string | null
   ): Promise<{ success: boolean; message: string; data?: { id: number; sheet_title: string } }> {
     try {
       const response = await apiClient.post<{
@@ -412,6 +416,7 @@ class GoogleSheetsService {
         project_id: projectId || null,
         template_id: templateId || null,
         role: role || 'all',
+        allowed_user_ids: allowedUserIds || null,
       });
 
       if (!response.data.success) {
