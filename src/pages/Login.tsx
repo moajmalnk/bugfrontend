@@ -171,8 +171,62 @@ const Login = () => {
     [loginWithToken, navigate]
   );
 
+  /**
+   * Why: Welcome email CTA uses a unique invite JWT so new users skip the
+   * password form; after session start OnboardingGuard shows the required popup.
+   */
+  const handleWelcomeInviteVerification = useCallback(
+    async (token: string) => {
+      setIsLoading(true);
+      try {
+        const response = await axios.post<AuthApiResponse>(
+          `${API_BASE_URL}/verify_welcome_invite.php`,
+          { token }
+        );
+
+        const data = response.data;
+        if (data.success && data.token && data.user) {
+          const { token: jwtToken, user } = data;
+          localStorage.setItem("token", jwtToken);
+          sessionStorage.setItem("token", jwtToken);
+
+          toast({
+            title: "Welcome to BugRicer",
+            description: `Signed in as ${user.username}`,
+            variant: "default",
+          });
+
+          await loginWithToken(user, jwtToken);
+        } else {
+          throw new Error(data.message || "Welcome link verification failed");
+        }
+      } catch (error: unknown) {
+        console.error("Welcome invite verification error:", error);
+        toast({
+          title: "Welcome link error",
+          description: extractApiErrorMessage(
+            error,
+            "Invalid or expired welcome link. Use the password from your email to sign in."
+          ),
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loginWithToken]
+  );
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+    const welcomeToken = urlParams.get("welcome_token");
+    if (welcomeToken) {
+      // Clear immediately so StrictMode / auth updates do not re-consume the invite.
+      window.history.replaceState({}, document.title, window.location.pathname);
+      void handleWelcomeInviteVerification(welcomeToken);
+      return;
+    }
+
     const magicToken = urlParams.get("magic_token");
     if (magicToken) {
       void handleMagicLinkVerification(magicToken);
@@ -184,7 +238,13 @@ const Login = () => {
     if (isAuthenticated && currentUser?.role && token) {
       navigate(`/${currentUser.role}/dashboard`, { replace: true });
     }
-  }, [isAuthenticated, currentUser, navigate, handleMagicLinkVerification]);
+  }, [
+    isAuthenticated,
+    currentUser,
+    navigate,
+    handleMagicLinkVerification,
+    handleWelcomeInviteVerification,
+  ]);
 
   if (isAuthLoading) {
     // Show loading spinner

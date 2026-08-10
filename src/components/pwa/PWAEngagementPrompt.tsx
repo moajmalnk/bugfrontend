@@ -16,7 +16,7 @@ import {
   resetPushBrowserState,
 } from "@/firebase-messaging-sw";
 import { useAuth } from "@/context/AuthContext";
-import { cn } from "@/lib/utils";
+import { cn, userHasPendingOnboarding } from "@/lib/utils";
 
 const INSTALLED_KEY = "bugricer_pwa_installed";
 const INSTALL_DISMISS_KEY = "bugricer_pwa_install_dismissed_at";
@@ -123,6 +123,10 @@ export function PWAEngagementPrompt() {
     notificationState === "denied" ||
     (notificationState === "granted" && pushNeedsRegistration);
 
+  // Why: Onboarding uses a modal Dialog (body pointer-events:none). Stacking this
+  // prompt on top looks clickable but Close / Not now cannot receive clicks.
+  const onboardingIncomplete = userHasPendingOnboarding(currentUser);
+
   const setInstalled = useCallback(() => {
     markInstalled();
     setInstallDone(true);
@@ -211,10 +215,20 @@ export function PWAEngagementPrompt() {
       return;
     }
 
+    if (userHasPendingOnboarding(currentUser)) {
+      setOpen(false);
+      return;
+    }
+
     clearLegacyDismiss();
     let cancelled = false;
 
     const decide = async () => {
+      if (userHasPendingOnboarding(currentUser)) {
+        setOpen(false);
+        return;
+      }
+
       const standalone = isStandaloneDisplay();
       if (standalone || hasInstalledFlag()) {
         setInstalled();
@@ -496,12 +510,17 @@ export function PWAEngagementPrompt() {
   };
 
   // Floating bell when notifications still need attention (default or blocked)
-  const showFloatingBell = Boolean(currentUser) && !open && needsNotifications;
+  const showFloatingBell =
+    Boolean(currentUser) && !onboardingIncomplete && !open && needsNotifications;
 
   // Nothing useful to show in the modal
   const showInstallSection = !installDone && (canInstall || ios);
   const showNotifSection = needsNotifications;
-  const shouldRenderModal = open && currentUser && (showInstallSection || showNotifSection);
+  const shouldRenderModal =
+    open &&
+    currentUser &&
+    !onboardingIncomplete &&
+    (showInstallSection || showNotifSection);
 
   return (
     <>
@@ -510,7 +529,7 @@ export function PWAEngagementPrompt() {
           type="button"
           onClick={openNotificationPrompt}
           className={cn(
-            "fixed z-[70] bottom-20 right-4 sm:bottom-6 sm:right-6",
+            "fixed z-[110] bottom-20 right-4 sm:bottom-6 sm:right-6 pointer-events-auto",
             "flex items-center gap-2 rounded-full px-4 py-2.5 shadow-lg shadow-black/40",
             "bg-violet-600 text-white text-sm font-medium",
             "hover:bg-violet-500 active:scale-[0.98] transition"
@@ -526,15 +545,21 @@ export function PWAEngagementPrompt() {
       )}
 
       {shouldRenderModal && (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center p-4 bg-black/70 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-[110] flex items-end justify-center sm:items-center p-4 bg-black/70 backdrop-blur-sm pointer-events-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePrompt(true);
+          }}
+        >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="pwa-prompt-title"
             className={cn(
-              "w-full max-w-md rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl shadow-black/50",
+              "w-full max-w-md rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl shadow-black/50 pointer-events-auto",
               "animate-in fade-in-0 zoom-in-95 duration-200"
             )}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 p-5 pb-3">
               <div className="flex items-start gap-3">

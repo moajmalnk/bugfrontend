@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
+import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { cn, getEffectiveRole, showBugMessageInMainNav } from "@/lib/utils";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -472,9 +473,19 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
           >
             <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
               <img
-                src={currentUser?.avatar || defaultAvatar}
+                src={
+                  currentUser?.avatar
+                    ? resolveAvatarUrl(
+                        currentUser.avatar,
+                        currentUser.name || currentUser.username || "User"
+                      )
+                    : defaultAvatar
+                }
                 alt="User avatar"
                 className="h-10 w-10 rounded-xl object-cover ring-2 ring-border/50 group-hover:ring-accent/50 transition-all duration-200"
+                onError={(e) => {
+                  e.currentTarget.src = defaultAvatar;
+                }}
               />
               {isFullFledgedUser(currentUser) ? (
                 <VerifiedBlueTick

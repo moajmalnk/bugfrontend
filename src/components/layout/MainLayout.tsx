@@ -17,6 +17,10 @@ import { ImpersonateBanner } from "../ui/ImpersonateBanner";
 const FirebaseListener = lazy(() => import("../messaging/FirebaseListener"));
 const AnnouncementPopup = lazy(() => import("../ui/AnnouncementPopup"));
 const FeedbackWidget = lazy(() => import("../feedback/FeedbackWidget"));
+const OnboardingGuard = lazy(() => import("../onboarding/OnboardingGuard"));
+const OnboardingVerificationBanner = lazy(
+  () => import("../onboarding/OnboardingVerificationBanner")
+);
 const BugBotFab = lazy(() =>
   import("@/components/bugbot/BugBotFab").then((m) => ({ default: m.BugBotFab }))
 );
@@ -227,6 +231,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           {/* Top bar with menu button on mobile/tablet */}
           <MobileTopBar onOpenSidebar={openSidebar} />
 
+          <Suspense fallback={null}>
+            <OnboardingVerificationBanner />
+          </Suspense>
+
           {role === "admin" && !isUsersListPage ? <AdminShortsStrip /> : null}
           {role === "admin" && isUsersListPage ? <AdminActiveUsersStrip /> : null}
 
@@ -255,6 +263,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       <GlobalSearchDialog />
       <Suspense fallback={null}>
         <FirebaseListener />
+        <OnboardingGuard />
         <AnnouncementPopup />
         <FeedbackWidget />
         <BugBotFab />

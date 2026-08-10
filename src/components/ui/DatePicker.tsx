@@ -55,6 +55,9 @@ type CommonProps = {
   className?: string;
   disableFuture?: boolean;
   allowOnlyTodayAndYesterday?: boolean;
+  disabled?: boolean;
+  /** date-fns format for the closed trigger label (single mode). Default: d MMM yyyy */
+  displayFormat?: string;
 };
 
 type SingleProps = CommonProps & {
@@ -100,6 +103,8 @@ export function DatePicker(props: Props) {
     className,
     disableFuture,
     allowOnlyTodayAndYesterday,
+    disabled = false,
+    displayFormat = 'd MMM yyyy',
   } = props;
   const isMultiple = props.mode === 'multiple';
   const [open, setOpen] = useState(false);
@@ -119,7 +124,8 @@ export function DatePicker(props: Props) {
     return new Date();
   });
 
-  const disabled = useMemo(() => {
+  // Why: named separately from props.disabled (button lock) — Calendar needs day matchers.
+  const disabledDays = useMemo(() => {
     if (allowOnlyTodayAndYesterday) {
       const today = new Date();
       const yesterday = new Date(today);
@@ -155,7 +161,7 @@ export function DatePicker(props: Props) {
   const label = isMultiple
     ? formatMultiLabel(props.values ?? [])
     : selectedDates[0]
-      ? format(selectedDates[0], 'PPP')
+      ? format(selectedDates[0], displayFormat)
       : '';
 
   const toggleMonth = () => {
@@ -170,21 +176,29 @@ export function DatePicker(props: Props) {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={false}>
+    <Popover
+      open={disabled ? false : open}
+      onOpenChange={(next) => {
+        if (disabled) return;
+        setOpen(next);
+      }}
+      modal={false}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
-          className={`w-full justify-start text-left font-normal text-xs sm:text-sm ${className || ''}`}
+          disabled={disabled}
+          className={`w-full justify-between text-left font-normal text-xs sm:text-sm ${className || ''}`}
         >
-          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-          <span className="truncate">
+          <span className="truncate min-w-0">
             {label ? label : <span className="text-muted-foreground">{placeholder}</span>}
           </span>
+          <CalendarIcon className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-auto p-0 max-w-[min(100vw-1.5rem,300px)] overflow-hidden z-[200] rounded-2xl"
+        className="w-auto p-0 max-w-[min(100vw-1.5rem,300px)] overflow-hidden z-[200] rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg"
         align="start"
         side="bottom"
         alignOffset={0}
@@ -203,7 +217,7 @@ export function DatePicker(props: Props) {
               const next = (days ?? []).map(toYMD).sort();
               props.onChange(next);
             }}
-            disabled={disabled}
+            disabled={disabledDays}
             initialFocus
           />
         ) : (
@@ -217,7 +231,7 @@ export function DatePicker(props: Props) {
               props.onChange(toYMD(d));
               setOpen(false);
             }}
-            disabled={disabled}
+            disabled={disabledDays}
             initialFocus
           />
         )}

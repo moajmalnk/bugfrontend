@@ -1,5 +1,6 @@
 import { toast } from "@/components/ui/use-toast";
 import { getNetworkErrorMessage } from "@/lib/apiError";
+import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { ENV } from "@/lib/env";
 import { syncFcmTokenForSession, clearFcmRegistrationCache, applyServerFcmEpoch, setupFcmPwaAutoSync, prepareFcmOnLogin } from "@/firebase-messaging-sw";
 import { User } from "@/types";
@@ -44,6 +45,17 @@ const AUTH_ENDPOINTS = {
   me: `${API_URL}/me.php`,
 };
 
+/**
+ * Why: Persist a browser-loadable avatar URL on the session user so Profile,
+ * Sidebar, and nav never hit legacy `/BugRicer/backend/...` 404 paths.
+ */
+function withResolvedAvatar(user: User): User {
+  const label = user.name || user.username || "User";
+  const raw = (user.avatar || "").trim();
+  if (!raw) return user;
+  return { ...user, avatar: resolveAvatarUrl(raw, label) };
+}
+
 function handleAuthFcmSync(payload?: {
   fcm_token_epoch?: string | number;
   user?: { fcm_token_epoch?: string | number };
@@ -77,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   const updateCurrentUser = (user: User) => {
-    setCurrentUser(user);
+    setCurrentUser(withResolvedAvatar(user));
   };
 
   const storeIntendedDestination = (path: string) => {
@@ -132,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // If token decoding fails, continue with normal flow
         }
         
-        setCurrentUser(data.data);
+        setCurrentUser(withResolvedAvatar(data.data));
         handleAuthFcmSync({ user: data.data, fcm_token_epoch: data.data?.fcm_token_epoch });
       } else {
         if (data?.error_code === "ACCOUNT_REVOKED") {
@@ -272,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok && data.success && data.token) {
         localStorage.setItem("token", data.token);
         const user = data.user;
-        setCurrentUser(user);
+        setCurrentUser(withResolvedAvatar(user));
         handleAuthFcmSync({ user, fcm_token_epoch: data.fcm_token_epoch });
 
         // Start activity session tracking on login
@@ -334,7 +346,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success && result.data?.token) {
         localStorage.setItem("token", result.data.token);
         const user = result.data.user;
-        setCurrentUser(user);
+        setCurrentUser(withResolvedAvatar(user));
         handleAuthFcmSync({ user, fcm_token_epoch: user?.fcm_token_epoch ?? result.fcm_token_epoch });
         navigate(`/${user.role}/dashboard`, { replace: true });
         return true;
@@ -396,7 +408,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithToken = async (user: User, token: string) => {
     localStorage.setItem("token", token);
-    setCurrentUser(user);
+    setCurrentUser(withResolvedAvatar(user));
     handleAuthFcmSync({ user: user as { fcm_token_epoch?: string | number } });
 
     // Start activity session tracking on login

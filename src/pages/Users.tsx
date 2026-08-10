@@ -25,7 +25,7 @@ import { ENV } from "@/lib/env";
 import { getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
-import { BarChart3, Bug, Code2, Shield, UserCheck, UserRound } from "lucide-react";
+import { BarChart3, Bug, ClipboardList, Code2, Shield, UserCheck, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -166,7 +166,7 @@ interface NewUser {
   name: string;
   username: string;
   email: string;
-  password: string;
+  password?: string;
   role: UserRole;
   phone?: string;
   joining_date?: string;
@@ -333,6 +333,12 @@ const Users = () => {
     if (!query && tabFromUrl !== "analytics") {
       if (tabFromUrl === "active") {
         filtered = filtered.filter((user) => user.checked_in_today);
+      } else if (tabFromUrl === "pending") {
+        filtered = filtered.filter(
+          (user) =>
+            String(user.onboarding_verification_status || "").toLowerCase() ===
+            "pending"
+        );
       } else if (tabFromUrl === "developers") {
         filtered = filtered.filter(user => user.role === "developer");
       } else if (tabFromUrl === "testers") {
@@ -380,15 +386,17 @@ const Users = () => {
       const payload = {
         username: userData.username,
         email: userData.email,
-        password: userData.password,
         role: userData.role,
         phone: userData.phone,
         joining_date: userData.joining_date || undefined,
       };
       const result = await userService.addUser(payload);
       toast({
-        title: "Success",
-        description: result.message,
+        title: result.emailSent === false ? "User created — email failed" : "Success",
+        description: result.temporaryPassword
+          ? `${result.message} Temporary password: ${result.temporaryPassword}`
+          : result.message,
+        variant: result.emailSent === false ? "destructive" : "default",
       });
       fetchUsers(); // Refresh user list after adding
       return true;
@@ -487,13 +495,26 @@ const Users = () => {
   const testerCount = users.filter(u => u.role === "tester").length;
   const othersCount = users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length;
   const activeTodayCount = users.filter((u) => u.checked_in_today).length;
+  const pendingVerificationCount = users.filter(
+    (u) =>
+      String(u.onboarding_verification_status || "").toLowerCase() === "pending"
+  ).length;
 
   // Always keep role tabs mounted (even at 0) so URL tab + Radix Tabs don't
   // snap back to "active" while users are still loading after Back.
-  const knownTabs = ["active", "admins", "developers", "testers", "others", "analytics"] as const;
+  const knownTabs = [
+    "active",
+    "pending",
+    "admins",
+    "developers",
+    "testers",
+    "others",
+    "analytics",
+  ] as const;
   const isKnownTab = (knownTabs as readonly string[]).includes(tabFromUrl);
   const isValidTab =
     tabFromUrl === "active" ||
+    tabFromUrl === "pending" ||
     tabFromUrl === "analytics" ||
     tabFromUrl === "admins" ||
     tabFromUrl === "developers" ||
@@ -510,6 +531,14 @@ const Users = () => {
       icon: UserCheck,
       count: activeTodayCount,
       countClass: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300",
+    },
+    {
+      value: "pending",
+      label: "Pending",
+      shortLabel: "Pending",
+      icon: ClipboardList,
+      count: pendingVerificationCount,
+      countClass: "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300",
     },
     {
       value: "admins",
@@ -579,6 +608,12 @@ const Users = () => {
       switch (activeTab) {
         case "active":
           return users.filter((u) => u.checked_in_today);
+        case "pending":
+          return users.filter(
+            (u) =>
+              String(u.onboarding_verification_status || "").toLowerCase() ===
+              "pending"
+          );
         case "admins":
           return users.filter((u) => u.role === "admin");
         case "developers":
@@ -693,12 +728,15 @@ const Users = () => {
           value={activeTab}
           onValueChange={handleTabChange}
           title="Select Section"
-          description="Navigate between active check-ins and user roles"
+          description="Navigate between check-ins, pending verification, and roles"
           desktopBreakpoint="xl"
         />
 
         {/* Keep all tab panels mounted so Back to ?tab=developers does not reset */}
         <TabsContent value="active" className="space-y-6 sm:space-y-8">
+          {renderUsersContent()}
+        </TabsContent>
+        <TabsContent value="pending" className="space-y-6 sm:space-y-8">
           {renderUsersContent()}
         </TabsContent>
         <TabsContent value="developers" className="space-y-6 sm:space-y-8">
@@ -1032,6 +1070,8 @@ const Users = () => {
             <p className="text-sm font-medium text-gray-900 dark:text-white">
               {activeTab === "active" && !searchTerm.trim()
                 ? "No team members have checked in for work today yet."
+                : activeTab === "pending" && !searchTerm.trim()
+                  ? "No onboarding submissions waiting for verification."
                 : "No users match your current filters."}
             </p>
           </div>
@@ -1114,11 +1154,22 @@ const Users = () => {
                                 className="h-10 w-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
                               />
                               <div>
-                                <p className="font-semibold text-sm text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
-                                  {user.username}
-                                </p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold text-sm text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                                    {user.username}
+                                  </p>
+                                  {String(user.onboarding_verification_status || "").toLowerCase() ===
+                                  "pending" ? (
+                                    <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                                      Pending verify
+                                    </span>
+                                  ) : null}
+                                </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
                                   ID: {user.id}
+                                  {user.onboarding_completed_at
+                                    ? ` · Submitted ${formatDistanceToNow(new Date(user.onboarding_completed_at), { addSuffix: true })}`
+                                    : ""}
                                 </p>
                               </div>
                             </div>
@@ -1173,9 +1224,17 @@ const Users = () => {
                         className="h-12 w-12 rounded-full border-2 border-gray-200 dark:border-gray-700 shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">
-                          {user.username}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">
+                            {user.username}
+                          </p>
+                          {String(user.onboarding_verification_status || "").toLowerCase() ===
+                          "pending" ? (
+                            <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                              Pending verify
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {user.email}
                         </p>
@@ -1188,6 +1247,14 @@ const Users = () => {
                           </div>
                           <StatusBadge status={user.status || 'offline'} lastSeen={user.last_active_at} />
                         </div>
+                        {user.onboarding_completed_at ? (
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Submitted{" "}
+                            {formatDistanceToNow(new Date(user.onboarding_completed_at), {
+                              addSuffix: true,
+                            })}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 

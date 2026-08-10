@@ -8,6 +8,8 @@ import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
 import { UserAttendanceExceptions } from "@/components/users/UserAttendanceExceptions";
 import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
+import { OnboardingProfileSection } from "@/components/onboarding/OnboardingProfileSection";
+import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -24,6 +26,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
+import { resolveAvatarUrl } from "@/lib/avatarUrl";
+import { userRequiresOnboarding } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
@@ -339,12 +343,21 @@ export default function UserDetails() {
                     <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                       <div className="relative shrink-0 self-start">
                         <img
-                          src={user.avatar}
+                          src={resolveAvatarUrl(
+                            user.avatar,
+                            user.name || user.username || "User"
+                          )}
                           alt={`${user.name}'s avatar`}
                           className={cn(
                             "h-20 w-20 sm:h-24 sm:w-24 rounded-full border-4 border-background shadow-xl",
                             statusConfig.pulse && "ring-4 ring-primary/10"
                           )}
+                          onError={(e) => {
+                            e.currentTarget.src = resolveAvatarUrl(
+                              null,
+                              user.name || user.username || "User"
+                            );
+                          }}
                         />
                         <div
                           className={cn(
@@ -391,6 +404,12 @@ export default function UserDetails() {
                               ? "Account deactivated"
                               : "Account active"}
                           </span>
+                          {userRequiresOnboarding(user) &&
+                          Number(user.onboarding_completed ?? 0) === 1 ? (
+                            <OnboardingVerificationBadge
+                              status={user.onboarding_verification_status}
+                            />
+                          ) : null}
                           {user.last_active_at && (
                             <span className="text-xs text-muted-foreground">
                               {formatDistanceToNow(new Date(user.last_active_at), {
@@ -749,9 +768,21 @@ export default function UserDetails() {
 
             {/* Stats */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              <div className="xl:col-span-12">
-                <UserProjectPortfolio userId={user.id} />
-              </div>
+              {userRequiresOnboarding(user) ? (
+                <div className="xl:col-span-12">
+                  <OnboardingProfileSection
+                    userId={user.id}
+                    onboardingCompleted={user.onboarding_completed}
+                    canVerify={effectiveRole === "admin"}
+                    employeeName={user.name || user.username}
+                    employeeUsername={user.username}
+                    employeeEmail={user.email}
+                    employeePhone={user.phone}
+                    employeeRole={user.role}
+                    employeeAvatar={user.avatar}
+                  />
+                </div>
+              ) : null}
               <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
                 <CardContent className="p-5 sm:p-6 space-y-6">
                   <UserLeaveDetails
@@ -776,6 +807,9 @@ export default function UserDetails() {
                   <UserWorkStats userId={user.id} />
                 </CardContent>
               </Card>
+              <div className="xl:col-span-12">
+                <UserProjectPortfolio userId={user.id} />
+              </div>
               <Card className="xl:col-span-12 border-border/60 bg-card/60 backdrop-blur">
                 <CardContent className="p-5 sm:p-6 space-y-6">
                   <h3 className="text-lg font-semibold">Active Hours</h3>

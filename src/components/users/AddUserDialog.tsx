@@ -29,7 +29,7 @@ import { toast } from "@/components/ui/use-toast";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2, UserPlus } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -44,9 +44,6 @@ const userFormSchema = z.object({
       message: "Username can only contain letters, numbers, and underscores",
     }),
   email: z.string().email({ message: "Invalid email address" }),
-  password: z
-    .string()
-    .min(6, { message: "Password must be at least 6 characters" }),
   role: z.string().min(1, {
     message: "Please select a role",
   }),
@@ -115,7 +112,6 @@ function PhoneInput({
 export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
 
   const form = useForm<UserFormValues>({
@@ -123,7 +119,6 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
     defaultValues: {
       username: "",
       email: "",
-      password: "",
       role: "",
       phone: "",
       joining_date: "",
@@ -164,7 +159,6 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
       const payload = {
         username: userData.username,
         email: userData.email,
-        password: userData.password,
         role: userData.role,
         role_id: selectedRole?.id,
         phone: userData.phone && userData.phone.trim() ? "+91" + userData.phone.trim() : undefined,
@@ -199,7 +193,6 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
     setOpen(next);
     if (!next) {
       form.reset();
-      setShowPassword(false);
     }
   };
 
@@ -225,7 +218,7 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                 Add New User
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Create a new user account. Fill in all required information below.
+                Create a new account. They will set their own password during onboarding.
               </DialogDescription>
             </div>
           </div>
@@ -265,37 +258,6 @@ export function AddUserDialog({ onUserAdd }: AddUserDialogProps) {
                         className={fieldInputClass}
                       />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem className="space-y-2">
-                    <FormLabelDot color="bg-violet-500">Password</FormLabelDot>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Enter password"
-                          {...field}
-                          className={cn(fieldInputClass, "pr-11")}
-                        />
-                        <button
-                          type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                          onClick={() => setShowPassword((v) => !v)}
-                          tabIndex={-1}
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </FormControl>
-                    <FormDescription className="text-xs">At least 6 characters</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

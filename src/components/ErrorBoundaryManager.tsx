@@ -392,7 +392,7 @@ export const ErrorBoundaryProvider: React.FC<ErrorBoundaryProviderProps> = ({ ch
 
       {/* Non-critical error notifications */}
       {errorState && errorState.severity !== 'critical' && (
-        <div className="fixed top-4 right-4 z-40 max-w-sm">
+        <div className="fixed top-4 right-4 z-[200] max-w-sm">
           <Alert className={`rounded-2xl border-2 ${
             errorState.severity === 'warning' ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20' :
             'border-orange-200 bg-orange-50 dark:bg-orange-900/20'

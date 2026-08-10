@@ -405,8 +405,10 @@ const PerformanceReviewForm = () => {
                   setDirty(true);
                 }}
                 placeholder="Pick review date"
+                displayFormat="d MMM yyyy"
                 disableFuture={false}
-                className={`${fieldClass} border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70`}
+                disabled={saving}
+                className={`${fieldClass} justify-between border-gray-200/70 dark:border-gray-700/70 bg-white/70 dark:bg-gray-800/70`}
               />
             </div>
           </div>

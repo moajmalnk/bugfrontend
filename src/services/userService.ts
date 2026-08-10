@@ -1,4 +1,5 @@
 import { ENV } from '@/lib/env';
+import { resolveAvatarUrl } from '@/lib/avatarUrl';
 import { sortUsersActiveFirst } from '@/lib/utils/userSort';
 import { User, UserRole } from '@/types';
 import axios from 'axios';
@@ -75,7 +76,7 @@ interface NewUserData {
   username: string;
   email: string;
   phone?: string;
-  password: string;
+  password?: string;
   role: UserRole;
   joining_date?: string | null;
 }
@@ -268,6 +269,18 @@ class UserService {
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=${bgColor}&color=fff`;
   }
 
+  private resolveUserAvatar(
+    avatar: string | null | undefined,
+    name: string,
+    role: UserRole
+  ): string {
+    const raw = (avatar || "").trim();
+    if (raw) {
+      return resolveAvatarUrl(raw, name);
+    }
+    return this.generateAvatar(name, role);
+  }
+
   private async fetchWithAuth(url: string, options: RequestInit = {}) {
     const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     const headers = {
@@ -294,7 +307,11 @@ class UserService {
     return sortUsersActiveFirst(
       response.data.map((user: any) => ({
         ...user,
-        avatar: this.generateAvatar(user.name, user.role), // <-- use name
+        avatar: this.resolveUserAvatar(
+          user.avatar,
+          user.name || user.username || "User",
+          user.role
+        ),
         account_active:
           user.account_active !== undefined && user.account_active !== null
             ? Number(user.account_active)
@@ -313,7 +330,12 @@ class UserService {
     return data.emails;
   }
 
-  async addUser(userData: NewUserData): Promise<{ user: User, message: string }> {
+  async addUser(userData: NewUserData): Promise<{
+    user: User;
+    message: string;
+    emailSent?: boolean;
+    temporaryPassword?: string;
+  }> {
     const response = await fetch(`${this.baseUrl}/create.php`, {
       method: "POST",
       headers: {
@@ -327,7 +349,12 @@ class UserService {
     if (!response.ok || !data.success) {
       throw new Error(data.message || "Failed to add user.");
     }
-    return { user: { ...data.data, phone: data.data.phone }, message: data.message };
+    return {
+      user: { ...data.data, phone: data.data.phone },
+      message: data.message,
+      emailSent: data.data?.email_sent === true,
+      temporaryPassword: data.data?.temporary_password || undefined,
+    };
   }
 
   async updateUser(userId: string, userData: UpdateUserData): Promise<User> {
@@ -356,7 +383,8 @@ class UserService {
         role: updatedUser.role || userData.role || 'user',
         role_id: updatedUser.role_id || null,
         name: updatedUser.name || updatedUser.username || '',
-        avatar: this.generateAvatar(
+        avatar: this.resolveUserAvatar(
+          updatedUser.avatar,
           updatedUser.name || updatedUser.username || '',
           (updatedUser.role || userData.role || 'user') as UserRole
         ),

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserIcon, LogOut, Settings, User as UserAvatar, Shield, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
+import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { cn } from "@/lib/utils";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { useState } from "react";
@@ -21,6 +22,10 @@ export function UserNav() {
   const [logoutOpen, setLogoutOpen] = useState(false);
 
   const defaultAvatar = "/logo.png";
+  const displayName = currentUser?.name || currentUser?.username || "User";
+  const avatarSrc = currentUser?.avatar
+    ? resolveAvatarUrl(currentUser.avatar, displayName)
+    : null;
 
   return (
     <>
@@ -36,11 +41,14 @@ export function UserNav() {
           aria-label="User menu"
         >
           <div className="relative">
-            {currentUser?.avatar ? (
+            {avatarSrc ? (
               <img
-                src={currentUser.avatar}
+                src={avatarSrc}
                 alt="User avatar"
                 className="h-10 w-10 rounded-xl object-cover ring-2 ring-border/50 hover:ring-accent/50 transition-all duration-200"
+                onError={(e) => {
+                  e.currentTarget.src = defaultAvatar;
+                }}
               />
             ) : (
               <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center ring-2 ring-border/50 hover:ring-accent/50 transition-all duration-200">

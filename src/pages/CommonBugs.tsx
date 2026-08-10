@@ -53,7 +53,8 @@ const CommonBugs = () => {
   const role = getEffectiveRole(currentUser || {});
   const canAccessCommonBugs =
     hasPermissionOrAdmin(role, hasPermission, "COMMON_BUGS_VIEW") ||
-    role === "developer";
+    role === "developer" ||
+    role === "tester";
   const [bugs, setBugs] = useState<CommonBug[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);

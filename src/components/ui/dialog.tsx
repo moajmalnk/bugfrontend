@@ -32,12 +32,14 @@ type DialogContentProps = React.ComponentPropsWithoutRef<
 > & {
   /** When false, omit the default top-right overlay close (use inline header/footer closes instead). */
   showCloseButton?: boolean;
+  /** Optional classes for the dimmed backdrop (e.g. raise z-index above Leaflet maps). */
+  overlayClassName?: string;
 };
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, showCloseButton = true, onCloseAutoFocus, ...props }, ref) => {
+>(({ className, children, showCloseButton = true, overlayClassName, onCloseAutoFocus, ...props }, ref) => {
   const contentRef = React.useRef<HTMLDivElement | null>(null)
 
   // When a nested modal (e.g. AlertDialog) marks this dialog aria-hidden,
@@ -62,7 +64,7 @@ const DialogContent = React.forwardRef<
 
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         ref={(node) => {
           contentRef.current = node

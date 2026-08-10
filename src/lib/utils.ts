@@ -56,6 +56,27 @@ export const getEffectiveRole = (user: { role?: string; role_id?: number | null 
   return user.role || 'user';
 };
 
+/**
+ * Why: Statutory/banking onboarding wizard is mandatory for developers only.
+ * Testers, admins, and custom roles skip the lock-screen wizard.
+ */
+export const userRequiresOnboarding = (user: {
+  role?: string;
+  role_id?: number | null;
+} | null | undefined): boolean => getEffectiveRole(user || {}) === "developer";
+
+/**
+ * Incomplete mandatory onboarding — only developers are locked into the wizard.
+ */
+export const userHasPendingOnboarding = (user: {
+  role?: string;
+  role_id?: number | null;
+  onboarding_completed?: number | null;
+} | null | undefined): boolean =>
+  !!user &&
+  userRequiresOnboarding(user) &&
+  Number(user.onboarding_completed ?? 0) === 0;
+
 /** Show BugMessage in the main sidebar (after BugUpdate) for admins and developers. */
 export const showBugMessageInMainNav = (role: string | undefined | null): boolean =>
   role === "admin" || role === "developer";

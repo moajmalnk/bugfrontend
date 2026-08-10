@@ -128,6 +128,16 @@ export interface User {
   role_id?: number | null;
   /** 1 = active, 0 = deactivated by admin (when column exists) */
   account_active?: number;
+  /** 1 = mandatory onboarding wizard finished */
+  onboarding_completed?: number;
+  /** 1 = must choose password during onboarding (new hires) */
+  must_set_password?: number;
+  /** none | pending | verified | rejected */
+  onboarding_verification_status?: 'none' | 'pending' | 'verified' | 'rejected' | string;
+  onboarding_verified_at?: string | null;
+  onboarding_completed_at?: string | null;
+  terms_accepted_at?: string | null;
+  privacy_accepted_at?: string | null;
   /** Employment start date (YYYY-MM-DD); attendance blocked before this day */
   joining_date?: string | null;
   avatar?: string;
