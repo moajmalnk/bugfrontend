@@ -493,9 +493,9 @@ export default function AdminAttendanceExceptionUserDetail() {
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-sky-50/50 via-transparent to-blue-50/50 dark:from-sky-950/20 dark:via-transparent dark:to-blue-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-6 min-w-0">
-              <div className="space-y-3 min-w-0 flex-1">
-                <div className="flex items-center gap-3 min-w-0">
+            <div className="grid grid-cols-12 gap-4 sm:gap-6 min-w-0 w-full">
+              <div className="col-span-12 xl:col-span-8 space-y-3 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
                   <Button
                     type="button"
                     variant="ghost"
@@ -509,14 +509,14 @@ export default function AdminAttendanceExceptionUserDetail() {
                   <div className="p-2 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl shadow-lg shrink-0">
                     <UserRound className="h-5 w-5 sm:h-6 sm:w-6 text-white" aria-hidden />
                   </div>
-                  <div className="min-w-0">
-                    <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
+                  <div className="min-w-0 flex-1 basis-[12rem]">
+                    <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
                       {displayName}
                     </h1>
                     <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full mt-2" />
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl min-w-0 break-words capitalize">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl capitalize">
                   <span className="font-medium text-gray-800 dark:text-gray-200">
                     {(detailUser?.role || 'teammate').toString()}
                   </span>
@@ -553,12 +553,12 @@ export default function AdminAttendanceExceptionUserDetail() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 shrink-0 w-full lg:w-auto">
+              <div className="col-span-12 xl:col-span-4 flex flex-col sm:flex-row xl:flex-col items-stretch gap-3 min-w-0">
                 <Button
                   type="button"
                   variant="outline"
                   size="lg"
-                  className="h-12 w-full sm:w-auto rounded-xl border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-semibold shadow-sm hover:shadow-md"
+                  className="h-12 w-full rounded-xl border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-semibold shadow-sm hover:shadow-md"
                   asChild
                 >
                   <Link to={`/${role}/users/${userId}`}>
@@ -570,7 +570,7 @@ export default function AdminAttendanceExceptionUserDetail() {
                   type="button"
                   size="lg"
                   onClick={backToList}
-                  className="h-12 w-full sm:w-auto px-6 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 rounded-xl"
+                  className="h-12 w-full px-6 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
                 >
                   <ArrowLeft className="mr-2 h-5 w-5 shrink-0" />
                   All people

@@ -399,27 +399,27 @@ export default function AdminAttendanceExceptions() {
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-sky-50/50 via-transparent to-blue-50/50 dark:from-sky-950/20 dark:via-transparent dark:to-blue-950/20" />
           <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-4 sm:p-6 md:p-8">
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 sm:gap-6 min-w-0">
-              <div className="space-y-3 min-w-0 flex-1">
+            <div className="grid grid-cols-12 gap-4 sm:gap-6 min-w-0 w-full">
+              <div className="col-span-12 space-y-3 min-w-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl shadow-lg shrink-0">
                     <CalendarClock className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
-                  <div className="min-w-0">
-                    <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight truncate">
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent tracking-tight break-words">
                       Attendance exceptions
                     </h1>
                     <div className="h-1 w-16 sm:w-20 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full mt-2" />
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl min-w-0 break-words">
+                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg font-medium max-w-2xl">
                   Browse people below, then open their page for day details, weekly Office &amp; WFH
                   tables, exceptions, and late check-ins.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-stretch gap-3 shrink-0 w-full lg:w-auto">
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/30 border border-sky-200 dark:border-sky-800 rounded-xl shadow-sm min-w-0">
+              <div className="col-span-12 flex flex-wrap items-stretch gap-3 min-w-0">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/30 border border-sky-200 dark:border-sky-800 rounded-xl shadow-sm min-w-0 flex-1 basis-[min(100%,11rem)] sm:basis-[min(100%,12rem)]">
                   <div className="p-1.5 bg-sky-500 rounded-lg shrink-0">
                     <MapPin className="h-5 w-5 text-white" />
                   </div>
@@ -432,41 +432,41 @@ export default function AdminAttendanceExceptions() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm min-w-0 flex-1 basis-[min(100%,11rem)] sm:basis-[min(100%,12rem)]">
                   <div className="p-1.5 bg-emerald-500 rounded-lg shrink-0">
                     <UserRound className="h-5 w-5 text-white" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums leading-none">
                       {data?.office_active_days_total ?? 0}
                     </p>
-                    <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-1">
+                    <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-1 truncate">
                       office days total
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 border border-violet-200 dark:border-violet-800 rounded-xl shadow-sm">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 border border-violet-200 dark:border-violet-800 rounded-xl shadow-sm min-w-0 flex-1 basis-[min(100%,11rem)] sm:basis-[min(100%,12rem)]">
                   <div className="p-1.5 bg-violet-500 rounded-lg shrink-0">
                     <CalendarClock className="h-5 w-5 text-white" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xl sm:text-2xl font-bold text-violet-700 dark:text-violet-300 tabular-nums leading-none">
                       {data?.exception_count ?? 0}
                     </p>
-                    <p className="text-[11px] text-violet-700/80 dark:text-violet-300/80 mt-1">
+                    <p className="text-[11px] text-violet-700/80 dark:text-violet-300/80 mt-1 truncate">
                       exceptions · {usersWithExceptions} people
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-rose-50 to-orange-50 dark:from-rose-950/30 dark:to-orange-950/30 border border-rose-200 dark:border-rose-800 rounded-xl shadow-sm">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-rose-50 to-orange-50 dark:from-rose-950/30 dark:to-orange-950/30 border border-rose-200 dark:border-rose-800 rounded-xl shadow-sm min-w-0 flex-1 basis-[min(100%,11rem)] sm:basis-[min(100%,12rem)]">
                   <div className="p-1.5 bg-rose-500 rounded-lg shrink-0">
                     <Home className="h-5 w-5 text-white" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xl sm:text-2xl font-bold text-rose-700 dark:text-rose-300 tabular-nums leading-none">
                       {data?.late_count ?? 0}
                     </p>
-                    <p className="text-[11px] text-rose-700/80 dark:text-rose-300/80 mt-1">
+                    <p className="text-[11px] text-rose-700/80 dark:text-rose-300/80 mt-1 truncate">
                       late on record
                     </p>
                   </div>
