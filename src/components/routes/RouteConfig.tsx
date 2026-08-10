@@ -156,6 +156,9 @@ const AdminLeaveUserDetail = lazy(() => import("@/pages/AdminLeaveUserDetail"));
 const AdminAttendanceExceptions = lazy(() => import("@/pages/AdminAttendanceExceptions"));
 const AdminAttendanceExceptionUserDetail = lazy(() => import("@/pages/AdminAttendanceExceptionUserDetail"));
 const FeedbackStats = lazy(() => import("@/pages/FeedbackStats"));
+const PerformanceReviews = lazy(() => import("@/pages/PerformanceReviews"));
+const PerformanceReviewForm = lazy(() => import("@/pages/PerformanceReviewForm"));
+const PerformanceReviewTemplate = lazy(() => import("@/pages/PerformanceReviewTemplate"));
 const CommonBugs = lazy(() => import("@/pages/CommonBugs"));
 const CommonCodoRules = lazy(() => import("@/pages/CommonCodoRules"));
 const DocsSetupSuccess = lazy(() => import("@/pages/DocsSetupSuccess"));
@@ -337,6 +340,10 @@ const RouteConfig = () => {
       <Route path="/leave-requests" element={<RolePathRedirect suffix="leave-requests" />} />
       <Route path="/attendance-exceptions" element={<RolePathRedirect suffix="attendance-exceptions" />} />
       <Route path="/feedback-stats" element={<RolePathRedirect suffix="feedback-stats" />} />
+      <Route path="/performance-reviews/template" element={<RolePathRedirect suffix="performance-reviews/template" />} />
+      <Route path="/performance-reviews/new" element={<RolePathRedirect suffix="performance-reviews/new" />} />
+      <Route path="/performance-reviews/:id/edit" element={<RolePathRedirect suffix="performance-reviews/:id/edit" />} />
+      <Route path="/performance-reviews" element={<RolePathRedirect suffix="performance-reviews" />} />
       <Route path="/push-coverage" element={<RolePathRedirect suffix="push-coverage" />} />
       <Route path="/shorts/:shortId" element={<RolePathRedirect suffix="shorts/:shortId" />} />
       <Route path="/shorts" element={<RolePathRedirect suffix="shorts" />} />
@@ -406,6 +413,10 @@ const RouteConfig = () => {
           <Route path="attendance-exceptions/:userId" element={<AdminAttendanceExceptionUserDetail />} />
           <Route path="attendance-exceptions" element={<AdminAttendanceExceptions />} />
           <Route path="feedback-stats" element={<FeedbackStats />} />
+          <Route path="performance-reviews/template" element={<PerformanceReviewTemplate />} />
+          <Route path="performance-reviews/new" element={<PerformanceReviewForm />} />
+          <Route path="performance-reviews/:id/edit" element={<PerformanceReviewForm />} />
+          <Route path="performance-reviews" element={<PerformanceReviews />} />
           <Route path="common-bugs" element={<CommonBugs />} />
           <Route path="common-codo" element={<CommonCodoRules />} />
           <Route path="bugdocs" element={<BugDocsPage />} />

@@ -34,6 +34,7 @@ import {
   LayoutDashboard,
   Clapperboard,
   CalendarClock,
+  ClipboardList,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationPopover } from "@/components/notifications/NotificationPopover";
@@ -301,6 +302,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
             // Why: WhatsApp bulk tools are admin-only — hide from developer portal.
             const showWhatsApp = hasMessagingCreate && role === "admin";
             const hasFeedbackView = can("FEEDBACK_VIEW");
+            const hasPerformanceReviews = can("PERFORMANCE_REVIEWS_MANAGE");
             const hasActivityView = can("ACTIVITY_VIEW");
             const hasSettingsEdit = can("SETTINGS_EDIT");
             const hasBackupManage = can("BACKUP_MANAGE") || hasSettingsEdit;
@@ -318,6 +320,7 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
               (hasMessagingView && !messagesInMain) ||
               showWhatsApp ||
               hasFeedbackView ||
+              hasPerformanceReviews ||
               hasActivityView ||
               hasSettingsEdit ||
               hasBackupManage ||
@@ -400,6 +403,14 @@ export const Sidebar = ({ className, closeSidebar }: SidebarProps) => {
                       to="/feedback-stats"
                       icon={<BarChart3 className="h-5 w-5" />}
                       label="Feedbacks"
+                    />
+                  )}
+
+                  {hasPerformanceReviews && (
+                    <NavLink
+                      to="/performance-reviews"
+                      icon={<ClipboardList className="h-5 w-5" />}
+                      label="Performance Reviews"
                     />
                   )}
 

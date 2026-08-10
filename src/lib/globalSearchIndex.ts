@@ -412,6 +412,21 @@ const PAGE_ENTRIES: PageSearchEntry[] = [
     subtitle: "Administration",
   },
   {
+    id: "page-performance-reviews",
+    label: "Performance Reviews",
+    path: "/performance-reviews",
+    keywords: [
+      "performance reviews",
+      "employee review",
+      "monthly review",
+      "appraisal",
+      "challenges",
+      "team review",
+    ],
+    permission: "PERFORMANCE_REVIEWS_MANAGE",
+    subtitle: "Administration",
+  },
+  {
     id: "page-activity",
     label: "Activities",
     path: "/activity",
