@@ -100,6 +100,7 @@ export interface GetOnboardingResponse {
     reports_to_username?: string | null;
     contract_type?: string | null;
     offer_letter_issued?: number | boolean | null;
+    offer_letter_shared_date?: string | null;
     probation_end_date?: string | null;
     employment_status?: string | null;
     role?: string;

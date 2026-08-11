@@ -92,6 +92,7 @@ type HrEmploymentForm = {
   reports_to_user_id: string;
   contract_type: string;
   offer_letter_issued: boolean;
+  offer_letter_shared_date: string;
   probation_end_date: string;
 };
 
@@ -104,6 +105,7 @@ const EMPTY_HR_FORM: HrEmploymentForm = {
   reports_to_user_id: "",
   contract_type: "",
   offer_letter_issued: false,
+  offer_letter_shared_date: "",
   probation_end_date: "",
 };
 
@@ -116,6 +118,7 @@ function hrFormFromUser(user?: {
   reports_to_user_id?: string | null;
   contract_type?: string | null;
   offer_letter_issued?: number | boolean | null;
+  offer_letter_shared_date?: string | null;
   probation_end_date?: string | null;
 } | null): HrEmploymentForm {
   return {
@@ -127,6 +130,7 @@ function hrFormFromUser(user?: {
     reports_to_user_id: String(user?.reports_to_user_id || ""),
     contract_type: String(user?.contract_type || ""),
     offer_letter_issued: Number(user?.offer_letter_issued) === 1,
+    offer_letter_shared_date: String(user?.offer_letter_shared_date || "").slice(0, 10),
     probation_end_date: String(user?.probation_end_date || "").slice(0, 10),
   };
 }
@@ -363,6 +367,7 @@ interface OnboardingProfileSectionProps {
   employeeReportsTo?: string | null;
   employeeContractType?: string | null;
   employeeOfferLetterIssued?: number | boolean | null;
+  employeeOfferLetterSharedDate?: string | null;
   employeeProbationEndDate?: string | null;
 }
 
@@ -384,6 +389,7 @@ export function OnboardingProfileSection({
   employeeReportsTo,
   employeeContractType,
   employeeOfferLetterIssued,
+  employeeOfferLetterSharedDate,
   employeeProbationEndDate,
 }: OnboardingProfileSectionProps) {
   const queryClient = useQueryClient();
@@ -481,6 +487,8 @@ export function OnboardingProfileSection({
           : Number(offerRaw) === 1
             ? "Yes"
             : "No",
+      offer_letter_shared_date:
+        u?.offer_letter_shared_date || employeeOfferLetterSharedDate || null,
       probation_end_date:
         u?.probation_end_date || employeeProbationEndDate || null,
     };
@@ -493,6 +501,7 @@ export function OnboardingProfileSection({
     employeeJobTitle,
     employeeJoiningDate,
     employeeOfferLetterIssued,
+    employeeOfferLetterSharedDate,
     employeeProbationEndDate,
     employeeReportsTo,
   ]);
@@ -540,9 +549,13 @@ export function OnboardingProfileSection({
       hrFormFromUser({
         ...data?.user,
         joining_date: data?.user?.joining_date || employeeJoiningDate || null,
+        offer_letter_shared_date:
+          data?.user?.offer_letter_shared_date ||
+          employeeOfferLetterSharedDate ||
+          null,
       })
     );
-  }, [reviewOpen, data?.user, employeeJoiningDate]);
+  }, [reviewOpen, data?.user, employeeJoiningDate, employeeOfferLetterSharedDate]);
 
   useEffect(() => {
     if (!reviewOpen || !canVerify) return;
@@ -618,6 +631,7 @@ export function OnboardingProfileSection({
         reports_to_user_id: hrForm.reports_to_user_id.trim() || null,
         contract_type: hrForm.contract_type.trim() || null,
         offer_letter_issued: hrForm.offer_letter_issued,
+        offer_letter_shared_date: hrForm.offer_letter_shared_date.trim() || null,
         probation_end_date: hrForm.probation_end_date.trim() || null,
       });
       await queryClient.invalidateQueries({ queryKey: ["onboarding-details", userId] });
@@ -641,8 +655,24 @@ export function OnboardingProfileSection({
     }
   };
 
+  const employeeIdMissing = useMemo(() => {
+    const missing: string[] = [];
+    if (!hrForm.joining_date.trim()) missing.push("Join date");
+    const dob = String(details?.date_of_birth || data?.user?.date_of_birth || "").slice(0, 10);
+    if (!dob) missing.push("Date of birth");
+    return missing;
+  }, [hrForm.joining_date, details?.date_of_birth, data?.user]);
+
   const regenerateEmployeeCode = async () => {
     if (!canVerify || hrRegenerating || hrSaving || verifying) return;
+    if (employeeIdMissing.length > 0) {
+      toast({
+        title: "Cannot create Employee ID",
+        description: `Missing: ${employeeIdMissing.join(" and ")}. Set them first, then regenerate.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setHrRegenerating(true);
     try {
       // Why: Persist join date first so cipher uses the value currently in the form.
@@ -663,11 +693,11 @@ export function OnboardingProfileSection({
       });
     } catch (err) {
       toast({
-        title: "Could not regenerate",
+        title: "Cannot create Employee ID",
         description:
           err instanceof Error
             ? err.message
-            : "Joining date and date of birth are required",
+            : "Join date and date of birth are required",
         variant: "destructive",
       });
     } finally {
@@ -973,6 +1003,19 @@ export function OnboardingProfileSection({
                   : null,
               },
               { label: "Offer letter", value: employment.offer_letter },
+              {
+                label: "Offer letter shared",
+                value: employment.offer_letter_shared_date
+                  ? new Date(
+                      String(employment.offer_letter_shared_date).slice(0, 10) +
+                        "T00:00:00"
+                    ).toLocaleDateString(undefined, {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : null,
+              },
               {
                 label: "End date",
                 value: employment.probation_end_date
@@ -1333,7 +1376,11 @@ export function OnboardingProfileSection({
                         type="button"
                         variant="outline"
                         className="h-11 w-11 rounded-xl shrink-0 px-0"
-                        title="Regenerate from join date + DOB"
+                        title={
+                          employeeIdMissing.length > 0
+                            ? `Cannot create — missing: ${employeeIdMissing.join(" and ")}`
+                            : "Regenerate from join date + DOB"
+                        }
                         disabled={hrSaving || verifying || hrRegenerating}
                         onClick={() => void regenerateEmployeeCode()}
                       >
@@ -1344,6 +1391,24 @@ export function OnboardingProfileSection({
                         )}
                       </Button>
                     </div>
+                    {employeeIdMissing.length > 0 ? (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
+                        ID needs{" "}
+                        <span className="font-medium">{employeeIdMissing.join(" + ")}</span>
+                        {employeeIdMissing.includes("Date of birth")
+                          ? " (from employee onboarding)."
+                          : "."}{" "}
+                        Set {employeeIdMissing.length === 1 ? "it" : "them"}, then click refresh.
+                      </p>
+                    ) : !hrForm.employee_code.trim() ? (
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Ready — click refresh to generate from join date + DOB.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Built from join date + DOB. Refresh to regenerate.
+                      </p>
+                    )}
                   </div>
 
                   <div className="col-span-12 md:col-span-6 space-y-1.5">
@@ -1483,8 +1548,34 @@ export function OnboardingProfileSection({
                       checked={hrForm.offer_letter_issued}
                       disabled={hrSaving || verifying}
                       onCheckedChange={(checked) =>
-                        setHrForm((p) => ({ ...p, offer_letter_issued: checked }))
+                        setHrForm((p) => ({
+                          ...p,
+                          offer_letter_issued: checked,
+                          // Why: Turning on with empty date defaults to today as shared date.
+                          offer_letter_shared_date:
+                            checked && !p.offer_letter_shared_date
+                              ? new Date().toISOString().slice(0, 10)
+                              : p.offer_letter_shared_date,
+                        }))
                       }
+                    />
+                  </div>
+
+                  <div className="col-span-12 md:col-span-6 space-y-1.5">
+                    <Label>Offer letter shared</Label>
+                    <DatePicker
+                      value={hrForm.offer_letter_shared_date || ""}
+                      onChange={(v) =>
+                        setHrForm((p) => ({
+                          ...p,
+                          offer_letter_shared_date: v || "",
+                          offer_letter_issued: v ? true : p.offer_letter_issued,
+                        }))
+                      }
+                      placeholder="When shared"
+                      className="h-11 rounded-xl"
+                      disabled={hrSaving || verifying}
+                      disableFuture
                     />
                   </div>
                 </div>

@@ -96,6 +96,7 @@ interface UpdateUserData {
   reports_to_user_id?: string | null;
   contract_type?: string | null;
   offer_letter_issued?: boolean | number;
+  offer_letter_shared_date?: string | null;
   probation_end_date?: string | null;
   employment_status?: "active" | "inactive" | string;
   regenerate_employee_code?: boolean;
@@ -327,8 +328,39 @@ class UserService {
             ? Number(user.account_active)
             : undefined,
         joining_date: user.joining_date ?? null,
+        employee_code: user.employee_code ?? null,
+        job_title: user.job_title ?? null,
+        job_level: user.job_level ?? null,
+        department: user.department ?? null,
       }))
     );
+  }
+
+  async getUser(userId: string): Promise<User> {
+    const response = await this.fetchWithAuth(
+      `${this.baseUrl}/get.php?id=${encodeURIComponent(userId)}`
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.message || "Failed to fetch user");
+    }
+    const user = response.data;
+    return {
+      ...user,
+      avatar: this.resolveUserAvatar(
+        user.avatar,
+        user.name || user.username || "User",
+        user.role
+      ),
+      account_active:
+        user.account_active !== undefined && user.account_active !== null
+          ? Number(user.account_active)
+          : undefined,
+      joining_date: user.joining_date ?? null,
+      employee_code: user.employee_code ?? null,
+      job_title: user.job_title ?? null,
+      job_level: user.job_level ?? null,
+      department: user.department ?? null,
+    };
   }
 
   async getAllTesterEmails(): Promise<string[]> {
@@ -384,19 +416,20 @@ class UserService {
     // Backend now returns the updated user in result.data
     if (result.data) {
       const updatedUser = result.data;
-      // Ensure all required User fields are present
+      // Why: Spread full payload so HR fields (employee_code, etc.) are not dropped.
       return {
+        ...updatedUser,
         id: updatedUser.id || userId,
-        username: updatedUser.username || '',
-        email: updatedUser.email || '',
-        phone: updatedUser.phone || '',
-        role: updatedUser.role || userData.role || 'user',
-        role_id: updatedUser.role_id || null,
-        name: updatedUser.name || updatedUser.username || '',
+        username: updatedUser.username || "",
+        email: updatedUser.email || "",
+        phone: updatedUser.phone || "",
+        role: updatedUser.role || userData.role || "user",
+        role_id: updatedUser.role_id ?? null,
+        name: updatedUser.name || updatedUser.username || "",
         avatar: this.resolveUserAvatar(
           updatedUser.avatar,
-          updatedUser.name || updatedUser.username || '',
-          (updatedUser.role || userData.role || 'user') as UserRole
+          updatedUser.name || updatedUser.username || "",
+          (updatedUser.role || userData.role || "user") as UserRole
         ),
         created_at: updatedUser.created_at,
         last_active_at: updatedUser.last_active_at || null,
@@ -405,6 +438,17 @@ class UserService {
             ? Number(updatedUser.account_active)
             : undefined,
         joining_date: updatedUser.joining_date ?? null,
+        employee_code: updatedUser.employee_code ?? null,
+        job_title: updatedUser.job_title ?? null,
+        job_level: updatedUser.job_level ?? null,
+        department: updatedUser.department ?? null,
+        reports_to_user_id: updatedUser.reports_to_user_id ?? null,
+        reports_to_username: updatedUser.reports_to_username ?? null,
+        contract_type: updatedUser.contract_type ?? null,
+        offer_letter_issued: updatedUser.offer_letter_issued ?? null,
+        offer_letter_shared_date: updatedUser.offer_letter_shared_date ?? null,
+        probation_end_date: updatedUser.probation_end_date ?? null,
+        employment_status: updatedUser.employment_status ?? null,
       };
     }
     

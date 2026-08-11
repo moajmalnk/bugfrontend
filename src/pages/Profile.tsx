@@ -954,6 +954,7 @@ export default function Profile() {
                 employeeReportsTo={currentUser.reports_to_username}
                 employeeContractType={currentUser.contract_type}
                 employeeOfferLetterIssued={currentUser.offer_letter_issued}
+                employeeOfferLetterSharedDate={currentUser.offer_letter_shared_date}
                 employeeProbationEndDate={currentUser.probation_end_date}
               />
             </ProfileSection>

@@ -152,6 +152,7 @@ export interface User {
   reports_to_username?: string | null;
   contract_type?: 'full_time' | 'remote' | 'part_time' | 'contract' | 'intern' | 'other' | string | null;
   offer_letter_issued?: number | boolean | null;
+  offer_letter_shared_date?: string | null;
   probation_end_date?: string | null;
   employment_status?: 'active' | 'inactive' | string | null;
   avatar?: string;

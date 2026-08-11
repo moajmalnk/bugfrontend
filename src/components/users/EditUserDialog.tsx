@@ -62,6 +62,7 @@ const userFormSchema = z.object({
   reports_to_user_id: z.string().optional(),
   contract_type: z.string().optional(),
   offer_letter_issued: z.boolean().optional(),
+  offer_letter_shared_date: optionalDate,
   probation_end_date: optionalDate,
 });
 
@@ -154,6 +155,7 @@ function toFormValues(user: User): UserFormValues {
     reports_to_user_id: user.reports_to_user_id || "",
     contract_type: user.contract_type || "",
     offer_letter_issued: Number(user.offer_letter_issued) === 1,
+    offer_letter_shared_date: user.offer_letter_shared_date || "",
     probation_end_date: user.probation_end_date || "",
   };
 }
@@ -233,6 +235,8 @@ export function EditUserDialog({
         payload.reports_to_user_id = data.reports_to_user_id?.trim() || null;
         payload.contract_type = data.contract_type?.trim() || null;
         payload.offer_letter_issued = !!data.offer_letter_issued;
+        payload.offer_letter_shared_date =
+          data.offer_letter_shared_date?.trim() || null;
         payload.probation_end_date = data.probation_end_date?.trim() || null;
       }
 
@@ -275,9 +279,19 @@ export function EditUserDialog({
 
   const handleRegenerateCode = async () => {
     if (!isAdminEditor || regenerating || isSubmitting) return;
+    const join = (form.getValues("joining_date") || "").trim();
+    if (!join) {
+      toast({
+        title: "Cannot create Employee ID",
+        description: "Missing: Join date. Set Join date first, then regenerate. Date of birth must also exist from onboarding.",
+        variant: "destructive",
+      });
+      return;
+    }
     setRegenerating(true);
     try {
       const updatedUser = await userService.updateUser(user.id, {
+        joining_date: join,
         regenerate_employee_code: true,
       });
       form.setValue("employee_code", updatedUser.employee_code || "");
@@ -288,11 +302,11 @@ export function EditUserDialog({
       });
     } catch (error: unknown) {
       toast({
-        title: "Could not regenerate",
+        title: "Cannot create Employee ID",
         description:
           error instanceof Error
             ? error.message
-            : "Joining date and date of birth are required",
+            : "Join date and date of birth are required",
         variant: "destructive",
       });
     } finally {
@@ -464,6 +478,10 @@ export function EditUserDialog({
                             )}
                           </Button>
                         </div>
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          Needs Join date + Date of birth (from onboarding). Refresh regenerates the
+                          cipher ID.
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -624,7 +642,7 @@ export function EditUserDialog({
                     control={form.control}
                     name="offer_letter_issued"
                     render={({ field }) => (
-                      <FormItem className="col-span-12 flex items-center justify-between gap-4 rounded-xl border border-border/60 px-4 py-3">
+                      <FormItem className="col-span-12 md:col-span-6 flex items-center justify-between gap-4 rounded-xl border border-border/60 px-4 py-3">
                         <div className="min-w-0">
                           <FormLabelDot color="bg-violet-500">Offer letter</FormLabelDot>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -634,12 +652,50 @@ export function EditUserDialog({
                         <FormControl>
                           <Switch
                             checked={!!field.value}
-                            onCheckedChange={field.onChange}
+                            onCheckedChange={(checked) => {
+                              field.onChange(checked);
+                              if (checked && !form.getValues("offer_letter_shared_date")) {
+                                form.setValue(
+                                  "offer_letter_shared_date",
+                                  new Date().toISOString().slice(0, 10),
+                                  { shouldDirty: true }
+                                );
+                              }
+                            }}
                           />
                         </FormControl>
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="offer_letter_shared_date"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                        <FormLabelDot color="bg-violet-500">Offer letter shared</FormLabelDot>
+                        <FormControl>
+                          <DatePicker
+                            value={field.value || ""}
+                            onChange={(v) => {
+                              field.onChange(v);
+                              if (v) {
+                                form.setValue("offer_letter_issued", true, {
+                                  shouldDirty: true,
+                                });
+                              }
+                            }}
+                            placeholder="When shared"
+                            className={fieldInputClass}
+                            disableFuture
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="col-span-12 pt-1" />
                 </>
               ) : null}
             </div>

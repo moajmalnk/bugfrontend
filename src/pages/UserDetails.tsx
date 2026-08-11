@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn, getEffectiveRole } from "@/lib/utils";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import { userService } from "@/services/userService";
+import { onboardingService } from "@/services/onboardingService";
 import type { User } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -159,11 +160,27 @@ export default function UserDetails() {
   const { data: user, isLoading, refetch } = useQuery({
     queryKey: ["userDetails", userId],
     queryFn: async () => {
-      const users = await userService.getUsers();
-      return users.find((u) => String(u.id) === String(userId)) || null;
+      if (!userId) return null;
+      try {
+        return await userService.getUser(userId);
+      } catch {
+        // Fallback for older APIs that only list users
+        const users = await userService.getUsers();
+        return users.find((u) => String(u.id) === String(userId)) || null;
+      }
     },
     enabled: Boolean(userId),
   });
+
+  const { data: onboardingData } = useQuery({
+    queryKey: ["onboarding-details", userId],
+    queryFn: () => onboardingService.get(String(userId)),
+    enabled: Boolean(userId),
+  });
+
+  const employeeCodeDisplay =
+    (user?.employee_code || onboardingData?.user?.employee_code || "").trim() ||
+    null;
 
   const status = useMemo(() => {
     if (!user) return "offline" as const;
@@ -483,8 +500,16 @@ export default function UserDetails() {
                           <div className="text-xs text-muted-foreground">
                             Employee ID
                           </div>
-                          <div className="font-semibold font-mono text-sm truncate">
-                            {user.employee_code || "—"}
+                          <div
+                            className={cn(
+                              "font-semibold font-mono text-sm truncate",
+                              employeeCodeDisplay
+                                ? "text-foreground tracking-wide"
+                                : "text-muted-foreground"
+                            )}
+                            title={employeeCodeDisplay || "Not assigned"}
+                          >
+                            {employeeCodeDisplay || "—"}
                           </div>
                         </div>
                       </div>
@@ -827,13 +852,14 @@ export default function UserDetails() {
                     employeeRole={user.role}
                     employeeAvatar={user.avatar}
                     employeeJoiningDate={user.joining_date}
-                    employeeCode={user.employee_code}
+                    employeeCode={employeeCodeDisplay}
                     employeeJobTitle={user.job_title}
                     employeeJobLevel={user.job_level}
                     employeeDepartment={user.department}
                     employeeReportsTo={user.reports_to_username}
                     employeeContractType={user.contract_type}
                     employeeOfferLetterIssued={user.offer_letter_issued}
+                    employeeOfferLetterSharedDate={user.offer_letter_shared_date}
                     employeeProbationEndDate={user.probation_end_date}
                   />
                 </div>
