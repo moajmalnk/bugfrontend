@@ -340,11 +340,13 @@ const Users = () => {
       if (tabFromUrl === "active") {
         filtered = filtered.filter((user) => user.checked_in_today);
       } else if (tabFromUrl === "pending") {
-        filtered = filtered.filter(
-          (user) =>
-            String(user.onboarding_verification_status || "").toLowerCase() ===
-            "pending"
-        );
+        // Why: Rejected onboarding still needs HR follow-up — show with pending.
+        filtered = filtered.filter((user) => {
+          const status = String(
+            user.onboarding_verification_status || ""
+          ).toLowerCase();
+          return status === "pending" || status === "rejected";
+        });
       } else if (tabFromUrl === "developers") {
         filtered = filtered.filter(user => user.role === "developer");
       } else if (tabFromUrl === "testers") {
@@ -501,10 +503,10 @@ const Users = () => {
   const testerCount = users.filter(u => u.role === "tester").length;
   const othersCount = users.filter(u => u.role_id && ![1, 2, 3].includes(u.role_id)).length;
   const activeTodayCount = users.filter((u) => u.checked_in_today).length;
-  const pendingVerificationCount = users.filter(
-    (u) =>
-      String(u.onboarding_verification_status || "").toLowerCase() === "pending"
-  ).length;
+  const pendingVerificationCount = users.filter((u) => {
+    const status = String(u.onboarding_verification_status || "").toLowerCase();
+    return status === "pending" || status === "rejected";
+  }).length;
 
   // Always keep role tabs mounted (even at 0) so URL tab + Radix Tabs don't
   // snap back to "active" while users are still loading after Back.
@@ -615,11 +617,12 @@ const Users = () => {
         case "active":
           return users.filter((u) => u.checked_in_today);
         case "pending":
-          return users.filter(
-            (u) =>
-              String(u.onboarding_verification_status || "").toLowerCase() ===
-              "pending"
-          );
+          return users.filter((u) => {
+            const status = String(
+              u.onboarding_verification_status || ""
+            ).toLowerCase();
+            return status === "pending" || status === "rejected";
+          });
         case "admins":
           return users.filter((u) => u.role === "admin");
         case "developers":
@@ -1077,7 +1080,7 @@ const Users = () => {
               {activeTab === "active" && !searchTerm.trim()
                 ? "No team members have checked in for work today yet."
                 : activeTab === "pending" && !searchTerm.trim()
-                  ? "No onboarding submissions waiting for verification."
+                  ? "No pending or rejected onboarding submissions."
                 : "No users match your current filters."}
             </p>
           </div>
@@ -1169,12 +1172,26 @@ const Users = () => {
                                   <p className="font-semibold text-sm text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
                                     {user.username}
                                   </p>
-                                  {String(user.onboarding_verification_status || "").toLowerCase() ===
-                                  "pending" ? (
-                                    <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                                      Pending verify
-                                    </span>
-                                  ) : null}
+                                  {(() => {
+                                    const vs = String(
+                                      user.onboarding_verification_status || ""
+                                    ).toLowerCase();
+                                    if (vs === "pending") {
+                                      return (
+                                        <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                                          Pending verify
+                                        </span>
+                                      );
+                                    }
+                                    if (vs === "rejected") {
+                                      return (
+                                        <span className="inline-flex items-center rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+                                          Rejected
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
                                   ID: {user.id}
@@ -1244,12 +1261,26 @@ const Users = () => {
                           <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">
                             {user.username}
                           </p>
-                          {String(user.onboarding_verification_status || "").toLowerCase() ===
-                          "pending" ? (
-                            <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                              Pending verify
-                            </span>
-                          ) : null}
+                          {(() => {
+                            const vs = String(
+                              user.onboarding_verification_status || ""
+                            ).toLowerCase();
+                            if (vs === "pending") {
+                              return (
+                                <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                                  Pending verify
+                                </span>
+                              );
+                            }
+                            if (vs === "rejected") {
+                              return (
+                                <span className="inline-flex items-center rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+                                  Rejected
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {user.email}
