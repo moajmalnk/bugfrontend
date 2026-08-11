@@ -33,6 +33,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import {
   ProjectPickerListItemContent,
@@ -49,6 +51,7 @@ import { Bug } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRightLeft,
+  BellRing,
   FolderInput,
   Loader2,
   Megaphone,
@@ -72,6 +75,11 @@ type ConvertBugDialogProps = {
   onConvertedToUpdate?: (updateId: string, projectId: string) => void;
 };
 
+function isProjectAssigned(project: Project, userId: string): boolean {
+  const members = Array.isArray(project.members) ? project.members : [];
+  return members.some((memberId) => String(memberId) === userId);
+}
+
 export function ConvertBugDialog({
   bug,
   open,
@@ -87,8 +95,13 @@ export function ConvertBugDialog({
   const [updateType, setUpdateType] = useState<UpdateType | typeof SELECT_UNSET>(
     SELECT_UNSET
   );
+  const [requestNote, setRequestNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [accessConfirmOpen, setAccessConfirmOpen] = useState(false);
+
+  const userId = String(currentUser?.id || "");
+  const isAdmin = currentUser?.role === "admin";
 
   const {
     data: projects = [],
@@ -101,50 +114,53 @@ export function ConvertBugDialog({
     staleTime: 60_000,
   });
 
-  const accessibleProjects = useMemo(() => {
-    const all = projects as Project[];
-    if (currentUser?.role === "admin") {
-      return all;
-    }
-    const userId = String(currentUser?.id || "");
-    if (!userId) {
-      return all;
-    }
-    return all.filter((project) => {
-      const members = Array.isArray(project.members) ? project.members : [];
-      return members.some((memberId) => String(memberId) === userId);
-    });
-  }, [projects, currentUser?.id, currentUser?.role]);
+  const allProjects = useMemo(() => sortProjectsForPicker(projects as Project[]), [projects]);
 
-  const moveProjects = useMemo(
+  const assignedProjects = useMemo(() => {
+    if (isAdmin) return allProjects;
+    if (!userId) return allProjects;
+    return allProjects.filter((project) => isProjectAssigned(project, userId));
+  }, [allProjects, isAdmin, userId]);
+
+  const unassignedProjects = useMemo(() => {
+    if (isAdmin || !userId) return [];
+    return allProjects.filter((project) => !isProjectAssigned(project, userId));
+  }, [allProjects, isAdmin, userId]);
+
+  const moveAssignedProjects = useMemo(
     () =>
-      sortProjectsForPicker(
-        accessibleProjects.filter(
-          (p) => String(p.id) !== String(bug.project_id)
-        )
-      ),
-    [accessibleProjects, bug.project_id]
+      assignedProjects.filter((p) => String(p.id) !== String(bug.project_id)),
+    [assignedProjects, bug.project_id]
   );
 
-  const typeProjects = useMemo(
-    () => sortProjectsForPicker(accessibleProjects),
-    [accessibleProjects]
+  const moveUnassignedProjects = useMemo(
+    () =>
+      unassignedProjects.filter((p) => String(p.id) !== String(bug.project_id)),
+    [unassignedProjects, bug.project_id]
   );
 
-  const projectList = mode === "move" ? moveProjects : typeProjects;
+  const typeAssignedProjects = assignedProjects;
+  const typeUnassignedProjects = unassignedProjects;
 
   const selected = useMemo(
-    () => projectList.find((p) => String(p.id) === String(targetProjectId)),
-    [projectList, targetProjectId]
+    () => allProjects.find((p) => String(p.id) === String(targetProjectId)),
+    [allProjects, targetProjectId]
   );
+
+  const selectedNeedsAccessRequest = useMemo(() => {
+    if (!selected || isAdmin || !userId) return false;
+    return !isProjectAssigned(selected, userId);
+  }, [selected, isAdmin, userId]);
 
   useEffect(() => {
     if (!open) {
       setMode("move");
       setTargetProjectId("");
       setUpdateType(SELECT_UNSET);
+      setRequestNote("");
       setSubmitting(false);
       setConfirmOpen(false);
+      setAccessConfirmOpen(false);
     }
   }, [open]);
 
@@ -155,6 +171,7 @@ export function ConvertBugDialog({
     } else {
       setTargetProjectId(String(bug.project_id || ""));
     }
+    setRequestNote("");
   }, [mode, open, bug.project_id]);
 
   const canSubmit =
@@ -173,6 +190,35 @@ export function ConvertBugDialog({
       );
     }
     return err instanceof Error ? err.message : "Request failed";
+  };
+
+  const runAccessRequest = async () => {
+    setSubmitting(true);
+    try {
+      const result = await bugService.requestProjectAccess(bug.id, {
+        project_id: targetProjectId,
+        intent: mode === "to_update" ? "to_update" : "move",
+        update_type:
+          mode === "to_update" && updateType !== SELECT_UNSET
+            ? (updateType as UpdateType)
+            : undefined,
+        note: requestNote.trim() || undefined,
+      });
+      toast({
+        title: "Access request sent",
+        description: `Admins and members of “${result.project_name || selected?.name || "the project"}” were notified by email and WhatsApp.`,
+      });
+      onOpenChange(false);
+    } catch (err: unknown) {
+      toast({
+        title: "Request failed",
+        description: extractError(err),
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+      setAccessConfirmOpen(false);
+    }
   };
 
   const runConvert = async () => {
@@ -230,6 +276,13 @@ export function ConvertBugDialog({
   };
 
   const handlePrimaryClick = () => {
+    if (selectedNeedsAccessRequest) {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      requestAnimationFrame(() => setAccessConfirmOpen(true));
+      return;
+    }
     if (mode === "to_update") {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
@@ -239,6 +292,48 @@ export function ConvertBugDialog({
     }
     void runConvert();
   };
+
+  const renderProjectItems = (list: Project[], showRequestBadge: boolean) =>
+    list.map((project) => {
+      const stats = {
+        status: project.status,
+        bug_stats: project.bug_stats,
+        update_stats: project.update_stats,
+      };
+      const isSelected = String(targetProjectId) === String(project.id);
+      return (
+        <CommandItem
+          key={project.id}
+          value={projectPickerSearchValue(project.name, project.id, stats)}
+          onSelect={() => {
+            setTargetProjectId(String(project.id));
+          }}
+          className={cn(
+            "items-start gap-2 py-2.5 cursor-pointer",
+            isSelected && "bg-sky-50 dark:bg-sky-950/40"
+          )}
+        >
+          <ProjectPickerListItemContent
+            name={project.name}
+            selected={isSelected}
+            stats={stats}
+          />
+          {showRequestBadge ? (
+            <Badge
+              variant="outline"
+              className="shrink-0 rounded-full border-amber-300/80 bg-amber-50 text-[10px] font-semibold text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200"
+            >
+              Request access
+            </Badge>
+          ) : null}
+        </CommandItem>
+      );
+    });
+
+  const assignedList = mode === "move" ? moveAssignedProjects : typeAssignedProjects;
+  const unassignedList =
+    mode === "move" ? moveUnassignedProjects : typeUnassignedProjects;
+  const hasAnyProjects = assignedList.length > 0 || unassignedList.length > 0;
 
   return (
     <>
@@ -384,47 +479,25 @@ export function ConvertBugDialog({
                           Could not load projects
                         </CommandItem>
                       </CommandGroup>
-                    ) : projectList.length === 0 ? (
+                    ) : !hasAnyProjects ? (
                       <CommandGroup>
                         <CommandItem disabled>
                           No projects available
                         </CommandItem>
                       </CommandGroup>
                     ) : (
-                      <CommandGroup>
-                        {projectList.map((project) => {
-                          const stats = {
-                            status: project.status,
-                            bug_stats: project.bug_stats,
-                            update_stats: project.update_stats,
-                          };
-                          const isSelected =
-                            String(targetProjectId) === String(project.id);
-                          return (
-                            <CommandItem
-                              key={project.id}
-                              value={projectPickerSearchValue(
-                                project.name,
-                                project.id,
-                                stats
-                              )}
-                              onSelect={() => {
-                                setTargetProjectId(String(project.id));
-                              }}
-                              className={cn(
-                                "items-start gap-2 py-2.5 cursor-pointer",
-                                isSelected && "bg-sky-50 dark:bg-sky-950/40"
-                              )}
-                            >
-                              <ProjectPickerListItemContent
-                                name={project.name}
-                                selected={isSelected}
-                                stats={stats}
-                              />
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
+                      <>
+                        {assignedList.length > 0 ? (
+                          <CommandGroup heading="Your projects">
+                            {renderProjectItems(assignedList, false)}
+                          </CommandGroup>
+                        ) : null}
+                        {unassignedList.length > 0 ? (
+                          <CommandGroup heading="Other projects — request access">
+                            {renderProjectItems(unassignedList, true)}
+                          </CommandGroup>
+                        ) : null}
+                      </>
                     )}
                   </CommandList>
                 </Command>
@@ -432,11 +505,34 @@ export function ConvertBugDialog({
 
               <p className="shrink-0 text-xs text-muted-foreground">
                 {selected
-                  ? `Selected: ${selected.name}`
+                  ? selectedNeedsAccessRequest
+                    ? `Selected: ${selected.name} — you’ll request access from admins and project members.`
+                    : `Selected: ${selected.name}`
                   : mode === "move"
-                    ? "Pick a different project you can access."
-                    : "Defaults to the current project; pick another if needed."}
+                    ? isAdmin
+                      ? "Pick a different project."
+                      : "Pick your project to move instantly, or request access to another."
+                    : isAdmin
+                      ? "Defaults to the current project; pick another if needed."
+                      : "Pick your project to convert instantly, or request access to another."}
               </p>
+
+              {selectedNeedsAccessRequest ? (
+                <div className="shrink-0 space-y-2">
+                  <Label htmlFor="access-request-note" className="text-sm font-semibold">
+                    Message for admins (optional)
+                  </Label>
+                  <Textarea
+                    id="access-request-note"
+                    value={requestNote}
+                    onChange={(e) => setRequestNote(e.target.value.slice(0, 500))}
+                    maxLength={500}
+                    placeholder="Why do you need access to this project?"
+                    disabled={submitting}
+                    className="min-h-[72px] rounded-xl resize-none"
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -456,15 +552,22 @@ export function ConvertBugDialog({
               disabled={!canSubmit}
               className={cn(
                 "rounded-xl text-white",
-                mode === "to_update"
-                  ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700"
-                  : "bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700"
+                selectedNeedsAccessRequest
+                  ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
+                  : mode === "to_update"
+                    ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700"
+                    : "bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700"
               )}
             >
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Converting…
+                  {selectedNeedsAccessRequest ? "Sending…" : "Converting…"}
+                </>
+              ) : selectedNeedsAccessRequest ? (
+                <>
+                  <BellRing className="mr-2 h-4 w-4" />
+                  Request access
                 </>
               ) : mode === "to_update" ? (
                 <>
@@ -481,6 +584,47 @@ export function ConvertBugDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={accessConfirmOpen} onOpenChange={setAccessConfirmOpen}>
+        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Request project access?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                We’ll notify admins and members of{" "}
+                <strong>{selected?.name || "the selected project"}</strong> by
+                email and WhatsApp.
+              </span>
+              <span className="block">
+                After they add you to the project, you can{" "}
+                {mode === "to_update" ? "convert this bug to an update" : "move this bug"}.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting} className="rounded-xl">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={submitting}
+              className="rounded-xl"
+              onClick={(e) => {
+                e.preventDefault();
+                void runAccessRequest();
+              }}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                "Send request"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent className="max-w-[400px] rounded-2xl">

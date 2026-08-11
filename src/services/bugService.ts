@@ -330,6 +330,34 @@ export const bugService = {
     throw new Error(response.data.message || 'Failed to convert bug');
   },
 
+  async requestProjectAccess(
+    bugId: string,
+    payload: {
+      project_id: string;
+      intent: 'move' | 'to_update';
+      update_type?: 'feature' | 'updation' | 'maintenance';
+      note?: string;
+    }
+  ): Promise<{ bug_id: string; project_id: string; project_name: string; intent: string }> {
+    const response = await apiClient.post<{
+      success: boolean;
+      data?: {
+        bug_id: string;
+        project_id: string;
+        project_name: string;
+        intent: string;
+      };
+      message?: string;
+    }>(`${API_ENDPOINT}/request_project_access.php`, {
+      bug_id: bugId,
+      ...payload,
+    });
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || 'Failed to send access request');
+  },
+
   async convertToUpdate(
     bugId: string,
     payload: { type: 'feature' | 'updation' | 'maintenance'; project_id?: string }
