@@ -8,7 +8,7 @@ import {
 } from "@/components/bugs/BugTypeFilterSelect";
 import { ProjectInfoOverview } from "@/components/projects/ProjectInfoOverview";
 import { ProjectAnalytics } from "@/components/projects/ProjectAnalytics";
-import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
+import { UpdateTimingInfo, UpdateReviewStatusCell } from "@/components/updates/UpdateTimingInfo";
 import Bugs from "@/pages/Bugs";
 import Fixes from "@/pages/Fixes";
 import MyTasks from "@/pages/MyTasks";
@@ -81,6 +81,10 @@ import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 import { ENV } from "@/lib/env";
 import { canReportBug } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import {
+  getProjectStatusLabel,
+  projectStatusBadgeClass,
+} from "@/lib/utils/projectUtils";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { bugService, Bug as BugType } from "@/services/bugService";
 import {
@@ -3939,19 +3943,7 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                                 : '—'}
                             </TableCell>
                             <TableCell className="min-w-[180px] px-4 text-xs sm:text-sm py-4">
-                              {update.status === 'approved' && update.approved_at ? (
-                                <span className="block leading-snug text-emerald-700 dark:text-emerald-300">
-                                  Approved · {formatLocalDate(update.approved_at, 'datetime')}
-                                </span>
-                              ) : update.status === 'declined' && update.declined_at ? (
-                                <span className="block leading-snug text-rose-700 dark:text-rose-300">
-                                  Declined · {formatLocalDate(update.declined_at, 'datetime')}
-                                </span>
-                              ) : (
-                                <span className="block leading-snug text-muted-foreground italic whitespace-nowrap">
-                                  Awaiting approval
-                                </span>
-                              )}
+                              <UpdateReviewStatusCell update={update} />
                             </TableCell>
                             <TableCell className="w-[100px] pr-4 text-right py-4">
                               <Button
@@ -4240,19 +4232,7 @@ const UpdatesWithInitialParams = ({ projectId, initialTab, initialStatus }: { pr
                                 : '—'}
                             </TableCell>
                             <TableCell className="min-w-[180px] px-4 text-xs sm:text-sm py-4">
-                              {update.status === 'approved' && update.approved_at ? (
-                                <span className="block leading-snug text-emerald-700 dark:text-emerald-300">
-                                  Approved · {formatLocalDate(update.approved_at, 'datetime')}
-                                </span>
-                              ) : update.status === 'declined' && update.declined_at ? (
-                                <span className="block leading-snug text-rose-700 dark:text-rose-300">
-                                  Declined · {formatLocalDate(update.declined_at, 'datetime')}
-                                </span>
-                              ) : (
-                                <span className="block leading-snug text-muted-foreground italic whitespace-nowrap">
-                                  Awaiting approval
-                                </span>
-                              )}
+                              <UpdateReviewStatusCell update={update} />
                             </TableCell>
                             <TableCell className="w-[100px] pr-4 text-right py-4">
                               <Button
@@ -5310,7 +5290,21 @@ const ProjectDetails = () => {
                   <span>Owner: <span className="text-foreground">{projectOwner.username}</span></span>
                 )}
                 <span>Created: <span className="text-foreground">{new Date(project.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></span>
-                <span>Status: <span className="capitalize inline-flex items-center px-1.5 py-0.5 rounded-full border bg-muted/40">{project.status}</span></span>
+                <span className="inline-flex items-center gap-1.5">
+                  Status:
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 capitalize rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                      projectStatusBadgeClass(project.status)
+                    )}
+                  >
+                    {(project.status === 'completed' ||
+                      project.status === 'release_ready') && (
+                      <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden />
+                    )}
+                    {getProjectStatusLabel(project.status)}
+                  </span>
+                </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:text-red-300 tabular-nums">
                   <Bug className="h-3 w-3" />
                   {projectTabCounts.bugs} open

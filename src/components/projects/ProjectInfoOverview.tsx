@@ -2,17 +2,21 @@ import { Badge } from '@/components/ui/badge';
 import { buildDocumentPreviewPagePath } from '@/lib/attachmentUtils';
 import {
   computeProjectDurationDays,
+  deadlineTimerToneClass,
   formatProjectDate,
+  getDeadlineTimerReminder,
   getProjectStatusLabel,
   parseProjectPlatforms,
   Project,
   PROJECT_PLATFORM_OPTIONS,
+  projectStatusBadgeClass,
 } from '@/lib/utils/projectUtils';
 import { useAuth } from '@/context/AuthContext';
 import {
   BellRing,
   Building2,
   Calendar,
+  CheckCircle2,
   ExternalLink,
   FileText,
   Github,
@@ -23,6 +27,7 @@ import {
   Paperclip,
   Phone,
   Smartphone,
+  Timer,
   UserCircle,
   Users,
 } from 'lucide-react';
@@ -199,27 +204,130 @@ function TeamRoleMembers({
   );
 }
 
-function TimelineItem({ label, value }: { label: string; value: string }) {
+function StatusStatPill({
+  label,
+  status,
+  value,
+}: {
+  label: string;
+  status: Project['status'];
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200/70 bg-gray-50/50 px-3 py-2.5 sm:px-4 sm:py-3 min-w-0 dark:border-gray-800/70 dark:bg-gray-800/30">
+      <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">
+        {label}
+      </p>
+      <div className="mt-1.5">
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold capitalize',
+            projectStatusBadgeClass(status)
+          )}
+        >
+          {(status === 'completed' || status === 'release_ready') && (
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          )}
+          {value}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function DeadlineStatPill({
+  deadline,
+  status,
+}: {
+  deadline?: string | null;
+  status: Project['status'];
+}) {
+  const reminder = getDeadlineTimerReminder(deadline, status);
+  const dateLabel = formatProjectDate(deadline);
+
+  return (
+    <div
+      className={cn(
+        'rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3 min-w-0',
+        reminder.tone === 'overdue'
+          ? 'border-red-300/80 bg-red-50/80 dark:border-red-800/60 dark:bg-red-950/30'
+          : reminder.tone === 'today' || reminder.tone === 'soon'
+            ? 'border-orange-300/80 bg-orange-50/80 dark:border-orange-800/60 dark:bg-orange-950/30'
+            : reminder.tone === 'done'
+              ? 'border-emerald-300/70 bg-emerald-50/80 dark:border-emerald-800/60 dark:bg-emerald-950/30'
+              : 'border-blue-200/80 bg-blue-50/60 dark:border-blue-800/60 dark:bg-blue-950/30'
+      )}
+    >
+      <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">
+        Deadline
+      </p>
+      <p className="mt-1 text-sm sm:text-base font-semibold text-gray-900 dark:text-white break-words">
+        {dateLabel}
+      </p>
+      <span
+        className={cn(
+          'mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] sm:text-xs font-semibold',
+          deadlineTimerToneClass(reminder.tone)
+        )}
+      >
+        <Timer className="h-3 w-3 shrink-0" aria-hidden />
+        {reminder.label}
+      </span>
+    </div>
+  );
+}
+
+function TimelineItem({
+  label,
+  value,
+  deadlineHint,
+  deadlineTone,
+}: {
+  label: string;
+  value: string;
+  deadlineHint?: string;
+  deadlineTone?: ReturnType<typeof getDeadlineTimerReminder>['tone'];
+}) {
   const isUnset = value === 'Not set';
+  const isDeadline = label === 'Deadline' && deadlineHint;
 
   return (
     <div className="flex items-start gap-3 min-w-0">
       <div
         className={cn(
           'mt-1.5 h-2 w-2 rounded-full shrink-0',
-          isUnset ? 'bg-gray-300 dark:bg-gray-600' : 'bg-emerald-500'
+          isDeadline && deadlineTone === 'overdue'
+            ? 'bg-red-500'
+            : isDeadline && (deadlineTone === 'today' || deadlineTone === 'soon')
+              ? 'bg-amber-500'
+              : isDeadline && deadlineTone === 'done'
+                ? 'bg-emerald-500'
+                : isUnset
+                  ? 'bg-gray-300 dark:bg-gray-600'
+                  : 'bg-emerald-500'
         )}
       />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 space-y-1">
         <p className="text-[10px] sm:text-xs text-muted-foreground">{label}</p>
         <p
           className={cn(
-            'text-sm font-medium mt-0.5',
+            'text-sm font-medium',
             isUnset ? 'text-muted-foreground italic' : 'text-gray-900 dark:text-white'
           )}
         >
           {value}
         </p>
+        {isDeadline && deadlineHint ? (
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+              deadlineTimerToneClass(deadlineTone ?? 'none')
+            )}
+          >
+            <Timer className="h-3 w-3 shrink-0" aria-hidden />
+            {deadlineHint}
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -308,10 +416,16 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
 
   const statusLabel = getProjectStatusLabel(project.status);
   const isActiveClient = project.client_account_status !== 'inactive';
+  const deadlineReminder = getDeadlineTimerReminder(project.deadline_date, project.status);
 
   const timelineItems = [
     { label: 'Start Date', value: formatProjectDate(project.start_date) },
-    { label: 'Deadline', value: formatProjectDate(project.deadline_date) },
+    {
+      label: 'Deadline',
+      value: formatProjectDate(project.deadline_date),
+      deadlineHint: project.deadline_date ? deadlineReminder.label : undefined,
+      deadlineTone: project.deadline_date ? deadlineReminder.tone : undefined,
+    },
     { label: 'Expected Publish', value: formatProjectDate(project.expected_publish_date) },
     { label: 'Testing Start', value: formatProjectDate(project.testing_start_date) },
     { label: 'Testing End', value: formatProjectDate(project.testing_end_date) },
@@ -323,12 +437,31 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Key metrics strip */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-2 sm:gap-3">
         <StatPill label="Duration" value={`${duration} days`} highlight />
-        <StatPill label="Status" value={statusLabel} />
+        <StatusStatPill label="Status" status={project.status} value={statusLabel} />
+        <DeadlineStatPill deadline={project.deadline_date} status={project.status} />
         <StatPill label="Created" value={formatProjectDate(project.created_at)} />
         <StatPill label="Created By" value={createdByName || 'System'} />
       </div>
+
+      {deadlineReminder.tone === 'overdue' && (
+        <div className="rounded-xl border border-red-300/80 bg-gradient-to-r from-red-50/90 to-orange-50/70 px-4 py-3 dark:border-red-800/60 dark:from-red-950/40 dark:to-orange-950/30">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/15 text-red-700 dark:text-red-300">
+              <Timer className="h-4 w-4" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-red-800 dark:text-red-200">
+                Deadline delayed
+              </p>
+              <p className="text-xs sm:text-sm text-red-700/90 dark:text-red-300/90 mt-0.5">
+                {deadlineReminder.label}. Review timeline and update stakeholders.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Description — full width */}
       <SectionShell title="About Project" icon={FileText} accent="blue">
@@ -417,7 +550,13 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
         <SectionShell title="Project Timeline" icon={Calendar} accent="blue" className="xl:col-span-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
             {timelineItems.map((item) => (
-              <TimelineItem key={item.label} label={item.label} value={item.value} />
+              <TimelineItem
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                deadlineHint={item.deadlineHint}
+                deadlineTone={item.deadlineTone}
+              />
             ))}
           </div>
         </SectionShell>

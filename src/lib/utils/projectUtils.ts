@@ -556,15 +556,84 @@ export function getProjectStatusLabel(status: ProjectStatus): string {
 export function projectStatusBadgeClass(status?: ProjectStatus | string | null): string {
   switch (status) {
     case 'active':
-      return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-800';
+      return 'border-blue-300/80 bg-blue-50 text-blue-800 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-200';
     case 'release_ready':
-      return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-800';
+      return 'border-emerald-300/80 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200';
     case 'completed':
-      return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700';
+      return 'border-emerald-300/80 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200';
     case 'archived':
-      return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-800';
+      return 'border-amber-300/80 bg-amber-50 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200';
     default:
-      return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
+      return 'border-gray-300/80 bg-gray-50 text-gray-700 dark:border-gray-700/60 dark:bg-gray-900/40 dark:text-gray-300';
+  }
+}
+
+export type DeadlineTimerTone = 'ok' | 'soon' | 'today' | 'overdue' | 'done' | 'none';
+
+/** Why: One deadline countdown label for project cards, overview, and headers. */
+export function getDeadlineTimerReminder(
+  deadline?: string | null,
+  status?: ProjectStatus | string | null
+): { label: string; tone: DeadlineTimerTone; daysUntil: number | null } {
+  if (!deadline) {
+    return { label: 'No deadline set', tone: 'none', daysUntil: null };
+  }
+  if (status === 'completed' || status === 'archived') {
+    return { label: 'Project closed', tone: 'done', daysUntil: null };
+  }
+  const end = new Date(deadline.includes('T') ? deadline : `${deadline}T00:00:00`);
+  if (Number.isNaN(end.getTime())) {
+    return { label: 'No deadline set', tone: 'none', daysUntil: null };
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  const daysUntil = Math.round(
+    (end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (daysUntil < 0) {
+    const overdue = Math.abs(daysUntil);
+    return {
+      label: `${overdue} day${overdue === 1 ? '' : 's'} overdue`,
+      tone: 'overdue',
+      daysUntil,
+    };
+  }
+  if (daysUntil === 0) {
+    return { label: 'Due today — act now', tone: 'today', daysUntil: 0 };
+  }
+  if (daysUntil === 1) {
+    return { label: '1 day left', tone: 'soon', daysUntil: 1 };
+  }
+  if (daysUntil <= 7) {
+    return {
+      label: `${daysUntil} days left — due soon`,
+      tone: 'soon',
+      daysUntil,
+    };
+  }
+  return {
+    label: `${daysUntil} days left`,
+    tone: 'ok',
+    daysUntil,
+  };
+}
+
+export function deadlineTimerToneClass(tone: DeadlineTimerTone): string {
+  switch (tone) {
+    case 'overdue':
+      return 'border-red-300/80 bg-red-50 text-red-800 dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-200';
+    case 'today':
+      return 'border-amber-300/80 bg-amber-50 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200';
+    case 'soon':
+      return 'border-orange-300/80 bg-orange-50 text-orange-900 dark:border-orange-800/60 dark:bg-orange-950/40 dark:text-orange-200';
+    case 'done':
+      return 'border-emerald-300/70 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200';
+    case 'none':
+      return 'border-border/60 bg-muted/40 text-muted-foreground';
+    default:
+      return 'border-cyan-200/80 bg-cyan-50 text-cyan-800 dark:border-cyan-800/50 dark:bg-cyan-950/30 dark:text-cyan-200';
   }
 }
 

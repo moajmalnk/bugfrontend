@@ -41,7 +41,7 @@ import {
   useMergeSearchParam,
   listReturnState,
 } from "@/hooks/useUrlPagination";
-import { UpdateTimingInfo } from "@/components/updates/UpdateTimingInfo";
+import { UpdateTimingInfo, UpdateReviewStatusCell } from "@/components/updates/UpdateTimingInfo";
 import { ConvertUpdateDialog } from "@/components/updates/ConvertUpdateDialog";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
 import { sortUsernamesActiveFirst } from "@/lib/utils/userSort";
@@ -766,19 +766,7 @@ const Updates = () => {
                             : '—'}
                         </TableCell>
                         <TableCell className="min-w-[180px] px-4 text-xs sm:text-sm py-4">
-                          {update.status === 'approved' && update.approved_at ? (
-                            <span className="block leading-snug text-emerald-700 dark:text-emerald-300">
-                              Approved · {formatLocalDate(update.approved_at, 'datetime')}
-                            </span>
-                          ) : update.status === 'declined' && update.declined_at ? (
-                            <span className="block leading-snug text-rose-700 dark:text-rose-300">
-                              Declined · {formatLocalDate(update.declined_at, 'datetime')}
-                            </span>
-                          ) : (
-                            <span className="block leading-snug text-muted-foreground italic whitespace-nowrap">
-                              Awaiting approval
-                            </span>
-                          )}
+                          <UpdateReviewStatusCell update={update} />
                         </TableCell>
                         <TableCell className="w-[180px] pr-4 text-right py-4">
                           <div className="flex flex-wrap items-center justify-end gap-2">
