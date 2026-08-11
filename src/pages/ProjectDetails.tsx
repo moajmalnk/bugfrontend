@@ -90,6 +90,7 @@ import {
 } from "@/services/projectService";
 import { updateService } from "@/services/updateService";
 import { userService } from "@/services/userService";
+import { UserAvatar } from "@/components/users/UserAvatar";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -208,6 +209,7 @@ interface ProjectUser {
   username: string;
   email: string;
   role: string;
+  avatar?: string | null;
   account_active?: number;
   status?: "active" | "idle" | "offline";
   name?: string;
@@ -246,28 +248,19 @@ const MemberCard = ({
   const { currentUser } = useAuth();
   const canRemove = currentUser?.role === "admin" && !isAdmin;
 
-  const RoleIcon = isAdmin
-    ? Shield
-    : member.role === "developer"
-    ? Code
-    : TestTube;
-
   const theme = isAdmin
     ? {
-        avatar: "from-blue-500 to-indigo-600",
         badge: "bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border-blue-200/60 dark:border-blue-800/60",
         statBug: "text-red-600 dark:text-red-400",
         statFix: "text-emerald-600 dark:text-emerald-400",
       }
     : member.role === "developer"
     ? {
-        avatar: "from-emerald-500 to-teal-600",
         badge: "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60",
         statBug: "text-red-600 dark:text-red-400",
         statFix: "text-emerald-600 dark:text-emerald-400",
       }
     : {
-        avatar: "from-purple-500 to-violet-600",
         badge: "bg-purple-500/10 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 border-purple-200/60 dark:border-purple-800/60",
         statBug: "text-red-600 dark:text-red-400",
         statFix: "text-emerald-600 dark:text-emerald-400",
@@ -290,11 +283,11 @@ const MemberCard = ({
           <div className="p-4 pb-3">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div
-                  className={`flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br ${theme.avatar} flex items-center justify-center shadow-md`}
-                >
-                  <RoleIcon className="h-5 w-5 text-white" />
-                </div>
+                <UserAvatar
+                  name={member.username || member.name || "User"}
+                  avatar={member.avatar}
+                  size="md"
+                />
                 <div className="min-w-0 flex-1">
                   <h4 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white truncate">
                     {member.username}

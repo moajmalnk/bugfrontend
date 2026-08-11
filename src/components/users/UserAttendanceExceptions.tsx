@@ -64,6 +64,7 @@ export function UserAttendanceExceptions({ userId, username }: Props) {
   const [adminNote, setAdminNote] = useState('');
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [pendingRemoveDates, setPendingRemoveDates] = useState<string[] | null>(null);
+  const [pendingForgiveLate, setPendingForgiveLate] = useState<LateDayRow | null>(null);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -174,6 +175,7 @@ export function UserAttendanceExceptions({ userId, username }: Props) {
         title: 'Late unmarked',
         description: `${formatDay(row.submission_date)} no longer counts toward Office-only strikes.`,
       });
+      setPendingForgiveLate(null);
       await load();
     } catch (e) {
       toast({
@@ -184,6 +186,11 @@ export function UserAttendanceExceptions({ userId, username }: Props) {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleConfirmForgiveLate() {
+    if (!pendingForgiveLate) return;
+    await handleForgiveLateDay(pendingForgiveLate);
   }
 
   async function handleConfirmRemove() {
@@ -498,7 +505,7 @@ export function UserAttendanceExceptions({ userId, username }: Props) {
                     size="sm"
                     className="rounded-xl shrink-0 border-rose-300 dark:border-rose-800"
                     disabled={saving}
-                    onClick={() => void handleForgiveLateDay(row)}
+                    onClick={() => setPendingForgiveLate(row)}
                   >
                     Unmark late
                   </Button>
@@ -508,6 +515,48 @@ export function UserAttendanceExceptions({ userId, username }: Props) {
           )}
         </div>
       </div>
+
+      <AlertDialog
+        open={!!pendingForgiveLate}
+        onOpenChange={(open) => {
+          if (!open && !saving) setPendingForgiveLate(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unmark late check-in?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingForgiveLate
+                ? `Remove the late flag for ${
+                    username || 'this user'
+                  } · ${formatDay(pendingForgiveLate.submission_date)}. It will no longer count toward Office-only strikes, and they will be notified.`
+                : 'This late day will no longer count toward Office-only strikes.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={saving}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl"
+              disabled={saving || !pendingForgiveLate}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmForgiveLate();
+              }}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Unmarking…
+                </>
+              ) : (
+                'Unmark late'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!pendingRemoveDates}

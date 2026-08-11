@@ -189,17 +189,7 @@ export function EditUserDialog({
         role: updatedRole,
         phone: updatedUser.phone || (data.phone ? "+91" + data.phone : ""),
         name: updatedUser.name || updatedUser.username || data.username,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-          updatedUser.name || updatedUser.username || data.username
-        )}&background=${
-          updatedRole === "admin"
-            ? "3b82f6"
-            : updatedRole === "developer"
-              ? "10b981"
-              : updatedRole === "tester"
-                ? "f59e0b"
-                : "6b7280"
-        }&color=fff&size=128`,
+        avatar: updatedUser.avatar || user.avatar,
       };
 
       onUserUpdate(finalUpdatedUser);

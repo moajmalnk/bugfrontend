@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { UserAvatar } from "@/components/users/UserAvatar";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { ENV } from "@/lib/env";
@@ -337,13 +338,24 @@ export function UserDetailDialog({
             {/* Avatar with Status Indicator */}
             <div className="relative flex-shrink-0">
               <div className="relative">
-                <img
-                  src={user.avatar}
-                  alt={`${user.name}'s avatar`}
-                  className="h-20 w-20 sm:h-28 sm:w-28 rounded-full border-2 sm:border-4 border-background shadow-xl ring-2 sm:ring-4 ring-primary/10"
+                <UserAvatar
+                  name={user.name || user.username || "User"}
+                  avatar={user.avatar}
+                  size="2xl"
+                  previewable
+                  className="hidden sm:inline-flex"
+                  alt={`${user.name || user.username}'s profile photo`}
+                />
+                <UserAvatar
+                  name={user.name || user.username || "User"}
+                  avatar={user.avatar}
+                  size="xl"
+                  previewable
+                  className="sm:hidden"
+                  alt={`${user.name || user.username}'s profile photo`}
                 />
                 {/* Status Badge */}
-                <div className={`absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-5 h-5 sm:w-7 sm:h-7 ${statusConfig.color} rounded-full border-2 sm:border-4 border-background shadow-lg flex items-center justify-center ${statusConfig.pulse ? 'animate-pulse' : ''}`}>
+                <div className={`absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-5 h-5 sm:w-7 sm:h-7 ${statusConfig.color} rounded-full border-2 sm:border-4 border-background shadow-lg flex items-center justify-center z-10 ${statusConfig.pulse ? 'animate-pulse' : ''}`}>
                   <div className={`w-2 h-2 sm:w-3 sm:h-3 ${statusConfig.color} rounded-full ${statusConfig.ring} ring-1 sm:ring-2 ${statusConfig.pulse ? 'animate-ping' : ''}`}></div>
                 </div>
               </div>

@@ -8,6 +8,7 @@ import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
 import { UserAttendanceExceptions } from "@/components/users/UserAttendanceExceptions";
 import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
+import { UserAvatar } from "@/components/users/UserAvatar";
 import { OnboardingProfileSection } from "@/components/onboarding/OnboardingProfileSection";
 import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { ENV } from "@/lib/env";
-import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { userRequiresOnboarding } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
@@ -342,26 +342,19 @@ export default function UserDetails() {
                     {/* Avatar + identity */}
                     <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                       <div className="relative shrink-0 self-start">
-                        <img
-                          src={resolveAvatarUrl(
-                            user.avatar,
-                            user.name || user.username || "User"
-                          )}
-                          alt={`${user.name}'s avatar`}
+                        <UserAvatar
+                          name={user.name || user.username || "User"}
+                          avatar={user.avatar}
+                          size="xl"
+                          previewable
+                          alt={`${user.name || user.username}'s profile photo`}
                           className={cn(
-                            "h-20 w-20 sm:h-24 sm:w-24 rounded-full border-4 border-background shadow-xl",
-                            statusConfig.pulse && "ring-4 ring-primary/10"
+                            statusConfig.pulse && "ring-4 ring-primary/10 rounded-full"
                           )}
-                          onError={(e) => {
-                            e.currentTarget.src = resolveAvatarUrl(
-                              null,
-                              user.name || user.username || "User"
-                            );
-                          }}
                         />
                         <div
                           className={cn(
-                            "absolute -bottom-1 -right-1 h-7 w-7 rounded-full border-4 border-background shadow-lg flex items-center justify-center",
+                            "absolute -bottom-1 -right-1 h-7 w-7 rounded-full border-4 border-background shadow-lg flex items-center justify-center z-10",
                             statusConfig.color,
                             statusConfig.pulse && "animate-pulse"
                           )}

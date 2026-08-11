@@ -30,6 +30,7 @@ import {
   Loader2,
   Mail,
   MapPin,
+  Navigation,
   Phone,
   ShieldCheck,
   UserRound,
@@ -561,9 +562,28 @@ export function OnboardingProfileSection({
 
       <Card className="col-span-12 lg:col-span-6 rounded-2xl shadow-sm">
         <CardHeader className="p-4 sm:p-5">
-          <div className="flex items-center gap-2">
-            <Landmark className="h-4 w-4 text-primary" />
-            <CardTitle className="text-lg">WFH Location</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Landmark className="h-4 w-4 text-primary shrink-0" />
+              <CardTitle className="text-lg">WFH Location</CardTitle>
+            </div>
+            {coords ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl h-9 shrink-0"
+                onClick={() => {
+                  const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                    `${coords.lat},${coords.lng}`
+                  )}`;
+                  window.open(url, "_blank", "noopener,noreferrer");
+                }}
+              >
+                <Navigation className="h-3.5 w-3.5 mr-1.5" />
+                Directions
+              </Button>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-5 pt-0 space-y-3">

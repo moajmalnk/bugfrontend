@@ -17,11 +17,13 @@ import { ActiveTodayWorkSummary } from "@/components/users/ActiveTodayWorkSummar
 import { UserAnalytics } from "@/components/users/UserAnalytics";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { UsersTopLeaderboards } from "@/components/users/UsersTopLeaderboards";
+import { UserAvatar } from "@/components/users/UserAvatar";
 import { useAuth } from "@/context/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { UndoDeleteNotificationPortal } from "@/components/ui/UndoDeleteNotification";
 import { ENV } from "@/lib/env";
+import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { getEffectiveRole } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { User, UserRole } from "@/types";
@@ -268,19 +270,23 @@ const Users = () => {
         throw new Error(data?.message || "Invalid response from server");
       }
       setUsers(
-        data.data.map((user: any) => ({
-          ...user,
-          checked_in_today: Boolean(user.checked_in_today),
-          check_in_time: user.check_in_time || null,
-          today_hours_worked: Number(user.today_hours_worked || 0),
-          today_break_minutes: Number(user.today_break_minutes || 0),
-          checkout_time: user.checkout_time || null,
-          work_mode: user.work_mode === 'office' || user.work_mode === 'wfh' ? user.work_mode : null,
-          is_late: Boolean(user.is_late),
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            user.username || user.name || "?"
-          )}&background=3b82f6&color=fff`,
-        }))
+        data.data.map((user: any) => {
+          const name = user.username || user.name || "User";
+          return {
+            ...user,
+            checked_in_today: Boolean(user.checked_in_today),
+            check_in_time: user.check_in_time || null,
+            today_hours_worked: Number(user.today_hours_worked || 0),
+            today_break_minutes: Number(user.today_break_minutes || 0),
+            checkout_time: user.checkout_time || null,
+            work_mode: user.work_mode === 'office' || user.work_mode === 'wfh' ? user.work_mode : null,
+            is_late: Boolean(user.is_late),
+            // Keep raw/resolved upload path — do not force ui-avatars over real photos.
+            avatar: user.avatar
+              ? resolveAvatarUrl(user.avatar, name)
+              : undefined,
+          };
+        })
       );
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to load users. Please try again.";
@@ -1148,10 +1154,15 @@ const Users = () => {
                         >
                           <TableCell className="w-[20%] px-6 py-5">
                             <div className="flex items-center gap-3">
-                              <img
-                                src={user.avatar}
-                                alt={`${user.username}'s avatar`}
-                                className="h-10 w-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
+                              <UserAvatar
+                                name={user.username || user.name || "User"}
+                                avatar={user.avatar}
+                                size="md"
+                                status={
+                                  user.status === "active" || user.status === "idle"
+                                    ? user.status
+                                    : null
+                                }
                               />
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -1218,10 +1229,15 @@ const Users = () => {
                   >
                     {/* User Header */}
                     <div className="flex items-center gap-3">
-                      <img
-                        src={user.avatar}
-                        alt={`${user.username}'s avatar`}
-                        className="h-12 w-12 rounded-full border-2 border-gray-200 dark:border-gray-700 shrink-0"
+                      <UserAvatar
+                        name={user.username || user.name || "User"}
+                        avatar={user.avatar}
+                        size="lg"
+                        status={
+                          user.status === "active" || user.status === "idle"
+                            ? user.status
+                            : null
+                        }
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">

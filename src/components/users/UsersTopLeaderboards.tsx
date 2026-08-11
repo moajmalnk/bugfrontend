@@ -1,3 +1,4 @@
+import { UserAvatar } from "@/components/users/UserAvatar";
 import { cn } from "@/lib/utils";
 import { User } from "@/types";
 import { Activity, Clock, Trophy } from "lucide-react";
@@ -94,9 +95,6 @@ export function UsersTopLeaderboards({
     metric: ReactNode,
     accent: "emerald" | "blue"
   ) => {
-    const initials = String(user.username || user.name || "?")
-      .slice(0, 2)
-      .toUpperCase();
     const isLive = user.status === "active";
 
     return (
@@ -118,22 +116,12 @@ export function UsersTopLeaderboards({
           {rank}
         </span>
 
-        <div className="relative shrink-0">
-          {user.avatar ? (
-            <img
-              src={user.avatar}
-              alt=""
-              className="h-9 w-9 rounded-full object-cover ring-2 ring-background"
-            />
-          ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-semibold text-white ring-2 ring-background">
-              {initials}
-            </div>
-          )}
-          {isLive ? (
-            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-500" />
-          ) : null}
-        </div>
+        <UserAvatar
+          name={user.username || user.name || "User"}
+          avatar={user.avatar}
+          size="md"
+          status={isLive ? "active" : user.status === "idle" ? "idle" : null}
+        />
 
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">

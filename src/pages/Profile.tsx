@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/use-toast";
 import { VerifiedBlueTick, isFullFledgedUser } from "@/components/ui/VerifiedBlueTick";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -213,6 +214,7 @@ export default function Profile() {
   const [connectedGoogleEmail, setConnectedGoogleEmail] = useState<string | null>(null);
   const [showDisconnectGoogleDialog, setShowDisconnectGoogleDialog] = useState(false);
   const [isDisconnectingGoogle, setIsDisconnectingGoogle] = useState(false);
+  const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
 
   /**
    * Why: Edit-onboarding is URL-driven (`?onboarding=address|…|legal`) so refresh
@@ -559,6 +561,10 @@ export default function Profile() {
 
   const displayName = currentUser.name || currentUser.username || "Member";
   const avatarSrc = resolveAvatarUrl(currentUser.avatar, displayName);
+  const hasRealPhoto =
+    !!currentUser.avatar &&
+    String(currentUser.avatar).trim() !== "" &&
+    !/^https?:\/\/ui-avatars\.com\//i.test(String(currentUser.avatar).trim());
   const roleLabel = (currentUser.role || "member").replace(/_/g, " ");
   const joiningLabel = currentUser.joining_date
     ? new Date(currentUser.joining_date).toLocaleDateString(undefined, {
@@ -614,18 +620,38 @@ export default function Profile() {
             <CardContent className="relative p-5 sm:p-6 lg:p-8 space-y-6">
               <div className="flex flex-col lg:flex-row lg:items-end gap-5 lg:gap-8">
                 <div className="relative shrink-0 self-center lg:self-end -mt-1 sm:mt-2">
-                  <div className="h-28 w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36 rounded-2xl overflow-hidden border-[3px] border-background shadow-xl bg-muted ring-1 ring-border/40">
-                    <img
-                      src={avatarSrc}
-                      alt={`${displayName}'s profile photo`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                      onError={(e) => {
-                        e.currentTarget.src = resolveAvatarUrl(null, displayName);
-                      }}
-                    />
-                  </div>
+                  {hasRealPhoto ? (
+                    <button
+                      type="button"
+                      className="h-28 w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36 rounded-2xl overflow-hidden border-[3px] border-background shadow-xl bg-muted ring-1 ring-border/40 cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                      aria-label={`View ${displayName}'s profile photo`}
+                      onClick={() => setPhotoPreviewOpen(true)}
+                    >
+                      <img
+                        src={avatarSrc}
+                        alt={`${displayName}'s profile photo`}
+                        className="h-full w-full object-cover transition-opacity hover:opacity-90"
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          e.currentTarget.src = resolveAvatarUrl(null, displayName);
+                        }}
+                      />
+                    </button>
+                  ) : (
+                    <div className="h-28 w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36 rounded-2xl overflow-hidden border-[3px] border-background shadow-xl bg-muted ring-1 ring-border/40">
+                      <img
+                        src={avatarSrc}
+                        alt={`${displayName}'s profile photo`}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          e.currentTarget.src = resolveAvatarUrl(null, displayName);
+                        }}
+                      />
+                    </div>
+                  )}
                   {isFullFledgedUser(currentUser) ? (
                     <VerifiedBlueTick
                       size="lg"
@@ -1482,6 +1508,43 @@ export default function Profile() {
           </Card>
           </ProfileSection>
         </div>
+
+        {/* Profile photo lightbox */}
+        <Dialog open={photoPreviewOpen} onOpenChange={setPhotoPreviewOpen}>
+          <DialogContent
+            showCloseButton={false}
+            className="max-w-[min(92vw,560px)] w-auto p-3 sm:p-4 gap-3 rounded-2xl border-border/60 bg-background z-[1200]"
+            overlayClassName="z-[1200] bg-black/85"
+          >
+            <div className="flex items-center justify-between gap-3 min-w-0">
+              <DialogTitle className="text-base font-semibold truncate min-w-0">
+                {displayName}
+              </DialogTitle>
+              <DialogClose asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
+                  aria-label="Close photo preview"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
+            <DialogDescription className="sr-only">
+              Full-size profile photo for {displayName}
+            </DialogDescription>
+            <div className="flex items-center justify-center overflow-hidden rounded-2xl bg-muted/40">
+              <img
+                src={avatarSrc}
+                alt={`${displayName}'s profile photo`}
+                className="max-h-[min(72vh,520px)] w-auto max-w-full object-contain"
+                decoding="async"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Disconnect Google Confirmation Dialog */}
         <Dialog open={showDisconnectGoogleDialog} onOpenChange={setShowDisconnectGoogleDialog}>

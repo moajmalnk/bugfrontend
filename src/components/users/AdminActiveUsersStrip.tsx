@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/carousel";
 import { Button } from "@/components/ui/button";
 import { ActiveUserActivityDialog } from "@/components/users/ActiveUserActivityDialog";
+import { UserAvatar } from "@/components/users/UserAvatar";
+import { resolveAvatarUrl } from "@/lib/avatarUrl";
 import { cn } from "@/lib/utils";
 import { userService } from "@/services/userService";
 import { User } from "@/types";
@@ -43,13 +45,12 @@ function presenceSortRank(status?: User["status"]) {
 
 function getUserDisplay(user: User) {
   const name = user.username || user.name || "User";
-  const avatar =
-    user.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff`;
+  const avatar = resolveAvatarUrl(user.avatar, name);
   const modeLabel = user.work_mode === "wfh" ? "WFH" : user.work_mode === "office" ? "Office" : null;
   return {
     name,
     avatar,
+    rawAvatar: user.avatar,
     checkInLabel: formatCheckInTime(user.check_in_time),
     modeLabel,
     isLate: Boolean(user.is_late),
@@ -58,7 +59,7 @@ function getUserDisplay(user: User) {
 
 /** Instagram-style circular story avatar — mobile only */
 function InstagramStoryAvatar({ user, onClick }: { user: User; onClick: () => void }) {
-  const { name, avatar, checkInLabel, modeLabel, isLate } = getUserDisplay(user);
+  const { name, checkInLabel, modeLabel, isLate } = getUserDisplay(user);
   const isLive = user.status === "active" || user.status === "idle";
 
   return (
@@ -77,11 +78,7 @@ function InstagramStoryAvatar({ user, onClick }: { user: User; onClick: () => vo
         )}
       >
         <div className="rounded-full bg-background p-[2px]">
-          <img
-            src={avatar}
-            alt=""
-            className="h-[3.65rem] w-[3.65rem] rounded-full object-cover"
-          />
+          <UserAvatar name={name} avatar={user.avatar} size="lg" className="[&>span]:h-[3.65rem] [&>span]:w-[3.65rem] [&>span]:ring-0" />
         </div>
       </div>
       <div className="w-full min-w-0 text-center">
@@ -128,14 +125,15 @@ function WhatsAppStatusCard({ user, onClick }: { user: User; onClick: () => void
       <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/45 to-background/95" />
 
       <div className="relative z-10 flex h-full flex-col p-2.5">
-        <div
+        <UserAvatar
+          name={name}
+          avatar={user.avatar}
+          size="md"
           className={cn(
-            "h-9 w-9 overflow-hidden rounded-full ring-2 ring-offset-1 ring-offset-background",
+            "[&>span]:ring-2 [&>span]:ring-offset-1 [&>span]:ring-offset-background",
             presenceRing(user.status)
           )}
-        >
-          <img src={avatar} alt="" className="h-full w-full object-cover" />
-        </div>
+        />
 
         <div className="mt-auto min-w-0 space-y-0.5">
           <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-foreground">
