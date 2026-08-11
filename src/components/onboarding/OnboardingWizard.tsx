@@ -598,8 +598,8 @@ function mapDetailsToForm(
     !!details.emergency_contact_verified_at ||
     (!!opts?.trustSavedContacts && emgLast10.length === 10);
 
-  // Why: Never default to login email — account emails are blocked as contact email.
-  const mail = String(details.contact_email || "")
+  // Prefer saved contact email; otherwise seed with the user's own login email (allowed).
+  const mail = String(details.contact_email || opts?.employeeEmail || "")
     .trim()
     .toLowerCase()
     .slice(0, 150);
@@ -810,6 +810,9 @@ export function OnboardingWizard({
         upi_linked_phone:
           base.upi_linked_phone.replace(/\D/g, "") ||
           employeePhone.replace(/\D/g, "").slice(0, 15),
+        contact_email:
+          base.contact_email.trim() ||
+          employeeEmail.trim().toLowerCase().slice(0, 150),
       });
 
       if (editMode) {
@@ -1130,26 +1133,10 @@ export function OnboardingWizard({
   const isValidContactEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
-  const accountEmailNorm = employeeEmail.trim().toLowerCase();
-  const accountPhoneLast10 = employeePhone.replace(/\D/g, "").slice(-10);
-
-  const emergencyPhoneConflict = useMemo(() => {
-    const digits = form.emergency_contact.replace(/\D/g, "");
-    if (digits.length !== 10 || accountPhoneLast10.length !== 10) return null;
-    if (digits === accountPhoneLast10) {
-      return "Use a different number — this WhatsApp is already on your BugRicer account.";
-    }
-    return null;
-  }, [form.emergency_contact, accountPhoneLast10]);
-
-  const contactEmailConflict = useMemo(() => {
-    const email = form.contact_email.trim().toLowerCase();
-    if (!isValidContactEmail(email) || !accountEmailNorm) return null;
-    if (email === accountEmailNorm) {
-      return "Use a different email — this address is already your BugRicer login.";
-    }
-    return null;
-  }, [form.contact_email, accountEmailNorm]);
+  // Why: Own account email/phone are allowed; conflicts come from the API when
+  // another user already owns the value.
+  const [emgConflictMsg, setEmgConflictMsg] = useState<string | null>(null);
+  const [mailConflictMsg, setMailConflictMsg] = useState<string | null>(null);
 
   const sendEmergencyOtp = async () => {
     const digits = form.emergency_contact.replace(/\D/g, "");
@@ -1157,11 +1144,11 @@ export function OnboardingWizard({
       digits.length < 10 ||
       emgOtpBusy ||
       emgCooldown > 0 ||
-      form.emergency_contact_verified ||
-      emergencyPhoneConflict
+      form.emergency_contact_verified
     ) {
       return;
     }
+    setEmgConflictMsg(null);
     // Optimistic: show OTP fields immediately while request runs.
     setEmgOtpBusy(true);
     setEmgOtpSent(true);
@@ -1177,9 +1164,11 @@ export function OnboardingWizard({
     } catch (err) {
       setEmgOtpSent(false);
       setEmgCooldown(0);
+      const msg = err instanceof Error ? err.message : "Try again";
+      setEmgConflictMsg(msg);
       toast({
         title: "Could not send OTP",
-        description: err instanceof Error ? err.message : "Try again",
+        description: msg,
         variant: "destructive",
       });
     } finally {
@@ -1224,11 +1213,11 @@ export function OnboardingWizard({
       !isValidContactEmail(email) ||
       mailOtpBusy ||
       mailCooldown > 0 ||
-      form.contact_email_verified ||
-      contactEmailConflict
+      form.contact_email_verified
     ) {
       return;
     }
+    setMailConflictMsg(null);
     // Optimistic: show OTP fields immediately while SMTP runs in background.
     setMailOtpBusy(true);
     setMailOtpSent(true);
@@ -1244,9 +1233,11 @@ export function OnboardingWizard({
     } catch (err) {
       setMailOtpSent(false);
       setMailCooldown(0);
+      const msg = err instanceof Error ? err.message : "Try again";
+      setMailConflictMsg(msg);
       toast({
         title: "Could not send email OTP",
-        description: err instanceof Error ? err.message : "Try again",
+        description: msg,
         variant: "destructive",
       });
     } finally {
@@ -1290,10 +1281,8 @@ export function OnboardingWizard({
     return (
       hasPhoto &&
       form.emergency_contact.replace(/\D/g, "").length >= 10 &&
-      !emergencyPhoneConflict &&
       form.emergency_contact_verified &&
       isValidContactEmail(form.contact_email) &&
-      !contactEmailConflict &&
       form.contact_email_verified &&
       form.house_name_number.trim() &&
       form.city.trim() &&
@@ -1301,13 +1290,7 @@ export function OnboardingWizard({
       form.district.trim() &&
       form.state.trim()
     );
-  }, [
-    form,
-    editMode,
-    existingAvatarUrl,
-    emergencyPhoneConflict,
-    contactEmailConflict,
-  ]);
+  }, [form, editMode, existingAvatarUrl]);
 
   const step2Valid = useMemo(() => {
     const hasAadhaar = !!form.aadhaar_file || (editMode && hasExistingAadhaar);
@@ -1931,7 +1914,7 @@ export function OnboardingWizard({
                           fieldClass,
                           "w-full",
                           form.emergency_contact_verified && "pr-10 border-emerald-500/50",
-                          emergencyPhoneConflict && "border-destructive/60"
+                          emgConflictMsg && "border-destructive/60"
                         )}
                         inputMode="numeric"
                         maxLength={10}
@@ -1941,6 +1924,7 @@ export function OnboardingWizard({
                           const next = e.target.value.replace(/\D/g, "").slice(0, 10);
                           const matchesBaseline =
                             verifiedEmgBaseline != null && next === verifiedEmgBaseline;
+                          setEmgConflictMsg(null);
                           setForm((prev) => ({
                             ...prev,
                             emergency_contact: next,
@@ -1959,8 +1943,8 @@ export function OnboardingWizard({
                         <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
                       ) : null}
                     </div>
-                    {emergencyPhoneConflict ? (
-                      <p className="text-xs text-destructive">{emergencyPhoneConflict}</p>
+                    {emgConflictMsg ? (
+                      <p className="text-xs text-destructive">{emgConflictMsg}</p>
                     ) : null}
 
                     {form.emergency_contact_verified ? (
@@ -1987,7 +1971,6 @@ export function OnboardingWizard({
                         className="rounded-xl h-11 w-full sm:w-auto sm:self-start"
                         disabled={
                           form.emergency_contact.replace(/\D/g, "").length < 10 ||
-                          !!emergencyPhoneConflict ||
                           emgOtpBusy
                         }
                         onClick={() => void sendEmergencyOtp()}
