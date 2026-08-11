@@ -159,36 +159,42 @@ type TeamMemberChip = {
   avatar?: string | null;
 };
 
-function MemberChips({
+function TeamRoleMembers({
+  label,
   members,
   emptyLabel,
 }: {
+  label: string;
   members: TeamMemberChip[];
   emptyLabel: string;
 }) {
-  if (members.length === 0) {
-    return (
-      <span className="text-sm text-muted-foreground italic">{emptyLabel}</span>
-    );
-  }
-
   return (
-    <div className="flex flex-wrap gap-1.5 sm:gap-2">
-      {members.map((member) => (
-        <span
-          key={member.id}
-          className="inline-flex items-center gap-1.5 rounded-full border border-gray-200/80 bg-white/80 px-2 py-1 text-xs font-medium text-gray-800 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200"
-        >
-          <UserAvatar
-            name={member.username}
-            avatar={member.avatar}
-            size="sm"
-            className="h-5 w-5 text-[9px] shrink-0"
-            alt={`${member.username} profile photo`}
-          />
-          <span className="truncate max-w-[120px] sm:max-w-none">{member.username}</span>
-        </span>
-      ))}
+    <div className="space-y-2 min-w-0">
+      <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      {members.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">{emptyLabel}</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {members.map((member) => (
+            <div
+              key={member.id}
+              className="flex items-center gap-3 min-w-0 rounded-xl border border-border/60 bg-muted/15 px-3 py-2.5"
+            >
+              <UserAvatar
+                name={member.username}
+                avatar={member.avatar}
+                size="sm"
+                alt={`${member.username} profile photo`}
+              />
+              <p className="min-w-0 flex-1 text-sm font-medium text-foreground truncate">
+                {member.username}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -367,25 +373,22 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
         </SectionShell>
 
         <SectionShell title="Team Allocation" icon={Users} accent="emerald">
-          <div className="space-y-4 sm:space-y-5">
-            <div>
-              <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">
-                Project Lead
-              </p>
-              <MemberChips members={leads} emptyLabel="Not assigned" />
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">
-                Developers
-              </p>
-              <MemberChips members={developers} emptyLabel="Not assigned" />
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">
-                QA & Testing
-              </p>
-              <MemberChips members={testers} emptyLabel="Not assigned" />
-            </div>
+          <div className="flex flex-col gap-4 sm:gap-5 min-w-0">
+            <TeamRoleMembers
+              label="Project Lead"
+              members={leads}
+              emptyLabel="Not assigned"
+            />
+            <TeamRoleMembers
+              label="Developers"
+              members={developers}
+              emptyLabel="Not assigned"
+            />
+            <TeamRoleMembers
+              label="QA & Testing"
+              members={testers}
+              emptyLabel="Not assigned"
+            />
           </div>
         </SectionShell>
       </div>
