@@ -328,11 +328,28 @@ const Users = () => {
     // Filter by search query
     const query = searchTerm.trim().toLowerCase();
     if (query) {
-      filtered = filtered.filter(
-        (user) =>
-          user.username.toLowerCase().includes(query) ||
-          user.email.toLowerCase().includes(query)
-      );
+      filtered = filtered.filter((user) => {
+        const haystack = [
+          user.username,
+          user.name,
+          user.email,
+          user.phone,
+          user.employee_code,
+          user.job_title,
+          user.department,
+          user.role,
+          user.id,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const compactQuery = query.replace(/[\s_\-./]+/g, "");
+        const compactHaystack = haystack.replace(/[\s_\-./]+/g, "");
+        return (
+          haystack.includes(query) ||
+          (compactQuery.length >= 4 && compactHaystack.includes(compactQuery))
+        );
+      });
     }
 
     // Role tabs apply only when not searching (search spans all users)
@@ -828,7 +845,7 @@ const Users = () => {
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  placeholder="Search all users by username or email..."
+                  placeholder="Search by name, email, phone, employee ID, or job title…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-4 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"

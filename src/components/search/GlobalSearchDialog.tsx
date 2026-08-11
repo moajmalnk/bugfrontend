@@ -18,6 +18,7 @@ import { useGlobalSearchModal } from "@/context/GlobalSearchContext";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getEffectiveRole } from "@/lib/utils";
+import { UserAvatar } from "@/components/users/UserAvatar";
 import {
   getSearchCategoryOrder,
   getSearchEmptyHint,
@@ -130,6 +131,7 @@ const CHIP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   Project: FolderKanban,
   Client: Building2,
   Name: User,
+  "Employee ID": Users,
 };
 
 function resolveResultIcon(result: SearchResult) {
@@ -310,6 +312,7 @@ export function GlobalSearchDialog() {
                 >
                   {group.items.map((result) => {
                     const Icon = resolveResultIcon(result);
+                    const isPerson = result.category === "users";
                     return (
                       <CommandItem
                         key={result.id}
@@ -318,17 +321,33 @@ export function GlobalSearchDialog() {
                           handleSelect(result.href, result.external)
                         }
                         className={cn(
-                          "group flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2",
+                          "group flex cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2.5",
                           "data-[selected=true]:bg-accent/80"
                         )}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/50 bg-background/50">
-                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                        </div>
+                        {isPerson ? (
+                          <UserAvatar
+                            name={result.title}
+                            avatar={result.avatar}
+                            size="sm"
+                            className="shrink-0"
+                          />
+                        ) : (
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border/50 bg-background/50">
+                            <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                          </div>
+                        )}
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium leading-tight">
-                            {result.title}
-                          </p>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <p className="truncate text-sm font-medium leading-tight">
+                              {result.title}
+                            </p>
+                            {result.badge ? (
+                              <span className="shrink-0 rounded-xl border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium capitalize text-muted-foreground">
+                                {result.badge}
+                              </span>
+                            ) : null}
+                          </div>
                           {result.subtitle ? (
                             <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
                               {result.subtitle}
@@ -350,25 +369,44 @@ export function GlobalSearchDialog() {
 
           <div className="flex items-center justify-between border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
-              <kbd className="rounded border border-border/70 bg-muted/40 px-1 py-0.5 font-medium">
+              <kbd className="rounded-xl border border-border/70 bg-muted/40 px-1.5 py-0.5 font-medium">
                 ↵
               </kbd>
               Open
               <span className="mx-1 text-border">·</span>
-              <kbd className="rounded border border-border/70 bg-muted/40 px-1 py-0.5 font-medium">
+              <kbd className="rounded-xl border border-border/70 bg-muted/40 px-1.5 py-0.5 font-medium">
                 esc
               </kbd>
               Close
             </span>
             <span className="hidden items-center gap-3 sm:inline-flex">
-              <span className="inline-flex items-center gap-1">
-                <Mail className="h-3 w-3" />
-                Email
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <CalendarClock className="h-3 w-3" />
-                Attendance
-              </span>
+              {role === "admin" ? (
+                <>
+                  <span className="inline-flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    Employee ID
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Mail className="h-3 w-3" />
+                    Email
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    Phone
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-1">
+                    <Mail className="h-3 w-3" />
+                    Email
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <CalendarClock className="h-3 w-3" />
+                    Attendance
+                  </span>
+                </>
+              )}
             </span>
           </div>
         </Command>

@@ -40,6 +40,10 @@ export interface SearchResult {
   href: string;
   external?: boolean;
   keywords?: string[];
+  /** Optional avatar URL for people results */
+  avatar?: string | null;
+  /** Compact secondary badge (role, status, etc.) */
+  badge?: string | null;
 }
 
 const PAGE_ENTRIES: PageSearchEntry[] = [
@@ -659,7 +663,7 @@ export function getSearchCategoryOrder(role: string): SearchCategory[] {
 
 export function getSearchPlaceholder(role: string): string {
   if (role === "admin") {
-    return "Search users, leave, attendance, bugs, settings…";
+    return "Search employee ID, name, email, phone, job title…";
   }
   if (role === "tester") {
     return "Search bugs, projects, CODO rules, help…";
@@ -667,16 +671,22 @@ export function getSearchPlaceholder(role: string): string {
   return "Search check-in, leave, bugs, projects, or keyword…";
 }
 
-export function getSearchEmptyHint(_role: string, hasQuery: boolean): string {
+export function getSearchEmptyHint(role: string, hasQuery: boolean): string {
   if (hasQuery) {
+    if (role === "admin") {
+      return "Try an employee ID (CODO-…), name, email, phone, or job title.";
+    }
     return "No matches for that search.";
+  }
+  if (role === "admin") {
+    return "Search people by employee ID, name, email, phone, department, or job title.";
   }
   return "Try a name, email, phone, leave, attendance, or page.";
 }
 
 export function getSearchHintChips(role: string): string[] {
   if (role === "admin") {
-    return ["Name", "Email", "Leave", "Attendance", "Bug"];
+    return ["Employee ID", "Name", "Email", "Phone", "Leave"];
   }
   if (role === "tester") {
     return ["Name", "Project", "Bug", "CODO", "Help"];
@@ -737,8 +747,16 @@ export function normalizePhoneDigits(value: string): string {
 }
 
 /**
- * Match free text plus phone-style queries.
- * e.g. "8848676627" matches "+91 88486-76627" via digit normalization.
+ * Why: Employee IDs are typed with or without hyphens (CODO-TSLO-TOTM vs CODOTSLOTOTM).
+ */
+export function normalizeSearchToken(value: string): string {
+  return value.toLowerCase().replace(/[\s_\-./]+/g, "");
+}
+
+/**
+ * Match free text plus phone-style and employee-code queries.
+ * e.g. "8848676627" matches "+91 88486-76627"
+ * e.g. "CODOTSLOTOTM" matches "CODO-TSLO-TOTM"
  */
 export function matchesSearchText(
   query: string,
@@ -749,6 +767,15 @@ export function matchesSearchText(
 
   if (fields.some((field) => field?.toLowerCase().includes(q))) {
     return true;
+  }
+
+  const qToken = normalizeSearchToken(q);
+  if (qToken.length >= 4) {
+    const tokenHit = fields.some((field) => {
+      if (!field) return false;
+      return normalizeSearchToken(field).includes(qToken);
+    });
+    if (tokenHit) return true;
   }
 
   const qDigits = normalizePhoneDigits(q);
@@ -769,6 +796,63 @@ export function formatSearchContactLine(
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part))
     .join(" · ");
+}
+
+/**
+ * Why: Admin people search should surface HR identifiers first (employee ID, title).
+ */
+export function formatUserSearchSubtitle(user: {
+  employee_code?: string | null;
+  job_title?: string | null;
+  department?: string | null;
+  role?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}): string {
+  return formatSearchContactLine(
+    user.employee_code,
+    user.job_title,
+    user.department,
+    user.email,
+    user.phone
+  );
+}
+
+/** Keywords indexed for people search — keep in sync with admin HR fields. */
+export function getUserSearchKeywords(user: {
+  id?: string | null;
+  username?: string | null;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  role?: string | null;
+  employee_code?: string | null;
+  job_title?: string | null;
+  job_level?: string | null;
+  department?: string | null;
+  contract_type?: string | null;
+  employment_status?: string | null;
+  joining_date?: string | null;
+}): string[] {
+  return [
+    user.id,
+    user.username,
+    user.name,
+    user.email,
+    user.phone,
+    user.role,
+    user.employee_code,
+    user.employee_code ? normalizeSearchToken(user.employee_code) : null,
+    user.job_title,
+    user.job_level,
+    user.department,
+    user.contract_type,
+    user.employment_status,
+    user.joining_date,
+    "employee",
+    "employee id",
+    "emp id",
+  ].filter((value): value is string => Boolean(value?.trim()));
 }
 
 /** Collect contact-related keywords from a project (inline + linked client). */

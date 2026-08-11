@@ -11,7 +11,9 @@ import {
   buildRolePath,
   createPermissionChecker,
   formatSearchContactLine,
+  formatUserSearchSubtitle,
   getProjectContactKeywords,
+  getUserSearchKeywords,
   getVisiblePages,
   isUserAssignedToProject,
   matchesSearchText,
@@ -22,7 +24,7 @@ import {
 import type { Project } from "@/services/projectService";
 
 /** Bump when search indexing fields change so in-session cache refreshes. */
-const SEARCH_INDEX_VERSION = "features-attendance-v3";
+const SEARCH_INDEX_VERSION = "features-hr-employee-search-v4";
 
 interface SearchCache {
   pages: SearchResult[];
@@ -155,16 +157,15 @@ export function useGlobalSearch({
           ? usersResult.value.map((user) => ({
               id: `user-${user.id}`,
               category: "users" as const,
-              title: user.username,
-              subtitle: formatSearchContactLine(user.role, user.email, user.phone),
+              title: user.username || user.name || "User",
+              subtitle: formatUserSearchSubtitle(user),
               href: buildRolePath(role, `/users/${user.id}`),
-              keywords: [
-                user.username,
-                user.email,
-                user.phone,
-                user.role,
-                user.name,
-              ],
+              avatar: user.avatar ?? null,
+              badge: user.role
+                ? String(user.role).charAt(0).toUpperCase() +
+                  String(user.role).slice(1)
+                : null,
+              keywords: getUserSearchKeywords(user),
             }))
           : [];
 
@@ -463,11 +464,13 @@ export function useGlobalSearch({
     if (!cache) return [];
 
     const hasQuery = Boolean(query.trim());
+    const looksLikeEmployeeCode =
+      /codo/i.test(query) || /^[a-z0-9]+(?:-[a-z0-9]+){1,3}$/i.test(query.trim());
 
     const byCategory: Record<SearchCategory, SearchResult[]> = {
       pages: filterResults(cache.pages, hasQuery ? 24 : 14),
       help: filterResults(cache.help, hasQuery ? 20 : 8),
-      users: filterResults(cache.users),
+      users: filterResults(cache.users, looksLikeEmployeeCode ? 30 : 20),
       clients: filterResults(cache.clients),
       bugs: filterResults(cache.bugs),
       fixes: filterResults(cache.fixes),
@@ -479,6 +482,21 @@ export function useGlobalSearch({
     if (activeTab === "all") {
       if (!hasQuery) {
         return [...byCategory.pages, ...byCategory.help];
+      }
+
+      // Why: Employee-ID style queries should surface people before pages/help.
+      if (looksLikeEmployeeCode && byCategory.users.length > 0) {
+        return [
+          ...byCategory.users,
+          ...byCategory.pages,
+          ...byCategory.help,
+          ...byCategory.clients,
+          ...byCategory.bugs,
+          ...byCategory.fixes,
+          ...byCategory.docs,
+          ...byCategory.sheets,
+          ...byCategory.other,
+        ].slice(0, 24);
       }
 
       return [
