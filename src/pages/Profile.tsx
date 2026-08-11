@@ -940,6 +940,21 @@ export default function Profile() {
               <OnboardingProfileSection
                 userId={currentUser.id}
                 onboardingCompleted={currentUser.onboarding_completed}
+                employeeName={currentUser.name || currentUser.username}
+                employeeUsername={currentUser.username}
+                employeeEmail={currentUser.email}
+                employeePhone={currentUser.phone}
+                employeeRole={currentUser.role}
+                employeeAvatar={currentUser.avatar}
+                employeeJoiningDate={currentUser.joining_date}
+                employeeCode={currentUser.employee_code}
+                employeeJobTitle={currentUser.job_title}
+                employeeJobLevel={currentUser.job_level}
+                employeeDepartment={currentUser.department}
+                employeeReportsTo={currentUser.reports_to_username}
+                employeeContractType={currentUser.contract_type}
+                employeeOfferLetterIssued={currentUser.offer_letter_issued}
+                employeeProbationEndDate={currentUser.probation_end_date}
               />
             </ProfileSection>
           ) : null}

@@ -30,6 +30,7 @@ import axios from "axios";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   AtSign,
+  Briefcase,
   Bug,
   Calendar,
   Clock,
@@ -470,9 +471,57 @@ export function UserDetailDialog({
                         </p>
                       </div>
                     </div>
-                    <div></div>
+                    {user.employee_code ? (
+                      <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/40 rounded-lg border border-border/30 hover:bg-muted/60 transition-colors min-w-0">
+                        <div className="p-1 sm:p-1.5 bg-primary/10 rounded-md flex-shrink-0">
+                          <Briefcase className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Employee ID</p>
+                          <p className="text-[10px] sm:text-sm font-medium font-mono text-foreground truncate">
+                            {user.employee_code}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div />
+                    )}
                   </div>
                 )}
+                {user.job_title || user.department ? (
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    {user.job_title ? (
+                      <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/40 rounded-lg border border-border/30 min-w-0">
+                        <div className="p-1 sm:p-1.5 bg-primary/10 rounded-md flex-shrink-0">
+                          <Briefcase className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Job title</p>
+                          <p className="text-[10px] sm:text-sm font-medium text-foreground truncate">
+                            {user.job_title}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div />
+                    )}
+                    {user.department ? (
+                      <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/40 rounded-lg border border-border/30 min-w-0">
+                        <div className="p-1 sm:p-1.5 bg-primary/10 rounded-md flex-shrink-0">
+                          <Briefcase className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5 truncate">Department</p>
+                          <p className="text-[10px] sm:text-sm font-medium text-foreground truncate">
+                            {user.department}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div />
+                    )}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

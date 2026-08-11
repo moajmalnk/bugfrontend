@@ -38,6 +38,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
   AtSign,
+  Briefcase,
   Bug,
   Calendar,
   Code2,
@@ -474,6 +475,58 @@ export default function UserDetails() {
                           </div>
                         </div>
                       ) : null}
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Briefcase className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-muted-foreground">
+                            Employee ID
+                          </div>
+                          <div className="font-semibold font-mono text-sm truncate">
+                            {user.employee_code || "—"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Briefcase className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-muted-foreground">
+                            Job title
+                          </div>
+                          <div className="font-semibold truncate">
+                            {user.job_title || "—"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Briefcase className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-muted-foreground">
+                            Job level
+                          </div>
+                          <div className="font-semibold truncate">
+                            {user.job_level || "—"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 min-w-0">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Briefcase className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-muted-foreground">
+                            Department
+                          </div>
+                          <div className="font-semibold truncate">
+                            {user.department || "—"}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -773,6 +826,15 @@ export default function UserDetails() {
                     employeePhone={user.phone}
                     employeeRole={user.role}
                     employeeAvatar={user.avatar}
+                    employeeJoiningDate={user.joining_date}
+                    employeeCode={user.employee_code}
+                    employeeJobTitle={user.job_title}
+                    employeeJobLevel={user.job_level}
+                    employeeDepartment={user.department}
+                    employeeReportsTo={user.reports_to_username}
+                    employeeContractType={user.contract_type}
+                    employeeOfferLetterIssued={user.offer_letter_issued}
+                    employeeProbationEndDate={user.probation_end_date}
                   />
                 </div>
               ) : null}

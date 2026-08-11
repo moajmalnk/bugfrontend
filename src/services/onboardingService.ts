@@ -7,6 +7,9 @@ export interface UserOnboardingDetails {
   emergency_contact_verified_at?: string | null;
   contact_email?: string | null;
   contact_email_verified_at?: string | null;
+  date_of_birth?: string | null;
+  gender?: "male" | "female" | "other" | "prefer_not_to_say" | string | null;
+  marital_status?: "single" | "married" | "divorced" | "widowed" | "other" | string | null;
   house_name_number?: string | null;
   landmark?: string | null;
   city?: string | null;
@@ -44,6 +47,9 @@ export interface OnboardingPayload {
   contact_email: string;
   emergency_contact_verified_at?: string | null;
   contact_email_verified_at?: string | null;
+  date_of_birth: string;
+  gender: string;
+  marital_status: string;
   house_name_number: string;
   landmark: string;
   city: string;
@@ -86,12 +92,25 @@ export interface GetOnboardingResponse {
     phone?: string | null;
     avatar?: string | null;
     joining_date?: string | null;
+    employee_code?: string | null;
+    job_title?: string | null;
+    job_level?: string | null;
+    department?: string | null;
+    reports_to_user_id?: string | null;
+    reports_to_username?: string | null;
+    contract_type?: string | null;
+    offer_letter_issued?: number | boolean | null;
+    probation_end_date?: string | null;
+    employment_status?: string | null;
     role?: string;
     onboarding_completed?: number;
     must_set_password?: number;
     onboarding_completed_at?: string | null;
     onboarding_verification_status?: string;
     onboarding_verified_at?: string | null;
+    onboarding_rejection_reason?: string | null;
+    onboarding_rejection_note?: string | null;
+    onboarding_rejection_action?: string | null;
     terms_accepted_at?: string | null;
     privacy_accepted_at?: string | null;
   };
@@ -101,6 +120,9 @@ export interface GetOnboardingResponse {
   onboarding_completed_at?: string | null;
   onboarding_verification_status?: string;
   onboarding_verified_at?: string | null;
+  onboarding_rejection_reason?: string | null;
+  onboarding_rejection_note?: string | null;
+  onboarding_rejection_action?: string | null;
   terms_accepted_at?: string | null;
   privacy_accepted_at?: string | null;
 }
@@ -110,6 +132,9 @@ function buildFormData(payload: OnboardingPayload): FormData {
   const textKeys: (keyof OnboardingPayload)[] = [
     "emergency_contact",
     "contact_email",
+    "date_of_birth",
+    "gender",
+    "marital_status",
     "house_name_number",
     "landmark",
     "city",
@@ -217,10 +242,29 @@ export const onboardingService = {
     return response.data?.data as GetOnboardingResponse;
   },
 
-  async verify(userId: string, action: "verify" | "reject" = "verify") {
+  async verify(
+    userId: string,
+    action: "verify" | "reject" = "verify",
+    options?: {
+      rejectionReasons?: string[];
+      /** @deprecated Prefer rejectionReasons multi-select */
+      rejectionReason?: string;
+      rejectionNote?: string;
+    }
+  ) {
+    const reasons =
+      options?.rejectionReasons?.filter(Boolean) ??
+      (options?.rejectionReason ? [options.rejectionReason] : []);
     const response = await apiClient.post("/users/verify_onboarding.php", {
       user_id: userId,
       action,
+      ...(action === "reject"
+        ? {
+            rejection_reasons: reasons,
+            rejection_reason: reasons.join(","),
+            rejection_note: options?.rejectionNote || undefined,
+          }
+        : {}),
     });
     return response.data;
   },

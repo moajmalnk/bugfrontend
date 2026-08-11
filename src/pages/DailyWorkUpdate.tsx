@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { submitWork, WorkSubmission, listMyTasks, UserTask, updateTask, listMySubmissions, checkIn, notifyWorkActivity, parseSubmissionsListResponse } from '@/services/todoService';
 import { CheckoutProjectUpdatesCard } from '@/components/daily-work/CheckoutProjectUpdatesCard';
 import {
@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { HourPicker } from '@/components/ui/HourPicker';
 import { StatusDropdown, type StatusOption } from '@/components/ui/StatusDropdown';
 import { useAuth } from '@/context/AuthContext';
+import { userRequiresOnboarding } from '@/lib/utils';
 import { bugService } from '@/services/bugService';
 import { updateService } from '@/services/updateService';
 import { toLocalCalendarDateString } from '@/lib/dateUtils';
@@ -342,6 +343,12 @@ export function DailyWorkFlowPanel({
   const hasCheckedIn = !!form.check_in_time;
   const hasActiveWorkSession = hasCheckedIn && !todaySubmissionComplete && !isEditing;
   const attendanceBlocked = attendanceGate != null && attendanceGate.allowed === false;
+  /** Why: Rejected verification locks check-in/checkout; pending + verified stay open. */
+  const verificationRejected =
+    userRequiresOnboarding(currentUser) &&
+    Number(currentUser?.onboarding_completed ?? 0) === 1 &&
+    String(currentUser?.onboarding_verification_status || '').toLowerCase() === 'rejected';
+  const attendanceActionsBlocked = attendanceBlocked || verificationRejected;
   const officeOnlyActive = Boolean(attendanceGate?.office_only);
   const allowWfhToday = Boolean(attendanceGate?.allow_wfh_today);
   /** Why: WFH choice only when Attendance exceptions grant it for today. */
@@ -382,6 +389,7 @@ export function DailyWorkFlowPanel({
   );
   const officeGeoVerified = workMode === 'office' && officeGeoStatus === 'ok' && !!officePosition;
   const canConfirmCheckIn =
+    !verificationRejected &&
     !!workMode &&
     (workMode === 'wfh' || officeGeoVerified) &&
     (selectedProjects.length > 0 || !!plannedWork.trim()) &&
@@ -947,6 +955,15 @@ export function DailyWorkFlowPanel({
 
   async function onSubmit(options?: { openPreviewAfter?: boolean }) {
     try {
+      if (verificationRejected) {
+        toast({
+          title: 'Checkout blocked',
+          description:
+            'Your onboarding verification was rejected. Fix the issues on Profile, then wait for HR to re-verify.',
+          variant: 'destructive',
+        });
+        return;
+      }
       setLoading(true);
       setError(null);
       
@@ -1072,6 +1089,15 @@ export function DailyWorkFlowPanel({
   }
 
   function openCheckInDialog() {
+    if (verificationRejected) {
+      toast({
+        title: 'Check-in blocked',
+        description:
+          'Your onboarding verification was rejected. Fix the issues on Profile, then wait for HR to re-verify.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (attendanceBlocked) {
       toast({
         title: 'Check-in unavailable',
@@ -1110,6 +1136,15 @@ export function DailyWorkFlowPanel({
   }
 
   function openCheckoutWizard() {
+    if (verificationRejected) {
+      toast({
+        title: 'Checkout blocked',
+        description:
+          'Your onboarding verification was rejected. Fix the issues on Profile, then wait for HR to re-verify.',
+        variant: 'destructive',
+      });
+      return;
+    }
     syncFlowAction('checkout');
     setCheckoutWizardStep('form');
     if (!isEditing) {
@@ -1153,6 +1188,15 @@ export function DailyWorkFlowPanel({
 
   const handleCheckIn = useCallback(async () => {
     try {
+      if (verificationRejected) {
+        toast({
+          title: 'Check-in blocked',
+          description:
+            'Your onboarding verification was rejected. Fix the issues on Profile, then wait for HR to re-verify.',
+          variant: 'destructive',
+        });
+        return;
+      }
       if (!workMode) {
         toast({
           title: 'Select work location',
@@ -1287,6 +1331,7 @@ export function DailyWorkFlowPanel({
     syncFlowAction,
     currentUser?.id,
     onSaved,
+    verificationRejected,
   ]);
 
   function handleProjectToggle(projectId: string) {
@@ -1995,11 +2040,20 @@ export function DailyWorkFlowPanel({
   useEffect(() => {
     if (isEditing && editId && !tasksLoading && !didAutoOpenEditRef.current) {
       didAutoOpenEditRef.current = true;
+      if (verificationRejected) {
+        toast({
+          title: 'Checkout blocked',
+          description:
+            'Your onboarding verification was rejected. Fix the issues on Profile, then wait for HR to re-verify.',
+          variant: 'destructive',
+        });
+        return;
+      }
       syncFlowAction('checkout');
       setCheckoutWizardStep('form');
       setIsCheckoutWizardOpen(true);
     }
-  }, [isEditing, editId, tasksLoading, syncFlowAction]);
+  }, [isEditing, editId, tasksLoading, syncFlowAction, verificationRejected]);
 
   useEffect(() => {
     const flowKey = `${flowAction || ''}:${editId || ''}`;
@@ -2010,6 +2064,11 @@ export function DailyWorkFlowPanel({
     if (didAutoOpenFlowRef.current === flowKey) return;
 
     if (flowAction === 'checkin') {
+      if (verificationRejected || attendanceBlocked) {
+        didAutoOpenFlowRef.current = flowKey;
+        clearWorkFlowUrl();
+        return;
+      }
       didAutoOpenFlowRef.current = flowKey;
       clearOfficeGeoState();
       if (workModeLockedToOffice) {
@@ -2022,12 +2081,27 @@ export function DailyWorkFlowPanel({
     }
 
     if (flowAction === 'checkout' && !isEditing) {
+      if (verificationRejected) {
+        didAutoOpenFlowRef.current = flowKey;
+        clearWorkFlowUrl();
+        return;
+      }
       didAutoOpenFlowRef.current = flowKey;
       resetCheckoutFormDefaults();
       setCheckoutWizardStep('form');
       setIsCheckoutWizardOpen(true);
     }
-  }, [flowAction, editId, isEditing, workModeLockedToOffice, clearOfficeGeoState, selectWorkMode]);
+  }, [
+    flowAction,
+    editId,
+    isEditing,
+    workModeLockedToOffice,
+    clearOfficeGeoState,
+    selectWorkMode,
+    verificationRejected,
+    attendanceBlocked,
+    clearWorkFlowUrl,
+  ]);
 
   async function startEdit(t: UserTask) {
     setEditingTaskId((t.id as number) ?? null);
@@ -2066,6 +2140,24 @@ export function DailyWorkFlowPanel({
 
   return (
     <>
+      {verificationRejected ? (
+        <div className="w-full rounded-xl border border-rose-200/80 dark:border-rose-800/60 bg-rose-50/90 dark:bg-rose-950/40 px-4 py-3 text-sm text-rose-900 dark:text-rose-100 flex items-start gap-2 mb-3">
+          <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="font-semibold">Check-in & checkout blocked</p>
+            <p className="text-xs mt-0.5 opacity-90">
+              Your onboarding verification was rejected. Fix the issues on{' '}
+              <Link
+                to={`/${currentUser?.role}/profile`}
+                className="underline font-medium"
+              >
+                Profile
+              </Link>
+              , then wait for HR to re-verify. Pending or verified accounts can check in normally.
+            </p>
+          </div>
+        </div>
+      ) : null}
       {attendanceBlocked && !hasCheckedIn ? (
         <div className="w-full rounded-xl border border-rose-200/80 dark:border-rose-800/60 bg-rose-50/90 dark:bg-rose-950/40 px-4 py-3 text-sm text-rose-900 dark:text-rose-100 flex items-start gap-2 mb-3">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -2202,8 +2294,8 @@ export function DailyWorkFlowPanel({
         {!isEditing && !hasCheckedIn && !todaySubmissionComplete ? (
           <Button
             onClick={openCheckInDialog}
-            disabled={isCheckingIn || attendanceBlocked}
-            className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-blue-600 to-emerald-700 text-white hover:from-blue-700 hover:to-emerald-800`}
+            disabled={isCheckingIn || attendanceActionsBlocked}
+            className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-blue-600 to-emerald-700 text-white hover:from-blue-700 hover:to-emerald-800 disabled:opacity-50 disabled:hover:scale-100`}
           >
             {isCheckingIn ? (
               <div className="flex items-center gap-3">
@@ -2221,7 +2313,8 @@ export function DailyWorkFlowPanel({
         {hasActiveWorkSession ? (
           <Button
             onClick={openCheckoutWizard}
-            className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700`}
+            disabled={verificationRejected}
+            className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 disabled:hover:scale-100`}
           >
             <div className="flex items-center gap-3">
               <LogOut className="h-5 w-5" />
@@ -2232,7 +2325,8 @@ export function DailyWorkFlowPanel({
         {isEditing ? (
           <Button
             onClick={openCheckoutWizard}
-            className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-blue-600 to-emerald-700 text-white hover:from-blue-700 hover:to-emerald-800`}
+            disabled={verificationRejected}
+            className={`${primaryBtnClass} shrink-0 bg-gradient-to-r from-blue-600 to-emerald-700 text-white hover:from-blue-700 hover:to-emerald-800 disabled:opacity-50 disabled:hover:scale-100`}
           >
             <div className="flex items-center gap-3">
               <FileText className="h-5 w-5" />

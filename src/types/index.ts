@@ -135,11 +135,25 @@ export interface User {
   /** none | pending | verified | rejected */
   onboarding_verification_status?: 'none' | 'pending' | 'verified' | 'rejected' | string;
   onboarding_verified_at?: string | null;
+  onboarding_rejection_reason?: string | null;
+  onboarding_rejection_note?: string | null;
+  onboarding_rejection_action?: string | null;
   onboarding_completed_at?: string | null;
   terms_accepted_at?: string | null;
   privacy_accepted_at?: string | null;
   /** Employment start date (YYYY-MM-DD); attendance blocked before this day */
   joining_date?: string | null;
+  /** CODO cipher employee ID e.g. CODO-TPLN-KLTK */
+  employee_code?: string | null;
+  job_title?: string | null;
+  job_level?: string | null;
+  department?: string | null;
+  reports_to_user_id?: string | null;
+  reports_to_username?: string | null;
+  contract_type?: 'full_time' | 'remote' | 'part_time' | 'contract' | 'intern' | 'other' | string | null;
+  offer_letter_issued?: number | boolean | null;
+  probation_end_date?: string | null;
+  employment_status?: 'active' | 'inactive' | string | null;
   avatar?: string;
   created_at?: string;
   admin_id?: string; // For impersonation tracking

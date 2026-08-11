@@ -209,12 +209,12 @@ export default function AdminAttendanceExceptionUserDetail() {
   }, [loadUserDetail]);
 
   const weeklyAttendanceRows = useMemo(
-    () => buildAttendancePeriodRows(detailAttendanceDays, 'week'),
-    [detailAttendanceDays]
+    () => buildAttendancePeriodRows(detailAttendanceDays, 'week', detailWfhRequests),
+    [detailAttendanceDays, detailWfhRequests]
   );
   const monthlyAttendanceRows = useMemo(
-    () => buildAttendancePeriodRows(detailAttendanceDays, 'month'),
-    [detailAttendanceDays]
+    () => buildAttendancePeriodRows(detailAttendanceDays, 'month', detailWfhRequests),
+    [detailAttendanceDays, detailWfhRequests]
   );
 
   const filteredExceptions = useMemo(() => {
@@ -830,7 +830,7 @@ export default function AdminAttendanceExceptionUserDetail() {
                     </p>
                   </div>
                   <p className="text-[11px] sm:text-xs text-muted-foreground">
-                    Last ~120 days · check-ins + WFH exceptions
+                    Last ~120 days · check-ins + WFH requests
                   </p>
                 </div>
                 <Tabs
@@ -873,6 +873,12 @@ export default function AdminAttendanceExceptionUserDetail() {
                               <TableHead className="text-xs sm:text-sm text-right tabular-nums">
                                 WFH
                               </TableHead>
+                              <TableHead className="text-xs sm:text-sm text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+                                Approved
+                              </TableHead>
+                              <TableHead className="text-xs sm:text-sm text-right tabular-nums text-rose-700 dark:text-rose-400">
+                                Rejected
+                              </TableHead>
                               <TableHead className="text-xs sm:text-sm text-right tabular-nums">
                                 Late
                               </TableHead>
@@ -892,6 +898,12 @@ export default function AdminAttendanceExceptionUserDetail() {
                                 </TableCell>
                                 <TableCell className="text-xs sm:text-sm text-right tabular-nums">
                                   {row.wfh}
+                                </TableCell>
+                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+                                  {row.approved}
+                                </TableCell>
+                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-rose-700 dark:text-rose-400">
+                                  {row.rejected}
                                 </TableCell>
                                 <TableCell className="text-xs sm:text-sm text-right tabular-nums text-muted-foreground">
                                   {row.late}
@@ -925,6 +937,12 @@ export default function AdminAttendanceExceptionUserDetail() {
                               <TableHead className="text-xs sm:text-sm text-right tabular-nums">
                                 WFH
                               </TableHead>
+                              <TableHead className="text-xs sm:text-sm text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+                                Approved
+                              </TableHead>
+                              <TableHead className="text-xs sm:text-sm text-right tabular-nums text-rose-700 dark:text-rose-400">
+                                Rejected
+                              </TableHead>
                               <TableHead className="text-xs sm:text-sm text-right tabular-nums">
                                 Late
                               </TableHead>
@@ -944,6 +962,12 @@ export default function AdminAttendanceExceptionUserDetail() {
                                 </TableCell>
                                 <TableCell className="text-xs sm:text-sm text-right tabular-nums">
                                   {row.wfh}
+                                </TableCell>
+                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+                                  {row.approved}
+                                </TableCell>
+                                <TableCell className="text-xs sm:text-sm text-right tabular-nums text-rose-700 dark:text-rose-400">
+                                  {row.rejected}
                                 </TableCell>
                                 <TableCell className="text-xs sm:text-sm text-right tabular-nums text-muted-foreground">
                                   {row.late}
@@ -1094,9 +1118,34 @@ export default function AdminAttendanceExceptionUserDetail() {
                       ? ` / ${detailWfhRequests.length}`
                       : ''}
                   </span>
-                  {filteredWfhRequests.some((r) => r.status === 'rejected') ? (
-                    <span className="text-rose-600 dark:text-rose-400 font-normal ml-2 text-xs">
-                      · {filteredWfhRequests.filter((r) => r.status === 'rejected').length} rejected
+                  {filteredWfhRequests.some((r) =>
+                    ['approved', 'rejected'].includes(String(r.status || '').toLowerCase())
+                  ) ? (
+                    <span className="font-normal ml-2 text-xs">
+                      {filteredWfhRequests.filter((r) => String(r.status).toLowerCase() === 'approved')
+                        .length > 0 ? (
+                        <span className="text-emerald-600 dark:text-emerald-400">
+                          ·{' '}
+                          {
+                            filteredWfhRequests.filter(
+                              (r) => String(r.status).toLowerCase() === 'approved'
+                            ).length
+                          }{' '}
+                          approved
+                        </span>
+                      ) : null}
+                      {filteredWfhRequests.filter((r) => String(r.status).toLowerCase() === 'rejected')
+                        .length > 0 ? (
+                        <span className="text-rose-600 dark:text-rose-400">
+                          ·{' '}
+                          {
+                            filteredWfhRequests.filter(
+                              (r) => String(r.status).toLowerCase() === 'rejected'
+                            ).length
+                          }{' '}
+                          rejected
+                        </span>
+                      ) : null}
                     </span>
                   ) : null}
                 </p>

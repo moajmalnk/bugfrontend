@@ -28,8 +28,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
-import { ProjectWorkActivityOverview } from '@/components/projects/ProjectWorkActivityOverview';
+import { UserAvatar } from '@/components/users/UserAvatar';
 import { ProjectDeadlineReminders } from '@/components/projects/ProjectDeadlineReminders';
+import { ProjectWorkActivityOverview } from '@/components/projects/ProjectWorkActivityOverview';
 
 interface ProjectInfoOverviewProps {
   project: Project;
@@ -152,8 +153,20 @@ function DetailField({
   );
 }
 
-function MemberChips({ names, emptyLabel }: { names: string[]; emptyLabel: string }) {
-  if (names.length === 0) {
+type TeamMemberChip = {
+  id: string;
+  username: string;
+  avatar?: string | null;
+};
+
+function MemberChips({
+  members,
+  emptyLabel,
+}: {
+  members: TeamMemberChip[];
+  emptyLabel: string;
+}) {
+  if (members.length === 0) {
     return (
       <span className="text-sm text-muted-foreground italic">{emptyLabel}</span>
     );
@@ -161,15 +174,19 @@ function MemberChips({ names, emptyLabel }: { names: string[]; emptyLabel: strin
 
   return (
     <div className="flex flex-wrap gap-1.5 sm:gap-2">
-      {names.map((name) => (
+      {members.map((member) => (
         <span
-          key={name}
-          className="inline-flex items-center gap-1.5 rounded-full border border-gray-200/80 bg-white/80 px-2.5 py-1 text-xs font-medium text-gray-800 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200"
+          key={member.id}
+          className="inline-flex items-center gap-1.5 rounded-full border border-gray-200/80 bg-white/80 px-2 py-1 text-xs font-medium text-gray-800 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200"
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-emerald-600 text-[10px] font-bold text-white">
-            {name[0]?.toUpperCase() || '?'}
-          </span>
-          <span className="truncate max-w-[120px] sm:max-w-none">{name}</span>
+          <UserAvatar
+            name={member.username}
+            avatar={member.avatar}
+            size="sm"
+            className="h-5 w-5 text-[9px] shrink-0"
+            alt={`${member.username} profile photo`}
+          />
+          <span className="truncate max-w-[120px] sm:max-w-none">{member.username}</span>
         </span>
       ))}
     </div>
@@ -273,9 +290,15 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
     (p) => PROJECT_PLATFORM_OPTIONS.find((o) => o.value === p)?.label || p
   );
 
-  const leads = members.filter((m) => m.role === 'manager').map((m) => m.username || 'Unknown');
-  const developers = members.filter((m) => m.role === 'developer').map((m) => m.username || 'Unknown');
-  const testers = members.filter((m) => m.role === 'tester').map((m) => m.username || 'Unknown');
+  const toChip = (m: (typeof members)[number]): TeamMemberChip => ({
+    id: m.user_id,
+    username: m.username || 'Unknown',
+    avatar: m.avatar ?? null,
+  });
+
+  const leads = members.filter((m) => m.role === 'manager').map(toChip);
+  const developers = members.filter((m) => m.role === 'developer').map(toChip);
+  const testers = members.filter((m) => m.role === 'tester').map(toChip);
 
   const statusLabel = getProjectStatusLabel(project.status);
   const isActiveClient = project.client_account_status !== 'inactive';
@@ -349,19 +372,19 @@ export function ProjectInfoOverview({ project, createdByName }: ProjectInfoOverv
               <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">
                 Project Lead
               </p>
-              <MemberChips names={leads} emptyLabel="Not assigned" />
+              <MemberChips members={leads} emptyLabel="Not assigned" />
             </div>
             <div>
               <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">
                 Developers
               </p>
-              <MemberChips names={developers} emptyLabel="Not assigned" />
+              <MemberChips members={developers} emptyLabel="Not assigned" />
             </div>
             <div>
               <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">
                 QA & Testing
               </p>
-              <MemberChips names={testers} emptyLabel="Not assigned" />
+              <MemberChips members={testers} emptyLabel="Not assigned" />
             </div>
           </div>
         </SectionShell>

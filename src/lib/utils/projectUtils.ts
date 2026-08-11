@@ -208,6 +208,7 @@ export interface ProjectMemberDetail {
   role: ProjectMemberRole;
   username?: string;
   email?: string;
+  avatar?: string | null;
 }
 
 export interface ProjectAttachment {

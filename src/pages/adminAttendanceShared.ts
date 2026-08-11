@@ -1,5 +1,6 @@
 import { format, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import type { AttendanceDayException, AttendanceModeDay } from '@/services/attendanceExceptionService';
+import type { WfhRequest } from '@/services/wfhRequestService';
 import type { User } from '@/types';
 
 export function todayYMD() {
@@ -62,56 +63,101 @@ export type AttendancePeriodRow = {
   office: number;
   wfh: number;
   late: number;
+  /** WFH requests approved in this period */
+  approved: number;
+  /** WFH requests rejected in this period */
+  rejected: number;
+  /** WFH requests still pending in this period */
+  pending: number;
   total: number;
 };
 
+type PeriodBucket = {
+  label: string;
+  office: number;
+  wfh: number;
+  late: number;
+  approved: number;
+  rejected: number;
+  pending: number;
+  sort: string;
+};
+
+function periodKeyForDate(
+  dateStr: string,
+  mode: 'week' | 'month'
+): { key: string; label: string; sort: string } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+  try {
+    const d = parseISO(dateStr);
+    if (mode === 'week') {
+      const start = startOfWeek(d, { weekStartsOn: 1 });
+      const end = endOfWeek(d, { weekStartsOn: 1 });
+      const key = format(start, 'yyyy-MM-dd');
+      return {
+        key,
+        label: `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`,
+        sort: key,
+      };
+    }
+    const key = format(d, 'yyyy-MM');
+    return {
+      key,
+      label: format(d, 'MMMM yyyy'),
+      sort: key,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function emptyBucket(label: string, sort: string): PeriodBucket {
+  return {
+    label,
+    office: 0,
+    wfh: 0,
+    late: 0,
+    approved: 0,
+    rejected: 0,
+    pending: 0,
+    sort,
+  };
+}
+
 /**
- * Why: Admins need week/month rollups of Office vs WFH for the opened teammate.
+ * Why: Admins need week/month rollups of Office vs WFH plus WFH request outcomes.
  * Weeks use Mon–Sun (IST calendar dates as Y-m-d strings).
  */
 export function buildAttendancePeriodRows(
   days: AttendanceModeDay[],
-  mode: 'week' | 'month'
+  mode: 'week' | 'month',
+  wfhRequests: WfhRequest[] = []
 ): AttendancePeriodRow[] {
-  const buckets = new Map<
-    string,
-    { label: string; office: number; wfh: number; late: number; sort: string }
-  >();
+  const buckets = new Map<string, PeriodBucket>();
 
   for (const day of days) {
     const dateStr = String(day.date || '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
-    let key = '';
-    let label = '';
-    let sort = '';
-    try {
-      const d = parseISO(dateStr);
-      if (mode === 'week') {
-        const start = startOfWeek(d, { weekStartsOn: 1 });
-        const end = endOfWeek(d, { weekStartsOn: 1 });
-        key = format(start, 'yyyy-MM-dd');
-        label = `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`;
-        sort = key;
-      } else {
-        key = format(d, 'yyyy-MM');
-        label = format(d, 'MMMM yyyy');
-        sort = key;
-      }
-    } catch {
-      continue;
-    }
+    const period = periodKeyForDate(dateStr, mode);
+    if (!period) continue;
 
-    const cur = buckets.get(key) ?? {
-      label,
-      office: 0,
-      wfh: 0,
-      late: 0,
-      sort,
-    };
+    const cur = buckets.get(period.key) ?? emptyBucket(period.label, period.sort);
     if (day.work_mode === 'wfh') cur.wfh += 1;
     else cur.office += 1;
     if (day.is_late) cur.late += 1;
-    buckets.set(key, cur);
+    buckets.set(period.key, cur);
+  }
+
+  for (const req of wfhRequests) {
+    const dateStr = String(req.request_date || '').trim().slice(0, 10);
+    const period = periodKeyForDate(dateStr, mode);
+    if (!period) continue;
+
+    const status = String(req.status || '').toLowerCase();
+    const cur = buckets.get(period.key) ?? emptyBucket(period.label, period.sort);
+    if (status === 'approved') cur.approved += 1;
+    else if (status === 'rejected') cur.rejected += 1;
+    else if (status === 'pending') cur.pending += 1;
+    buckets.set(period.key, cur);
   }
 
   return [...buckets.entries()]
@@ -121,6 +167,9 @@ export function buildAttendancePeriodRows(
       office: v.office,
       wfh: v.wfh,
       late: v.late,
+      approved: v.approved,
+      rejected: v.rejected,
+      pending: v.pending,
       total: v.office + v.wfh,
     }))
     .sort((a, b) => b.key.localeCompare(a.key));

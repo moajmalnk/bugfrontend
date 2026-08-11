@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/DatePicker";
 import {
   Dialog,
   DialogContent,
@@ -8,15 +9,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { resolveAvatarUrl } from "@/lib/avatarUrl";
+import {
+  ONBOARDING_REJECTION_REASONS,
+  type OnboardingRejectionReasonCode,
+} from "@/lib/onboardingRejectionReasons";
 import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
 import {
   onboardingService,
   type UserOnboardingDetails,
 } from "@/services/onboardingService";
+import { userService } from "@/services/userService";
+import type { User } from "@/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import L from "leaflet";
 import {
@@ -32,13 +50,86 @@ import {
   MapPin,
   Navigation,
   Phone,
+  RefreshCw,
   ShieldCheck,
   UserRound,
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+
+/** Why: Deep-link + browser Back close the admin review workspace. */
+const REVIEW_QUERY_KEY = "review";
+const REVIEW_QUERY_VALUE = "onboarding";
+
+const HR_JOB_LEVELS = [
+  "Founder",
+  "Head",
+  "Senior",
+  "Junior",
+  "Intern",
+  "Freelancer",
+  "Contract",
+] as const;
+
+const HR_CONTRACT_TYPES = [
+  { value: "full_time", label: "Full-Time" },
+  { value: "remote", label: "Remote" },
+  { value: "part_time", label: "Part-Time" },
+  { value: "contract", label: "Contract" },
+  { value: "intern", label: "Intern" },
+  { value: "other", label: "Other" },
+] as const;
+
+type HrEmploymentForm = {
+  joining_date: string;
+  employee_code: string;
+  job_title: string;
+  job_level: string;
+  department: string;
+  reports_to_user_id: string;
+  contract_type: string;
+  offer_letter_issued: boolean;
+  probation_end_date: string;
+};
+
+const EMPTY_HR_FORM: HrEmploymentForm = {
+  joining_date: "",
+  employee_code: "",
+  job_title: "",
+  job_level: "",
+  department: "",
+  reports_to_user_id: "",
+  contract_type: "",
+  offer_letter_issued: false,
+  probation_end_date: "",
+};
+
+function hrFormFromUser(user?: {
+  joining_date?: string | null;
+  employee_code?: string | null;
+  job_title?: string | null;
+  job_level?: string | null;
+  department?: string | null;
+  reports_to_user_id?: string | null;
+  contract_type?: string | null;
+  offer_letter_issued?: number | boolean | null;
+  probation_end_date?: string | null;
+} | null): HrEmploymentForm {
+  return {
+    joining_date: String(user?.joining_date || "").slice(0, 10),
+    employee_code: String(user?.employee_code || ""),
+    job_title: String(user?.job_title || ""),
+    job_level: String(user?.job_level || ""),
+    department: String(user?.department || ""),
+    reports_to_user_id: String(user?.reports_to_user_id || ""),
+    contract_type: String(user?.contract_type || ""),
+    offer_letter_issued: Number(user?.offer_letter_issued) === 1,
+    probation_end_date: String(user?.probation_end_date || "").slice(0, 10),
+  };
+}
 
 const markerIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -48,12 +139,77 @@ const markerIcon = L.icon({
   iconAnchor: [12, 41],
 });
 
-function DetailRow({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null;
+function DetailRow({
+  label,
+  value,
+  showEmpty = false,
+}: {
+  label: string;
+  value?: string | null;
+  /** When true, render "—" instead of hiding the row */
+  showEmpty?: boolean;
+}) {
+  const display = (value || "").trim();
+  if (!display && !showEmpty) return null;
   return (
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm text-foreground break-words">{value}</p>
+      <p className="text-sm text-foreground break-words">{display || "—"}</p>
+    </div>
+  );
+}
+
+type DetailCell = { label: string; value?: string | null };
+
+/**
+ * Why: Fixed-column table keeps label/value rows horizontally aligned
+ * across the Employment / Address / Banking profile cards.
+ */
+function DetailTable({
+  columns,
+  cells,
+}: {
+  columns: 2 | 3;
+  cells: DetailCell[];
+}) {
+  const rows: DetailCell[][] = [];
+  for (let i = 0; i < cells.length; i += columns) {
+    const slice = cells.slice(i, i + columns);
+    while (slice.length < columns) {
+      slice.push({ label: "", value: null });
+    }
+    rows.push(slice);
+  }
+
+  return (
+    <div className="w-full overflow-x-auto" style={{ scrollbarWidth: "thin" }}>
+      <table className="w-full table-fixed border-collapse">
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri}>
+              {row.map((cell, ci) => (
+                <td
+                  key={`${ri}-${ci}-${cell.label || "empty"}`}
+                  className={cn(
+                    "align-top py-2.5 px-3 first:pl-0 last:pr-0 min-w-0",
+                    ri > 0 && "border-t border-border/50"
+                  )}
+                  style={{ width: `${100 / columns}%` }}
+                >
+                  {cell.label ? (
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">{cell.label}</p>
+                      <p className="text-sm text-foreground break-words mt-0.5">
+                        {(cell.value || "").trim() || "—"}
+                      </p>
+                    </div>
+                  ) : null}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -198,6 +354,16 @@ interface OnboardingProfileSectionProps {
   employeePhone?: string;
   employeeRole?: string;
   employeeAvatar?: string | null;
+  /** Optional HR fallbacks from parent user payload */
+  employeeJoiningDate?: string | null;
+  employeeCode?: string | null;
+  employeeJobTitle?: string | null;
+  employeeJobLevel?: string | null;
+  employeeDepartment?: string | null;
+  employeeReportsTo?: string | null;
+  employeeContractType?: string | null;
+  employeeOfferLetterIssued?: number | boolean | null;
+  employeeProbationEndDate?: string | null;
 }
 
 export function OnboardingProfileSection({
@@ -210,12 +376,29 @@ export function OnboardingProfileSection({
   employeePhone,
   employeeRole,
   employeeAvatar,
+  employeeJoiningDate,
+  employeeCode,
+  employeeJobTitle,
+  employeeJobLevel,
+  employeeDepartment,
+  employeeReportsTo,
+  employeeContractType,
+  employeeOfferLetterIssued,
+  employeeProbationEndDate,
 }: OnboardingProfileSectionProps) {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const reviewFromUrl = searchParams.get(REVIEW_QUERY_KEY) === REVIEW_QUERY_VALUE;
   const [reviewOpen, setReviewOpen] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<"verify" | "reject" | null>(null);
+  const [rejectionReasons, setRejectionReasons] = useState<OnboardingRejectionReasonCode[]>([]);
+  const [rejectionNote, setRejectionNote] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [previewBusyKey, setPreviewBusyKey] = useState<string | null>(null);
+  const [hrForm, setHrForm] = useState<HrEmploymentForm>(EMPTY_HR_FORM);
+  const [hrSaving, setHrSaving] = useState(false);
+  const [hrRegenerating, setHrRegenerating] = useState(false);
+  const [managerOptions, setManagerOptions] = useState<User[]>([]);
   const [docPreview, setDocPreview] = useState<{
     title: string;
     url: string;
@@ -277,6 +460,43 @@ export function OnboardingProfileSection({
     return { lat, lng };
   }, [details]);
 
+  const employment = useMemo(() => {
+    const u = data?.user;
+    const joining =
+      u?.joining_date || employeeJoiningDate || null;
+    const offerRaw =
+      u?.offer_letter_issued ?? employeeOfferLetterIssued ?? null;
+    return {
+      employee_code: u?.employee_code || employeeCode || null,
+      joining_date: joining,
+      job_title: u?.job_title || employeeJobTitle || null,
+      job_level: u?.job_level || employeeJobLevel || null,
+      department: u?.department || employeeDepartment || null,
+      reports_to:
+        u?.reports_to_username || employeeReportsTo || null,
+      contract_type: u?.contract_type || employeeContractType || null,
+      offer_letter:
+        offerRaw == null
+          ? null
+          : Number(offerRaw) === 1
+            ? "Yes"
+            : "No",
+      probation_end_date:
+        u?.probation_end_date || employeeProbationEndDate || null,
+    };
+  }, [
+    data?.user,
+    employeeCode,
+    employeeContractType,
+    employeeDepartment,
+    employeeJobLevel,
+    employeeJobTitle,
+    employeeJoiningDate,
+    employeeOfferLetterIssued,
+    employeeProbationEndDate,
+    employeeReportsTo,
+  ]);
+
   useEffect(() => {
     // Fix default leaflet icon paths in some builds
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -289,24 +509,176 @@ export function OnboardingProfileSection({
   }, []);
 
   useEffect(() => {
-    if (!reviewOpen) return;
-    window.history.pushState({ onboardingReview: true }, "");
-    const onPop = () => {
-      if (verifying) return;
+    // Why: URL is source of truth — open on deep link / refresh, close on Back.
+    if (reviewFromUrl) {
+      if (canVerify) {
+        setReviewOpen(true);
+      } else {
+        // No permission — strip stale review query.
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete(REVIEW_QUERY_KEY);
+            return next;
+          },
+          { replace: true }
+        );
+      }
+      return;
+    }
+    if (!verifying && !hrSaving) {
       setPendingDecision(null);
+      setRejectionReasons([]);
+      setRejectionNote("");
       setReviewOpen(false);
+    }
+  }, [reviewFromUrl, canVerify, verifying, hrSaving, setSearchParams]);
+
+  useEffect(() => {
+    if (!reviewOpen) return;
+    setHrForm(
+      hrFormFromUser({
+        ...data?.user,
+        joining_date: data?.user?.joining_date || employeeJoiningDate || null,
+      })
+    );
+  }, [reviewOpen, data?.user, employeeJoiningDate]);
+
+  useEffect(() => {
+    if (!reviewOpen || !canVerify) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const list = await userService.getUsers();
+        if (cancelled) return;
+        setManagerOptions(list.filter((u) => String(u.id) !== String(userId)));
+      } catch {
+        if (!cancelled) setManagerOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [reviewOpen, verifying]);
+  }, [reviewOpen, canVerify, userId]);
+
+  useEffect(() => {
+    if (pendingDecision !== "reject") return;
+    const panel = document.getElementById("onboarding-reject-panel");
+    panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [pendingDecision]);
+
+  const openReview = () => {
+    if (verifying || hrSaving) return;
+    setPendingDecision(null);
+    setRejectionReasons([]);
+    setRejectionNote("");
+    setReviewOpen(true);
+    if (reviewFromUrl) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set(REVIEW_QUERY_KEY, REVIEW_QUERY_VALUE);
+        return next;
+      },
+      { replace: false }
+    );
+  };
 
   const closeReview = () => {
-    if (verifying) return;
+    if (verifying || hrSaving) return;
     setPendingDecision(null);
+    setRejectionReasons([]);
+    setRejectionNote("");
     setReviewOpen(false);
-    if (window.history.state?.onboardingReview) {
-      window.history.back();
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(REVIEW_QUERY_KEY);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const resetRejectForm = () => {
+    setRejectionReasons([]);
+    setRejectionNote("");
+  };
+
+  const saveHrEmployment = async (opts?: { silent?: boolean }) => {
+    if (!canVerify) return true;
+    setHrSaving(true);
+    try {
+      await userService.updateUser(userId, {
+        joining_date: hrForm.joining_date.trim() || null,
+        employee_code: hrForm.employee_code.trim() || null,
+        job_title: hrForm.job_title.trim() || null,
+        job_level: hrForm.job_level.trim() || null,
+        department: hrForm.department.trim() || null,
+        reports_to_user_id: hrForm.reports_to_user_id.trim() || null,
+        contract_type: hrForm.contract_type.trim() || null,
+        offer_letter_issued: hrForm.offer_letter_issued,
+        probation_end_date: hrForm.probation_end_date.trim() || null,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-details", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["userDetails"] });
+      if (!opts?.silent) {
+        toast({
+          title: "Employment saved",
+          description: "HR details updated for this employee.",
+        });
+      }
+      return true;
+    } catch (err) {
+      toast({
+        title: "Could not save employment",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setHrSaving(false);
     }
+  };
+
+  const regenerateEmployeeCode = async () => {
+    if (!canVerify || hrRegenerating || hrSaving || verifying) return;
+    setHrRegenerating(true);
+    try {
+      // Why: Persist join date first so cipher uses the value currently in the form.
+      const updated = await userService.updateUser(userId, {
+        joining_date: hrForm.joining_date.trim() || null,
+        regenerate_employee_code: true,
+      });
+      setHrForm((prev) => ({
+        ...prev,
+        joining_date: String(updated.joining_date || prev.joining_date || "").slice(0, 10),
+        employee_code: String(updated.employee_code || ""),
+      }));
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-details", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["userDetails"] });
+      toast({
+        title: "Employee ID regenerated",
+        description: updated.employee_code || "Code updated",
+      });
+    } catch (err) {
+      toast({
+        title: "Could not regenerate",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Joining date and date of birth are required",
+        variant: "destructive",
+      });
+    } finally {
+      setHrRegenerating(false);
+    }
+  };
+
+  const toggleRejectionReason = (code: OnboardingRejectionReasonCode) => {
+    setRejectionReasons((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
   };
 
   const closeDocPreview = () => {
@@ -370,27 +742,71 @@ export function OnboardingProfileSection({
     }
   };
 
+  const selectedRejectReasons = useMemo(
+    () =>
+      ONBOARDING_REJECTION_REASONS.filter((r) => rejectionReasons.includes(r.code)),
+    [rejectionReasons]
+  );
+
+  const rejectRequiresNote = selectedRejectReasons.some((r) => r.requiresNote);
+
+  const canConfirmReject =
+    selectedRejectReasons.length > 0 &&
+    (!rejectRequiresNote || rejectionNote.trim().length >= 3);
+
   const runVerification = async (action: "verify" | "reject") => {
-    if (verifying) return;
+    if (verifying || hrSaving) return;
+    if (action === "reject" && !canConfirmReject) {
+      toast({
+        title: "Choose reasons",
+        description: rejectRequiresNote
+          ? "Add a short note so the employee knows what to fix."
+          : "Select one or more reasons for rejecting this onboarding.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Why: Persist HR employment before verify so Employee ID / title are not lost.
+    if (action === "verify" && canVerify) {
+      const saved = await saveHrEmployment({ silent: true });
+      if (!saved) return;
+    }
+
     setVerifying(true);
 
-    // Why: Close immediately — mail/WhatsApp/push must not keep Confirm verify spinning.
+    // Why: Close immediately — mail/WhatsApp/push must not keep Confirm spinning.
     const decision = action;
+    const reasonPayload =
+      decision === "reject"
+        ? {
+            rejectionReasons: [...rejectionReasons],
+            rejectionNote: rejectionNote.trim().slice(0, 500) || undefined,
+          }
+        : undefined;
+
     setPendingDecision(null);
+    setRejectionReasons([]);
+    setRejectionNote("");
     setReviewOpen(false);
-    if (window.history.state?.onboardingReview) {
-      window.history.back();
-    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(REVIEW_QUERY_KEY);
+        return next;
+      },
+      { replace: true }
+    );
     toast({
-      title: decision === "verify" ? "Verifying…" : "Updating…",
+      title: decision === "verify" ? "Verifying…" : "Rejecting…",
       description:
         decision === "verify"
           ? "Marking documents as verified."
-          : "Marking onboarding as rejected.",
+          : "Notifying the employee by email, WhatsApp, and push.",
     });
 
     try {
-      await onboardingService.verify(userId, decision);
+      await onboardingService.verify(userId, decision, reasonPayload);
       await queryClient.invalidateQueries({ queryKey: ["onboarding-details", userId] });
       await queryClient.invalidateQueries({ queryKey: ["userDetails"] });
       toast({
@@ -398,7 +814,7 @@ export function OnboardingProfileSection({
         description:
           decision === "verify"
             ? "Onboarding documents are now verified."
-            : "The employee will see a rejected status banner.",
+            : "Employee was notified with the reason and next step.",
       });
     } catch (err) {
       toast({
@@ -406,8 +822,20 @@ export function OnboardingProfileSection({
         description: err instanceof Error ? err.message : "Please try again.",
         variant: "destructive",
       });
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set(REVIEW_QUERY_KEY, REVIEW_QUERY_VALUE);
+          return next;
+        },
+        { replace: false }
+      );
       setReviewOpen(true);
       setPendingDecision(decision);
+      if (reasonPayload) {
+        setRejectionReasons(reasonPayload.rejectionReasons);
+        setRejectionNote(reasonPayload.rejectionNote || "");
+      }
     } finally {
       setVerifying(false);
     }
@@ -500,16 +928,65 @@ export function OnboardingProfileSection({
                 type="button"
                 className="rounded-xl h-10"
                 disabled={verifying}
-                onClick={() => {
-                  setPendingDecision(null);
-                  setReviewOpen(true);
-                }}
+                onClick={openReview}
               >
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Review & decide
               </Button>
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+
+      <Card className="col-span-12 rounded-2xl shadow-sm">
+        <CardHeader className="p-4 sm:p-5">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-primary" />
+            <CardTitle className="text-lg">Employment</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-5 pt-0">
+          <DetailTable
+            columns={3}
+            cells={[
+              { label: "Employee ID", value: employment.employee_code },
+              {
+                label: "Join date",
+                value: employment.joining_date
+                  ? new Date(
+                      String(employment.joining_date).slice(0, 10) + "T00:00:00"
+                    ).toLocaleDateString(undefined, {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : null,
+              },
+              { label: "Job title", value: employment.job_title },
+              { label: "Job level", value: employment.job_level },
+              { label: "Department", value: employment.department },
+              { label: "Reports to", value: employment.reports_to },
+              {
+                label: "Contract type",
+                value: employment.contract_type
+                  ? String(employment.contract_type).replace(/_/g, " ")
+                  : null,
+              },
+              { label: "Offer letter", value: employment.offer_letter },
+              {
+                label: "End date",
+                value: employment.probation_end_date
+                  ? new Date(
+                      String(employment.probation_end_date).slice(0, 10) + "T00:00:00"
+                    ).toLocaleDateString(undefined, {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "NILL",
+              },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -520,43 +997,58 @@ export function OnboardingProfileSection({
             <CardTitle className="text-lg">Address</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="p-4 sm:p-5 pt-0 grid grid-cols-12 gap-4">
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="Emergency contact" value={details.emergency_contact} />
-            <DetailRow
-              label="Emergency verified"
-              value={formatWhen(details.emergency_contact_verified_at)}
-            />
-            <DetailRow label="Contact email" value={details.contact_email} />
-            <DetailRow
-              label="Email verified"
-              value={formatWhen(details.contact_email_verified_at)}
-            />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="House" value={details.house_name_number} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="Landmark" value={details.landmark} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="City" value={details.city} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="Post office" value={details.post_office} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="PIN" value={details.pin_code} />
-          </div>
-          <div className="col-span-12 md:col-span-4">
-            <DetailRow label="District" value={details.district} />
-          </div>
-          <div className="col-span-12 md:col-span-4">
-            <DetailRow label="State" value={details.state} />
-          </div>
-          <div className="col-span-12 md:col-span-4">
-            <DetailRow label="Country" value={details.country} />
-          </div>
+        <CardContent className="p-4 sm:p-5 pt-0">
+          <DetailTable
+            columns={2}
+            cells={[
+              { label: "Emergency contact", value: details.emergency_contact },
+              { label: "House", value: details.house_name_number },
+              {
+                label: "Emergency verified",
+                value: formatWhen(details.emergency_contact_verified_at),
+              },
+              { label: "Landmark", value: details.landmark },
+              { label: "Contact email", value: details.contact_email },
+              { label: "City", value: details.city },
+              {
+                label: "Email verified",
+                value: formatWhen(details.contact_email_verified_at),
+              },
+              { label: "Post office", value: details.post_office },
+              {
+                label: "Date of birth",
+                value: details.date_of_birth
+                  ? new Date(
+                      String(details.date_of_birth).slice(0, 10) + "T00:00:00"
+                    ).toLocaleDateString(undefined, {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : null,
+              },
+              { label: "PIN", value: details.pin_code },
+              {
+                label: "Gender",
+                value: details.gender
+                  ? String(details.gender)
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                  : null,
+              },
+              { label: "District", value: details.district },
+              {
+                label: "Marital status",
+                value: details.marital_status
+                  ? String(details.marital_status).replace(/\b\w/g, (c) =>
+                      c.toUpperCase()
+                    )
+                  : null,
+              },
+              { label: "State", value: details.state },
+              { label: "Country", value: details.country },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -643,31 +1135,20 @@ export function OnboardingProfileSection({
             <CardTitle className="text-lg">Banking Details</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="p-4 sm:p-5 pt-0 grid grid-cols-12 gap-4">
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="Account holder" value={details.account_holder_name} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="Bank" value={details.bank_name} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="Account number" value={details.account_number} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="IFSC" value={details.ifsc_code} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="Branch" value={details.branch_name} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="Account type" value={details.account_type} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="UPI ID" value={details.upi_id} />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <DetailRow label="UPI phone" value={details.upi_linked_phone} />
-          </div>
+        <CardContent className="p-4 sm:p-5 pt-0">
+          <DetailTable
+            columns={2}
+            cells={[
+              { label: "Account holder", value: details.account_holder_name },
+              { label: "Bank", value: details.bank_name },
+              { label: "Account number", value: details.account_number },
+              { label: "IFSC", value: details.ifsc_code },
+              { label: "Branch", value: details.branch_name },
+              { label: "Account type", value: details.account_type },
+              { label: "UPI ID", value: details.upi_id },
+              { label: "UPI phone", value: details.upi_linked_phone },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -710,20 +1191,24 @@ export function OnboardingProfileSection({
         }}
       >
         <DialogContent
-          className="w-[min(96vw,980px)] max-w-none rounded-2xl p-0 gap-0 overflow-hidden z-[1000]"
+          className="w-[min(96vw,980px)] max-w-none max-h-[min(92dvh,900px)] rounded-2xl p-0 gap-0 overflow-hidden z-[1000] flex flex-col"
           overlayClassName="z-[1000]"
-          showCloseButton={!verifying}
+          showCloseButton={!verifying && !hrSaving}
         >
-          <DialogHeader className="border-b border-border/50 px-5 sm:px-6 py-5 text-left space-y-2">
+          <DialogHeader className="border-b border-border/50 px-5 sm:px-6 py-5 text-left space-y-2 shrink-0">
             <DialogTitle className="text-xl font-semibold tracking-tight">
               Review onboarding
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed">
-              Check the employee summary and documents below, then reject or verify.
+              Update employment details if needed, check documents, then reject or verify.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[min(70vh,640px)] overflow-y-auto px-5 sm:px-6 py-5 space-y-5">
+          {/* Why: Cap dialog to viewport; one scroll region so reject reasons aren't clipped by overflow-hidden footer. */}
+          <div
+            className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 py-5 space-y-5"
+            style={{ scrollbarWidth: "thin" }}
+          >
             <section className="rounded-2xl border border-border/60 bg-muted/15 p-4 sm:p-5 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="h-16 w-16 rounded-2xl overflow-hidden border border-border/60 bg-muted shrink-0">
@@ -787,6 +1272,225 @@ export function OnboardingProfileSection({
               </div>
             </section>
 
+            {canVerify ? (
+              <section className="rounded-2xl border border-border/60 bg-muted/10 p-4 sm:p-5 space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <h3 className="text-sm font-semibold tracking-tight">Employment (HR)</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Set join date, Employee ID, role, and contract before verifying. Saved
+                      when you confirm verify.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl h-9 shrink-0"
+                    disabled={hrSaving || verifying || hrRegenerating}
+                    onClick={() => void saveHrEmployment()}
+                  >
+                    {hrSaving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                    ) : null}
+                    Save employment
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-12 gap-3">
+                  <div className="col-span-12 md:col-span-6 space-y-1.5">
+                    <Label>Join date</Label>
+                    <DatePicker
+                      value={hrForm.joining_date || ""}
+                      onChange={(v) =>
+                        setHrForm((p) => ({ ...p, joining_date: v || "" }))
+                      }
+                      placeholder="Pick joining date"
+                      className="h-11 rounded-xl"
+                      disabled={hrSaving || verifying}
+                      disableFuture
+                    />
+                  </div>
+
+                  <div className="col-span-12 md:col-span-6 space-y-1.5">
+                    <Label htmlFor="hr-employee-code">Employee ID</Label>
+                    <div className="flex gap-2 min-w-0">
+                      <Input
+                        id="hr-employee-code"
+                        value={hrForm.employee_code}
+                        maxLength={32}
+                        disabled={hrSaving || verifying}
+                        placeholder="CODO-XXXX-XXXX"
+                        className="h-11 rounded-xl font-mono text-sm"
+                        onChange={(e) =>
+                          setHrForm((p) => ({
+                            ...p,
+                            employee_code: e.target.value.toUpperCase().slice(0, 32),
+                          }))
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 w-11 rounded-xl shrink-0 px-0"
+                        title="Regenerate from join date + DOB"
+                        disabled={hrSaving || verifying || hrRegenerating}
+                        onClick={() => void regenerateEmployeeCode()}
+                      >
+                        {hrRegenerating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="col-span-12 md:col-span-6 space-y-1.5">
+                    <Label htmlFor="hr-job-title">Job title</Label>
+                    <Input
+                      id="hr-job-title"
+                      value={hrForm.job_title}
+                      maxLength={200}
+                      disabled={hrSaving || verifying}
+                      placeholder="e.g. Full Stack Developer"
+                      className="h-11 rounded-xl"
+                      onChange={(e) =>
+                        setHrForm((p) => ({
+                          ...p,
+                          job_title: e.target.value.slice(0, 200),
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="col-span-12 md:col-span-6 space-y-1.5">
+                    <Label>Job level</Label>
+                    <Select
+                      value={hrForm.job_level || undefined}
+                      onValueChange={(v) => setHrForm((p) => ({ ...p, job_level: v }))}
+                      disabled={hrSaving || verifying}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl">
+                        <SelectValue placeholder="Select level" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="rounded-xl z-[1100]">
+                        {HR_JOB_LEVELS.map((level) => (
+                          <SelectItem key={level} value={level}>
+                            {level}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="col-span-12 md:col-span-6 space-y-1.5">
+                    <Label htmlFor="hr-department">Department</Label>
+                    <Input
+                      id="hr-department"
+                      value={hrForm.department}
+                      maxLength={150}
+                      disabled={hrSaving || verifying}
+                      placeholder="e.g. CODO Agency - Development"
+                      className="h-11 rounded-xl"
+                      onChange={(e) =>
+                        setHrForm((p) => ({
+                          ...p,
+                          department: e.target.value.slice(0, 150),
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="col-span-12 md:col-span-6 space-y-1.5">
+                    <Label>Reports to</Label>
+                    <Select
+                      value={hrForm.reports_to_user_id || "__none__"}
+                      onValueChange={(v) =>
+                        setHrForm((p) => ({
+                          ...p,
+                          reports_to_user_id: v === "__none__" ? "" : v,
+                        }))
+                      }
+                      disabled={hrSaving || verifying}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl">
+                        <SelectValue placeholder="Select manager" />
+                      </SelectTrigger>
+                      <SelectContent
+                        position="popper"
+                        className="rounded-xl z-[1100] max-h-64"
+                        searchPlaceholder="Search manager..."
+                      >
+                        <SelectItem value="__none__">N/A</SelectItem>
+                        {managerOptions.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.username || m.name || m.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="col-span-12 md:col-span-6 space-y-1.5">
+                    <Label>Contract type</Label>
+                    <Select
+                      value={hrForm.contract_type || "__none__"}
+                      onValueChange={(v) =>
+                        setHrForm((p) => ({
+                          ...p,
+                          contract_type: v === "__none__" ? "" : v,
+                        }))
+                      }
+                      disabled={hrSaving || verifying}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="rounded-xl z-[1100]">
+                        <SelectItem value="__none__">Not set</SelectItem>
+                        {HR_CONTRACT_TYPES.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="col-span-12 md:col-span-6 space-y-1.5">
+                    <Label>End date (probation)</Label>
+                    <DatePicker
+                      value={hrForm.probation_end_date || ""}
+                      onChange={(v) =>
+                        setHrForm((p) => ({ ...p, probation_end_date: v || "" }))
+                      }
+                      placeholder="Optional / NILL"
+                      className="h-11 rounded-xl"
+                      disabled={hrSaving || verifying}
+                    />
+                  </div>
+
+                  <div className="col-span-12 md:col-span-6 flex items-center justify-between gap-4 rounded-xl border border-border/60 px-4 py-2.5 min-h-11">
+                    <div className="min-w-0">
+                      <Label htmlFor="hr-offer-letter">Offer letter</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Mark Yes when issued
+                      </p>
+                    </div>
+                    <Switch
+                      id="hr-offer-letter"
+                      checked={hrForm.offer_letter_issued}
+                      disabled={hrSaving || verifying}
+                      onCheckedChange={(checked) =>
+                        setHrForm((p) => ({ ...p, offer_letter_issued: checked }))
+                      }
+                    />
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
             <section className="space-y-3">
               <div className="space-y-1">
                 <h3 className="text-sm font-semibold tracking-tight">Documents</h3>
@@ -849,16 +1553,92 @@ export function OnboardingProfileSection({
                 <DetailRow label="IFSC" value={details.ifsc_code} />
               </div>
             </section>
+
+            {pendingDecision === "reject" && (
+              <section
+                id="onboarding-reject-panel"
+                className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 flex flex-col gap-4"
+              >
+                <div className="flex items-start gap-2 min-w-0">
+                  <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Reject with reasons</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Select one or more issues. The employee gets email, WhatsApp, and a push
+                      notification with the next steps.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="grid grid-cols-12 gap-2"
+                  role="group"
+                  aria-label="Rejection reasons"
+                >
+                  {ONBOARDING_REJECTION_REASONS.map((reason) => {
+                    const selected = rejectionReasons.includes(reason.code);
+                    return (
+                      <button
+                        key={reason.code}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={selected}
+                        disabled={verifying}
+                        onClick={() => toggleRejectionReason(reason.code)}
+                        className={cn(
+                          "col-span-12 text-left rounded-xl border px-3.5 py-3 transition-colors",
+                          selected
+                            ? "border-destructive/50 bg-destructive/10 ring-1 ring-destructive/30"
+                            : "border-border/60 bg-background/60 hover:bg-muted/40"
+                        )}
+                      >
+                        <p className="text-sm font-medium text-foreground">{reason.label}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                          {reason.action}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedRejectReasons.length > 0 && (
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-12">
+                      <label
+                        htmlFor="onboarding-rejection-note"
+                        className="text-xs font-medium text-muted-foreground"
+                      >
+                        {rejectRequiresNote
+                          ? "Note for employee (required)"
+                          : "Optional note for employee"}
+                      </label>
+                      <Textarea
+                        id="onboarding-rejection-note"
+                        value={rejectionNote}
+                        maxLength={500}
+                        disabled={verifying}
+                        placeholder="e.g. Photo looks like someone else — please upload your own clear photo."
+                        className="mt-1.5 rounded-xl min-h-[72px] resize-y"
+                        onChange={(e) => setRejectionNote(e.target.value.slice(0, 500))}
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {rejectionNote.length}/500
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
           </div>
 
-          <DialogFooter className="border-t border-border/50 px-5 sm:px-6 py-4 gap-3 sm:justify-between flex-col sm:flex-row">
+          <DialogFooter className="border-t border-border/50 px-5 sm:px-6 py-4 gap-3 sm:justify-between flex-col sm:flex-row shrink-0">
             {!pendingDecision ? (
               <>
                 <Button
                   type="button"
                   variant="outline"
                   className="rounded-xl h-11 order-3 sm:order-1"
-                  disabled={verifying}
+                  disabled={verifying || hrSaving}
                   onClick={closeReview}
                 >
                   Close
@@ -868,7 +1648,7 @@ export function OnboardingProfileSection({
                     type="button"
                     variant="outline"
                     className="rounded-xl h-11 border-destructive/30 text-destructive hover:bg-destructive/10"
-                    disabled={verifying || verificationStatus === "rejected"}
+                    disabled={verifying || hrSaving || verificationStatus === "rejected"}
                     onClick={() => setPendingDecision("reject")}
                   >
                     <XCircle className="h-4 w-4 mr-2" />
@@ -877,7 +1657,7 @@ export function OnboardingProfileSection({
                   <Button
                     type="button"
                     className="rounded-xl h-11"
-                    disabled={verifying || verificationStatus === "verified"}
+                    disabled={verifying || hrSaving || verificationStatus === "verified"}
                     onClick={() => setPendingDecision("verify")}
                   >
                     <ShieldCheck className="h-4 w-4 mr-2" />
@@ -885,31 +1665,15 @@ export function OnboardingProfileSection({
                   </Button>
                 </div>
               </>
-            ) : (
-              <div
-                className={cn(
-                  "w-full rounded-xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3",
-                  pendingDecision === "verify"
-                    ? "border-emerald-500/30 bg-emerald-500/5"
-                    : "border-destructive/30 bg-destructive/5"
-                )}
-              >
+            ) : pendingDecision === "verify" ? (
+              <div className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-2 min-w-0">
-                  {pendingDecision === "verify" ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
-                  ) : (
-                    <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                  )}
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      {pendingDecision === "verify"
-                        ? "Confirm verification?"
-                        : "Confirm rejection?"}
-                    </p>
+                    <p className="text-sm font-medium">Confirm verification?</p>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      {pendingDecision === "verify"
-                        ? "Marks statutory and banking documents as verified for this employee."
-                        : "Employee will see a rejected banner until you verify later."}
+                      Saves employment details, then marks statutory and banking documents as
+                      verified.
                     </p>
                   </div>
                 </div>
@@ -918,7 +1682,7 @@ export function OnboardingProfileSection({
                     type="button"
                     variant="outline"
                     className="rounded-xl h-10"
-                    disabled={verifying}
+                    disabled={verifying || hrSaving}
                     onClick={() => setPendingDecision(null)}
                   >
                     Back
@@ -926,22 +1690,50 @@ export function OnboardingProfileSection({
                   <Button
                     type="button"
                     className="rounded-xl h-10"
-                    variant={pendingDecision === "reject" ? "destructive" : "default"}
-                    disabled={verifying}
-                    onClick={() => void runVerification(pendingDecision)}
+                    disabled={verifying || hrSaving}
+                    onClick={() => void runVerification("verify")}
                   >
-                    {verifying ? (
+                    {verifying || hrSaving ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         Saving…
                       </>
-                    ) : pendingDecision === "verify" ? (
-                      "Confirm verify"
                     ) : (
-                      "Confirm reject"
+                      "Confirm verify"
                     )}
                   </Button>
                 </div>
+              </div>
+            ) : (
+              <div className="w-full flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl h-10"
+                  disabled={verifying}
+                  onClick={() => {
+                    setPendingDecision(null);
+                    resetRejectForm();
+                  }}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  className="rounded-xl h-10"
+                  variant="destructive"
+                  disabled={verifying || !canConfirmReject}
+                  onClick={() => void runVerification("reject")}
+                >
+                  {verifying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Saving…
+                    </>
+                  ) : (
+                    "Confirm reject & notify"
+                  )}
+                </Button>
               </div>
             )}
           </DialogFooter>

@@ -89,6 +89,16 @@ interface UpdateUserData {
   role_id?: number;
   account_active?: boolean | number;
   joining_date?: string | null;
+  employee_code?: string | null;
+  job_title?: string | null;
+  job_level?: string | null;
+  department?: string | null;
+  reports_to_user_id?: string | null;
+  contract_type?: string | null;
+  offer_letter_issued?: boolean | number;
+  probation_end_date?: string | null;
+  employment_status?: "active" | "inactive" | string;
+  regenerate_employee_code?: boolean;
 }
 
 // Define the structure for user statistics

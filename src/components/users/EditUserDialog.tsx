@@ -24,17 +24,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { userService } from "@/services/userService";
 import { permissionService } from "@/services/permissionService";
 import { User, UserRole } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, RefreshCw } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
+
+const optionalDate = z
+  .string()
+  .optional()
+  .refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), {
+    message: "Date must be YYYY-MM-DD",
+  });
 
 const userFormSchema = z.object({
   username: z
@@ -46,12 +54,15 @@ const userFormSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
   role: z.string().min(1, { message: "Please select a role" }),
   phone: z.string().optional(),
-  joining_date: z
-    .string()
-    .optional()
-    .refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), {
-      message: "Joining date must be YYYY-MM-DD",
-    }),
+  joining_date: optionalDate,
+  employee_code: z.string().optional(),
+  job_title: z.string().max(200).optional(),
+  job_level: z.string().max(80).optional(),
+  department: z.string().max(150).optional(),
+  reports_to_user_id: z.string().optional(),
+  contract_type: z.string().optional(),
+  offer_letter_issued: z.boolean().optional(),
+  probation_end_date: optionalDate,
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -65,6 +76,25 @@ type EditUserDialogProps = {
 
 const fieldInputClass =
   "h-11 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl shadow-sm";
+
+const CONTRACT_OPTIONS = [
+  { value: "full_time", label: "Full-Time" },
+  { value: "remote", label: "Remote" },
+  { value: "part_time", label: "Part-Time" },
+  { value: "contract", label: "Contract" },
+  { value: "intern", label: "Intern" },
+  { value: "other", label: "Other" },
+] as const;
+
+const JOB_LEVEL_OPTIONS = [
+  "Founder",
+  "Head",
+  "Senior",
+  "Junior",
+  "Intern",
+  "Freelancer",
+  "Contract",
+] as const;
 
 function FormLabelDot({
   children,
@@ -110,6 +140,24 @@ function PhoneInput({
   );
 }
 
+function toFormValues(user: User): UserFormValues {
+  return {
+    username: user.username || "",
+    email: user.email,
+    role: user.role || "tester",
+    phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
+    joining_date: user.joining_date || "",
+    employee_code: user.employee_code || "",
+    job_title: user.job_title || "",
+    job_level: user.job_level || "",
+    department: user.department || "",
+    reports_to_user_id: user.reports_to_user_id || "",
+    contract_type: user.contract_type || "",
+    offer_letter_issued: Number(user.offer_letter_issued) === 1,
+    probation_end_date: user.probation_end_date || "",
+  };
+}
+
 export function EditUserDialog({
   user,
   onUserUpdate,
@@ -118,15 +166,16 @@ export function EditUserDialog({
 }: EditUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [roles, setRoles] = useState<{ id: number; role_name: string }[]>([]);
+  const [managerOptions, setManagerOptions] = useState<User[]>([]);
 
   useEffect(() => {
     const loadRoles = async () => {
       try {
         const data = await permissionService.getRoles();
         setRoles(data);
-      } catch (error) {
-        console.error("Failed to load roles:", error);
+      } catch {
         setRoles([
           { id: 1, role_name: "Admin" },
           { id: 2, role_name: "Developer" },
@@ -134,28 +183,29 @@ export function EditUserDialog({
         ]);
       }
     };
-    loadRoles();
+    void loadRoles();
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const loadManagers = async () => {
+      try {
+        const list = await userService.getUsers();
+        setManagerOptions(list.filter((u) => u.id !== user.id));
+      } catch {
+        setManagerOptions([]);
+      }
+    };
+    void loadManagers();
+  }, [open, user.id]);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
-    defaultValues: {
-      username: user.username || "",
-      email: user.email,
-      role: user.role || "tester",
-      phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
-      joining_date: user.joining_date || "",
-    },
+    defaultValues: toFormValues(user),
   });
 
   useEffect(() => {
-    form.reset({
-      username: user.username || "",
-      email: user.email,
-      role: user.role || "tester",
-      phone: user.phone ? user.phone.replace(/^\+91/, "") : "",
-      joining_date: user.joining_date || "",
-    });
+    form.reset(toFormValues(user));
   }, [user, form]);
 
   const isAdminEditor = String(loggedInUserRole || "").toLowerCase() === "admin";
@@ -176,6 +226,14 @@ export function EditUserDialog({
       };
       if (isAdminEditor) {
         payload.joining_date = data.joining_date?.trim() || null;
+        payload.employee_code = data.employee_code?.trim() || null;
+        payload.job_title = data.job_title?.trim() || null;
+        payload.job_level = data.job_level?.trim() || null;
+        payload.department = data.department?.trim() || null;
+        payload.reports_to_user_id = data.reports_to_user_id?.trim() || null;
+        payload.contract_type = data.contract_type?.trim() || null;
+        payload.offer_letter_issued = !!data.offer_letter_issued;
+        payload.probation_end_date = data.probation_end_date?.trim() || null;
       }
 
       const updatedUser = await userService.updateUser(user.id, payload);
@@ -201,13 +259,7 @@ export function EditUserDialog({
       setOpen(false);
     } catch (error: unknown) {
       let errorMessage = "Failed to update the user. Please try again.";
-      if (
-        error instanceof Error &&
-        (error.message.includes("Username already taken") ||
-          error.message.includes("Email already in use"))
-      ) {
-        errorMessage = error.message;
-      } else if (error instanceof Error && error.message) {
+      if (error instanceof Error && error.message) {
         errorMessage = error.message;
       }
 
@@ -221,6 +273,33 @@ export function EditUserDialog({
     }
   };
 
+  const handleRegenerateCode = async () => {
+    if (!isAdminEditor || regenerating || isSubmitting) return;
+    setRegenerating(true);
+    try {
+      const updatedUser = await userService.updateUser(user.id, {
+        regenerate_employee_code: true,
+      });
+      form.setValue("employee_code", updatedUser.employee_code || "");
+      onUserUpdate({ ...user, ...updatedUser });
+      toast({
+        title: "Employee ID regenerated",
+        description: updatedUser.employee_code || "Code updated",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "Could not regenerate",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Joining date and date of birth are required",
+        variant: "destructive",
+      });
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -231,7 +310,7 @@ export function EditUserDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-[min(96vw,520px)] max-w-none rounded-2xl p-0 gap-0 overflow-hidden">
+      <DialogContent className="w-[min(96vw,600px)] max-w-none rounded-2xl p-0 gap-0 overflow-hidden">
         <DialogHeader className="border-b border-gray-200/50 dark:border-gray-700/50 px-6 py-5 text-left">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
@@ -242,7 +321,7 @@ export function EditUserDialog({
                 Edit User
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Update account details for {user.username || user.name}.
+                Update account and employment details for {user.username || user.name}.
               </DialogDescription>
             </div>
           </div>
@@ -250,12 +329,12 @@ export function EditUserDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="max-h-[min(70vh,480px)] overflow-y-auto px-6 py-5 space-y-4">
+            <div className="max-h-[min(70vh,560px)] overflow-y-auto px-6 py-5 grid grid-cols-12 gap-4">
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
-                  <FormItem className="space-y-2">
+                  <FormItem className="col-span-12 space-y-2">
                     <FormLabelDot>Username</FormLabelDot>
                     <FormControl>
                       <Input placeholder="Enter username" {...field} className={fieldInputClass} />
@@ -269,7 +348,7 @@ export function EditUserDialog({
                 control={form.control}
                 name="email"
                 render={({ field }) => (
-                  <FormItem className="space-y-2">
+                  <FormItem className="col-span-12 space-y-2">
                     <FormLabelDot color="bg-indigo-500">Email</FormLabelDot>
                     <FormControl>
                       <Input
@@ -288,7 +367,7 @@ export function EditUserDialog({
                 control={form.control}
                 name="role"
                 render={({ field }) => (
-                  <FormItem className="space-y-2">
+                  <FormItem className="col-span-12 md:col-span-6 space-y-2">
                     <FormLabelDot color="bg-emerald-500">Role</FormLabelDot>
                     <Select
                       onValueChange={field.onChange}
@@ -317,7 +396,7 @@ export function EditUserDialog({
                 control={form.control}
                 name="phone"
                 render={({ field }) => (
-                  <FormItem className="space-y-2">
+                  <FormItem className="col-span-12 md:col-span-6 space-y-2">
                     <FormLabelDot color="bg-orange-500">Phone</FormLabelDot>
                     <FormControl>
                       <PhoneInput value={field.value} onChange={field.onChange} />
@@ -328,25 +407,240 @@ export function EditUserDialog({
               />
 
               {isAdminEditor ? (
-                <FormField
-                  control={form.control}
-                  name="joining_date"
-                  render={({ field }) => (
-                    <FormItem className="space-y-2">
-                      <FormLabelDot color="bg-teal-500">Joining date</FormLabelDot>
-                      <FormControl>
-                        <DatePicker
-                          value={field.value || ""}
-                          onChange={field.onChange}
-                          placeholder="Pick joining date"
-                          className={fieldInputClass}
-                          disableFuture
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <div className="col-span-12 pt-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Employment (HR)
+                    </p>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="joining_date"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                        <FormLabelDot color="bg-teal-500">Join date</FormLabelDot>
+                        <FormControl>
+                          <DatePicker
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            placeholder="Pick joining date"
+                            className={fieldInputClass}
+                            disableFuture
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="employee_code"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                        <FormLabelDot color="bg-sky-500">Employee ID</FormLabelDot>
+                        <div className="flex gap-2 min-w-0">
+                          <FormControl>
+                            <Input
+                              placeholder="CODO-XXXX-XXXX"
+                              {...field}
+                              className={cn(fieldInputClass, "font-mono text-sm")}
+                              maxLength={32}
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-11 rounded-xl shrink-0"
+                            disabled={regenerating || isSubmitting}
+                            onClick={() => void handleRegenerateCode()}
+                            title="Regenerate from join date + DOB"
+                          >
+                            {regenerating ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="job_title"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 space-y-2">
+                        <FormLabelDot>Job title</FormLabelDot>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g. Full Stack Developer"
+                            {...field}
+                            className={fieldInputClass}
+                            maxLength={200}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="job_level"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                        <FormLabelDot>Job level</FormLabelDot>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || undefined}
+                        >
+                          <FormControl>
+                            <SelectTrigger className={fieldInputClass}>
+                              <SelectValue placeholder="Select level" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent position="popper" className="z-[70]">
+                            {JOB_LEVEL_OPTIONS.map((level) => (
+                              <SelectItem key={level} value={level}>
+                                {level}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="department"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                        <FormLabelDot>Department</FormLabelDot>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g. CODO Agency - Development"
+                            {...field}
+                            className={fieldInputClass}
+                            maxLength={150}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="reports_to_user_id"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                        <FormLabelDot>Reports to</FormLabelDot>
+                        <Select
+                          onValueChange={(v) =>
+                            field.onChange(v === "__none__" ? "" : v)
+                          }
+                          value={field.value ? field.value : "__none__"}
+                        >
+                          <FormControl>
+                            <SelectTrigger className={fieldInputClass}>
+                              <SelectValue placeholder="Select manager" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent
+                            position="popper"
+                            className="z-[70] max-h-64"
+                            searchPlaceholder="Search manager..."
+                          >
+                            <SelectItem value="__none__">N/A</SelectItem>
+                            {managerOptions.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.username || m.name || m.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="contract_type"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                        <FormLabelDot>Contract type</FormLabelDot>
+                        <Select
+                          onValueChange={(v) =>
+                            field.onChange(v === "__none__" ? "" : v)
+                          }
+                          value={field.value ? field.value : "__none__"}
+                        >
+                          <FormControl>
+                            <SelectTrigger className={fieldInputClass}>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent position="popper" className="z-[70]">
+                            <SelectItem value="__none__">Not set</SelectItem>
+                            {CONTRACT_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="probation_end_date"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 md:col-span-6 space-y-2">
+                        <FormLabelDot>Probation end date</FormLabelDot>
+                        <FormControl>
+                          <DatePicker
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            placeholder="Optional / NILL"
+                            className={fieldInputClass}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="offer_letter_issued"
+                    render={({ field }) => (
+                      <FormItem className="col-span-12 flex items-center justify-between gap-4 rounded-xl border border-border/60 px-4 py-3">
+                        <div className="min-w-0">
+                          <FormLabelDot color="bg-violet-500">Offer letter</FormLabelDot>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Mark when the offer letter has been issued
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={!!field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </>
               ) : null}
             </div>
 
@@ -356,14 +650,14 @@ export function EditUserDialog({
                 variant="outline"
                 onClick={() => setOpen(false)}
                 disabled={isSubmitting}
-                className="h-11 px-6 border-gray-200 dark:border-gray-700"
+                className="h-11 px-6 border-gray-200 dark:border-gray-700 rounded-xl"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="h-11 px-8 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg"
+                className="h-11 px-8 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold shadow-lg"
               >
                 {isSubmitting ? (
                   <>

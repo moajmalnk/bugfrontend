@@ -23,6 +23,9 @@ export type OnboardingDraftForm = {
   contact_email: string;
   contact_email_verified: boolean;
   contact_email_verified_at: string | null;
+  date_of_birth: string;
+  gender: string;
+  marital_status: string;
   house_name_number: string;
   landmark: string;
   city: string;
@@ -199,6 +202,9 @@ export async function loadOnboardingDraft(
       contact_email: parsed.contact_email ?? "",
       contact_email_verified: !!parsed.contact_email_verified,
       contact_email_verified_at: parsed.contact_email_verified_at ?? null,
+      date_of_birth: parsed.date_of_birth ?? "",
+      gender: parsed.gender ?? "",
+      marital_status: parsed.marital_status ?? "",
       house_name_number: parsed.house_name_number ?? "",
       landmark: parsed.landmark ?? "",
       city: parsed.city ?? "",

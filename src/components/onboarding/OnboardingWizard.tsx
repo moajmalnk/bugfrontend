@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/DatePicker";
 import {
   Select,
   SelectContent,
@@ -506,6 +507,9 @@ export interface OnboardingFormState {
   contact_email: string;
   contact_email_verified: boolean;
   contact_email_verified_at: string | null;
+  date_of_birth: string;
+  gender: string;
+  marital_status: string;
   house_name_number: string;
   landmark: string;
   city: string;
@@ -542,6 +546,9 @@ const INITIAL: OnboardingFormState = {
   contact_email: "",
   contact_email_verified: false,
   contact_email_verified_at: null,
+  date_of_birth: "",
+  gender: "",
+  marital_status: "",
   house_name_number: "",
   landmark: "",
   city: "",
@@ -629,6 +636,9 @@ function mapDetailsToForm(
     contact_email_verified_at:
       details.contact_email_verified_at ||
       (mailVerified ? details.updated_at || details.created_at || null : null),
+    date_of_birth: String(details.date_of_birth || "").slice(0, 10),
+    gender: String(details.gender || "").toLowerCase(),
+    marital_status: String(details.marital_status || "").toLowerCase(),
     house_name_number: String(details.house_name_number || "").slice(0, 150),
     landmark: String(details.landmark || "").slice(0, 200),
     city: String(details.city || "").slice(0, 100),
@@ -882,7 +892,12 @@ export function OnboardingWizard({
       const urlSlug = searchParams.get("onboarding");
       const urlStep = slugToStep(urlSlug);
       if (draft) {
-        setForm(withProfileDefaults(draft.form));
+        setForm(
+          withProfileDefaults({
+            ...INITIAL,
+            ...draft.form,
+          } as OnboardingFormState)
+        );
         const nextStep = urlSlug ? urlStep : draft.step;
         setStep(nextStep);
         syncStepToUrl(nextStep, true);
@@ -1293,6 +1308,9 @@ export function OnboardingWizard({
       isValidContactEmail(form.contact_email) &&
       !mailConflictMsg &&
       form.contact_email_verified &&
+      !!form.date_of_birth &&
+      !!form.gender &&
+      !!form.marital_status &&
       form.house_name_number.trim() &&
       form.city.trim() &&
       form.pin_code.replace(/\D/g, "").length >= 6 &&
@@ -1363,6 +1381,9 @@ export function OnboardingWizard({
     if (!isValidContactEmail(form.contact_email)) return "Enter a valid contact email";
     if (mailConflictMsg) return mailConflictMsg;
     if (!form.contact_email_verified) return "Verify contact email with OTP";
+    if (!form.date_of_birth) return "Enter your date of birth";
+    if (!form.gender) return "Select your gender";
+    if (!form.marital_status) return "Select your marital status";
     if (!form.state.trim()) return "Select your state";
     if (!form.district.trim()) return "Select your district";
     if (!form.city.trim()) return "Enter your city";
@@ -1581,6 +1602,9 @@ export function OnboardingWizard({
       contact_email_verified_at: form.contact_email_verified
         ? form.contact_email_verified_at || new Date().toISOString()
         : null,
+      date_of_birth: form.date_of_birth,
+      gender: form.gender,
+      marital_status: form.marital_status,
       house_name_number: form.house_name_number,
       landmark: form.landmark,
       city: form.city,
@@ -2219,6 +2243,59 @@ export function OnboardingWizard({
                   </div>
                 </FieldShell>
 
+                <FieldShell label="Date of birth" required className="col-span-12 md:col-span-4">
+                  <DatePicker
+                    value={form.date_of_birth || ""}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        date_of_birth: (v || "").slice(0, 10),
+                      }))
+                    }
+                    placeholder="Pick date of birth"
+                    className={cn(fieldClass, "w-full")}
+                    disableFuture
+                    showToday={false}
+                    fromYear={new Date().getFullYear() - 100}
+                    toYear={new Date().getFullYear()}
+                  />
+                </FieldShell>
+
+                <FieldShell label="Gender" required className="col-span-12 md:col-span-4">
+                  <Select
+                    value={form.gender || undefined}
+                    onValueChange={(v) => setForm((p) => ({ ...p, gender: v }))}
+                  >
+                    <SelectTrigger className={cn(fieldClass, "w-full")}>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="rounded-xl z-[1100]">
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FieldShell>
+
+                <FieldShell label="Marital status" required className="col-span-12 md:col-span-4">
+                  <Select
+                    value={form.marital_status || undefined}
+                    onValueChange={(v) => setForm((p) => ({ ...p, marital_status: v }))}
+                  >
+                    <SelectTrigger className={cn(fieldClass, "w-full")}>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="rounded-xl z-[1100]">
+                      <SelectItem value="single">Single</SelectItem>
+                      <SelectItem value="married">Married</SelectItem>
+                      <SelectItem value="divorced">Divorced</SelectItem>
+                      <SelectItem value="widowed">Widowed</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FieldShell>
+
                 <FieldShell label="State" required className="md:col-span-4">
                   <Select value={form.state || undefined} onValueChange={handleStateChange}>
                     <SelectTrigger className={cn(fieldClass, "w-full")}>
@@ -2754,6 +2831,42 @@ export function OnboardingWizard({
                               ? `Verified on ${formatVerifiedAt(form.contact_email_verified_at)}`
                               : "Email OTP confirmed"
                             : "Email OTP still required"
+                        }
+                      />
+                    </div>
+                  </SummarySection>
+
+                  <SummarySection title="Personal">
+                    <div className="col-span-12 sm:col-span-4">
+                      <SummaryItem
+                        label="Date of birth"
+                        value={
+                          form.date_of_birth
+                            ? new Date(form.date_of_birth + "T00:00:00").toLocaleDateString(
+                                undefined,
+                                { day: "2-digit", month: "short", year: "numeric" }
+                              )
+                            : "—"
+                        }
+                      />
+                    </div>
+                    <div className="col-span-12 sm:col-span-4">
+                      <SummaryItem
+                        label="Gender"
+                        value={
+                          form.gender
+                            ? form.gender.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+                            : "—"
+                        }
+                      />
+                    </div>
+                    <div className="col-span-12 sm:col-span-4">
+                      <SummaryItem
+                        label="Marital status"
+                        value={
+                          form.marital_status
+                            ? form.marital_status.replace(/\b\w/g, (c) => c.toUpperCase())
+                            : "—"
                         }
                       />
                     </div>

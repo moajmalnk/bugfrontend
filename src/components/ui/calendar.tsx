@@ -98,7 +98,7 @@ function CalendarCaption({ displayMonth }: CaptionProps) {
             side="bottom"
             sideOffset={6}
             collisionPadding={12}
-            className="z-[220] w-[min(16rem,calc(100vw-2rem))] p-2 rounded-2xl"
+            className="z-[1200] w-[min(16rem,calc(100vw-2rem))] p-2 rounded-2xl"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <div className="grid grid-cols-3 gap-1.5">
@@ -141,7 +141,7 @@ function CalendarCaption({ displayMonth }: CaptionProps) {
             side="bottom"
             sideOffset={6}
             collisionPadding={12}
-            className="z-[220] w-[min(16rem,calc(100vw-2rem))] p-2 rounded-2xl"
+            className="z-[1200] w-[min(16rem,calc(100vw-2rem))] p-2 rounded-2xl"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <div

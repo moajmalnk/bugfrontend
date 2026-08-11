@@ -58,6 +58,11 @@ type CommonProps = {
   disabled?: boolean;
   /** date-fns format for the closed trigger label (single mode). Default: d MMM yyyy */
   displayFormat?: string;
+  /** Inclusive year bounds for month/year caption dropdowns */
+  fromYear?: number;
+  toYear?: number;
+  /** Footer “Today” shortcut. Hide for DOB-style fields. Default true. */
+  showToday?: boolean;
 };
 
 type SingleProps = CommonProps & {
@@ -105,9 +110,16 @@ export function DatePicker(props: Props) {
     allowOnlyTodayAndYesterday,
     disabled = false,
     displayFormat = 'd MMM yyyy',
+    fromYear,
+    toYear,
+    showToday = true,
   } = props;
   const isMultiple = props.mode === 'multiple';
   const [open, setOpen] = useState(false);
+
+  const yearNow = new Date().getFullYear();
+  const calendarFromYear = fromYear ?? yearNow - 15;
+  const calendarToYear = toYear ?? yearNow + 15;
 
   const multiValues = isMultiple ? props.values : undefined;
   const singleValue = !isMultiple ? props.value : undefined;
@@ -198,7 +210,7 @@ export function DatePicker(props: Props) {
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-auto p-0 max-w-[min(100vw-1.5rem,300px)] overflow-hidden z-[200] rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg"
+        className="w-auto p-0 max-w-[min(100vw-1.5rem,300px)] overflow-hidden z-[1100] rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg"
         align="start"
         side="bottom"
         alignOffset={0}
@@ -218,6 +230,8 @@ export function DatePicker(props: Props) {
               props.onChange(next);
             }}
             disabled={disabledDays}
+            fromYear={calendarFromYear}
+            toYear={calendarToYear}
             initialFocus
           />
         ) : (
@@ -232,6 +246,8 @@ export function DatePicker(props: Props) {
               setOpen(false);
             }}
             disabled={disabledDays}
+            fromYear={calendarFromYear}
+            toYear={calendarToYear}
             initialFocus
           />
         )}
@@ -273,26 +289,28 @@ export function DatePicker(props: Props) {
               Clear
             </Button>
             <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-blue-600 dark:text-blue-400"
-                onClick={() => {
-                  const iso = toYMD(new Date());
-                  setDisplayMonth(new Date());
-                  if (isMultiple) {
-                    const set = new Set(props.values ?? []);
-                    set.add(iso);
-                    props.onChange([...set].sort());
-                  } else {
-                    props.onChange(iso);
-                    setOpen(false);
-                  }
-                }}
-              >
-                Today
-              </Button>
+              {showToday ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-blue-600 dark:text-blue-400"
+                  onClick={() => {
+                    const iso = toYMD(new Date());
+                    setDisplayMonth(new Date());
+                    if (isMultiple) {
+                      const set = new Set(props.values ?? []);
+                      set.add(iso);
+                      props.onChange([...set].sort());
+                    } else {
+                      props.onChange(iso);
+                      setOpen(false);
+                    }
+                  }}
+                >
+                  Today
+                </Button>
+              ) : null}
               {isMultiple ? (
                 <Button
                   type="button"

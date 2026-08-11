@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { getOnboardingRejectionLabel } from "@/lib/onboardingRejectionReasons";
 import { userRequiresOnboarding } from "@/lib/utils";
 import { Clock3, ShieldCheck, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -47,6 +48,12 @@ export default function OnboardingVerificationBanner() {
   }
 
   if (status === "rejected") {
+    const reasonLabel =
+      getOnboardingRejectionLabel(currentUser.onboarding_rejection_reason) ||
+      null;
+    const nextStep = (currentUser.onboarding_rejection_action || "").trim();
+    const note = (currentUser.onboarding_rejection_note || "").trim();
+
     return (
       <div className="border-b border-destructive/25 bg-destructive/10">
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
@@ -56,11 +63,20 @@ export default function OnboardingVerificationBanner() {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-destructive">
               Verification rejected
+              {reasonLabel ? ` · ${reasonLabel}` : ""}
             </p>
             <p className="text-xs text-destructive/80">
-              Please contact your admin to re-check your onboarding documents.
+              {nextStep ||
+                "Please update your details from Profile and ask your admin to re-check."}
+              {note ? ` Note: ${note}` : ""}
             </p>
           </div>
+          <Link
+            to={`/${currentUser.role}/profile`}
+            className="text-xs font-medium text-destructive underline underline-offset-2 shrink-0"
+          >
+            Open profile
+          </Link>
         </div>
       </div>
     );
