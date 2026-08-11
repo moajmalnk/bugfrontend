@@ -109,9 +109,17 @@ export function EditOwnProfileDialog({
 
     setSubmitting(true);
     try {
+      const trimmedUsername = username.trim();
+      const currentPhoneDigits = (user.phone || "")
+        .replace(/^\+91/, "")
+        .replace(/\D/g, "")
+        .slice(0, 10);
+      const usernameChanged = trimmedUsername !== (user.username || "").trim();
+      const phoneChanged = phoneDigits !== currentPhoneDigits;
+
       const updated = await userService.updateOwnProfile({
-        username: username.trim(),
-        phone: phoneDigits ? `+91${phoneDigits}` : "",
+        ...(usernameChanged ? { username: trimmedUsername } : {}),
+        ...(phoneChanged ? { phone: phoneDigits ? `+91${phoneDigits}` : "" } : {}),
         profile_photo: profilePhoto,
       });
       onUpdated(updated);
