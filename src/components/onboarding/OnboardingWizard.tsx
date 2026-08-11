@@ -1349,6 +1349,36 @@ export function OnboardingWizard({
 
   const canNext = [!!step1Valid, step2Valid, step3Valid, true, step5Valid][step];
 
+  /** Why: Users need a clear reason when Continue stays disabled on long address forms. */
+  const nextBlockedHint = useMemo(() => {
+    if (canNext || step !== 0) return null;
+    if (!(form.profile_photo || (editMode && existingAvatarUrl))) {
+      return "Upload a profile photo to continue";
+    }
+    if (form.emergency_contact.replace(/\D/g, "").length < 10) {
+      return "Enter a 10-digit emergency WhatsApp number";
+    }
+    if (emgConflictMsg) return emgConflictMsg;
+    if (!form.emergency_contact_verified) return "Verify emergency WhatsApp with OTP";
+    if (!isValidContactEmail(form.contact_email)) return "Enter a valid contact email";
+    if (mailConflictMsg) return mailConflictMsg;
+    if (!form.contact_email_verified) return "Verify contact email with OTP";
+    if (!form.state.trim()) return "Select your state";
+    if (!form.district.trim()) return "Select your district";
+    if (!form.city.trim()) return "Enter your city";
+    if (!form.house_name_number.trim()) return "Enter house name / number";
+    if (form.pin_code.replace(/\D/g, "").length < 6) return "Enter a 6-digit PIN code";
+    return "Complete all required address fields";
+  }, [
+    canNext,
+    step,
+    form,
+    editMode,
+    existingAvatarUrl,
+    emgConflictMsg,
+    mailConflictMsg,
+  ]);
+
   const handleStateChange = (state: string) => {
     setForm((prev) => {
       const nextDistricts = districtsForState(state);
@@ -1717,7 +1747,7 @@ export function OnboardingWizard({
       >
         <DialogContent
           showCloseButton={false}
-          className="max-w-[980px] w-[calc(100vw-1.25rem)] max-h-[92vh] overflow-hidden rounded-2xl p-0 gap-0 border-border/50 shadow-2xl bg-background z-[1000]"
+          className="max-w-[980px] w-[calc(100vw-0.75rem)] sm:w-[calc(100vw-1.25rem)] max-h-[min(92dvh,920px)] overflow-hidden rounded-2xl p-0 gap-0 border-border/50 shadow-2xl bg-background z-[1000] !flex flex-col"
           overlayClassName="z-[1000]"
           onInteractOutside={(e) => {
             // Select/Popover portals render outside Dialog — don't treat as dismiss.
@@ -1736,27 +1766,27 @@ export function OnboardingWizard({
             if (!editMode) e.preventDefault();
           }}
         >
-          <DialogHeader className="relative px-6 sm:px-8 pt-6 sm:pt-7 pb-5 border-b border-border/50 text-left space-y-0 overflow-hidden">
+          <DialogHeader className="relative shrink-0 px-4 sm:px-8 pt-4 sm:pt-7 pb-3 sm:pb-5 border-b border-border/50 text-left space-y-0 overflow-hidden">
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-transparent" />
-            <div className="relative space-y-5">
+            <div className="relative space-y-3 sm:space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1.5 min-w-0">
+                <div className="space-y-1 min-w-0">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-medium">
                     {editMode ? "Update employee records" : "Employee onboarding"}
                   </p>
-                  <DialogTitle className="text-2xl sm:text-[1.75rem] font-semibold tracking-tight text-foreground">
+                  <DialogTitle className="text-xl sm:text-[1.75rem] font-semibold tracking-tight text-foreground">
                     {editMode ? "Edit onboarding details" : "Set up your workspace"}
                   </DialogTitle>
-                  <DialogDescription className="text-sm text-muted-foreground max-w-xl leading-relaxed">
+                  <DialogDescription className="text-sm text-muted-foreground max-w-xl leading-relaxed hidden sm:block">
                     {editMode
                       ? "Update address, documents, banking, and permissions. Saving sends your profile back for HR verification."
                       : "A short guided setup for address, documents, banking, and permissions. Required before you can enter BugRicer."}
                   </DialogDescription>
                 </div>
                 <div className="flex items-start gap-2 shrink-0">
-                  <div className="rounded-2xl border border-border/60 bg-background/70 px-3.5 py-2 text-right">
+                  <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-1.5 sm:px-3.5 sm:py-2 text-right">
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Step</p>
-                    <p className="text-lg font-semibold tabular-nums text-foreground">
+                    <p className="text-base sm:text-lg font-semibold tabular-nums text-foreground">
                       {step + 1}
                       <span className="text-muted-foreground font-normal text-sm"> / {STEPS.length}</span>
                     </p>
@@ -1776,12 +1806,12 @@ export function OnboardingWizard({
                   ) : null}
                 </div>
               </div>
-              <div className="grid grid-cols-5 gap-2 sm:gap-3">
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
                 {STEPS.map((item, i) => {
                   const done = i < step;
                   const active = i === step;
                   return (
-                    <div key={item.label} className="min-w-0 flex flex-col gap-2">
+                    <div key={item.label} className="min-w-0 flex flex-col gap-1.5 sm:gap-2">
                       <div
                         className={cn(
                           "h-1.5 rounded-full transition-colors",
@@ -1825,7 +1855,7 @@ export function OnboardingWizard({
             </div>
           </DialogHeader>
 
-          <div className="px-6 sm:px-8 py-5 sm:py-6 overflow-y-auto max-h-[min(56vh,540px)] scrollbar-thin">
+          <div className="px-4 sm:px-8 py-4 sm:py-6 overflow-y-auto flex-1 min-h-0 scrollbar-thin overscroll-contain">
             {step === 0 && (
               <div className="grid grid-cols-12 gap-x-5 gap-y-5">
                 <div className="col-span-12 mb-1">
@@ -3142,61 +3172,68 @@ export function OnboardingWizard({
             )}
           </div>
 
-          <div className="px-6 sm:px-8 py-4 border-t border-border/50 bg-muted/20 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              {editMode ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="rounded-xl h-10 px-4"
-                  disabled={loading}
-                  onClick={closeWizard}
-                >
-                  Cancel
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="ghost"
-                className="rounded-xl h-10 px-4"
-                disabled={step === 0 || loading}
-                onClick={() => void goToStep(step - 1)}
-              >
-                Back
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <p className="hidden sm:block text-xs text-muted-foreground mr-1">
-                {STEPS[step].label} · {STEPS[step].short}
+          <div className="shrink-0 px-4 sm:px-8 py-3 sm:py-4 border-t border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 flex flex-col gap-2 sm:gap-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {nextBlockedHint ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400 order-first sm:order-none">
+                {nextBlockedHint}
               </p>
-              {step < 4 ? (
+            ) : null}
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+              <div className="flex items-center gap-2">
+                {editMode ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="rounded-xl h-11 px-4 flex-1 sm:flex-none"
+                    disabled={loading}
+                    onClick={closeWizard}
+                  >
+                    Cancel
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
-                  className="rounded-xl h-10 min-w-[110px]"
-                  disabled={!canNext}
-                  onClick={() => void goToStep(step + 1)}
+                  variant="outline"
+                  className="rounded-xl h-11 px-4 flex-1 sm:flex-none"
+                  disabled={step === 0 || loading}
+                  onClick={() => void goToStep(step - 1)}
                 >
-                  Continue
+                  Back
                 </Button>
-              ) : (
-                <Button
-                  type="button"
-                  className="rounded-xl h-10 min-w-[180px]"
-                  disabled={!canNext || loading}
-                  onClick={handleFinalize}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      {editMode ? "Saving…" : "Finalizing…"}
-                    </>
-                  ) : editMode ? (
-                    "Save changes"
-                  ) : (
-                    "Finalize & enter BugRicer"
-                  )}
-                </Button>
-              )}
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <p className="hidden md:block text-xs text-muted-foreground mr-1 shrink-0">
+                  {STEPS[step].label}
+                </p>
+                {step < 4 ? (
+                  <Button
+                    type="button"
+                    className="rounded-xl h-11 min-w-0 flex-1 sm:min-w-[140px] sm:flex-none text-base font-semibold shadow-md"
+                    disabled={!canNext}
+                    onClick={() => void goToStep(step + 1)}
+                  >
+                    Next
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    className="rounded-xl h-11 min-w-0 flex-1 sm:min-w-[180px] sm:flex-none text-base font-semibold shadow-md"
+                    disabled={!canNext || loading}
+                    onClick={handleFinalize}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        {editMode ? "Saving…" : "Finalizing…"}
+                      </>
+                    ) : editMode ? (
+                      "Save changes"
+                    ) : (
+                      "Finish & enter"
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>
