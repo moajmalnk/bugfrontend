@@ -456,6 +456,54 @@ class UserService {
     throw new Error("Backend did not return updated user data");
   }
 
+  async updateOwnProfile(payload: {
+    username?: string;
+    phone?: string;
+    profile_photo?: File | null;
+  }): Promise<User> {
+    const fd = new FormData();
+    if (payload.username !== undefined) {
+      fd.append('username', payload.username);
+    }
+    if (payload.phone !== undefined) {
+      fd.append('phone', payload.phone);
+    }
+    if (payload.profile_photo) {
+      fd.append('profile_photo', payload.profile_photo);
+    }
+
+    const response = await fetch(`${ENV.API_URL}/users/update_own_profile.php`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: fd,
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success || !result.data) {
+      throw new Error(result.message || 'Failed to update profile');
+    }
+
+    const updatedUser = result.data;
+    return {
+      ...updatedUser,
+      id: updatedUser.id,
+      username: updatedUser.username || '',
+      email: updatedUser.email || '',
+      phone: updatedUser.phone || '',
+      role: updatedUser.role || 'user',
+      role_id: updatedUser.role_id ?? null,
+      name: updatedUser.name || updatedUser.username || '',
+      avatar: this.resolveUserAvatar(
+        updatedUser.avatar,
+        updatedUser.name || updatedUser.username || '',
+        (updatedUser.role || 'user') as UserRole
+      ),
+      created_at: updatedUser.created_at,
+      joining_date: updatedUser.joining_date ?? null,
+    };
+  }
+
   async getUserStats(userId: string): Promise<UserStats> {
     // Assuming an API endpoint like /users/stats.php that accepts a user ID
     const response = await this.fetchWithAuth(`${this.baseUrl}/stats.php?id=${userId}`);

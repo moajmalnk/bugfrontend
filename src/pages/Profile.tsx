@@ -18,6 +18,7 @@ import { UserProjectPortfolio } from "@/components/users/UserProjectPortfolio";
 import { UserWorkStats } from "@/components/users/UserWorkStats";
 import { ActiveHours } from "@/components/users/ActiveHours";
 import { UserLeaveDetails } from "@/components/users/UserLeaveDetails";
+import { EditOwnProfileDialog } from "@/components/profile/EditOwnProfileDialog";
 import { OnboardingProfileSection } from "@/components/onboarding/OnboardingProfileSection";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { OnboardingVerificationBadge } from "@/components/onboarding/OnboardingVerificationBanner";
@@ -215,6 +216,7 @@ export default function Profile() {
   const [showDisconnectGoogleDialog, setShowDisconnectGoogleDialog] = useState(false);
   const [isDisconnectingGoogle, setIsDisconnectingGoogle] = useState(false);
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
+  const [editBasicOpen, setEditBasicOpen] = useState(false);
 
   /**
    * Why: Edit-onboarding is URL-driven (`?onboarding=address|…|legal`) so refresh
@@ -222,6 +224,9 @@ export default function Profile() {
    */
   const onboardingSlug = searchParams.get("onboarding");
   const canUseOnboarding = userRequiresOnboarding(currentUser);
+  const canEditViaOnboarding =
+    canUseOnboarding && Number(currentUser?.onboarding_completed ?? 0) === 1;
+  const canEditBasicProfile = !canUseOnboarding;
   const editOnboardingOpen =
     canUseOnboarding &&
     Number(currentUser?.onboarding_completed ?? 0) === 1 &&
@@ -412,6 +417,14 @@ export default function Profile() {
       setEditOnboardingOpen(false);
     },
     [currentUser, updateCurrentUser, queryClient]
+  );
+
+  const handleBasicProfileUpdated = useCallback(
+    (updated: NonNullable<typeof currentUser>) => {
+      updateCurrentUser(updated);
+      void queryClient.invalidateQueries({ queryKey: ["userStats", updated.id] });
+    },
+    [updateCurrentUser, queryClient]
   );
 
   const validateEmail = (email: string) => {
@@ -744,10 +757,14 @@ export default function Profile() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row lg:flex-col items-stretch gap-2 shrink-0 w-full sm:w-auto lg:min-w-[160px]">
-                  {canUseOnboarding ? (
+                  {canEditViaOnboarding || canEditBasicProfile ? (
                     <Button
                       className="h-11 rounded-xl px-5 font-medium shadow-sm"
-                      onClick={() => setEditOnboardingOpen(true)}
+                      onClick={() =>
+                        canEditViaOnboarding
+                          ? setEditOnboardingOpen(true)
+                          : setEditBasicOpen(true)
+                      }
                     >
                       <User className="w-4 h-4 mr-2" />
                       Edit profile
@@ -891,6 +908,13 @@ export default function Profile() {
           mustSetPassword={false}
           onOpenChange={setEditOnboardingOpen}
           onCompleted={handleOnboardingEditCompleted}
+        />
+
+        <EditOwnProfileDialog
+          open={editBasicOpen}
+          onOpenChange={setEditBasicOpen}
+          user={currentUser}
+          onUpdated={handleBasicProfileUpdated}
         />
 
         {/* Password Reset Confirmation Modal */}
