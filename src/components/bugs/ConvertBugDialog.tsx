@@ -101,19 +101,34 @@ export function ConvertBugDialog({
     staleTime: 60_000,
   });
 
+  const accessibleProjects = useMemo(() => {
+    const all = projects as Project[];
+    if (currentUser?.role === "admin") {
+      return all;
+    }
+    const userId = String(currentUser?.id || "");
+    if (!userId) {
+      return all;
+    }
+    return all.filter((project) => {
+      const members = Array.isArray(project.members) ? project.members : [];
+      return members.some((memberId) => String(memberId) === userId);
+    });
+  }, [projects, currentUser?.id, currentUser?.role]);
+
   const moveProjects = useMemo(
     () =>
       sortProjectsForPicker(
-        (projects as Project[]).filter(
+        accessibleProjects.filter(
           (p) => String(p.id) !== String(bug.project_id)
         )
       ),
-    [projects, bug.project_id]
+    [accessibleProjects, bug.project_id]
   );
 
   const typeProjects = useMemo(
-    () => sortProjectsForPicker(projects as Project[]),
-    [projects]
+    () => sortProjectsForPicker(accessibleProjects),
+    [accessibleProjects]
   );
 
   const projectList = mode === "move" ? moveProjects : typeProjects;
