@@ -723,11 +723,14 @@ export function OnboardingWizard({
   const [emgOtpBusy, setEmgOtpBusy] = useState(false);
   const [emgVerifyBusy, setEmgVerifyBusy] = useState(false);
   const [emgCooldown, setEmgCooldown] = useState(0);
+  // Why: Own account email/phone are allowed; API sets these when another user owns the value.
+  const [emgConflictMsg, setEmgConflictMsg] = useState<string | null>(null);
   const [mailOtpSent, setMailOtpSent] = useState(false);
   const [mailOtp, setMailOtp] = useState("");
   const [mailOtpBusy, setMailOtpBusy] = useState(false);
   const [mailVerifyBusy, setMailVerifyBusy] = useState(false);
   const [mailCooldown, setMailCooldown] = useState(0);
+  const [mailConflictMsg, setMailConflictMsg] = useState<string | null>(null);
   /** Why: Remember last OTP-verified values so edit mode only re-prompts OTP after a change. */
   const [verifiedEmgBaseline, setVerifiedEmgBaseline] = useState<string | null>(null);
   const [verifiedEmgBaselineAt, setVerifiedEmgBaselineAt] = useState<string | null>(null);
@@ -800,6 +803,12 @@ export function OnboardingWizard({
     setVerifiedEmgBaselineAt(null);
     setVerifiedMailBaseline(null);
     setVerifiedMailBaselineAt(null);
+    setEmgConflictMsg(null);
+    setMailConflictMsg(null);
+    setEmgOtpSent(false);
+    setEmgOtp("");
+    setMailOtpSent(false);
+    setMailOtp("");
     setHydrated(false);
     let cancelled = false;
     (async () => {
@@ -813,6 +822,9 @@ export function OnboardingWizard({
         contact_email:
           base.contact_email.trim() ||
           employeeEmail.trim().toLowerCase().slice(0, 150),
+        emergency_contact:
+          base.emergency_contact.replace(/\D/g, "").slice(-10) ||
+          employeePhone.replace(/\D/g, "").slice(-10),
       });
 
       if (editMode) {
@@ -1133,11 +1145,6 @@ export function OnboardingWizard({
   const isValidContactEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
-  // Why: Own account email/phone are allowed; conflicts come from the API when
-  // another user already owns the value.
-  const [emgConflictMsg, setEmgConflictMsg] = useState<string | null>(null);
-  const [mailConflictMsg, setMailConflictMsg] = useState<string | null>(null);
-
   const sendEmergencyOtp = async () => {
     const digits = form.emergency_contact.replace(/\D/g, "");
     if (
@@ -1281,8 +1288,10 @@ export function OnboardingWizard({
     return (
       hasPhoto &&
       form.emergency_contact.replace(/\D/g, "").length >= 10 &&
+      !emgConflictMsg &&
       form.emergency_contact_verified &&
       isValidContactEmail(form.contact_email) &&
+      !mailConflictMsg &&
       form.contact_email_verified &&
       form.house_name_number.trim() &&
       form.city.trim() &&
@@ -1290,7 +1299,7 @@ export function OnboardingWizard({
       form.district.trim() &&
       form.state.trim()
     );
-  }, [form, editMode, existingAvatarUrl]);
+  }, [form, editMode, existingAvatarUrl, emgConflictMsg, mailConflictMsg]);
 
   const step2Valid = useMemo(() => {
     const hasAadhaar = !!form.aadhaar_file || (editMode && hasExistingAadhaar);
@@ -1971,6 +1980,7 @@ export function OnboardingWizard({
                         className="rounded-xl h-11 w-full sm:w-auto sm:self-start"
                         disabled={
                           form.emergency_contact.replace(/\D/g, "").length < 10 ||
+                          !!emgConflictMsg ||
                           emgOtpBusy
                         }
                         onClick={() => void sendEmergencyOtp()}
@@ -2030,7 +2040,7 @@ export function OnboardingWizard({
 
                     {!form.emergency_contact_verified && !emgOtpSent ? (
                       <p className="text-[11px] text-muted-foreground">
-                        Must be WhatsApp-enabled and not already on BugRicer — verify with OTP to continue
+                        Must be WhatsApp-enabled — your own number is fine; another employee’s is not
                       </p>
                     ) : null}
                   </div>
@@ -2044,7 +2054,7 @@ export function OnboardingWizard({
                           fieldClass,
                           "w-full",
                           form.contact_email_verified && "pr-10 border-emerald-500/50",
-                          contactEmailConflict && "border-destructive/60"
+                          mailConflictMsg && "border-destructive/60"
                         )}
                         type="email"
                         maxLength={150}
@@ -2056,6 +2066,7 @@ export function OnboardingWizard({
                           const matchesBaseline =
                             verifiedMailBaseline != null &&
                             normalized === verifiedMailBaseline;
+                          setMailConflictMsg(null);
                           setForm((prev) => ({
                             ...prev,
                             contact_email: next,
@@ -2074,8 +2085,8 @@ export function OnboardingWizard({
                         <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
                       ) : null}
                     </div>
-                    {contactEmailConflict ? (
-                      <p className="text-xs text-destructive">{contactEmailConflict}</p>
+                    {mailConflictMsg ? (
+                      <p className="text-xs text-destructive">{mailConflictMsg}</p>
                     ) : null}
 
                     {form.contact_email_verified ? (
@@ -2102,7 +2113,7 @@ export function OnboardingWizard({
                         className="rounded-xl h-11 w-full sm:w-auto sm:self-start"
                         disabled={
                           !isValidContactEmail(form.contact_email) ||
-                          !!contactEmailConflict ||
+                          !!mailConflictMsg ||
                           mailOtpBusy
                         }
                         onClick={() => void sendContactEmailOtp()}
@@ -2162,7 +2173,7 @@ export function OnboardingWizard({
 
                     {!form.contact_email_verified && !mailOtpSent ? (
                       <p className="text-[11px] text-muted-foreground">
-                        Use an email not already on BugRicer — verify via OTP to continue
+                        Use your email or another personal address — not one already used by another employee
                       </p>
                     ) : null}
                   </div>
